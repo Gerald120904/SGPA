@@ -1,0 +1,66 @@
+/* =========================================================
+   RESET / BASE
+   ========================================================= */
+
+:root {
+  font-family:
+    Inter,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+
+  color: #182235;
+  background: #f5f7fa;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+* {
+  box-sizing: border-box;
+}
+
+
+html,
+body {
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+
+  margin: 0;
+  padding: 0;
+}
+
+
+body {
+  min-height: 100vh;
+
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      135deg,
+      #f8f9fb 0%,
+      #f3f5f8 100%
+    );
+}
+
+
+button,
+input {
+  font: inherit;
+}
+
+
+button {
+  border: 0;
+}
+
+
+.hidden {
+  display: none !important;
+}

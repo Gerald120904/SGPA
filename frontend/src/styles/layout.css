@@ -1,0 +1,496 @@
+/* =========================================================
+   APP
+   ========================================================= */
+
+.app-shell {
+  width: 100%;
+  height: 100vh;
+
+  display: grid;
+  grid-template-columns: 245px 1fr;
+
+  background: #f5f7fa;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+
+  border-right: 1px solid #e9edf3;
+}
+
+
+.sidebar-header {
+  height: 78px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 24px;
+
+  border-bottom: 1px solid #eef1f5;
+}
+
+
+.sidebar-logo {
+  display: block;
+
+  width: 135px;
+  height: auto;
+
+  user-select: none;
+}
+
+
+.sidebar-context {
+  padding: 21px 24px 18px;
+}
+
+
+.sidebar-context-label {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 700;
+
+  letter-spacing: 0.8px;
+
+  text-transform: uppercase;
+}
+
+
+.sidebar-context strong {
+  display: block;
+
+  color: #182235;
+
+  font-size: 18px;
+  font-weight: 700;
+}
+
+
+.sidebar-context small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+}
+
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+
+.sidebar-nav {
+  flex: 1;
+
+  min-height: 0;
+
+  padding: 4px 14px 20px;
+
+  overflow-y: auto;
+}
+
+
+.nav-section-title {
+  margin: 20px 10px 8px;
+
+  color: #98a2b3;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+}
+
+
+.nav-item {
+  width: 100%;
+  min-height: 42px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  margin-bottom: 3px;
+
+  padding: 0 12px;
+
+  border-radius: 9px;
+
+  background: transparent;
+
+  color: #526174;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.nav-item svg {
+  flex: 0 0 auto;
+
+  width: 17px;
+  height: 17px;
+
+  stroke-width: 1.8;
+}
+
+
+.nav-item:hover {
+  background: #f4f7fb;
+
+  color: #253347;
+}
+
+
+.nav-item.active {
+  background: #edf4ff;
+
+  color: #1769e8;
+
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   USUARIO SIDEBAR
+   ========================================================= */
+
+.sidebar-footer {
+  min-height: 74px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding: 14px 16px;
+
+  border-top: 1px solid #edf0f4;
+}
+
+
+.sidebar-user {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+.sidebar-user-info {
+  min-width: 0;
+}
+
+
+.sidebar-user-info strong,
+.sidebar-user-info span {
+  display: block;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.sidebar-user-info strong {
+  color: #273447;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.sidebar-user-info span {
+  margin-top: 2px;
+
+  color: #8b96a7;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   AVATARES
+   ========================================================= */
+
+.user-avatar,
+.topbar-avatar {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #eaf2ff;
+
+  color: #1769e8;
+
+  font-weight: 700;
+}
+
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+
+  font-size: 12px;
+}
+
+
+.topbar-avatar {
+  width: 36px;
+  height: 36px;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.logout-button {
+  flex: 0 0 auto;
+
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #7b8798;
+
+  cursor: pointer;
+}
+
+
+.logout-button:hover {
+  background: #fff1f1;
+
+  color: #c62828;
+}
+
+
+.logout-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+
+/* =========================================================
+   CONTENIDO
+   ========================================================= */
+
+.app-main {
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   TOPBAR
+   ========================================================= */
+
+.topbar {
+  height: 78px;
+
+  flex: 0 0 78px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  padding: 0 32px;
+
+  background: #ffffff;
+
+  border-bottom: 1px solid #e9edf3;
+}
+
+
+.topbar-kicker {
+  margin: 0 0 2px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+
+.topbar h1 {
+  margin: 0;
+
+  color: #182235;
+
+  font-size: 20px;
+  font-weight: 680;
+}
+
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+.topbar-user-text {
+  text-align: right;
+}
+
+
+.topbar-user-text strong,
+.topbar-user-text span {
+  display: block;
+}
+
+
+.topbar-user-text strong {
+  color: #344054;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.topbar-user-text span {
+  margin-top: 2px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   ÁREA CONTENIDO
+   ========================================================= */
+
+.content-area {
+  flex: 1;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding: 28px 32px 36px;
+
+  overflow-y: auto;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+  .app-shell {
+    grid-template-columns: 215px 1fr;
+  }
+
+  .content-area {
+    padding: 24px 24px 32px;
+  }
+
+  .topbar {
+    padding: 0 24px;
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  .app-shell {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .sidebar-header,
+  .sidebar-context,
+  .nav-section-title,
+  .nav-item span,
+  .sidebar-user-info {
+    display: none;
+  }
+
+  .sidebar-nav {
+    padding: 14px 10px;
+  }
+
+  .nav-item {
+    justify-content: center;
+
+    padding: 0;
+  }
+
+  .sidebar-footer {
+    flex-direction: column;
+
+    padding: 12px 8px;
+  }
+
+  .content-area {
+    padding: 18px;
+  }
+
+}
+
+
+@media (max-width: 560px) {
+
+  .topbar-user-text {
+    display: none;
+  }
+
+}
