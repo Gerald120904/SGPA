@@ -49,9 +49,7 @@ let detenerObservadorRutas =
 
 
 /* =========================================================
-   PÁGINAS REALES
-   =========================================================
-   Cuando desarrollemos un módulo real se agrega aquí.
+   PÁGINAS IMPLEMENTADAS
    ========================================================= */
 
 const PAGE_RENDERERS = {
@@ -63,7 +61,7 @@ const PAGE_RENDERERS = {
 
 
 /* =========================================================
-   INICIAR
+   INICIAR APLICACIÓN
    ========================================================= */
 
 export function iniciarAplicacion() {
@@ -84,8 +82,7 @@ export function iniciarAplicacion() {
 
 
   /*
-   * Listener global.
-   * Se crea una sola vez.
+   * Listener global único.
    */
 
   appRoot.addEventListener(
@@ -106,7 +103,6 @@ export function iniciarAplicacion() {
 function mostrarLogin() {
 
   desmontarRouter();
-
 
   limpiarRuta();
 
@@ -178,6 +174,13 @@ function mostrarAplicacion() {
     });
 
 
+  /*
+   * Aplicar estado inicial del sidebar.
+   */
+
+  aplicarEstadoInicialSidebar();
+
+
   renderizarIconos();
 
 
@@ -188,6 +191,160 @@ function mostrarAplicacion() {
     observarRutas(
       renderizarRuta
     );
+
+}
+
+
+/* =========================================================
+   ESTADO INICIAL SIDEBAR
+   ========================================================= */
+
+function aplicarEstadoInicialSidebar() {
+
+  const appShell =
+    document.getElementById(
+      'appShell'
+    );
+
+
+  if (!appShell) {
+    return;
+  }
+
+
+  const estadoGuardado =
+    localStorage.getItem(
+      'sgpa-sidebar-collapsed'
+    );
+
+
+  let collapsed;
+
+
+  /*
+   * Si el usuario ya eligió una opción,
+   * respetamos su elección.
+   */
+
+  if (estadoGuardado !== null) {
+
+    collapsed =
+      estadoGuardado === 'true';
+
+  } else {
+
+    /*
+     * En pantallas más pequeñas iniciamos
+     * contraído automáticamente.
+     */
+
+    collapsed =
+      window.innerWidth <= 900;
+
+  }
+
+
+  appShell.classList.toggle(
+    'sidebar-collapsed',
+    collapsed
+  );
+
+
+  actualizarBotonSidebar(
+    collapsed
+  );
+
+}
+
+
+/* =========================================================
+   ALTERNAR SIDEBAR
+   ========================================================= */
+
+function alternarSidebar() {
+
+  const appShell =
+    document.getElementById(
+      'appShell'
+    );
+
+
+  if (!appShell) {
+    return;
+  }
+
+
+  const collapsed =
+    appShell.classList.toggle(
+      'sidebar-collapsed'
+    );
+
+
+  localStorage.setItem(
+    'sgpa-sidebar-collapsed',
+    String(collapsed)
+  );
+
+
+  actualizarBotonSidebar(
+    collapsed
+  );
+
+}
+
+
+/* =========================================================
+   ACTUALIZAR BOTÓN SIDEBAR
+   ========================================================= */
+
+function actualizarBotonSidebar(
+  collapsed
+) {
+
+  const button =
+    document.getElementById(
+      'sidebarToggle'
+    );
+
+
+  if (!button) {
+    return;
+  }
+
+
+  button.setAttribute(
+    'aria-label',
+    collapsed
+      ? 'Expandir menú lateral'
+      : 'Contraer menú lateral'
+  );
+
+
+  button.setAttribute(
+    'title',
+    collapsed
+      ? 'Expandir menú'
+      : 'Contraer menú'
+  );
+
+
+  button.innerHTML =
+    collapsed
+      ? `
+        <i
+          data-lucide="chevron-right"
+          aria-hidden="true"
+        ></i>
+      `
+      : `
+        <i
+          data-lucide="chevron-left"
+          aria-hidden="true"
+        ></i>
+      `;
+
+
+  renderizarIconos();
 
 }
 
@@ -312,7 +469,7 @@ function renderizarRuta(
 
 
 /* =========================================================
-   ACTUALIZAR TOPBAR / SIDEBAR
+   ACTUALIZAR NAVEGACIÓN
    ========================================================= */
 
 function actualizarNavegacion(
@@ -365,7 +522,26 @@ function manejarClickGlobal(
 ) {
 
   /*
-   * Cerrar sesión
+   * BOTÓN SIDEBAR
+   */
+
+  const sidebarToggle =
+    event.target.closest(
+      '#sidebarToggle'
+    );
+
+
+  if (sidebarToggle) {
+
+    alternarSidebar();
+
+    return;
+
+  }
+
+
+  /*
+   * CERRAR SESIÓN
    */
 
   const logoutButton =
@@ -384,8 +560,7 @@ function manejarClickGlobal(
 
 
   /*
-   * Navegación.
-   * Sirve tanto para Sidebar como accesos rápidos.
+   * NAVEGACIÓN
    */
 
   const routeElement =
@@ -449,16 +624,14 @@ function manejarClickGlobal(
 
 
 /* =========================================================
-   LOGOUT
+   CERRAR SESIÓN
    ========================================================= */
 
 function cerrarSesion() {
 
   desmontarRouter();
 
-
   limpiarSesion();
-
 
   mostrarLogin();
 
@@ -466,7 +639,7 @@ function cerrarSesion() {
 
 
 /* =========================================================
-   LIMPIEZA ROUTER
+   LIMPIAR ROUTER
    ========================================================= */
 
 function desmontarRouter() {

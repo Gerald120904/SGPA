@@ -7,6 +7,14 @@ import {
 } from '../../components/QuickAccessCard.js';
 
 import {
+  MODULES
+} from '../../config/modules.js';
+
+import {
+  puedeAcceder
+} from '../../config/permissions.js';
+
+import {
   obtenerUsuario,
   obtenerRolUsuario,
   formatearRol
@@ -34,8 +42,59 @@ export function DashboardPage() {
     'Administrador';
 
 
+  /*
+   * Todos los módulos disponibles
+   * excepto Dashboard.
+   */
+
+  const accesosRapidos =
+    MODULES.filter(
+      (module) => {
+
+        return (
+          module.id !== 'dashboard' &&
+          puedeAcceder(
+            rol,
+            module.id
+          )
+        );
+
+      }
+    );
+
+
+  const cardsAcceso =
+    accesosRapidos
+      .map(
+        (module) => {
+
+          return QuickAccessCard({
+
+            route:
+              module.route,
+
+            icon:
+              module.icon,
+
+            title:
+              module.title,
+
+            description:
+              module.description
+
+          });
+
+        }
+      )
+      .join('');
+
+
   return `
     <section class="module-view">
+
+      <!-- =============================================== -->
+      <!-- BIENVENIDA -->
+      <!-- =============================================== -->
 
       <div class="dashboard-welcome">
 
@@ -85,6 +144,10 @@ export function DashboardPage() {
       </div>
 
 
+      <!-- =============================================== -->
+      <!-- INDICADORES -->
+      <!-- =============================================== -->
+
       <div class="dashboard-stats">
 
         ${StatCard({
@@ -129,6 +192,10 @@ export function DashboardPage() {
       </div>
 
 
+      <!-- =============================================== -->
+      <!-- ACCESOS RÁPIDOS -->
+      <!-- =============================================== -->
+
       <section class="dashboard-section">
 
         <div class="section-heading">
@@ -140,7 +207,8 @@ export function DashboardPage() {
             </h3>
 
             <p>
-              Ingrese rápidamente a los principales módulos.
+              Ingrese rápidamente a los módulos
+              disponibles del sistema.
             </p>
 
           </div>
@@ -150,52 +218,7 @@ export function DashboardPage() {
 
         <div class="quick-grid">
 
-          ${QuickAccessCard({
-            route:
-              '/estudiantes',
-            icon:
-              'graduation-cap',
-            title:
-              'Estudiantes',
-            description:
-              'Gestión y avance curricular'
-          })}
-
-
-          ${QuickAccessCard({
-            route:
-              '/cursos',
-            icon:
-              'book-open',
-            title:
-              'Cursos',
-            description:
-              'Malla y requisitos'
-          })}
-
-
-          ${QuickAccessCard({
-            route:
-              '/profesores',
-            icon:
-              'briefcase',
-            title:
-              'Profesores',
-            description:
-              'Docentes y disponibilidad'
-          })}
-
-
-          ${QuickAccessCard({
-            route:
-              '/proyeccion',
-            icon:
-              'line-chart',
-            title:
-              'Proyección',
-            description:
-              'Demanda y planificación'
-          })}
+          ${cardsAcceso}
 
         </div>
 

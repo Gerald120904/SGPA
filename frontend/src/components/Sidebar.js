@@ -25,6 +25,7 @@ function renderNavItem(
       data-module="${module.id}"
       data-route="${module.route}"
       type="button"
+      title="${module.title}"
     >
 
       <i
@@ -73,8 +74,7 @@ export function Sidebar({
   const dashboard =
     modulosVisibles.find(
       (module) =>
-        module.id ===
-        'dashboard'
+        module.id === 'dashboard'
     );
 
 
@@ -127,17 +127,45 @@ export function Sidebar({
       class="sidebar"
     >
 
+      <!-- =============================================== -->
+      <!-- CABECERA -->
+      <!-- =============================================== -->
+
       <div class="sidebar-header">
 
-        <img
-          src="/AVI_horizontal.png"
-          alt="AVI Universidad Nacional"
-          class="sidebar-logo"
-          draggable="false"
-        />
+        <div class="sidebar-header-brand">
+
+          <img
+            src="/AVI_horizontal.png"
+            alt="AVI Universidad Nacional"
+            class="sidebar-logo"
+            draggable="false"
+          />
+
+        </div>
+
+
+        <button
+          id="sidebarToggle"
+          class="sidebar-toggle"
+          type="button"
+          aria-label="Contraer menú lateral"
+          title="Contraer menú"
+        >
+
+          <i
+            data-lucide="chevron-left"
+            aria-hidden="true"
+          ></i>
+
+        </button>
 
       </div>
 
+
+      <!-- =============================================== -->
+      <!-- INFORMACIÓN -->
+      <!-- =============================================== -->
 
       <div class="sidebar-context">
 
@@ -156,6 +184,10 @@ export function Sidebar({
       </div>
 
 
+      <!-- =============================================== -->
+      <!-- NAVEGACIÓN -->
+      <!-- =============================================== -->
+
       <nav class="sidebar-nav">
 
         ${
@@ -166,10 +198,15 @@ export function Sidebar({
             : ''
         }
 
+
         ${navegacionSecciones}
 
       </nav>
 
+
+      <!-- =============================================== -->
+      <!-- USUARIO -->
+      <!-- =============================================== -->
 
       <div class="sidebar-footer">
 

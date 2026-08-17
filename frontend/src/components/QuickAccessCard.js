@@ -10,6 +10,7 @@ export function QuickAccessCard({
       class="quick-card"
       data-route="${route}"
       type="button"
+      title="Abrir ${title}"
     >
 
       <div class="quick-card-icon">
@@ -22,7 +23,7 @@ export function QuickAccessCard({
       </div>
 
 
-      <div>
+      <div class="quick-card-content">
 
         <strong>
           ${title}

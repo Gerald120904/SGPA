@@ -1837,3 +1837,700 @@ button {
   }
 
 }
+/* =========================================================
+   ACENTOS INSTITUCIONALES UNA
+   ========================================================= */
+
+:root {
+  --una-red: #cf2029;
+  --una-red-soft: rgba(207, 32, 41, 0.07);
+  --una-red-border: rgba(207, 32, 41, 0.22);
+}
+
+
+/* =========================================================
+   LÍNEA ROJA EN CARDS
+   ========================================================= */
+
+.dashboard-welcome,
+.stat-card,
+.quick-card,
+.module-placeholder {
+  position: relative;
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   CARD PRINCIPAL DE BIENVENIDA
+   Similar al login
+   ========================================================= */
+
+.dashboard-welcome::before {
+  content: "";
+
+  position: absolute;
+
+  top: 16px;
+  bottom: 16px;
+  left: 0;
+
+  width: 5px;
+
+  border-radius: 0 6px 6px 0;
+
+  background: var(--una-red);
+}
+
+
+/* Dar espacio visual al contenido */
+.dashboard-welcome {
+  padding-left: 32px;
+}
+
+
+/* =========================================================
+   TARJETAS DE ESTADÍSTICAS
+   ========================================================= */
+
+.stat-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: 11px;
+  bottom: 11px;
+  left: 0;
+
+  width: 3px;
+
+  border-radius: 0 4px 4px 0;
+
+  background: var(--una-red);
+}
+
+
+/* =========================================================
+   ACCESOS RÁPIDOS
+   ========================================================= */
+
+.quick-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: 11px;
+  bottom: 11px;
+  left: 0;
+
+  width: 3px;
+
+  border-radius: 0 4px 4px 0;
+
+  background: var(--una-red);
+
+  opacity: 0.75;
+
+  transition:
+    opacity 0.15s ease,
+    top 0.15s ease,
+    bottom 0.15s ease;
+}
+
+
+.quick-card:hover::before {
+  top: 7px;
+  bottom: 7px;
+
+  opacity: 1;
+}
+
+
+/* =========================================================
+   PLACEHOLDER DE MÓDULOS
+   ========================================================= */
+
+.module-placeholder::before {
+  content: "";
+
+  position: absolute;
+
+  top: 18px;
+  bottom: 18px;
+  left: 0;
+
+  width: 5px;
+
+  border-radius: 0 6px 6px 0;
+
+  background: var(--una-red);
+}
+
+
+/* =========================================================
+   DETALLES ROJOS DEL DASHBOARD
+   ========================================================= */
+
+/* "PANEL ADMINISTRATIVO" */
+.welcome-label {
+  color: var(--una-red);
+}
+
+
+/* Badge del perfil */
+.welcome-badge {
+  border-color: var(--una-red-border);
+
+  background: var(--una-red-soft);
+}
+
+
+.welcome-badge > svg {
+  color: var(--una-red);
+}
+
+
+/* =========================================================
+   SIDEBAR - DETALLE INSTITUCIONAL
+   ========================================================= */
+
+.sidebar {
+  position: relative;
+}
+
+
+.sidebar::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  width: 3px;
+  height: 100%;
+
+  background: var(--una-red);
+
+  z-index: 5;
+}
+
+
+/* =========================================================
+   NAVEGACIÓN ACTIVA
+   Mantiene el azul, agrega detalle rojo
+   ========================================================= */
+
+.nav-item.active {
+  position: relative;
+}
+
+
+.nav-item.active::before {
+  content: "";
+
+  position: absolute;
+
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+
+  width: 3px;
+
+  border-radius: 0 3px 3px 0;
+
+  background: var(--una-red);
+}
+
+/* =========================================================
+   SIDEBAR COLAPSABLE
+   ========================================================= */
+
+/*
+ * El cambio de ancho se realiza sobre el grid completo.
+ * El contenido principal recibe automáticamente
+ * el espacio liberado.
+ */
+
+.app-shell {
+  grid-template-columns:
+    245px minmax(0, 1fr);
+
+  transition:
+    grid-template-columns
+    0.22s ease;
+}
+
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns:
+    76px minmax(0, 1fr);
+}
+
+
+/* =========================================================
+   CABECERA SIDEBAR
+   ========================================================= */
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+}
+
+
+.sidebar-header-brand {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  overflow: hidden;
+}
+
+
+.sidebar-logo {
+  transition:
+    opacity 0.15s ease;
+}
+
+
+/* =========================================================
+   BOTÓN CONTRAER / EXPANDIR
+   ========================================================= */
+
+.sidebar-toggle {
+  flex: 0 0 auto;
+
+  width: 32px;
+  height: 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #475467;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.sidebar-toggle:hover {
+  background: #f2f4f7;
+
+  border-color: #d0d5dd;
+
+  color: #101828;
+}
+
+
+.sidebar-toggle svg {
+  width: 17px;
+  height: 17px;
+
+  stroke-width: 1.8;
+}
+
+
+/* =========================================================
+   SIDEBAR CONTRAÍDO
+   ========================================================= */
+
+.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+
+.sidebar-collapsed .sidebar-header-brand,
+.sidebar-collapsed .sidebar-logo {
+  display: none;
+}
+
+
+.sidebar-collapsed .sidebar-context {
+  display: none;
+}
+
+
+.sidebar-collapsed .nav-section-title {
+  display: none;
+}
+
+
+.sidebar-collapsed .sidebar-nav {
+  padding:
+    16px 10px
+    20px;
+}
+
+
+.sidebar-collapsed .nav-item {
+  min-height: 44px;
+
+  justify-content: center;
+
+  padding-left: 0;
+  padding-right: 0;
+
+  gap: 0;
+}
+
+
+.sidebar-collapsed .nav-item span {
+  display: none;
+}
+
+
+.sidebar-collapsed .nav-item svg {
+  width: 19px;
+  height: 19px;
+}
+
+
+/*
+ * En modo contraído mantenemos visible
+ * la línea roja del elemento activo.
+ */
+
+.sidebar-collapsed .nav-item.active::before {
+  top: 9px;
+  bottom: 9px;
+}
+
+
+/* =========================================================
+   PIE SIDEBAR CONTRAÍDO
+   ========================================================= */
+
+.sidebar-collapsed .sidebar-footer {
+  flex-direction: column;
+
+  justify-content: center;
+
+  gap: 8px;
+
+  padding:
+    12px 8px;
+}
+
+
+.sidebar-collapsed .sidebar-user {
+  justify-content: center;
+}
+
+
+.sidebar-collapsed .sidebar-user-info {
+  display: none;
+}
+
+
+/* =========================================================
+   CONTENIDO PRINCIPAL RESPONSIVE
+   ========================================================= */
+
+.app-main {
+  min-width: 0;
+}
+
+
+.content-area {
+  min-width: 0;
+}
+
+
+/* =========================================================
+   GRID DE ACCESOS RÁPIDOS
+   ========================================================= */
+
+/*
+ * Con administrador actualmente hay 9 módulos,
+ * por lo que en pantallas grandes quedan en 3 x 3.
+ */
+
+.quick-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 13px;
+}
+
+
+/* =========================================================
+   ICONOS DE CARDS
+   ========================================================= */
+
+/*
+ * Sustituimos el azul claro por un gris neutro
+ * y el icono pasa a negro / gris muy oscuro.
+ */
+
+.stat-icon,
+.quick-card-icon {
+  background: #f2f4f7;
+
+  color: #1f2937;
+
+  border: 1px solid #eaecf0;
+}
+
+
+.stat-icon svg,
+.quick-card-icon svg {
+  color: #1f2937;
+
+  stroke-width: 1.8;
+}
+
+
+/*
+ * El hover puede dar una pequeña respuesta
+ * sin volver azul el icono.
+ */
+
+.quick-card:hover .quick-card-icon {
+  background: #eaecf0;
+
+  color: #101828;
+}
+
+
+.quick-card:hover .quick-card-icon svg {
+  color: #101828;
+}
+
+
+/* =========================================================
+   TARJETAS DE ACCESO
+   ========================================================= */
+
+.quick-card-content {
+  min-width: 0;
+}
+
+
+.quick-card-content strong {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+.quick-card-content span {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* =========================================================
+   RESPONSIVE - PANTALLA MEDIANA
+   ========================================================= */
+
+@media (max-width: 1250px) {
+
+  .quick-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE - LAPTOP PEQUEÑA
+   ========================================================= */
+
+@media (max-width: 1000px) {
+
+  .app-shell {
+    grid-template-columns:
+      220px minmax(0, 1fr);
+  }
+
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns:
+      72px minmax(0, 1fr);
+  }
+
+
+  .content-area {
+    padding:
+      24px 22px
+      32px;
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE - TABLET / VENTANA ANGOSTA
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+  .app-shell {
+    grid-template-columns:
+      205px minmax(0, 1fr);
+  }
+
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns:
+      68px minmax(0, 1fr);
+  }
+
+
+  /*
+   * Sobrescribimos el comportamiento antiguo
+   * que ocultaba siempre los textos.
+   *
+   * Ahora se ocultan únicamente cuando
+   * .sidebar-collapsed está activo.
+   */
+
+  .sidebar-header,
+  .sidebar-context,
+  .nav-section-title,
+  .nav-item span,
+  .sidebar-user-info {
+    display: revert;
+  }
+
+
+  .sidebar-header {
+    display: flex;
+  }
+
+
+  .sidebar-context {
+    display: block;
+  }
+
+
+  .nav-section-title {
+    display: block;
+  }
+
+
+  .nav-item {
+    justify-content: flex-start;
+
+    padding:
+      0 12px;
+  }
+
+
+  .nav-item span {
+    display: inline;
+  }
+
+
+  .sidebar-user-info {
+    display: block;
+  }
+
+
+  /*
+   * Reaplicamos la ocultación únicamente
+   * si el usuario contrae el menú.
+   */
+
+  .sidebar-collapsed .sidebar-header-brand,
+  .sidebar-collapsed .sidebar-context,
+  .sidebar-collapsed .nav-section-title,
+  .sidebar-collapsed .nav-item span,
+  .sidebar-collapsed .sidebar-user-info {
+    display: none;
+  }
+
+
+  .sidebar-collapsed .sidebar-header {
+    display: flex;
+
+    justify-content: center;
+  }
+
+
+  .sidebar-collapsed .nav-item {
+    justify-content: center;
+
+    padding:
+      0;
+  }
+
+
+  .quick-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .dashboard-stats {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE - MUY ANGOSTO
+   ========================================================= */
+
+@media (max-width: 560px) {
+
+  .app-shell {
+    grid-template-columns:
+      190px minmax(0, 1fr);
+  }
+
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns:
+      64px minmax(0, 1fr);
+  }
+
+
+  .content-area {
+    padding:
+      18px 14px
+      26px;
+  }
+
+
+  .topbar {
+    padding:
+      0 16px;
+  }
+
+
+  .dashboard-stats {
+    grid-template-columns:
+      1fr;
+  }
+
+}

@@ -5,7 +5,8 @@ export const MODULES = [
     title: 'Dashboard',
     route: '/dashboard',
     icon: 'layout-dashboard',
-    section: null
+    section: null,
+    description: 'Resumen general del sistema'
   },
 
   {
@@ -13,7 +14,8 @@ export const MODULES = [
     title: 'Usuarios',
     route: '/usuarios',
     icon: 'users',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Administración de cuentas y accesos'
   },
 
   {
@@ -21,7 +23,8 @@ export const MODULES = [
     title: 'Estudiantes',
     route: '/estudiantes',
     icon: 'graduation-cap',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Gestión y avance curricular'
   },
 
   {
@@ -29,7 +32,8 @@ export const MODULES = [
     title: 'Carreras',
     route: '/carreras',
     icon: 'school',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Carreras y estructura académica'
   },
 
   {
@@ -37,7 +41,8 @@ export const MODULES = [
     title: 'Cursos',
     route: '/cursos',
     icon: 'book-open',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Malla, cursos y requisitos'
   },
 
   {
@@ -45,7 +50,8 @@ export const MODULES = [
     title: 'Profesores',
     route: '/profesores',
     icon: 'briefcase',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Docentes y disponibilidad'
   },
 
   {
@@ -53,7 +59,8 @@ export const MODULES = [
     title: 'Aulas',
     route: '/aulas',
     icon: 'door-open',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Espacios, capacidad y disponibilidad'
   },
 
   {
@@ -61,7 +68,8 @@ export const MODULES = [
     title: 'Periodos académicos',
     route: '/periodos',
     icon: 'calendar-days',
-    section: 'Gestión'
+    section: 'Gestión',
+    description: 'Administración de ciclos académicos'
   },
 
   {
@@ -69,7 +77,8 @@ export const MODULES = [
     title: 'Proyección',
     route: '/proyeccion',
     icon: 'line-chart',
-    section: 'Planificación'
+    section: 'Planificación',
+    description: 'Demanda y planificación académica'
   },
 
   {
@@ -77,7 +86,8 @@ export const MODULES = [
     title: 'Oferta académica',
     route: '/oferta',
     icon: 'clipboard-list',
-    section: 'Planificación'
+    section: 'Planificación',
+    description: 'Grupos, horarios y oferta académica'
   }
 
 ];

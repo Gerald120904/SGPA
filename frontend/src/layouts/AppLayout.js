@@ -13,7 +13,10 @@ export function AppLayout({
 }) {
 
   return `
-    <main class="app-shell">
+    <main
+      id="appShell"
+      class="app-shell"
+    >
 
       ${Sidebar({
         usuario,

@@ -17,6 +17,7 @@ import {
   LogOut,
   ShieldCheck,
   ChevronRight,
+  ChevronLeft,
   Construction
 } from 'lucide';
 
@@ -46,6 +47,7 @@ export function renderizarIconos() {
       LogOut,
       ShieldCheck,
       ChevronRight,
+      ChevronLeft,
       Construction
 
     }
