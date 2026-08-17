@@ -6,7 +6,7 @@ async function seedAdmin() {
     host: 'localhost',
     port: 3306,
     user: 'root',
-    password: 'Gerald.13',
+    password: 'EmmaP2026*',
     database: 'sgpa',
   });
 
