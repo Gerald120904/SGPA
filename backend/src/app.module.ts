@@ -6,6 +6,14 @@ import { AppService } from './app.service';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { RolesModule } from './roles/roles.module';
 import { AuthModule } from './auth/auth.module';
+import { EstudiantesModule } from './estudiantes/estudiantes.module';
+import { CarrerasModule } from './carreras/carreras.module';
+import { CursosModule } from './cursos/cursos.module';
+import { ProfesoresModule } from './profesores/profesores.module';
+import { AulasModule } from './aulas/aulas.module';
+import { PeriodosAcademicosModule } from './periodos-academicos/periodos-academicos.module';
+import { ProyeccionModule } from './proyeccion/proyeccion.module';
+import { OfertaAcademicaModule } from './oferta-academica/oferta-academica.module';
 
 @Module({
   imports: [
@@ -28,6 +36,14 @@ import { AuthModule } from './auth/auth.module';
     UsuariosModule,
     RolesModule,
     AuthModule,
+    EstudiantesModule,
+    CarrerasModule,
+    CursosModule,
+    ProfesoresModule,
+    AulasModule,
+    PeriodosAcademicosModule,
+    ProyeccionModule,
+    OfertaAcademicaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

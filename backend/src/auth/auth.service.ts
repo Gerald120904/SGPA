@@ -1,8 +1,15 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
+import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
+import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -57,6 +64,77 @@ export class AuthService {
         correo: usuario.correo,
         roles,
       },
+    };
+  }
+
+  private hashCodigo(codigo: string): string {
+    return createHash('sha256').update(codigo).digest('hex');
+  }
+
+  async solicitarRecuperacion(dto: SolicitarRecuperacionDto) {
+    const correo = dto.correo.trim().toLowerCase();
+    const usuario = await this.usuariosService.buscarPorCorreo(correo);
+
+    if (!usuario || !usuario.activo) {
+      throw new BadRequestException('No existe un usuario activo con ese correo');
+    }
+
+    const codigo = randomInt(100000, 1000000).toString();
+    const tokenHash = this.hashCodigo(codigo);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.usuariosService.guardarRecuperacionPassword(
+      usuario.id,
+      tokenHash,
+      expiresAt,
+    );
+
+    return {
+      message: 'Se generó un código de recuperación válido durante 15 minutos.',
+      ...(process.env.NODE_ENV !== 'production'
+        ? { codigoDesarrollo: codigo }
+        : {}),
+    };
+  }
+
+  async restablecerPassword(dto: RestablecerPasswordDto) {
+    const correo = dto.correo.trim().toLowerCase();
+    const usuario = await this.usuariosService.buscarPorCorreo(correo);
+    const errorCodigo = new BadRequestException('Código inválido o expirado');
+
+    if (
+      !usuario ||
+      !usuario.activo ||
+      !usuario.passwordResetTokenHash ||
+      !usuario.passwordResetExpiresAt
+    ) {
+      throw errorCodigo;
+    }
+
+    if (usuario.passwordResetExpiresAt.getTime() <= Date.now()) {
+      await this.usuariosService.limpiarRecuperacionPassword(usuario.id);
+      throw errorCodigo;
+    }
+
+    const hashRecibido = this.hashCodigo(dto.codigo);
+    const esperado = Buffer.from(usuario.passwordResetTokenHash, 'hex');
+    const recibido = Buffer.from(hashRecibido, 'hex');
+    const codigoValido =
+      esperado.length === recibido.length && timingSafeEqual(esperado, recibido);
+
+    if (!codigoValido) {
+      throw errorCodigo;
+    }
+
+    const nuevoPasswordHash = await bcrypt.hash(dto.password, 10);
+
+    await this.usuariosService.actualizarPassword(
+      usuario.id,
+      nuevoPasswordHash,
+    );
+
+    return {
+      message: 'La contraseña se actualizó correctamente.',
     };
   }
 
