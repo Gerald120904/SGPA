@@ -527,6 +527,132 @@
 
 
 /* =========================================================
+   RECUPERACIÓN DE CONTRASEÑA
+   ========================================================= */
+
+.recovery-panel {
+  width: 100%;
+}
+
+
+.recovery-form {
+  width: 100%;
+
+  margin-top: 26px;
+}
+
+
+.recovery-reset-section .recovery-form {
+  margin-top: 0;
+}
+
+
+.recovery-reset-section .form-group {
+  margin-bottom: 13px;
+}
+
+
+.recovery-reset-section .input-container input {
+  height: 45px;
+}
+
+
+.recovery-reset-section .login-button {
+  height: 45px;
+
+  margin-top: 14px;
+}
+
+
+.recovery-message {
+  margin-top: 18px;
+
+  padding: 11px 13px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 9px;
+
+  background: #f5f9ff;
+
+  color: #175cd3;
+
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+
+.recovery-success {
+  margin-top: 24px;
+
+  padding: 12px 14px;
+
+  border: 1px solid #b7e4c7;
+  border-radius: 9px;
+
+  background: #f3fbf6;
+
+  color: #216e39;
+
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+
+.development-code {
+  margin: 10px 0 14px;
+
+  padding: 11px 13px;
+
+  border: 1px dashed #d0d5dd;
+  border-radius: 9px;
+
+  background: #f9fafb;
+
+  color: #344054;
+
+  font-family:
+    Consolas,
+    monospace;
+
+  font-size: 12.5px;
+  font-weight: 600;
+
+  text-align: center;
+}
+
+
+.recovery-back-button {
+  width: 100%;
+
+  margin-top: 12px;
+
+  padding: 10px;
+
+  border-radius: 9px;
+
+  background: transparent;
+
+  color: #475467;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.recovery-back-button:hover {
+  background: #f5f7fa;
+
+  color: #101828;
+}
+
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 

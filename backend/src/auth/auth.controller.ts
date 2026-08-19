@@ -13,6 +13,8 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './guards/auth.guard';
 import { LoginDto } from './dto/login.dto';
+import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
+import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -22,6 +24,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('recuperar-password')
+  @HttpCode(HttpStatus.OK)
+  recuperarPassword(@Body() dto: SolicitarRecuperacionDto) {
+    return this.authService.solicitarRecuperacion(dto);
+  }
+
+  @Post('restablecer-password')
+  @HttpCode(HttpStatus.OK)
+  restablecerPassword(@Body() dto: RestablecerPasswordDto) {
+    return this.authService.restablecerPassword(dto);
   }
 
   @UseGuards(AuthGuard)

@@ -1,5 +1,7 @@
 import {
-  login
+  login,
+  solicitarRecuperacion,
+  restablecerPassword
 } from '../../services/auth.service.js';
 
 import {
@@ -70,7 +72,10 @@ export function LoginPage() {
 
           <div class="form-container">
 
-            <header class="form-header">
+            <header
+              id="loginHeader"
+              class="form-header"
+            >
 
               <h2>
                 Iniciar sesión
@@ -219,6 +224,239 @@ export function LoginPage() {
 
             </form>
 
+
+            <section
+              id="recoveryPanel"
+              class="recovery-panel hidden"
+            >
+
+              <header class="form-header">
+
+                <h2>
+                  Recuperar acceso
+                </h2>
+
+                <p>
+                  Restablezca la contraseña de su
+                  cuenta institucional.
+                </p>
+
+              </header>
+
+
+              <div
+                id="recoveryMessage"
+                class="recovery-message hidden"
+                role="status"
+                aria-live="polite"
+              ></div>
+
+
+              <div
+                id="recoverySuccess"
+                class="recovery-success hidden"
+                role="status"
+                aria-live="polite"
+              ></div>
+
+
+              <form
+                id="recoveryRequestForm"
+                class="recovery-form"
+                novalidate
+              >
+
+                <div class="form-group">
+
+                  <label for="recoveryEmail">
+                    Correo institucional
+                  </label>
+
+                  <div class="input-container">
+
+                    <i
+                      data-lucide="mail"
+                      class="input-icon"
+                      aria-hidden="true"
+                    ></i>
+
+                    <input
+                      id="recoveryEmail"
+                      name="recoveryEmail"
+                      type="email"
+                      autocomplete="email"
+                      placeholder="usuario@una.ac.cr"
+                      spellcheck="false"
+                      required
+                    />
+
+                  </div>
+
+                </div>
+
+
+                <div
+                  id="recoveryRequestError"
+                  class="login-error hidden"
+                  role="alert"
+                  aria-live="polite"
+                ></div>
+
+
+                <button
+                  id="recoveryRequestButton"
+                  type="submit"
+                  class="login-button"
+                >
+                  <span id="recoveryRequestButtonText">
+                    Enviar código
+                  </span>
+                </button>
+
+              </form>
+
+
+              <section
+                id="recoveryResetSection"
+                class="recovery-reset-section hidden"
+              >
+
+                <div
+                  id="developmentCode"
+                  class="development-code hidden"
+                ></div>
+
+
+                <form
+                  id="resetPasswordForm"
+                  class="recovery-form"
+                  novalidate
+                >
+
+                  <div class="form-group">
+
+                    <label for="recoveryCode">
+                      Código temporal
+                    </label>
+
+                    <div class="input-container">
+
+                      <i
+                        data-lucide="key-round"
+                        class="input-icon"
+                        aria-hidden="true"
+                      ></i>
+
+                      <input
+                        id="recoveryCode"
+                        name="recoveryCode"
+                        type="text"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        pattern="[0-9]{6}"
+                        placeholder="000000"
+                        required
+                      />
+
+                    </div>
+
+                  </div>
+
+
+                  <div class="form-group">
+
+                    <label for="newPassword">
+                      Nueva contraseña
+                    </label>
+
+                    <div class="input-container">
+
+                      <i
+                        data-lucide="lock-keyhole"
+                        class="input-icon"
+                        aria-hidden="true"
+                      ></i>
+
+                      <input
+                        id="newPassword"
+                        name="newPassword"
+                        type="password"
+                        autocomplete="new-password"
+                        minlength="8"
+                        maxlength="128"
+                        placeholder="Mínimo 8 caracteres"
+                        required
+                      />
+
+                    </div>
+
+                  </div>
+
+
+                  <div class="form-group">
+
+                    <label for="confirmPassword">
+                      Confirmar contraseña
+                    </label>
+
+                    <div class="input-container">
+
+                      <i
+                        data-lucide="shield-check"
+                        class="input-icon"
+                        aria-hidden="true"
+                      ></i>
+
+                      <input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        autocomplete="new-password"
+                        minlength="8"
+                        maxlength="128"
+                        placeholder="Repita la contraseña"
+                        required
+                      />
+
+                    </div>
+
+                  </div>
+
+
+                  <div
+                    id="resetPasswordError"
+                    class="login-error hidden"
+                    role="alert"
+                    aria-live="polite"
+                  ></div>
+
+
+                  <button
+                    id="resetPasswordButton"
+                    type="submit"
+                    class="login-button"
+                  >
+                    <span id="resetPasswordButtonText">
+                      Cambiar contraseña
+                    </span>
+                  </button>
+
+                </form>
+
+              </section>
+
+
+              <button
+                id="backToLoginButton"
+                type="button"
+                class="recovery-back-button"
+              >
+                Volver al inicio de sesión
+              </button>
+
+            </section>
+
           </div>
 
         </section>
@@ -280,6 +518,125 @@ export function iniciarLoginPage({
     );
 
 
+  const loginHeader =
+    document.getElementById(
+      'loginHeader'
+    );
+
+  const recoveryPanel =
+    document.getElementById(
+      'recoveryPanel'
+    );
+
+  const recoveryRequestForm =
+    document.getElementById(
+      'recoveryRequestForm'
+    );
+
+  const recoveryEmail =
+    document.getElementById(
+      'recoveryEmail'
+    );
+
+  const recoveryRequestError =
+    document.getElementById(
+      'recoveryRequestError'
+    );
+
+  const recoveryRequestButton =
+    document.getElementById(
+      'recoveryRequestButton'
+    );
+
+  const recoveryRequestButtonText =
+    document.getElementById(
+      'recoveryRequestButtonText'
+    );
+
+  const recoveryResetSection =
+    document.getElementById(
+      'recoveryResetSection'
+    );
+
+  const recoveryMessage =
+    document.getElementById(
+      'recoveryMessage'
+    );
+
+  const recoverySuccess =
+    document.getElementById(
+      'recoverySuccess'
+    );
+
+  const developmentCode =
+    document.getElementById(
+      'developmentCode'
+    );
+
+  const resetPasswordForm =
+    document.getElementById(
+      'resetPasswordForm'
+    );
+
+  const recoveryCode =
+    document.getElementById(
+      'recoveryCode'
+    );
+
+  const newPassword =
+    document.getElementById(
+      'newPassword'
+    );
+
+  const confirmPassword =
+    document.getElementById(
+      'confirmPassword'
+    );
+
+  const resetPasswordError =
+    document.getElementById(
+      'resetPasswordError'
+    );
+
+  const resetPasswordButton =
+    document.getElementById(
+      'resetPasswordButton'
+    );
+
+  const resetPasswordButtonText =
+    document.getElementById(
+      'resetPasswordButtonText'
+    );
+
+  const backToLoginButton =
+    document.getElementById(
+      'backToLoginButton'
+    );
+
+
+  const rememberMe =
+    document.getElementById(
+      'rememberMe'
+    );
+
+
+  const correoRecordado =
+    localStorage.getItem(
+      'sgpa-correo-recordado'
+    );
+
+
+  if (correoRecordado) {
+
+    correoInput.value =
+      correoRecordado;
+
+    rememberMe.checked =
+      true;
+
+  }
+
+
   function ocultarError() {
 
     loginError.classList.add(
@@ -301,6 +658,145 @@ export function iniciarLoginPage({
     loginError.classList.remove(
       'hidden'
     );
+
+  }
+
+
+  function ocultarErrorRecuperacion(
+    elemento
+  ) {
+
+    elemento.classList.add(
+      'hidden'
+    );
+
+    elemento.textContent = '';
+
+  }
+
+
+  function mostrarErrorRecuperacion(
+    elemento,
+    mensaje
+  ) {
+
+    elemento.textContent =
+      mensaje;
+
+    elemento.classList.remove(
+      'hidden'
+    );
+
+  }
+
+
+  function abrirRecuperacion() {
+
+    loginHeader.classList.add(
+      'hidden'
+    );
+
+    loginForm.classList.add(
+      'hidden'
+    );
+
+    recoveryPanel.classList.remove(
+      'hidden'
+    );
+
+    recoveryRequestForm.classList.remove(
+      'hidden'
+    );
+
+    resetPasswordForm.classList.remove(
+      'hidden'
+    );
+
+    recoveryResetSection.classList.add(
+      'hidden'
+    );
+
+    recoveryMessage.classList.add(
+      'hidden'
+    );
+
+    recoverySuccess.classList.add(
+      'hidden'
+    );
+
+    developmentCode.classList.add(
+      'hidden'
+    );
+
+    ocultarErrorRecuperacion(
+      recoveryRequestError
+    );
+
+    ocultarErrorRecuperacion(
+      resetPasswordError
+    );
+
+    recoveryEmail.value =
+      correoInput.value.trim();
+
+    recoveryCode.value = '';
+    newPassword.value = '';
+    confirmPassword.value = '';
+
+    recoveryEmail.focus();
+
+    renderizarIconos();
+
+  }
+
+
+  function volverAlLogin() {
+
+    recoveryPanel.classList.add(
+      'hidden'
+    );
+
+    loginHeader.classList.remove(
+      'hidden'
+    );
+
+    loginForm.classList.remove(
+      'hidden'
+    );
+
+    recoveryRequestForm.classList.remove(
+      'hidden'
+    );
+
+    resetPasswordForm.classList.remove(
+      'hidden'
+    );
+
+    recoveryResetSection.classList.add(
+      'hidden'
+    );
+
+    recoveryMessage.classList.add(
+      'hidden'
+    );
+
+    recoverySuccess.classList.add(
+      'hidden'
+    );
+
+    developmentCode.classList.add(
+      'hidden'
+    );
+
+    ocultarErrorRecuperacion(
+      recoveryRequestError
+    );
+
+    ocultarErrorRecuperacion(
+      resetPasswordError
+    );
+
+    correoInput.focus();
 
   }
 
@@ -416,6 +912,22 @@ export function iniciarLoginPage({
         );
 
 
+        if (rememberMe.checked) {
+
+          localStorage.setItem(
+            'sgpa-correo-recordado',
+            correo
+          );
+
+        } else {
+
+          localStorage.removeItem(
+            'sgpa-correo-recordado'
+          );
+
+        }
+
+
         onLoginSuccess(
           resultado
         );
@@ -448,21 +960,283 @@ export function iniciarLoginPage({
   );
 
 
-  if (
-    forgotPasswordButton
-  ) {
+  forgotPasswordButton.addEventListener(
+    'click',
+    abrirRecuperacion
+  );
 
-    forgotPasswordButton.addEventListener(
-      'click',
-      () => {
 
-        alert(
-          'La recuperación de contraseña se implementará posteriormente.'
+  backToLoginButton.addEventListener(
+    'click',
+    volverAlLogin
+  );
+
+
+  recoveryEmail.addEventListener(
+    'input',
+    () => ocultarErrorRecuperacion(
+      recoveryRequestError
+    )
+  );
+
+
+  recoveryRequestForm.addEventListener(
+    'submit',
+    async (event) => {
+
+      event.preventDefault();
+
+      ocultarErrorRecuperacion(
+        recoveryRequestError
+      );
+
+      recoveryMessage.classList.add(
+        'hidden'
+      );
+
+      developmentCode.classList.add(
+        'hidden'
+      );
+
+      const correo =
+        recoveryEmail.value.trim();
+
+      if (!correo) {
+
+        mostrarErrorRecuperacion(
+          recoveryRequestError,
+          'Debe ingresar su correo institucional.'
         );
 
-      }
-    );
+        return;
 
-  }
+      }
+
+      try {
+
+        recoveryRequestButton.disabled =
+          true;
+
+        recoveryRequestButtonText.textContent =
+          'Enviando...';
+
+        const resultado =
+          await solicitarRecuperacion(
+            correo
+          );
+
+        if (!resultado?.ok) {
+
+          mostrarErrorRecuperacion(
+            recoveryRequestError,
+            resultado?.message ||
+            'No fue posible solicitar el código.'
+          );
+
+          return;
+
+        }
+
+        recoveryRequestForm.classList.add(
+          'hidden'
+        );
+
+        recoveryResetSection.classList.remove(
+          'hidden'
+        );
+
+        recoveryMessage.textContent =
+          resultado.message ||
+          'Si el correo está registrado, se generó un código de recuperación.';
+
+        recoveryMessage.classList.remove(
+          'hidden'
+        );
+
+        if (
+          resultado.codigoDesarrollo
+        ) {
+
+          developmentCode.textContent =
+            `Código temporal de desarrollo: ${resultado.codigoDesarrollo}`;
+
+          developmentCode.classList.remove(
+            'hidden'
+          );
+
+        }
+
+        recoveryCode.focus();
+
+        renderizarIconos();
+
+      } catch (error) {
+
+        console.error(
+          'Error de recuperación:',
+          error
+        );
+
+        mostrarErrorRecuperacion(
+          recoveryRequestError,
+          'No fue posible conectar con el servidor.'
+        );
+
+      } finally {
+
+        recoveryRequestButton.disabled =
+          false;
+
+        recoveryRequestButtonText.textContent =
+          'Enviar código';
+
+      }
+
+    }
+  );
+
+
+  [
+    recoveryCode,
+    newPassword,
+    confirmPassword
+  ].forEach(
+    (input) => input.addEventListener(
+      'input',
+      () => ocultarErrorRecuperacion(
+        resetPasswordError
+      )
+    )
+  );
+
+
+  resetPasswordForm.addEventListener(
+    'submit',
+    async (event) => {
+
+      event.preventDefault();
+
+      ocultarErrorRecuperacion(
+        resetPasswordError
+      );
+
+      const correo =
+        recoveryEmail.value.trim();
+
+      const codigo =
+        recoveryCode.value.trim();
+
+      const password =
+        newPassword.value;
+
+      const confirmacion =
+        confirmPassword.value;
+
+      if (!/^\d{6}$/.test(codigo)) {
+
+        mostrarErrorRecuperacion(
+          resetPasswordError,
+          'El código debe contener 6 dígitos.'
+        );
+
+        return;
+
+      }
+
+      if (password.length < 8) {
+
+        mostrarErrorRecuperacion(
+          resetPasswordError,
+          'La contraseña debe contener al menos 8 caracteres.'
+        );
+
+        return;
+
+      }
+
+      if (password !== confirmacion) {
+
+        mostrarErrorRecuperacion(
+          resetPasswordError,
+          'Las contraseñas no coinciden.'
+        );
+
+        return;
+
+      }
+
+      try {
+
+        resetPasswordButton.disabled =
+          true;
+
+        resetPasswordButtonText.textContent =
+          'Actualizando...';
+
+        const resultado =
+          await restablecerPassword(
+            correo,
+            codigo,
+            password
+          );
+
+        if (!resultado?.ok) {
+
+          mostrarErrorRecuperacion(
+            resetPasswordError,
+            resultado?.message ||
+            'No fue posible cambiar la contraseña.'
+          );
+
+          return;
+
+        }
+
+        resetPasswordForm.classList.add(
+          'hidden'
+        );
+
+        recoveryMessage.classList.add(
+          'hidden'
+        );
+
+        developmentCode.classList.add(
+          'hidden'
+        );
+
+        recoverySuccess.textContent =
+          'Contraseña actualizada correctamente. Ya puede iniciar sesión con su nueva contraseña.';
+
+        recoverySuccess.classList.remove(
+          'hidden'
+        );
+
+        correoInput.value =
+          correo;
+
+      } catch (error) {
+
+        console.error(
+          'Error cambiando contraseña:',
+          error
+        );
+
+        mostrarErrorRecuperacion(
+          resetPasswordError,
+          'No fue posible conectar con el servidor.'
+        );
+
+      } finally {
+
+        resetPasswordButton.disabled =
+          false;
+
+        resetPasswordButtonText.textContent =
+          'Cambiar contraseña';
+
+      }
+
+    }
+  );
 
 }

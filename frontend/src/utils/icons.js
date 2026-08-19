@@ -4,6 +4,8 @@ import {
   LockKeyhole,
   Eye,
   EyeOff,
+  Mail,
+  KeyRound,
   LayoutDashboard,
   Users,
   GraduationCap,
@@ -32,6 +34,8 @@ export function renderizarIconos() {
       LockKeyhole,
       Eye,
       EyeOff,
+      Mail,
+      KeyRound,
 
       LayoutDashboard,
       Users,

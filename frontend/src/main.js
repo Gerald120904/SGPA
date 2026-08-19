@@ -49,6 +49,89 @@ ipcMain.handle('auth:login', async (_event, credenciales) => {
   }
 });
 
+ipcMain.handle('auth:recuperar-password', async (_event, datos) => {
+  try {
+    const response = await net.fetch(`${API_URL}/auth/recuperar-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        correo: datos.correo,
+      }),
+    });
+
+    const data = await response.json();
+    const message = Array.isArray(data.message)
+      ? data.message.join('. ')
+      : data.message;
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        message: message || 'No fue posible solicitar la recuperación.',
+      };
+    }
+
+    return {
+      ok: true,
+      message:
+        message ||
+        'Se generó un código de recuperación válido durante 15 minutos.',
+      codigoDesarrollo: data.codigoDesarrollo,
+    };
+  } catch (error) {
+    console.error('Error al solicitar recuperación de contraseña:', error);
+    return {
+      ok: false,
+      status: 0,
+      message: 'No se pudo conectar con el servidor del SGPA.',
+    };
+  }
+});
+
+ipcMain.handle('auth:restablecer-password', async (_event, datos) => {
+  try {
+    const response = await net.fetch(`${API_URL}/auth/restablecer-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        correo: datos.correo,
+        codigo: datos.codigo,
+        password: datos.password,
+      }),
+    });
+
+    const data = await response.json();
+    const message = Array.isArray(data.message)
+      ? data.message.join('. ')
+      : data.message;
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        message: message || 'No fue posible restablecer la contraseña.',
+      };
+    }
+
+    return {
+      ok: true,
+      message: message || 'La contraseña se actualizó correctamente.',
+    };
+  } catch (error) {
+    console.error('Error al restablecer contraseña:', error);
+    return {
+      ok: false,
+      status: 0,
+      message: 'No se pudo conectar con el servidor del SGPA.',
+    };
+  }
+});
+
 ipcMain.handle('auth:perfil', async () => {
   if (!accessToken) {
     return {
