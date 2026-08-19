@@ -37,4 +37,30 @@ export class UsuariosService {
       ultimoAcceso: new Date(),
     });
   }
+
+  async guardarRecuperacionPassword(
+    id: number,
+    tokenHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.usuarioRepository.update(id, {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: expiresAt,
+    });
+  }
+
+  async actualizarPassword(id: number, passwordHash: string): Promise<void> {
+    await this.usuarioRepository.update(id, {
+      passwordHash,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    });
+  }
+
+  async limpiarRecuperacionPassword(id: number): Promise<void> {
+    await this.usuarioRepository.update(id, {
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    });
+  }
 }

@@ -11,6 +11,8 @@ import {
   EyeOff,
 
   House,
+  Mail,
+  KeyRound,
   LayoutDashboard,
 
   Users,
@@ -58,6 +60,8 @@ export function renderizarIconos() {
 
       Eye,
       EyeOff,
+      Mail,
+      KeyRound,
 
       House,
       LayoutDashboard,

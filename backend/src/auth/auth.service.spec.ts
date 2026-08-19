@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { AuthService } from './auth.service';
 import { UsuariosService } from '../usuarios/usuarios.service';
 
@@ -10,6 +12,9 @@ describe('AuthService', () => {
   const usuariosService = {
     buscarPorCorreo: jest.fn(),
     actualizarUltimoAcceso: jest.fn(),
+    guardarRecuperacionPassword: jest.fn(),
+    actualizarPassword: jest.fn(),
+    limpiarRecuperacionPassword: jest.fn(),
   };
 
   const jwtService = {
@@ -68,5 +73,105 @@ describe('AuthService', () => {
         roles: ['ADMINISTRADOR'],
       },
     });
+  });
+
+  it('should generate and store a six-digit recovery code hash', async () => {
+    usuariosService.buscarPorCorreo.mockResolvedValue({
+      id: 1,
+      activo: true,
+    });
+
+    const before = Date.now();
+    const result = await service.solicitarRecuperacion({
+      correo: ' ADMIN@UNA.AC.CR ',
+    });
+    const after = Date.now();
+
+    expect(usuariosService.buscarPorCorreo).toHaveBeenCalledWith(
+      'admin@una.ac.cr',
+    );
+    expect(result.codigoDesarrollo).toMatch(/^\d{6}$/);
+
+    const expectedHash = createHash('sha256')
+      .update(result.codigoDesarrollo)
+      .digest('hex');
+    const [, storedHash, expiresAt] =
+      usuariosService.guardarRecuperacionPassword.mock.calls[0] as [
+        number,
+        string,
+        Date,
+      ];
+
+    expect(storedHash).toBe(expectedHash);
+    expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(after + 15 * 60 * 1000);
+  });
+
+  it('should not expose the recovery code in production', async () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    usuariosService.buscarPorCorreo.mockResolvedValue({
+      id: 1,
+      activo: true,
+    });
+
+    try {
+      const result = await service.solicitarRecuperacion({
+        correo: 'admin@una.ac.cr',
+      });
+
+      expect(result).not.toHaveProperty('codigoDesarrollo');
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it('should hash the new password and invalidate the recovery code', async () => {
+    const codigo = '123456';
+    usuariosService.buscarPorCorreo.mockResolvedValue({
+      id: 1,
+      activo: true,
+      passwordResetTokenHash: createHash('sha256')
+        .update(codigo)
+        .digest('hex'),
+      passwordResetExpiresAt: new Date(Date.now() + 60_000),
+    });
+
+    const result = await service.restablecerPassword({
+      correo: 'admin@una.ac.cr',
+      codigo,
+      password: 'NuevaClave123',
+    });
+
+    expect(usuariosService.actualizarPassword).toHaveBeenCalledWith(
+      1,
+      expect.any(String),
+    );
+    const passwordHash = usuariosService.actualizarPassword.mock.calls[0][1] as string;
+    await expect(bcrypt.compare('NuevaClave123', passwordHash)).resolves.toBe(true);
+    expect(result).toEqual({
+      message: 'La contraseña se actualizó correctamente.',
+    });
+  });
+
+  it('should reject and clear an expired recovery code', async () => {
+    usuariosService.buscarPorCorreo.mockResolvedValue({
+      id: 1,
+      activo: true,
+      passwordResetTokenHash: createHash('sha256')
+        .update('123456')
+        .digest('hex'),
+      passwordResetExpiresAt: new Date(Date.now() - 1),
+    });
+
+    await expect(
+      service.restablecerPassword({
+        correo: 'admin@una.ac.cr',
+        codigo: '123456',
+        password: 'NuevaClave123',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(usuariosService.limpiarRecuperacionPassword).toHaveBeenCalledWith(1);
+    expect(usuariosService.actualizarPassword).not.toHaveBeenCalled();
   });
 });
