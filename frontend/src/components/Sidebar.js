@@ -19,13 +19,18 @@ function renderNavItem(
   module
 ) {
 
+  const label =
+    module.navLabel ||
+    module.title;
+
+
   return `
     <button
       class="nav-item"
       data-module="${module.id}"
       data-route="${module.route}"
       type="button"
-      title="${module.title}"
+      title="${escapeHtml(label)}"
     >
 
       <i
@@ -34,7 +39,7 @@ function renderNavItem(
       ></i>
 
       <span>
-        ${module.title}
+        ${escapeHtml(label)}
       </span>
 
     </button>
@@ -61,6 +66,11 @@ export function Sidebar({
     'A';
 
 
+  /*
+   * Solamente módulos a los que tiene
+   * acceso visual el usuario.
+   */
+
   const modulosVisibles =
     MODULES.filter(
       (module) =>
@@ -71,29 +81,24 @@ export function Sidebar({
     );
 
 
-  const dashboard =
-    modulosVisibles.find(
-      (module) =>
-        module.id === 'dashboard'
-    );
-
+  /*
+   * Secciones en el mismo orden
+   * definido en modules.js.
+   */
 
   const secciones = [
     ...new Set(
       modulosVisibles
-        .filter(
-          (module) =>
-            module.section
-        )
         .map(
           (module) =>
             module.section
         )
+        .filter(Boolean)
     )
   ];
 
 
-  const navegacionSecciones =
+  const navegacion =
     secciones
       .map(
         (section) => {
@@ -108,7 +113,7 @@ export function Sidebar({
 
           return `
             <div class="nav-section-title">
-              ${section}
+              ${escapeHtml(section)}
             </div>
 
             ${modules
@@ -128,7 +133,7 @@ export function Sidebar({
     >
 
       <!-- =============================================== -->
-      <!-- CABECERA -->
+      <!-- LOGO -->
       <!-- =============================================== -->
 
       <div class="sidebar-header">
@@ -137,13 +142,17 @@ export function Sidebar({
 
           <img
             src="/AVI_horizontal.png"
-            alt="AVI Universidad Nacional"
+            alt="Universidad Nacional"
             class="sidebar-logo"
             draggable="false"
           />
 
         </div>
 
+
+        <!-- ============================================= -->
+        <!-- COLAPSAR -->
+        <!-- ============================================= -->
 
         <button
           id="sidebarToggle"
@@ -164,7 +173,7 @@ export function Sidebar({
 
 
       <!-- =============================================== -->
-      <!-- INFORMACIÓN -->
+      <!-- SISTEMA -->
       <!-- =============================================== -->
 
       <div class="sidebar-context">
@@ -185,21 +194,12 @@ export function Sidebar({
 
 
       <!-- =============================================== -->
-      <!-- NAVEGACIÓN -->
+      <!-- MENÚ CON SCROLL -->
       <!-- =============================================== -->
 
       <nav class="sidebar-nav">
 
-        ${
-          dashboard
-            ? renderNavItem(
-                dashboard
-              )
-            : ''
-        }
-
-
-        ${navegacionSecciones}
+        ${navegacion}
 
       </nav>
 

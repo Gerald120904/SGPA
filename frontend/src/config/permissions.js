@@ -5,6 +5,7 @@ export const ROLE_PERMISSIONS = {
   ],
 
   COORDINADOR_ACADEMICO: [
+    'home',
     'dashboard',
     'estudiantes',
     'carreras',
@@ -12,12 +13,22 @@ export const ROLE_PERMISSIONS = {
     'profesores',
     'aulas',
     'periodos',
-    'proyeccion',
-    'oferta'
+    'oferta',
+    'proyeccion'
   ]
 
 };
 
+
+/*
+ * IMPORTANTE:
+ *
+ * Esto solamente controla la visibilidad
+ * de opciones en frontend.
+ *
+ * La autorización real debe ser validada
+ * también por NestJS.
+ */
 
 export function puedeAcceder(
   rol,

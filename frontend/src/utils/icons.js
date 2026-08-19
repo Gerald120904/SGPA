@@ -1,24 +1,46 @@
 import {
   createIcons,
+
   User,
+  UserCog,
+  UserPlus,
+
   LockKeyhole,
+
   Eye,
   EyeOff,
+
+  House,
   LayoutDashboard,
+
   Users,
   GraduationCap,
-  School,
+
   BookOpen,
   Briefcase,
+
   DoorOpen,
+
   CalendarDays,
+
   LineChart,
+
   ClipboardList,
+
   LogOut,
+
   ShieldCheck,
+
   ChevronRight,
   ChevronLeft,
-  Construction
+
+  Construction,
+
+  TriangleAlert,
+
+  CirclePlus,
+
+  Clock
 } from 'lucide';
 
 
@@ -29,26 +51,45 @@ export function renderizarIconos() {
     icons: {
 
       User,
+      UserCog,
+      UserPlus,
+
       LockKeyhole,
+
       Eye,
       EyeOff,
 
+      House,
       LayoutDashboard,
+
       Users,
       GraduationCap,
-      School,
+
       BookOpen,
       Briefcase,
+
       DoorOpen,
+
       CalendarDays,
+
       LineChart,
+
       ClipboardList,
 
       LogOut,
+
       ShieldCheck,
+
       ChevronRight,
       ChevronLeft,
-      Construction
+
+      Construction,
+
+      TriangleAlert,
+
+      CirclePlus,
+
+      Clock
 
     }
 
