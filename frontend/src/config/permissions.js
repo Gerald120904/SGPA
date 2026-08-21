@@ -22,6 +22,7 @@ export const ROLE_PERMISSIONS = {
   ],
 
   [ROLES.COORDINADOR]: [
+    'home',
     'dashboard',
     'estudiantes',
     'carreras',
@@ -29,20 +30,32 @@ export const ROLE_PERMISSIONS = {
     'profesores',
     'aulas',
     'periodos',
-    'proyeccion',
-    'oferta'
+    'oferta',
+    'proyeccion'
   ],
 
   [ROLES.PROFESOR]: [
+    'home',
     'dashboard'
   ],
 
   [ROLES.ESTUDIANTE]: [
+    'home',
     'dashboard'
   ]
 
 };
 
+
+/*
+ * IMPORTANTE:
+ *
+ * Esto solamente controla la visibilidad
+ * de opciones en frontend.
+ *
+ * La autorización real debe ser validada
+ * también por NestJS.
+ */
 
 export function rolPuedeAcceder(
   rol,

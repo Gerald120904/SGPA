@@ -11,7 +11,7 @@ export function obtenerRutaActual() {
 
 
   if (!route) {
-    return '/dashboard';
+    return '/home';
   }
 
 
@@ -63,7 +63,7 @@ export function navegar(
 
 
 /* =========================================================
-   REEMPLAZAR RUTA SIN GENERAR EVENTO
+   REEMPLAZAR RUTA
    ========================================================= */
 
 export function reemplazarRuta(
@@ -86,7 +86,7 @@ export function reemplazarRuta(
 
 
 /* =========================================================
-   OBSERVAR
+   OBSERVAR RUTAS
    ========================================================= */
 
 export function observarRutas(
@@ -124,7 +124,7 @@ export function observarRutas(
 
 
 /* =========================================================
-   LIMPIAR HASH
+   LIMPIAR RUTA
    ========================================================= */
 
 export function limpiarRuta() {

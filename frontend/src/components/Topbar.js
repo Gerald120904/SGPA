@@ -9,7 +9,7 @@ export function Topbar({
 
   const nombre =
     usuario?.nombres ||
-    'Administrador';
+    'Usuario';
 
 
   const inicial =
@@ -23,18 +23,26 @@ export function Topbar({
   return `
     <header class="topbar">
 
-      <div>
+      <!-- =============================================== -->
+      <!-- PÁGINA ACTUAL -->
+      <!-- =============================================== -->
 
-        <p class="topbar-kicker">
-          Sistema de Gestión y Proyección Académica
-        </p>
+      <div class="topbar-heading">
 
         <h1 id="pageTitle">
-          Dashboard
+          SGPA
         </h1>
+
+        <p class="topbar-subtitle">
+          Campus Nicoya
+        </p>
 
       </div>
 
+
+      <!-- =============================================== -->
+      <!-- USUARIO -->
+      <!-- =============================================== -->
 
       <div class="topbar-user">
 

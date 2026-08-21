@@ -1,39 +1,54 @@
 export const MODULES = [
 
+  /* =======================================================
+     PRINCIPAL
+     ======================================================= */
+
   {
-    id: 'dashboard',
-    title: 'Dashboard',
-    route: '/dashboard',
-    icon: 'layout-dashboard',
-    section: null,
-    description: 'Resumen general del sistema'
+    id: 'home',
+    title: 'SGPA',
+    navLabel: 'Inicio',
+    route: '/home',
+    icon: 'house',
+    section: 'Principal',
+    description:
+      'Resumen general del sistema'
   },
 
   {
-    id: 'usuarios',
-    title: 'Usuarios',
-    route: '/usuarios',
-    icon: 'users',
-    section: 'Gestión',
-    description: 'Administración de cuentas y accesos'
+    id: 'dashboard',
+    title: 'Dashboard',
+    navLabel: 'Dashboard',
+    route: '/dashboard',
+    icon: 'layout-dashboard',
+    section: 'Principal',
+    description:
+      'Acceso a los módulos del sistema'
   },
+
+
+  /* =======================================================
+     GESTIÓN ACADÉMICA
+     ======================================================= */
 
   {
     id: 'estudiantes',
     title: 'Estudiantes',
     route: '/estudiantes',
-    icon: 'graduation-cap',
-    section: 'Gestión',
-    description: 'Gestión y avance curricular'
+    icon: 'users',
+    section: 'Gestión académica',
+    description:
+      'Gestión de estudiantes y avance curricular'
   },
 
   {
     id: 'carreras',
     title: 'Carreras',
     route: '/carreras',
-    icon: 'school',
-    section: 'Gestión',
-    description: 'Carreras y estructura académica'
+    icon: 'graduation-cap',
+    section: 'Gestión académica',
+    description:
+      'Administración de carreras y planes académicos'
   },
 
   {
@@ -41,8 +56,9 @@ export const MODULES = [
     title: 'Cursos',
     route: '/cursos',
     icon: 'book-open',
-    section: 'Gestión',
-    description: 'Malla, cursos y requisitos'
+    section: 'Gestión académica',
+    description:
+      'Cursos, malla curricular y requisitos'
   },
 
   {
@@ -50,8 +66,9 @@ export const MODULES = [
     title: 'Profesores',
     route: '/profesores',
     icon: 'briefcase',
-    section: 'Gestión',
-    description: 'Docentes y disponibilidad'
+    section: 'Gestión académica',
+    description:
+      'Gestión docente y disponibilidad'
   },
 
   {
@@ -59,8 +76,9 @@ export const MODULES = [
     title: 'Aulas',
     route: '/aulas',
     icon: 'door-open',
-    section: 'Gestión',
-    description: 'Espacios, capacidad y disponibilidad'
+    section: 'Gestión académica',
+    description:
+      'Espacios, capacidades y disponibilidad'
   },
 
   {
@@ -68,17 +86,9 @@ export const MODULES = [
     title: 'Periodos académicos',
     route: '/periodos',
     icon: 'calendar-days',
-    section: 'Gestión',
-    description: 'Administración de ciclos académicos'
-  },
-
-  {
-    id: 'proyeccion',
-    title: 'Proyección',
-    route: '/proyeccion',
-    icon: 'line-chart',
-    section: 'Planificación',
-    description: 'Demanda y planificación académica'
+    section: 'Gestión académica',
+    description:
+      'Administración de periodos y ciclos académicos'
   },
 
   {
@@ -86,8 +96,39 @@ export const MODULES = [
     title: 'Oferta académica',
     route: '/oferta',
     icon: 'clipboard-list',
+    section: 'Gestión académica',
+    description:
+      'Planificación de grupos, horarios y oferta'
+  },
+
+
+  /* =======================================================
+     PLANIFICACIÓN
+     ======================================================= */
+
+  {
+    id: 'proyeccion',
+    title: 'Proyección',
+    route: '/proyeccion',
+    icon: 'line-chart',
     section: 'Planificación',
-    description: 'Grupos, horarios y oferta académica'
+    description:
+      'Proyección de matrícula y análisis de demanda'
+  },
+
+
+  /* =======================================================
+     ADMINISTRACIÓN
+     ======================================================= */
+
+  {
+    id: 'usuarios',
+    title: 'Usuarios',
+    route: '/usuarios',
+    icon: 'user-cog',
+    section: 'Administración',
+    description:
+      'Usuarios, roles y acceso al sistema'
   }
 
 ];

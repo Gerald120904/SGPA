@@ -4,8 +4,12 @@ import {
 } from '../pages/login/LoginPage.js';
 
 import {
-  DashboardPage
-} from '../pages/dashboard/DashboardPage.js';
+  HomePage
+} from '../pages/home/HomePage.js';
+
+import {
+  ModulesPage
+} from '../pages/modules/ModulesPage.js';
 
 import {
   UsuariosPage,
@@ -60,12 +64,32 @@ let detenerObservadorRutas =
 
 /* =========================================================
    PÁGINAS IMPLEMENTADAS
+   =========================================================
+
+   IMPORTANTE:
+
+   home
+       ↓
+   HomePage
+       ↓
+   estadísticas / indicadores
+
+
+   dashboard
+       ↓
+   ModulesPage
+       ↓
+   cards de módulos
+
    ========================================================= */
 
 const PAGE_RENDERERS = {
 
+  home:
+    HomePage,
+
   dashboard:
-    DashboardPage,
+    ModulesPage,
 
   usuarios:
     UsuariosPage
@@ -93,10 +117,6 @@ export function iniciarAplicacion() {
 
   }
 
-
-  /*
-   * Listener global único.
-   */
 
   appRoot.addEventListener(
     'click',
@@ -141,8 +161,13 @@ function mostrarLogin() {
         );
 
 
+        /*
+         * Al iniciar sesión SIEMPRE
+         * entramos a Home.
+         */
+
         reemplazarRuta(
-          '/dashboard'
+          '/home'
         );
 
 
@@ -209,10 +234,6 @@ function mostrarAplicacion() {
     });
 
 
-  /*
-   * Aplicar estado inicial del sidebar.
-   */
-
   aplicarEstadoInicialSidebar();
 
 
@@ -231,7 +252,7 @@ function mostrarAplicacion() {
 
 
 /* =========================================================
-   ESTADO INICIAL SIDEBAR
+   SIDEBAR - ESTADO INICIAL
    ========================================================= */
 
 function aplicarEstadoInicialSidebar() {
@@ -256,22 +277,15 @@ function aplicarEstadoInicialSidebar() {
   let collapsed;
 
 
-  /*
-   * Si el usuario ya eligió una opción,
-   * respetamos su elección.
-   */
-
-  if (estadoGuardado !== null) {
+  if (
+    estadoGuardado !== null
+  ) {
 
     collapsed =
-      estadoGuardado === 'true';
+      estadoGuardado ===
+      'true';
 
   } else {
-
-    /*
-     * En pantallas más pequeñas iniciamos
-     * contraído automáticamente.
-     */
 
     collapsed =
       window.innerWidth <= 900;
@@ -293,7 +307,7 @@ function aplicarEstadoInicialSidebar() {
 
 
 /* =========================================================
-   ALTERNAR SIDEBAR
+   SIDEBAR - ALTERNAR
    ========================================================= */
 
 function alternarSidebar() {
@@ -329,7 +343,7 @@ function alternarSidebar() {
 
 
 /* =========================================================
-   ACTUALIZAR BOTÓN SIDEBAR
+   BOTÓN SIDEBAR
    ========================================================= */
 
 function actualizarBotonSidebar(
@@ -417,28 +431,28 @@ function renderizarRuta(
     );
 
 
-  /*
-   * Ruta inexistente.
-   */
+  /* =======================================================
+     RUTA INVÁLIDA
+     ======================================================= */
 
   if (!module) {
 
     reemplazarRuta(
-      '/dashboard'
+      '/home'
     );
 
 
     module =
       obtenerModuloPorRuta(
-        '/dashboard'
+        '/home'
       );
 
   }
 
 
-  /*
-   * Sin permiso visual.
-   */
+  /* =======================================================
+     PERMISOS
+     ======================================================= */
 
   if (
     !puedeAcceder(
@@ -448,13 +462,13 @@ function renderizarRuta(
   ) {
 
     reemplazarRuta(
-      '/dashboard'
+      '/home'
     );
 
 
     module =
       obtenerModuloPorRuta(
-        '/dashboard'
+        '/home'
       );
 
   }
@@ -471,11 +485,37 @@ function renderizarRuta(
   }
 
 
+  /* =======================================================
+     BUSCAR RENDERER
+     ======================================================= */
+
   const renderer =
     PAGE_RENDERERS[
       module.id
     ];
 
+
+  /*
+   * Para verificar visualmente durante desarrollo:
+   */
+
+  console.log(
+    '[SGPA ROUTER]',
+    {
+      route,
+      module:
+        module.id,
+
+      renderer:
+        renderer?.name ||
+        'placeholder'
+    }
+  );
+
+
+  /* =======================================================
+     RENDER
+     ======================================================= */
 
   if (renderer) {
 
@@ -496,6 +536,9 @@ function renderizarRuta(
   actualizarNavegacion(
     module
   );
+
+
+  contentArea.scrollTop = 0;
 
 
   renderizarIconos();
@@ -558,16 +601,16 @@ function actualizarNavegacion(
 
 
 /* =========================================================
-   CLICS GENERALES
+   EVENTOS
    ========================================================= */
 
 function manejarClickGlobal(
   event
 ) {
 
-  /*
-   * BOTÓN SIDEBAR
-   */
+  /* =======================================================
+     SIDEBAR
+     ======================================================= */
 
   const sidebarToggle =
     event.target.closest(
@@ -584,9 +627,9 @@ function manejarClickGlobal(
   }
 
 
-  /*
-   * CERRAR SESIÓN
-   */
+  /* =======================================================
+     CERRAR SESIÓN
+     ======================================================= */
 
   const logoutButton =
     event.target.closest(
@@ -603,9 +646,9 @@ function manejarClickGlobal(
   }
 
 
-  /*
-   * NAVEGACIÓN
-   */
+  /* =======================================================
+     NAVEGACIÓN
+     ======================================================= */
 
   const routeElement =
     event.target.closest(
