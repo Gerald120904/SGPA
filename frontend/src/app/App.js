@@ -8,6 +8,11 @@ import {
 } from '../pages/dashboard/DashboardPage.js';
 
 import {
+  UsuariosPage,
+  iniciarUsuariosPage
+} from '../pages/usuarios/UsuariosPage.js';
+
+import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
 
@@ -26,7 +31,8 @@ import {
 import {
   guardarSesion,
   obtenerUsuario,
-  obtenerRolUsuario,
+  obtenerRolesUsuario,
+  tieneRolValido,
   limpiarSesion
 } from './session.js';
 
@@ -40,6 +46,10 @@ import {
 import {
   renderizarIconos
 } from '../utils/icons.js';
+
+import {
+  logout
+} from '../services/auth.service.js';
 
 
 let appRoot = null;
@@ -55,7 +65,10 @@ let detenerObservadorRutas =
 const PAGE_RENDERERS = {
 
   dashboard:
-    DashboardPage
+    DashboardPage,
+
+  usuarios:
+    UsuariosPage
 
 };
 
@@ -161,8 +174,30 @@ function mostrarAplicacion() {
   }
 
 
-  const rol =
-    obtenerRolUsuario(
+  if (
+    !tieneRolValido(
+      usuario
+    )
+  ) {
+
+    console.error(
+      'Acceso rechazado: el usuario no posee un rol válido en SGPA.'
+    );
+
+
+    limpiarSesion();
+
+
+    mostrarLogin();
+
+
+    return;
+
+  }
+
+
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
@@ -170,7 +205,7 @@ function mostrarAplicacion() {
   appRoot.innerHTML =
     AppLayout({
       usuario,
-      rol
+      roles
     });
 
 
@@ -370,8 +405,8 @@ function renderizarRuta(
   }
 
 
-  const rol =
-    obtenerRolUsuario(
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
@@ -407,7 +442,7 @@ function renderizarRuta(
 
   if (
     !puedeAcceder(
-      rol,
+      roles,
       module.id
     )
   ) {
@@ -464,6 +499,15 @@ function renderizarRuta(
 
 
   renderizarIconos();
+
+
+  if (
+    module.id === 'usuarios'
+  ) {
+
+    iniciarUsuariosPage();
+
+  }
 
 }
 
@@ -598,15 +642,15 @@ function manejarClickGlobal(
     obtenerUsuario();
 
 
-  const rol =
-    obtenerRolUsuario(
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
 
   if (
     !puedeAcceder(
-      rol,
+      roles,
       module.id
     )
   ) {
@@ -627,13 +671,29 @@ function manejarClickGlobal(
    CERRAR SESIÓN
    ========================================================= */
 
-function cerrarSesion() {
+async function cerrarSesion() {
 
   desmontarRouter();
 
-  limpiarSesion();
+  try {
 
-  mostrarLogin();
+    await logout();
+
+  } catch (error) {
+
+    console.error(
+      'Error al cerrar la sesión en Electron:',
+      error
+    );
+
+  } finally {
+
+    limpiarSesion();
+
+    mostrarLogin();
+
+  }
+
 
 }
 

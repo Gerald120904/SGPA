@@ -10,6 +10,60 @@ export class UsuariosService {
     private readonly usuarioRepository: Repository<Usuario>,
   ) {}
 
+  async listar() {
+    const usuarios = await this.usuarioRepository.find({
+      select: {
+        id: true,
+        cedula: true,
+        nombres: true,
+        apellido1: true,
+        apellido2: true,
+        correo: true,
+        activo: true,
+        ultimoAcceso: true,
+        createdAt: true,
+        updatedAt: true,
+        usuarioRoles: {
+          usuarioId: true,
+          rolId: true,
+          createdAt: true,
+          rol: {
+            id: true,
+            nombre: true,
+            descripcion: true,
+            activo: true,
+            createdAt: true,
+          },
+        },
+      },
+      relations: {
+        usuarioRoles: {
+          rol: true,
+        },
+      },
+      order: {
+        nombres: 'ASC',
+        apellido1: 'ASC',
+      },
+    });
+
+    return usuarios.map((usuario) => ({
+      id: usuario.id,
+      cedula: usuario.cedula,
+      nombres: usuario.nombres,
+      apellido1: usuario.apellido1,
+      apellido2: usuario.apellido2,
+      correo: usuario.correo,
+      activo: usuario.activo,
+      ultimoAcceso: usuario.ultimoAcceso,
+      roles: usuario.usuarioRoles
+        .filter((relacion) => relacion.rol && relacion.rol.activo)
+        .map((relacion) => relacion.rol.nombre),
+      createdAt: usuario.createdAt,
+      updatedAt: usuario.updatedAt,
+    }));
+  }
+
   async buscarPorCorreo(correo: string): Promise<Usuario | null> {
     return this.usuarioRepository.findOne({
       where: { correo },

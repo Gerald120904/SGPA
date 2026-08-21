@@ -10,6 +10,10 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
 import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
+import {
+  RolSistema,
+  ROLES_SISTEMA,
+} from './constants/roles.constants';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +21,28 @@ export class AuthService {
     private readonly usuariosService: UsuariosService,
     private readonly jwtService: JwtService,
   ) {}
+
+  private obtenerRolesValidos(
+    usuarioRoles: {
+      rol: {
+        nombre: string;
+        activo: boolean;
+      };
+    }[],
+  ): RolSistema[] {
+    const roles = usuarioRoles
+      .filter(
+        (usuarioRol) =>
+          usuarioRol.rol &&
+          usuarioRol.rol.activo &&
+          ROLES_SISTEMA.includes(
+            usuarioRol.rol.nombre as RolSistema,
+          ),
+      )
+      .map((usuarioRol) => usuarioRol.rol.nombre as RolSistema);
+
+    return [...new Set(roles)];
+  }
 
   async login(loginDto: LoginDto) {
     const correo = loginDto.correo.trim().toLowerCase();
@@ -39,9 +65,13 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales incorrectas');
     }
 
-    const roles = usuario.usuarioRoles
-      .filter((usuarioRol) => usuarioRol.rol && usuarioRol.rol.activo)
-      .map((usuarioRol) => usuarioRol.rol.nombre);
+    const roles = this.obtenerRolesValidos(usuario.usuarioRoles);
+
+    if (roles.length === 0) {
+      throw new UnauthorizedException(
+        'El usuario no posee acceso habilitado al SGPA.',
+      );
+    }
 
     const payload = {
       sub: usuario.id,
@@ -145,9 +175,13 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no válido');
     }
 
-    const roles = usuario.usuarioRoles
-      .filter((usuarioRol) => usuarioRol.rol && usuarioRol.rol.activo)
-      .map((usuarioRol) => usuarioRol.rol.nombre);
+    const roles = this.obtenerRolesValidos(usuario.usuarioRoles);
+
+    if (roles.length === 0) {
+      throw new UnauthorizedException(
+        'El usuario no posee acceso habilitado al SGPA.',
+      );
+    }
 
     return {
       id: usuario.id,

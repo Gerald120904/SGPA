@@ -1,0 +1,127 @@
+.usuarios-heading {
+  margin-bottom: 20px;
+}
+
+.usuarios-heading h2,
+.usuarios-heading p,
+.usuarios-message h2,
+.usuarios-message p {
+  margin: 0;
+}
+
+.usuarios-heading p,
+.usuarios-message p {
+  margin-top: 6px;
+
+  color: #667085;
+}
+
+.usuarios-content {
+  width: 100%;
+}
+
+.usuarios-message {
+  padding: 24px;
+
+  border: 1px solid #e6ebf1;
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  color: #344054;
+}
+
+.usuarios-error {
+  border-color: #fecaca;
+
+  background: #fff7f7;
+}
+
+.usuarios-error h2,
+.usuarios-error p {
+  color: #b42318;
+}
+
+.usuarios-table-wrap {
+  width: 100%;
+
+  overflow-x: auto;
+
+  border: 1px solid #e6ebf1;
+  border-radius: 14px;
+
+  background: #ffffff;
+}
+
+.usuarios-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  font-size: 13px;
+}
+
+.usuarios-table th,
+.usuarios-table td {
+  padding: 14px 16px;
+
+  text-align: left;
+
+  border-bottom: 1px solid #edf0f4;
+}
+
+.usuarios-table th {
+  background: #f8fafc;
+
+  color: #667085;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.4px;
+}
+
+.usuarios-table td {
+  color: #344054;
+}
+
+.usuarios-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.usuarios-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.usuarios-status {
+  display: inline-flex;
+
+  padding: 4px 9px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.usuarios-status.is-active {
+  background: #ecfdf3;
+
+  color: #027a48;
+}
+
+.usuarios-status.is-inactive {
+  background: #f2f4f7;
+
+  color: #667085;
+}
+
+.usuarios-empty {
+  padding: 28px !important;
+
+  text-align: center !important;
+
+  color: #667085 !important;
+}

@@ -7,7 +7,8 @@ import {
 } from '../config/permissions.js';
 
 import {
-  formatearRol
+  formatearRol,
+  obtenerRolPrincipal
 } from '../app/session.js';
 
 import {
@@ -45,12 +46,12 @@ function renderNavItem(
 
 export function Sidebar({
   usuario,
-  rol
+  roles
 }) {
 
   const nombre =
     usuario?.nombres ||
-    'Administrador';
+    'Usuario';
 
 
   const inicial =
@@ -61,11 +62,17 @@ export function Sidebar({
     'A';
 
 
+  const rolPrincipal =
+    obtenerRolPrincipal(
+      usuario
+    );
+
+
   const modulosVisibles =
     MODULES.filter(
       (module) =>
         puedeAcceder(
-          rol,
+          roles,
           module.id
         )
     );
@@ -225,7 +232,9 @@ export function Sidebar({
 
             <span>
               ${escapeHtml(
-                formatearRol(rol)
+                formatearRol(
+                  rolPrincipal
+                )
               )}
             </span>
 

@@ -172,9 +172,57 @@ ipcMain.handle('auth:perfil', async () => {
   }
 });
 
-ipcMain.handle('auth:logout', async () => {
+ipcMain.handle('auth:logout', () => {
   accessToken = null;
-  return { ok: true };
+  return {
+    ok: true
+  };
+});
+
+ipcMain.handle('usuarios:listar', async () => {
+  if (!accessToken) {
+    return {
+      ok: false,
+      status: 401,
+      message: 'No existe una sesión activa.',
+    };
+  }
+
+  try {
+    const response = await net.fetch(`${API_URL}/usuarios`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        accessToken = null;
+      }
+
+      return {
+        ok: false,
+        status: response.status,
+        message: data.message || 'No fue posible consultar los usuarios.',
+      };
+    }
+
+    return {
+      ok: true,
+      usuarios: data,
+    };
+  } catch (error) {
+    console.error('Error consultando usuarios:', error);
+
+    return {
+      ok: false,
+      status: 0,
+      message: 'No se pudo conectar con el servidor del SGPA.',
+    };
+  }
 });
 
 const createWindow = () => {

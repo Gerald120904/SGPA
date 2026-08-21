@@ -16,7 +16,8 @@ import {
 
 import {
   obtenerUsuario,
-  obtenerRolUsuario,
+  obtenerRolesUsuario,
+  obtenerRolPrincipal,
   formatearRol
 } from '../../app/session.js';
 
@@ -31,15 +32,21 @@ export function DashboardPage() {
     obtenerUsuario();
 
 
-  const rol =
-    obtenerRolUsuario(
+  const roles =
+    obtenerRolesUsuario(
+      usuario
+    );
+
+
+  const rolPrincipal =
+    obtenerRolPrincipal(
       usuario
     );
 
 
   const nombre =
     usuario?.nombres ||
-    'Administrador';
+    'Usuario';
 
 
   /*
@@ -54,7 +61,7 @@ export function DashboardPage() {
         return (
           module.id !== 'dashboard' &&
           puedeAcceder(
-            rol,
+            roles,
             module.id
           )
         );
@@ -133,7 +140,9 @@ export function DashboardPage() {
 
             <strong>
               ${escapeHtml(
-                formatearRol(rol)
+                formatearRol(
+                  rolPrincipal
+                )
               )}
             </strong>
 
