@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -13,6 +13,12 @@ describe('UsuariosController', () => {
   const jwtSecret = 'usuarios-controller-test-secret';
   const usuariosService = {
     listar: jest.fn(),
+    obtenerPorId: jest.fn(),
+    crear: jest.fn(),
+    actualizar: jest.fn(),
+    cambiarEstado: jest.fn(),
+    asignarRol: jest.fn(),
+    revocarRol: jest.fn(),
   };
 
   let app: INestApplication<App>;
@@ -39,6 +45,13 @@ describe('UsuariosController', () => {
     }).compile();
 
     app = module.createNestApplication();
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     jwtService = module.get(JwtService);
     await app.init();
   });
@@ -46,6 +59,12 @@ describe('UsuariosController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     usuariosService.listar.mockResolvedValue([]);
+    usuariosService.obtenerPorId.mockResolvedValue({ id: 2 });
+    usuariosService.crear.mockResolvedValue({ id: 2 });
+    usuariosService.actualizar.mockResolvedValue({ id: 2 });
+    usuariosService.cambiarEstado.mockResolvedValue({ id: 2 });
+    usuariosService.asignarRol.mockResolvedValue({ id: 2 });
+    usuariosService.revocarRol.mockResolvedValue({ id: 2 });
   });
 
   afterAll(async () => {
@@ -90,5 +109,134 @@ describe('UsuariosController', () => {
       .expect(200, []);
 
     expect(usuariosService.listar).toHaveBeenCalledTimes(1);
+  });
+
+  it('crea un usuario válido como ADMIN_GLOBAL', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+    const dto = {
+      cedula: '111111111',
+      nombres: 'Usuario',
+      apellido1: 'Prueba',
+      correo: 'usuario@sgpa.local',
+      password: 'ClaveSegura123',
+      roles: ['PROFESOR'],
+    };
+
+    await request(app.getHttpServer())
+      .post('/usuarios')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(201, { id: 2 });
+
+    expect(usuariosService.crear).toHaveBeenCalledWith(dto);
+  });
+
+  it('consulta el detalle de un usuario', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+
+    await request(app.getHttpServer())
+      .get('/usuarios/2')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { id: 2 });
+
+    expect(usuariosService.obtenerPorId).toHaveBeenCalledWith(2);
+  });
+
+  it('actualiza datos administrativos', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+    const dto = {
+      nombres: 'Nombre actualizado',
+      correo: 'actualizado@sgpa.local',
+    };
+
+    await request(app.getHttpServer())
+      .patch('/usuarios/2')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(200, { id: 2 });
+
+    expect(usuariosService.actualizar).toHaveBeenCalledWith(2, dto);
+  });
+
+  it('asigna un rol oficial', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+
+    await request(app.getHttpServer())
+      .post('/usuarios/2/roles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ rol: 'PROFESOR' })
+      .expect(201, { id: 2 });
+
+    expect(usuariosService.asignarRol).toHaveBeenCalledWith(2, 'PROFESOR');
+  });
+
+  it('rechaza un rol no oficial en el DTO de creación', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+
+    await request(app.getHttpServer())
+      .post('/usuarios')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        cedula: '111111111',
+        nombres: 'Usuario',
+        apellido1: 'Prueba',
+        correo: 'usuario@sgpa.local',
+        password: 'ClaveSegura123',
+        roles: ['ROL_INVENTADO'],
+      })
+      .expect(400);
+
+    expect(usuariosService.crear).not.toHaveBeenCalled();
+  });
+
+  it('envía el usuario autenticado al cambiar estado', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+
+    await request(app.getHttpServer())
+      .patch('/usuarios/2/estado')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ activo: false })
+      .expect(200, { id: 2 });
+
+    expect(usuariosService.cambiarEstado).toHaveBeenCalledWith(2, false, 1);
+  });
+
+  it('envía el usuario autenticado al revocar un rol', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1,
+      correo: 'admin@sgpa.local',
+      roles: ['ADMIN_GLOBAL'],
+    });
+
+    await request(app.getHttpServer())
+      .delete('/usuarios/2/roles/3')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { id: 2 });
+
+    expect(usuariosService.revocarRol).toHaveBeenCalledWith(2, 3, 1);
   });
 });

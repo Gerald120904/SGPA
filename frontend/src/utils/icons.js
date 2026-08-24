@@ -42,6 +42,16 @@ import {
 
   CirclePlus,
 
+  Plus,
+  Save,
+  CirclePause,
+  CircleCheck,
+
+  Search,
+  Pencil,
+  Power,
+  X,
+
   Clock
 } from 'lucide';
 
@@ -92,6 +102,16 @@ export function renderizarIconos() {
       TriangleAlert,
 
       CirclePlus,
+
+      Plus,
+      Save,
+      CirclePause,
+      CircleCheck,
+
+      Search,
+      Pencil,
+      Power,
+      X,
 
       Clock
 

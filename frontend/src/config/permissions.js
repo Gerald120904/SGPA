@@ -26,6 +26,7 @@ export const ROLE_PERMISSIONS = {
     'dashboard',
     'estudiantes',
     'carreras',
+    'planes-estudio',
     'cursos',
     'profesores',
     'aulas',

@@ -5,12 +5,14 @@ import { Usuario } from './entities/usuario.entity';
 import { UsuarioRol } from './entities/usuario-rol.entity';
 import { UsuariosController } from './usuarios.controller';
 import { SecurityModule } from '../auth/security.module';
+import { Rol } from '../roles/entities/rol.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Usuario,
       UsuarioRol,
+      Rol,
     ]),
     SecurityModule,
   ],

@@ -14,6 +14,7 @@ import { AulasModule } from './aulas/aulas.module';
 import { PeriodosAcademicosModule } from './periodos-academicos/periodos-academicos.module';
 import { ProyeccionModule } from './proyeccion/proyeccion.module';
 import { OfertaAcademicaModule } from './oferta-academica/oferta-academica.module';
+import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { OfertaAcademicaModule } from './oferta-academica/oferta-academica.modul
     EstudiantesModule,
     CarrerasModule,
     CursosModule,
+    PlanesEstudioModule,
     ProfesoresModule,
     AulasModule,
     PeriodosAcademicosModule,

@@ -17,6 +17,21 @@ import {
 } from '../pages/usuarios/UsuariosPage.js';
 
 import {
+  CarrerasPage,
+  iniciarCarrerasPage
+} from '../pages/carreras/CarrerasPage.js';
+
+import {
+  PlanesEstudioPage,
+  iniciarPlanesEstudioPage
+} from '../pages/planes-estudio/PlanesEstudioPage.js';
+
+import {
+  CursosPage,
+  iniciarCursosPage
+} from '../pages/cursos/CursosPage.js';
+
+import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
 
@@ -92,7 +107,16 @@ const PAGE_RENDERERS = {
     ModulesPage,
 
   usuarios:
-    UsuariosPage
+    UsuariosPage,
+
+  carreras:
+    CarrerasPage,
+
+  'planes-estudio':
+    PlanesEstudioPage,
+
+  cursos:
+    CursosPage
 
 };
 
@@ -549,6 +573,34 @@ function renderizarRuta(
   ) {
 
     iniciarUsuariosPage();
+
+  }
+
+
+  if (
+    module.id === 'carreras'
+  ) {
+
+    iniciarCarrerasPage();
+
+  }
+
+
+  if (
+    module.id ===
+    'planes-estudio'
+  ) {
+
+    iniciarPlanesEstudioPage();
+
+  }
+
+
+  if (
+    module.id === 'cursos'
+  ) {
+
+    iniciarCursosPage();
 
   }
 
