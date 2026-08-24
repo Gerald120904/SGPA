@@ -52,6 +52,16 @@ export const MODULES = [
   },
 
   {
+    id: 'planes-estudio',
+    title: 'Planes de estudio',
+    route: '/planes-estudio',
+    icon: 'clipboard-list',
+    section: 'Gestión académica',
+    description:
+      'Planes académicos y estructura curricular'
+  },
+
+  {
     id: 'cursos',
     title: 'Cursos',
     route: '/cursos',

@@ -9,7 +9,7 @@ export function Topbar({
 
   const nombre =
     usuario?.nombres ||
-    'Administrador';
+    'Usuario';
 
 
   const inicial =

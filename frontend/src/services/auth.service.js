@@ -80,3 +80,21 @@ export async function restablecerPassword(
     });
 
 }
+
+export async function logout() {
+
+  if (
+    !window.sgpa ||
+    typeof window.sgpa.logout !== 'function'
+  ) {
+
+    throw new Error(
+      'La API segura de Electron no está disponible.'
+    );
+
+  }
+
+
+  return window.sgpa.logout();
+
+}

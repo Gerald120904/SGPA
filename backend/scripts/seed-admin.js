@@ -14,7 +14,7 @@ async function seedAdmin() {
   const plainPassword = 'SGPA2026*';
 
   const [roles] = await conn.query(
-    "SELECT id, nombre FROM roles WHERE nombre IN ('ADMINISTRADOR', 'COORDINADOR_ACADEMICO') ORDER BY id",
+    "SELECT id, nombre FROM roles WHERE nombre IN ('ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR', 'ESTUDIANTE') ORDER BY id",
   );
 
   if (!roles.length) {
@@ -40,9 +40,9 @@ async function seedAdmin() {
     console.log(`Usuario creado. id=${usuarioId}`);
   }
 
-  const adminRole = roles.find((rol) => rol.nombre === 'ADMINISTRADOR');
+  const adminRole = roles.find((rol) => rol.nombre === 'ADMIN_GLOBAL');
   if (!adminRole) {
-    throw new Error('No existe el rol ADMINISTRADOR.');
+    throw new Error('No existe el rol ADMIN_GLOBAL.');
   }
 
   const [existingRelation] = await conn.query(
@@ -57,7 +57,7 @@ async function seedAdmin() {
       usuarioId,
       adminRole.id,
     ]);
-    console.log('Rol ADMINISTRADOR asignado al usuario.');
+    console.log('Rol ADMIN_GLOBAL asignado al usuario.');
   }
 
   await conn.end();

@@ -6,6 +6,18 @@ import {
   escapeHtml
 } from '../../utils/html.js';
 
+import {
+  obtenerModuloPorRuta
+} from '../../config/modules.js';
+
+import {
+  puedeAcceder
+} from '../../config/permissions.js';
+
+import {
+  obtenerRolesUsuario
+} from '../../app/session.js';
+
 
 /* =========================================================
    HOME
@@ -264,8 +276,30 @@ function renderActividad() {
 
 function renderAcciones() {
 
+  const roles =
+    obtenerRolesUsuario();
+
   return DASHBOARD_MOCK
     .acciones
+    .filter(
+      (action) => {
+
+        const module =
+          obtenerModuloPorRuta(
+            action.route
+          );
+
+
+        return (
+          module &&
+          puedeAcceder(
+            roles,
+            module.id
+          )
+        );
+
+      }
+    )
     .map(
       (action) => {
 

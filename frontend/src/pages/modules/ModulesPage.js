@@ -8,7 +8,7 @@ import {
 
 import {
   obtenerUsuario,
-  obtenerRolUsuario
+  obtenerRolesUsuario
 } from '../../app/session.js';
 
 import {
@@ -35,8 +35,8 @@ export function ModulesPage() {
     obtenerUsuario();
 
 
-  const rol =
-    obtenerRolUsuario(
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
@@ -62,7 +62,7 @@ export function ModulesPage() {
           module.id !== 'home' &&
           module.id !== 'dashboard' &&
           puedeAcceder(
-            rol,
+            roles,
             module.id
           )
         );

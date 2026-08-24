@@ -11,6 +11,7 @@ describe('AuthService', () => {
 
   const usuariosService = {
     buscarPorCorreo: jest.fn(),
+    buscarPorId: jest.fn(),
     actualizarUltimoAcceso: jest.fn(),
     guardarRecuperacionPassword: jest.fn(),
     actualizarPassword: jest.fn(),
@@ -47,7 +48,7 @@ describe('AuthService', () => {
       correo: 'admin@una.ac.cr',
       passwordHash: hashedPassword,
       activo: true,
-      usuarioRoles: [{ rol: { nombre: 'ADMINISTRADOR', activo: true } }],
+      usuarioRoles: [{ rol: { nombre: 'ADMIN_GLOBAL', activo: true } }],
     });
 
     jwtService.signAsync.mockResolvedValue('jwt-token');
@@ -58,7 +59,7 @@ describe('AuthService', () => {
     expect(jwtService.signAsync).toHaveBeenCalledWith({
       sub: 1,
       correo: 'admin@una.ac.cr',
-      roles: ['ADMINISTRADOR'],
+      roles: ['ADMIN_GLOBAL'],
     });
     expect(usuariosService.actualizarUltimoAcceso).toHaveBeenCalledWith(1);
     expect(result).toEqual({
@@ -70,9 +71,93 @@ describe('AuthService', () => {
         apellido1: 'SGPA',
         apellido2: null,
         correo: 'admin@una.ac.cr',
-        roles: ['ADMINISTRADOR'],
+        roles: ['ADMIN_GLOBAL'],
       },
     });
+  });
+
+  it('should reject a valid user without a valid SGPA role', async () => {
+    const password = 'MiClave123';
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    usuariosService.buscarPorCorreo.mockResolvedValue({
+      id: 2,
+      cedula: '111111111',
+      nombres: 'Usuario',
+      apellido1: 'Prueba',
+      apellido2: null,
+      correo: 'usuario@una.ac.cr',
+      passwordHash: hashedPassword,
+      activo: true,
+      usuarioRoles: [
+        {
+          rol: {
+            nombre: 'ROL_INVENTADO',
+            activo: true,
+          },
+        },
+      ],
+    });
+
+    await expect(
+      service.login({
+        correo: 'usuario@una.ac.cr',
+        password,
+      }),
+    ).rejects.toThrow('El usuario no posee acceso habilitado al SGPA.');
+
+    expect(jwtService.signAsync).not.toHaveBeenCalled();
+    expect(usuariosService.actualizarUltimoAcceso).not.toHaveBeenCalled();
+  });
+
+  it('should include only active, valid and unique roles in the JWT', async () => {
+    const password = 'MiClave123';
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    usuariosService.buscarPorCorreo.mockResolvedValue({
+      id: 3,
+      cedula: '222222222',
+      nombres: 'Usuario',
+      apellido1: 'Multirrol',
+      apellido2: null,
+      correo: 'multi@una.ac.cr',
+      passwordHash: hashedPassword,
+      activo: true,
+      usuarioRoles: [
+        { rol: { nombre: 'PROFESOR', activo: true } },
+        { rol: { nombre: 'COORDINADOR', activo: true } },
+        { rol: { nombre: 'PROFESOR', activo: true } },
+        { rol: { nombre: 'ESTUDIANTE', activo: false } },
+        { rol: { nombre: 'ROL_INVENTADO', activo: true } },
+      ],
+    });
+    jwtService.signAsync.mockResolvedValue('jwt-token');
+
+    await service.login({
+      correo: 'multi@una.ac.cr',
+      password,
+    });
+
+    expect(jwtService.signAsync).toHaveBeenCalledWith({
+      sub: 3,
+      correo: 'multi@una.ac.cr',
+      roles: ['PROFESOR', 'COORDINADOR'],
+    });
+  });
+
+  it('should reject perfil when the user no longer has a valid active role', async () => {
+    usuariosService.buscarPorId.mockResolvedValue({
+      id: 4,
+      activo: true,
+      usuarioRoles: [
+        { rol: { nombre: 'COORDINADOR', activo: false } },
+        { rol: { nombre: 'ROL_INVENTADO', activo: true } },
+      ],
+    });
+
+    await expect(service.perfil(4)).rejects.toThrow(
+      'El usuario no posee acceso habilitado al SGPA.',
+    );
   });
 
   it('should generate and store a six-digit recovery code hash', async () => {

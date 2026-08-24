@@ -12,6 +12,26 @@ import {
 } from '../pages/modules/ModulesPage.js';
 
 import {
+  UsuariosPage,
+  iniciarUsuariosPage
+} from '../pages/usuarios/UsuariosPage.js';
+
+import {
+  CarrerasPage,
+  iniciarCarrerasPage
+} from '../pages/carreras/CarrerasPage.js';
+
+import {
+  PlanesEstudioPage,
+  iniciarPlanesEstudioPage
+} from '../pages/planes-estudio/PlanesEstudioPage.js';
+
+import {
+  CursosPage,
+  iniciarCursosPage
+} from '../pages/cursos/CursosPage.js';
+
+import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
 
@@ -30,7 +50,8 @@ import {
 import {
   guardarSesion,
   obtenerUsuario,
-  obtenerRolUsuario,
+  obtenerRolesUsuario,
+  tieneRolValido,
   limpiarSesion
 } from './session.js';
 
@@ -44,6 +65,10 @@ import {
 import {
   renderizarIconos
 } from '../utils/icons.js';
+
+import {
+  logout
+} from '../services/auth.service.js';
 
 
 let appRoot = null;
@@ -79,7 +104,19 @@ const PAGE_RENDERERS = {
     HomePage,
 
   dashboard:
-    ModulesPage
+    ModulesPage,
+
+  usuarios:
+    UsuariosPage,
+
+  carreras:
+    CarrerasPage,
+
+  'planes-estudio':
+    PlanesEstudioPage,
+
+  cursos:
+    CursosPage
 
 };
 
@@ -186,8 +223,30 @@ function mostrarAplicacion() {
   }
 
 
-  const rol =
-    obtenerRolUsuario(
+  if (
+    !tieneRolValido(
+      usuario
+    )
+  ) {
+
+    console.error(
+      'Acceso rechazado: el usuario no posee un rol válido en SGPA.'
+    );
+
+
+    limpiarSesion();
+
+
+    mostrarLogin();
+
+
+    return;
+
+  }
+
+
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
@@ -195,7 +254,7 @@ function mostrarAplicacion() {
   appRoot.innerHTML =
     AppLayout({
       usuario,
-      rol
+      roles
     });
 
 
@@ -384,8 +443,8 @@ function renderizarRuta(
   }
 
 
-  const rol =
-    obtenerRolUsuario(
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
@@ -421,7 +480,7 @@ function renderizarRuta(
 
   if (
     !puedeAcceder(
-      rol,
+      roles,
       module.id
     )
   ) {
@@ -507,6 +566,43 @@ function renderizarRuta(
 
 
   renderizarIconos();
+
+
+  if (
+    module.id === 'usuarios'
+  ) {
+
+    iniciarUsuariosPage();
+
+  }
+
+
+  if (
+    module.id === 'carreras'
+  ) {
+
+    iniciarCarrerasPage();
+
+  }
+
+
+  if (
+    module.id ===
+    'planes-estudio'
+  ) {
+
+    iniciarPlanesEstudioPage();
+
+  }
+
+
+  if (
+    module.id === 'cursos'
+  ) {
+
+    iniciarCursosPage();
+
+  }
 
 }
 
@@ -641,15 +737,15 @@ function manejarClickGlobal(
     obtenerUsuario();
 
 
-  const rol =
-    obtenerRolUsuario(
+  const roles =
+    obtenerRolesUsuario(
       usuario
     );
 
 
   if (
     !puedeAcceder(
-      rol,
+      roles,
       module.id
     )
   ) {
@@ -670,13 +766,29 @@ function manejarClickGlobal(
    CERRAR SESIÓN
    ========================================================= */
 
-function cerrarSesion() {
+async function cerrarSesion() {
 
   desmontarRouter();
 
-  limpiarSesion();
+  try {
 
-  mostrarLogin();
+    await logout();
+
+  } catch (error) {
+
+    console.error(
+      'Error al cerrar la sesión en Electron:',
+      error
+    );
+
+  } finally {
+
+    limpiarSesion();
+
+    mostrarLogin();
+
+  }
+
 
 }
 

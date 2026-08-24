@@ -1,4 +1,23 @@
+import {
+  ROLES
+} from '../config/permissions.js';
+
+
 let sesionActual = null;
+
+
+const ROLE_PRIORITY = [
+  ROLES.ADMIN_GLOBAL,
+  ROLES.COORDINADOR,
+  ROLES.PROFESOR,
+  ROLES.ESTUDIANTE
+];
+
+
+const ROLES_VALIDOS =
+  new Set(
+    ROLE_PRIORITY
+  );
 
 
 /* =========================================================
@@ -12,12 +31,7 @@ export function guardarSesion(
   sesionActual = {
 
     usuario:
-      resultado?.usuario || null,
-
-    accessToken:
-      resultado?.accessToken ||
-      resultado?.token ||
-      null
+      resultado?.usuario || null
 
   };
 
@@ -36,150 +50,228 @@ export function obtenerUsuario() {
 
 
 /* =========================================================
-   TOKEN
+   ROLES DEL USUARIO
    ========================================================= */
 
-export function obtenerAccessToken() {
-
-  return sesionActual?.accessToken || null;
-
-}
-
-
-/* =========================================================
-   LIMPIAR
-   ========================================================= */
-
-export function limpiarSesion() {
-
-  sesionActual = null;
-
-}
-
-
-/* =========================================================
-   ROL
-   ========================================================= */
-
-export function obtenerRolUsuario(
-  usuario
+export function obtenerRolesUsuario(
+  usuario = obtenerUsuario()
 ) {
 
   if (!usuario) {
-
-    /*
-     * Temporal durante el desarrollo.
-     */
-    return 'ADMINISTRADOR';
-
+    return [];
   }
+
+
+  const roles = [];
 
 
   if (
     typeof usuario.rol === 'string'
   ) {
 
-    return usuario.rol;
+    roles.push(
+      usuario.rol.trim()
+    );
+
+  } else if (
+    typeof usuario.rol?.nombre === 'string'
+  ) {
+
+    roles.push(
+      usuario.rol.nombre.trim()
+    );
 
   }
 
 
   if (
-    usuario.rol?.nombre
+    Array.isArray(usuario.roles)
   ) {
 
-    return usuario.rol.nombre;
+    roles.push(
+      ...usuario.roles
+        .map(
+          (rol) => {
+
+            if (
+              typeof rol === 'string'
+            ) {
+              return rol.trim();
+            }
+
+
+            if (
+              typeof rol?.nombre === 'string'
+            ) {
+              return rol.nombre.trim();
+            }
+
+
+            if (
+              typeof rol?.rol?.nombre === 'string'
+            ) {
+              return rol.rol.nombre.trim();
+            }
+
+
+            return null;
+
+          }
+        )
+        .filter(Boolean)
+    );
 
   }
 
 
   if (
-    Array.isArray(usuario.roles) &&
-    usuario.roles.length > 0
+    Array.isArray(usuario.usuarioRoles)
   ) {
 
-    const rol =
-      usuario.roles[0];
+    roles.push(
+      ...usuario.usuarioRoles
+        .map(
+          (relacion) =>
+            relacion?.rol?.nombre
+              ?.trim() ||
+            null
+        )
+        .filter(Boolean)
+    );
 
+  }
+
+
+  return [
+    ...new Set(
+      roles.filter(
+        (rol) =>
+          ROLES_VALIDOS.has(rol)
+      )
+    )
+  ];
+
+}
+
+
+/* =========================================================
+   VALIDAR ROLES
+   ========================================================= */
+
+export function tieneRolValido(
+  usuario = obtenerUsuario()
+) {
+
+  return obtenerRolesUsuario(
+    usuario
+  ).length > 0;
+
+}
+
+
+/* =========================================================
+   ROL PRINCIPAL
+   ========================================================= */
+
+export function obtenerRolPrincipal(
+  usuario = obtenerUsuario()
+) {
+
+  const roles =
+    obtenerRolesUsuario(
+      usuario
+    );
+
+
+  for (
+    const rol of ROLE_PRIORITY
+  ) {
 
     if (
-      typeof rol === 'string'
+      roles.includes(rol)
     ) {
 
       return rol;
 
     }
 
-
-    if (
-      rol?.nombre
-    ) {
-
-      return rol.nombre;
-
-    }
-
-
-    if (
-      rol?.rol?.nombre
-    ) {
-
-      return rol.rol.nombre;
-
-    }
-
   }
 
 
-  if (
-    Array.isArray(usuario.usuarioRoles) &&
-    usuario.usuarioRoles.length > 0
-  ) {
-
-    const relacion =
-      usuario.usuarioRoles[0];
-
-
-    if (
-      relacion?.rol?.nombre
-    ) {
-
-      return relacion.rol.nombre;
-
-    }
-
-  }
-
-
-  /*
-   * Mientras Gerald termina la estructura
-   * definitiva de roles.
-   */
-  return 'ADMINISTRADOR';
+  return null;
 
 }
 
 
 /* =========================================================
-   FORMATO ROL
+   FORMATEAR ROL
    ========================================================= */
 
 export function formatearRol(
   rol
 ) {
 
-  if (!rol) {
-    return 'Administrador';
+  const nombres = {
+
+    [ROLES.ADMIN_GLOBAL]:
+      'Administrador global',
+
+    [ROLES.COORDINADOR]:
+      'Coordinador',
+
+    [ROLES.PROFESOR]:
+      'Profesor',
+
+    [ROLES.ESTUDIANTE]:
+      'Estudiante'
+
+  };
+
+
+  return (
+    nombres[rol] ||
+    'Rol no reconocido'
+  );
+
+}
+
+
+/* =========================================================
+   FORMATEAR TODOS LOS ROLES
+   ========================================================= */
+
+export function formatearRoles(
+  usuario = obtenerUsuario()
+) {
+
+  const roles =
+    obtenerRolesUsuario(
+      usuario
+    );
+
+
+  if (
+    roles.length === 0
+  ) {
+
+    return 'Sin rol asignado';
+
   }
 
 
-  return rol
-    .replaceAll('_', ' ')
-    .toLowerCase()
-    .replace(
-      /\b\w/g,
-      (letter) =>
-        letter.toUpperCase()
-    );
+  return roles
+    .map(formatearRol)
+    .join(', ');
+
+}
+
+
+/* =========================================================
+   LIMPIAR SESIÓN
+   ========================================================= */
+
+export function limpiarSesion() {
+
+  sesionActual = null;
 
 }
