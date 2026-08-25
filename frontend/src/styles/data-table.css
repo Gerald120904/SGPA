@@ -1,0 +1,431 @@
+/* =========================================================
+   DATA TABLE SGPA
+   =========================================================
+   Tabla reutilizable con identidad UNA.
+
+   Diseño:
+   - Fondo blanco
+   - Delineado rojo sutil
+   - Encabezados rojos
+   - Hover ligero
+   - Rojo como acento, no como fondo dominante
+   ========================================================= */
+
+
+/* =========================================================
+   CONTENEDOR
+   ========================================================= */
+
+.sgpa-table-shell {
+  position: relative;
+
+  width: 100%;
+  min-width: 0;
+
+  overflow: hidden;
+
+  border:
+    1px solid
+    rgba(207, 32, 41, 0.24);
+
+  border-radius:
+    12px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 2px 6px
+    rgba(16, 24, 40, 0.035);
+
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+
+/*
+ * Respuesta visual muy ligera.
+ */
+
+.sgpa-table-shell:hover {
+  border-color:
+    rgba(207, 32, 41, 0.32);
+
+  box-shadow:
+    0 3px 9px
+    rgba(16, 24, 40, 0.045);
+}
+
+
+/* =========================================================
+   SCROLL
+   ========================================================= */
+
+.sgpa-table-scroll {
+  width: 100%;
+
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+
+.sgpa-table-scroll::-webkit-scrollbar {
+  height:
+    7px;
+}
+
+
+.sgpa-table-scroll::-webkit-scrollbar-track {
+  background:
+    #f8f9fb;
+}
+
+
+.sgpa-table-scroll::-webkit-scrollbar-thumb {
+  background:
+    #d0d5dd;
+
+  border-radius:
+    20px;
+}
+
+
+.sgpa-table-scroll::-webkit-scrollbar-thumb:hover {
+  background:
+    #98a2b3;
+}
+
+
+/* =========================================================
+   TABLA
+   ========================================================= */
+
+.sgpa-data-table {
+  width:
+    100%;
+
+  min-width:
+    720px;
+
+  border-collapse:
+    collapse;
+
+  border-spacing:
+    0;
+
+  background:
+    #ffffff;
+
+  color:
+    #475467;
+
+  font-size:
+    13px;
+}
+
+
+/* =========================================================
+   ENCABEZADO
+   ========================================================= */
+
+.sgpa-data-table thead {
+  background:
+    rgba(207, 32, 41, 0.045);
+}
+
+
+.sgpa-data-table th {
+  padding:
+    14px 16px;
+
+  border-bottom:
+    1px solid
+    rgba(207, 32, 41, 0.18);
+
+  background:
+    transparent;
+
+  color:
+    var(
+      --una-red-dark,
+      #b71922
+    );
+
+  font-size:
+    10.5px;
+
+  font-weight:
+    720;
+
+  letter-spacing:
+    0.05em;
+
+  line-height:
+    1.35;
+
+  text-align:
+    left;
+
+  text-transform:
+    uppercase;
+
+  white-space:
+    nowrap;
+}
+
+
+/*
+ * Acciones.
+ */
+
+.sgpa-data-table th:last-child {
+  text-align:
+    center;
+}
+
+
+/* =========================================================
+   CELDAS
+   ========================================================= */
+
+.sgpa-data-table td {
+  padding:
+    14px 16px;
+
+  border-bottom:
+    1px solid #edf0f4;
+
+  background:
+    transparent;
+
+  color:
+    #475467;
+
+  vertical-align:
+    middle;
+
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+
+/* =========================================================
+   FILAS
+   ========================================================= */
+
+.sgpa-data-table tbody tr {
+  position:
+    relative;
+
+  background:
+    #ffffff;
+
+  transition:
+    background-color 0.16s ease;
+}
+
+
+.sgpa-data-table tbody tr:hover {
+  background:
+    rgba(207, 32, 41, 0.035);
+}
+
+
+.sgpa-data-table tbody tr:last-child td {
+  border-bottom:
+    none;
+}
+
+
+/* =========================================================
+   DETALLE ROJO EN HOVER
+   ========================================================= */
+
+.sgpa-data-table
+tbody
+tr
+td:first-child {
+  position:
+    relative;
+}
+
+
+.sgpa-data-table
+tbody
+tr:hover
+td:first-child::before {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  top:
+    10px;
+
+  bottom:
+    10px;
+
+  left:
+    0;
+
+  width:
+    3px;
+
+  border-radius:
+    0 3px
+    3px 0;
+
+  background:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+/* =========================================================
+   TEXTOS PRINCIPALES
+   ========================================================= */
+
+.sgpa-data-table td > strong {
+  color:
+    #1d2939;
+
+  font-weight:
+    650;
+}
+
+
+/* =========================================================
+   ACCIONES
+   ========================================================= */
+
+.sgpa-data-table td:last-child {
+  white-space:
+    nowrap;
+}
+
+
+/* =========================================================
+   ESTADO VACÍO
+   ========================================================= */
+
+.sgpa-table-empty {
+  min-height:
+    190px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    6px;
+
+  padding:
+    30px 20px;
+
+  border:
+    1px dashed
+    rgba(207, 32, 41, 0.28);
+
+  border-radius:
+    12px;
+
+  background:
+    #ffffff;
+
+  text-align:
+    center;
+}
+
+
+.sgpa-table-empty-icon {
+  width:
+    42px;
+
+  height:
+    42px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  margin-bottom:
+    4px;
+
+  border-radius:
+    10px;
+
+  background:
+    rgba(207, 32, 41, 0.07);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.sgpa-table-empty-icon svg {
+  width:
+    19px;
+
+  height:
+    19px;
+}
+
+
+.sgpa-table-empty strong {
+  color:
+    #344054;
+
+  font-size:
+    13px;
+}
+
+
+.sgpa-table-empty span {
+  color:
+    #98a2b3;
+
+  font-size:
+    11px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+  .sgpa-data-table {
+    min-width:
+      650px;
+  }
+
+
+  .sgpa-data-table th,
+  .sgpa-data-table td {
+    padding:
+      12px 13px;
+  }
+
+}

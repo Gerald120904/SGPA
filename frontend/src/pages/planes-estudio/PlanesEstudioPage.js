@@ -42,6 +42,9 @@ import {
 import { confirmarAccion } from "../../utils/confirm.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
+import { DataTable } from "../../components/DataTable.js";
+import { FormDialog, habilitarCierreExterior, } from "../../components/FormDialog.js";
+import { mostrarExito, mostrarError } from "../../components/AlertModal.js";
 
 let planes = [];
 let carrerasDisponibles = [];
@@ -119,26 +122,49 @@ export function PlanesEstudioPage() {
         <div class="planes-message">Cargando planes de estudio...</div>
       </div>
 
-      <dialog id="planDialog" class="plan-dialog">
-        <div id="planDialogContent"></div>
-      </dialog>
+<dialog
+  id="planDialog"
+  class="sgpa-form-dialog sgpa-form-dialog-lg"
+>
+  <div id="planDialogContent"></div>
+</dialog>
     </section>
   `;
 }
 
-function mostrarFeedback(mensaje, tipo = "success") {
-  const feedback = document.getElementById("planesFeedback");
+function mostrarFeedback(
+  mensaje,
+  tipo = "success"
+) {
 
-  if (!feedback) {
+  if (
+    tipo === "error"
+  ) {
+
+    mostrarError({
+
+      titulo:
+        "No se pudo completar la operación",
+
+      mensaje
+
+    });
+
+
     return;
+
   }
 
-  feedback.textContent = mensaje;
-  feedback.className = `planes-feedback planes-feedback-${tipo}`;
 
-  window.setTimeout(() => {
-    feedback.classList.add("hidden");
-  }, 3500);
+  mostrarExito({
+
+    titulo:
+      "Operación realizada correctamente",
+
+    mensaje
+
+  });
+
 }
 
 function obtenerPlanesFiltrados() {
@@ -176,116 +202,205 @@ function obtenerPlanesFiltrados() {
 }
 
 function renderizarPlanes() {
-  const contenedor = document.getElementById("planesContent");
+
+  const contenedor =
+    document.getElementById(
+      "planesContent"
+    );
+
 
   if (!contenedor) {
     return;
   }
 
-  const filtrados = obtenerPlanesFiltrados();
 
-  if (filtrados.length === 0) {
-    contenedor.innerHTML = `
-      <div class="planes-message">No se encontraron planes de estudio.</div>
-    `;
-    return;
-  }
+  const filtrados =
+    obtenerPlanesFiltrados();
 
-  const filas = filtrados
-    .map(
-      (plan) => `
-        <tr>
-          <td>
-            <strong class="plan-code">${escapeHtml(plan.codigo)}</strong>
-          </td>
-          <td>
-            <div class="plan-name">
-              <strong>${escapeHtml(plan.nombre)}</strong>
-              ${
-                plan.descripcion
-                  ? `<small>${escapeHtml(plan.descripcion)}</small>`
-                  : ""
-              }
-            </div>
-          </td>
-          <td>
-            <div class="plan-career">
-              <strong>
-                ${escapeHtml(plan.carrera?.nombre || "Carrera no disponible")}
-              </strong>
-              ${
-                plan.carrera?.codigo
-                  ? `<small>${escapeHtml(plan.carrera.codigo)}</small>`
-                  : ""
-              }
-            </div>
-          </td>
-          <td>
-            <span class="plan-status ${
-              plan.activo ? "plan-status-active" : "plan-status-inactive"
-            }">
-              ${plan.activo ? "Activo" : "Inactivo"}
-            </span>
-          </td>
-          <td class="planes-actions">
-            <button
-              class="planes-view-button"
-              data-action="ver-plan"
-              data-id="${plan.id}"
-              type="button"
-              title="Ver asignaturas del plan"
-            >
-              Ver plan
-            </button>
-            <button
-              class="planes-icon-button"
-              data-action="editar"
-              data-id="${plan.id}"
-              type="button"
-              title="Editar plan"
-            >
-              <i data-lucide="pencil" aria-hidden="true"></i>
-            </button>
-            <button
-              class="planes-icon-button ${
-                plan.activo ? "planes-danger-button" : "planes-success-button"
-              }"
-              data-action="estado"
-              data-id="${plan.id}"
-              type="button"
-              title="${plan.activo ? "Desactivar plan" : "Activar plan"}"
-            >
-              <i
-                data-lucide="${plan.activo ? "circle-pause" : "circle-check"}"
-                aria-hidden="true"
-              ></i>
-            </button>
-          </td>
-        </tr>
-      `,
-    )
-    .join("");
 
-  contenedor.innerHTML = `
-    <div class="planes-table-wrap">
-      <table class="planes-table">
-        <thead>
+  const filas =
+    filtrados
+      .map(
+        (plan) => `
           <tr>
-            <th>Código</th>
-            <th>Plan de estudio</th>
-            <th>Carrera</th>
-            <th>Estado</th>
-            <th>Acciones</th>
+
+            <td>
+
+              <strong class="plan-code">
+                ${escapeHtml(plan.codigo)}
+              </strong>
+
+            </td>
+
+
+            <td>
+
+              <div class="plan-name">
+
+                <strong>
+                  ${escapeHtml(plan.nombre)}
+                </strong>
+
+                ${
+                  plan.descripcion
+                    ? `
+                        <small>
+                          ${escapeHtml(plan.descripcion)}
+                        </small>
+                      `
+                    : ""
+                }
+
+              </div>
+
+            </td>
+
+
+            <td>
+
+              <div class="plan-career">
+
+                <strong>
+                  ${escapeHtml(
+                    plan.carrera?.nombre ||
+                    "Carrera no disponible"
+                  )}
+                </strong>
+
+                ${
+                  plan.carrera?.codigo
+                    ? `
+                        <small>
+                          ${escapeHtml(plan.carrera.codigo)}
+                        </small>
+                      `
+                    : ""
+                }
+
+              </div>
+
+            </td>
+
+
+            <td>
+
+              <span
+                class="
+                  plan-status
+                  ${
+                    plan.activo
+                      ? "plan-status-active"
+                      : "plan-status-inactive"
+                  }
+                "
+              >
+
+                ${
+                  plan.activo
+                    ? "Activo"
+                    : "Inactivo"
+                }
+
+              </span>
+
+            </td>
+
+
+            <td class="planes-actions">
+
+              <button
+                class="planes-view-button"
+                data-action="ver-plan"
+                data-id="${plan.id}"
+                type="button"
+                title="Ver asignaturas del plan"
+              >
+
+                Ver plan
+
+              </button>
+
+
+              <button
+                class="planes-icon-button"
+                data-action="editar"
+                data-id="${plan.id}"
+                type="button"
+                title="Editar plan"
+              >
+
+                <i
+                  data-lucide="pencil"
+                  aria-hidden="true"
+                ></i>
+
+              </button>
+
+
+              <button
+                class="
+                  planes-icon-button
+                  ${
+                    plan.activo
+                      ? "planes-danger-button"
+                      : "planes-success-button"
+                  }
+                "
+                data-action="estado"
+                data-id="${plan.id}"
+                type="button"
+                title="${
+                  plan.activo
+                    ? "Desactivar plan"
+                    : "Activar plan"
+                }"
+              >
+
+                <i
+                  data-lucide="${
+                    plan.activo
+                      ? "circle-pause"
+                      : "circle-check"
+                  }"
+                  aria-hidden="true"
+                ></i>
+
+              </button>
+
+            </td>
+
           </tr>
-        </thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>
-  `;
+        `
+      )
+      .join("");
+
+
+  contenedor.innerHTML =
+    DataTable({
+
+      columns: [
+        "Código",
+        "Plan de estudio",
+        "Carrera",
+        "Estado",
+        "Acciones"
+      ],
+
+      rows:
+        filas,
+
+      emptyMessage:
+        "No se encontraron planes de estudio con los filtros seleccionados.",
+
+      ariaLabel:
+        "Listado de planes de estudio"
+
+    });
+
 
   renderizarIconos();
-}
 
+}
 function renderizarFiltroCarreras() {
   const select = document.getElementById("planesCarrera");
 
@@ -362,219 +477,395 @@ async function cargarDatos(instancia) {
   }
 }
 
-function abrirFormulario(plan = null) {
-  const dialog = document.getElementById("planDialog");
-  const content = document.getElementById("planDialogContent");
+function abrirFormulario(
+  plan = null
+) {
 
-  if (!dialog || !content) {
+  const dialog =
+    document.getElementById(
+      "planDialog"
+    );
+
+
+  const content =
+    document.getElementById(
+      "planDialogContent"
+    );
+
+
+  if (
+    !dialog ||
+    !content
+  ) {
     return;
   }
 
-  const editando = Boolean(plan);
-  const opcionesCarreras = carrerasDisponibles
-    .filter((carrera) => carrera.activo === true)
-    .map(
-      (carrera) => `
-        <option value="${carrera.id}">
-          ${escapeHtml(carrera.codigo)} - ${escapeHtml(carrera.nombre)}
-        </option>
-      `,
-    )
-    .join("");
 
-  content.innerHTML = `
-    <form id="planForm" class="plan-form">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>${editando ? "Editar plan de estudio" : "Nuevo plan de estudio"}</h3>
-          <p>
-            ${
-              editando
-                ? "Actualice la información del plan."
-                : "Registre un nuevo plan para una carrera existente."
-            }
-          </p>
-        </div>
-        <button
-          id="cerrarPlanDialog"
-          class="planes-icon-button"
-          type="button"
-          aria-label="Cerrar"
-        >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
+  const editando =
+    Boolean(plan);
 
-      <div id="planFormError" class="plan-form-error hidden" role="alert"></div>
 
-      <div class="plan-form-grid">
-        ${
-          editando
-            ? `
-                <label class="plan-form-wide">
-                  <span>Carrera</span>
-                  <input
-                    type="text"
-                    value="${escapeHtml(
-                      `${plan.carrera?.codigo || ""} - ${
-                        plan.carrera?.nombre || ""
-                      }`,
-                    )}"
-                    disabled
-                  >
-                  <small class="plan-field-help">
-                    La carrera de un plan no se puede cambiar después de crearlo.
-                  </small>
-                </label>
-              `
-            : `
-                <label class="plan-form-wide">
-                  <span>Carrera</span>
-                  <select id="planCarrera" name="carreraId" required>
-                    <option value="" selected disabled>
-                      Seleccione una carrera...
-                    </option>
-                    ${opcionesCarreras}
-                  </select>
-                </label>
-              `
-        }
+  const opcionesCarreras =
+    carrerasDisponibles
+      .filter(
+        (carrera) =>
+          carrera.activo === true
+      )
+      .map(
+        (carrera) => `
+          <option value="${carrera.id}">
+            ${escapeHtml(carrera.codigo)}
+            -
+            ${escapeHtml(carrera.nombre)}
+          </option>
+        `
+      )
+      .join("");
 
-        <label>
-          <span>Código</span>
-          <input
-            id="planCodigo"
-            name="codigo"
-            type="text"
-            maxlength="40"
-            value="${plan ? escapeHtml(plan.codigo) : ""}"
-            placeholder="Ej. BA-INFORM 2012-10"
-            required
-          >
-        </label>
 
-        <label>
-          <span>Nombre</span>
-          <input
-            id="planNombre"
-            name="nombre"
-            type="text"
-            maxlength="180"
-            value="${plan ? escapeHtml(plan.nombre) : ""}"
-            placeholder="Ej. Plan de Bachillerato 2012-10"
-            required
-          >
-        </label>
+  const carreraField =
+    editando
+      ? `
 
-        <label class="plan-form-wide">
-          <span>Descripción</span>
-          <textarea
-            id="planDescripcion"
-            name="descripcion"
-            maxlength="500"
-            rows="4"
-            placeholder="Descripción opcional del plan"
-          >${plan?.descripcion ? escapeHtml(plan.descripcion) : ""}</textarea>
-        </label>
-      </div>
+          <label class="sgpa-form-wide">
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="cancelarPlanButton"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Cancelar
-        </button>
-        <button
-          id="guardarPlanButton"
-          class="planes-primary-button"
-          type="submit"
-        >
-          <i data-lucide="save" aria-hidden="true"></i>
-          <span>${editando ? "Guardar cambios" : "Crear plan"}</span>
-        </button>
-      </footer>
-    </form>
+            <span>
+              Carrera
+            </span>
+
+            <input
+              type="text"
+              value="${escapeHtml(
+                `${plan.carrera?.codigo || ""} - ${
+                  plan.carrera?.nombre || ""
+                }`
+              )}"
+              disabled
+            >
+
+            <small class="sgpa-field-help">
+              La carrera de un plan no se puede cambiar después de crearlo.
+            </small>
+
+          </label>
+
+        `
+      : `
+
+          <label class="sgpa-form-wide">
+
+            <span>
+              Carrera
+            </span>
+
+            <select
+              id="planCarrera"
+              name="carreraId"
+              required
+            >
+
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione una carrera...
+              </option>
+
+              ${opcionesCarreras}
+
+            </select>
+
+          </label>
+
+        `;
+
+
+  const body = `
+
+    ${carreraField}
+
+
+    <label>
+
+      <span>
+        Código
+      </span>
+
+      <input
+        id="planCodigo"
+        name="codigo"
+        type="text"
+        maxlength="40"
+        value="${
+          plan
+            ? escapeHtml(plan.codigo)
+            : ""
+        }"
+        placeholder="Ej. BA-INFORM 2012-10"
+        required
+      >
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Nombre
+      </span>
+
+      <input
+        id="planNombre"
+        name="nombre"
+        type="text"
+        maxlength="180"
+        value="${
+          plan
+            ? escapeHtml(plan.nombre)
+            : ""
+        }"
+        placeholder="Ej. Plan de Bachillerato 2012-10"
+        required
+      >
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Descripción
+      </span>
+
+      <textarea
+        id="planDescripcion"
+        name="descripcion"
+        maxlength="500"
+        rows="4"
+        placeholder="Descripción opcional del plan"
+      >${
+        plan?.descripcion
+          ? escapeHtml(plan.descripcion)
+          : ""
+      }</textarea>
+
+    </label>
+
   `;
+
+
+content.innerHTML = FormDialog({
+  formId: "planForm",
+  title: editando
+    ? "Editar plan de estudio"
+    : "Nuevo plan de estudio",
+  description: editando
+    ? "Actualice la información general del plan de estudio."
+    : "Registre un nuevo plan asociado a una carrera existente.",
+  body,
+  errorId: "planFormError",
+  cancelButtonId: "cancelarPlanButton",
+  submitButtonId: "guardarPlanButton",
+  submitText: editando
+    ? "Guardar cambios"
+    : "Crear plan",
+});
 
   renderizarIconos();
   dialog.showModal();
+  habilitarCierreExterior(dialog);
 
-  const cerrar = () => dialog.close();
+
+const cerrar = () => dialog.close();
+
+document
+  .getElementById("cancelarPlanButton")
+  ?.addEventListener("click", cerrar);
+
   document
-    .getElementById("cerrarPlanDialog")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("cancelarPlanButton")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "planForm"
+    )
+    ?.addEventListener(
+      "submit",
+      async (event) => {
 
-  document
-    .getElementById("planForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
+        event.preventDefault();
 
-      const errorBox = document.getElementById("planFormError");
-      const guardarButton = document.getElementById("guardarPlanButton");
-      const codigoInput = document.getElementById("planCodigo");
-      const nombreInput = document.getElementById("planNombre");
-      const descripcionInput = document.getElementById("planDescripcion");
 
-      if (!guardarButton || !codigoInput || !nombreInput || !descripcionInput) {
-        return;
-      }
+        const errorBox =
+          document.getElementById(
+            "planFormError"
+          );
 
-      const datos = {
-        codigo: codigoInput.value.trim(),
-        nombre: nombreInput.value.trim(),
-        descripcion: descripcionInput.value.trim(),
-      };
 
-      if (!editando) {
-        const carreraInput = document.getElementById("planCarrera");
+        const guardarButton =
+          document.getElementById(
+            "guardarPlanButton"
+          );
 
-        if (!carreraInput?.value) {
-          if (errorBox) {
-            errorBox.textContent = "Debe seleccionar una carrera.";
-            errorBox.classList.remove("hidden");
-          }
+
+        const codigoInput =
+          document.getElementById(
+            "planCodigo"
+          );
+
+
+        const nombreInput =
+          document.getElementById(
+            "planNombre"
+          );
+
+
+        const descripcionInput =
+          document.getElementById(
+            "planDescripcion"
+          );
+
+
+        if (
+          !guardarButton ||
+          !codigoInput ||
+          !nombreInput ||
+          !descripcionInput
+        ) {
           return;
         }
 
-        datos.carreraId = Number(carreraInput.value);
-      }
 
-      errorBox?.classList.add("hidden");
-      guardarButton.disabled = true;
+        const datos = {
 
-      try {
-        const resultado = editando
-          ? await actualizarPlanEstudio(plan.id, datos)
-          : await crearPlanEstudio(datos);
+          codigo:
+            codigoInput
+              .value
+              .trim(),
 
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || "No fue posible guardar el plan de estudio.",
+          nombre:
+            nombreInput
+              .value
+              .trim(),
+
+          descripcion:
+            descripcionInput
+              .value
+              .trim()
+
+        };
+
+
+        if (!editando) {
+
+          const carreraInput =
+            document.getElementById(
+              "planCarrera"
+            );
+
+
+          if (
+            !carreraInput?.value
+          ) {
+
+            if (errorBox) {
+
+              errorBox.textContent =
+                "Debe seleccionar una carrera.";
+
+
+              errorBox.classList.remove(
+                "hidden"
+              );
+
+            }
+
+
+            return;
+
+          }
+
+
+          datos.carreraId =
+            Number(
+              carreraInput.value
+            );
+
+        }
+
+
+        errorBox
+          ?.classList
+          .add(
+            "hidden"
           );
+
+
+        guardarButton.disabled =
+          true;
+
+
+        try {
+
+          const resultado =
+            editando
+              ? await actualizarPlanEstudio(
+                  plan.id,
+                  datos
+                )
+              : await crearPlanEstudio(
+                  datos
+                );
+
+
+          if (!resultado?.ok) {
+
+            throw new Error(
+              resultado?.message ||
+              "No fue posible guardar el plan de estudio."
+            );
+
+          }
+
+
+          cerrar();
+
+
+          mostrarFeedback(
+            editando
+              ? "Plan actualizado correctamente."
+              : "Plan creado correctamente."
+          );
+
+
+          await cargarDatos(
+            instanciaActual
+          );
+
+
+        } catch (error) {
+
+  mostrarError({
+
+    titulo:
+      editando
+        ? "No se pudo actualizar el plan"
+        : "No se pudo crear el plan",
+
+    mensaje:
+      error?.message ||
+      "No fue posible guardar el plan de estudio."
+
+  });
+
+}finally {
+
+          guardarButton.disabled =
+            false;
+
         }
 
-        cerrar();
-        mostrarFeedback(
-          editando
-            ? "Plan actualizado correctamente."
-            : "Plan creado correctamente.",
-        );
-        await cargarDatos(instanciaActual);
-      } catch (error) {
-        if (errorBox) {
-          errorBox.textContent =
-            error?.message || "No fue posible guardar el plan de estudio.";
-          errorBox.classList.remove("hidden");
-        }
-      } finally {
-        guardarButton.disabled = false;
       }
-    });
+    );
+
 }
 
 async function alternarEstado(plan) {
@@ -4911,12 +5202,7 @@ export function iniciarPlanesEstudioPage() {
       }
     });
 
-  const dialog = document.getElementById("planDialog");
-  dialog?.addEventListener("click", (event) => {
-    if (event.target === dialog) {
-      dialog.close();
-    }
-  });
+
 
   void cargarDatos(instancia);
 }

@@ -1,0 +1,812 @@
+/* =========================================================
+   ALERT MODAL SGPA
+   =========================================================
+   Alertas reutilizables:
+   - Success
+   - Error
+
+   Diseño:
+   - Elegante
+   - Profesional
+   - Animación ligera
+   - Sin saturación visual
+   ========================================================= */
+
+
+/* =========================================================
+   DIALOG
+   ========================================================= */
+
+.sgpa-alert-dialog {
+  position: fixed;
+
+  inset: 0;
+
+  width:
+    min(
+      420px,
+      calc(100vw - 32px)
+    );
+
+  margin:
+    auto;
+
+  padding:
+    0;
+
+  border:
+    none;
+
+  background:
+    transparent;
+
+  overflow:
+    visible;
+
+  outline:
+    none;
+}
+
+
+.sgpa-alert-dialog::backdrop {
+  background:
+    rgba(15, 23, 42, 0.42);
+
+  backdrop-filter:
+    blur(2px);
+
+  animation:
+    sgpa-alert-backdrop-in
+    0.18s ease-out;
+}
+
+
+/* =========================================================
+   CARD
+   ========================================================= */
+
+.sgpa-alert {
+  position:
+    relative;
+
+  width:
+    100%;
+
+  overflow:
+    hidden;
+
+  padding:
+    28px 30px
+    22px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    17px;
+
+  background:
+    #ffffff;
+
+  text-align:
+    center;
+
+  box-shadow:
+    0 26px 70px
+    rgba(15, 23, 42, 0.22);
+
+  animation:
+    sgpa-alert-enter
+    0.28s
+    cubic-bezier(
+      0.22,
+      1,
+      0.36,
+      1
+    );
+}
+
+
+/* =========================================================
+   LÍNEA SUPERIOR
+   ========================================================= */
+
+.sgpa-alert::before {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  top:
+    0;
+
+  left:
+    0;
+
+  right:
+    0;
+
+  height:
+    3px;
+}
+
+
+.sgpa-alert-success::before {
+  background:
+    #168653;
+}
+
+
+.sgpa-alert-error::before {
+  background:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+/* =========================================================
+   ICONO
+   ========================================================= */
+
+.sgpa-alert-icon-area {
+  display:
+    flex;
+
+  justify-content:
+    center;
+
+  margin-bottom:
+    17px;
+}
+
+
+.sgpa-alert-icon-ring {
+  position:
+    relative;
+
+  width:
+    58px;
+
+  height:
+    58px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    50%;
+}
+
+
+.sgpa-alert-icon-ring::before {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  inset:
+    -7px;
+
+  border-radius:
+    50%;
+
+  opacity:
+    0.65;
+
+  animation:
+    sgpa-alert-ring
+    0.48s ease-out;
+}
+
+
+.sgpa-alert-icon-ring svg {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  width:
+    25px;
+
+  height:
+    25px;
+
+  stroke-width:
+    2.2;
+
+  animation:
+    sgpa-alert-icon-enter
+    0.38s
+    0.08s
+    both;
+}
+
+
+/* =========================================================
+   SUCCESS ICON
+   ========================================================= */
+
+.sgpa-alert-success
+.sgpa-alert-icon-ring {
+  background:
+    #ecfdf3;
+
+  color:
+    #168653;
+}
+
+
+.sgpa-alert-success
+.sgpa-alert-icon-ring::before {
+  background:
+    rgba(22, 134, 83, 0.08);
+}
+
+
+/* =========================================================
+   ERROR ICON
+   ========================================================= */
+
+.sgpa-alert-error
+.sgpa-alert-icon-ring {
+  background:
+    rgba(207, 32, 41, 0.08);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.sgpa-alert-error
+.sgpa-alert-icon-ring::before {
+  background:
+    rgba(207, 32, 41, 0.055);
+}
+
+
+.sgpa-alert-error
+.sgpa-alert-icon-ring svg {
+  animation:
+    sgpa-alert-error-icon
+    0.42s
+    0.08s
+    both;
+}
+
+
+/* =========================================================
+   TEXTO
+   ========================================================= */
+
+.sgpa-alert-content {
+  max-width:
+    340px;
+
+  margin:
+    0 auto;
+}
+
+
+.sgpa-alert-eyebrow {
+  display:
+    block;
+
+  margin-bottom:
+    5px;
+
+  font-size:
+    9px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.8px;
+
+  text-transform:
+    uppercase;
+}
+
+
+.sgpa-alert-success
+.sgpa-alert-eyebrow {
+  color:
+    #168653;
+}
+
+
+.sgpa-alert-error
+.sgpa-alert-eyebrow {
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.sgpa-alert-content h3 {
+  margin:
+    0;
+
+  color:
+    #182235;
+
+  font-size:
+    19px;
+
+  font-weight:
+    720;
+
+  line-height:
+    1.3;
+
+  letter-spacing:
+    -0.25px;
+}
+
+
+.sgpa-alert-content p {
+  margin:
+    8px 0
+    0;
+
+  color:
+    #7b8798;
+
+  font-size:
+    11.5px;
+
+  line-height:
+    1.55;
+}
+
+
+/* =========================================================
+   BOTÓN
+   ========================================================= */
+
+.sgpa-alert-actions {
+  display:
+    flex;
+
+  justify-content:
+    center;
+
+  margin-top:
+    22px;
+}
+
+
+.sgpa-alert-button {
+  min-width:
+    112px;
+
+  min-height:
+    38px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    0 20px;
+
+  border-radius:
+    8px;
+
+  font-family:
+    inherit;
+
+  font-size:
+    11px;
+
+  font-weight:
+    680;
+
+  cursor:
+    pointer;
+
+  transition:
+    transform 0.16s ease,
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+
+.sgpa-alert-button:hover {
+  transform:
+    translateY(-1px);
+}
+
+
+/* =========================================================
+   SUCCESS BUTTON
+   ========================================================= */
+
+.sgpa-alert-success
+.sgpa-alert-button {
+  border:
+    1px solid #168653;
+
+  background:
+    #168653;
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0 4px 12px
+    rgba(22, 134, 83, 0.16);
+}
+
+
+.sgpa-alert-success
+.sgpa-alert-button:hover {
+  background:
+    #117145;
+
+  border-color:
+    #117145;
+
+  box-shadow:
+    0 6px 15px
+    rgba(22, 134, 83, 0.22);
+}
+
+
+/* =========================================================
+   ERROR BUTTON
+   ========================================================= */
+
+.sgpa-alert-error
+.sgpa-alert-button {
+  border:
+    1px solid
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  background:
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0 4px 12px
+    rgba(207, 32, 41, 0.16);
+}
+
+
+.sgpa-alert-error
+.sgpa-alert-button:hover {
+  border-color:
+    var(
+      --una-red-dark,
+      #b71922
+    );
+
+  background:
+    var(
+      --una-red-dark,
+      #b71922
+    );
+
+  box-shadow:
+    0 6px 15px
+    rgba(207, 32, 41, 0.22);
+}
+
+
+/* =========================================================
+   BARRA DE TIEMPO SUCCESS
+   ========================================================= */
+
+.sgpa-alert-progress {
+  position:
+    absolute;
+
+  right:
+    0;
+
+  bottom:
+    0;
+
+  left:
+    0;
+
+  height:
+    3px;
+
+  overflow:
+    hidden;
+
+  background:
+    #edf0f4;
+}
+
+
+.sgpa-alert-progress span {
+  display:
+    block;
+
+  width:
+    100%;
+
+  height:
+    100%;
+
+  background:
+    #168653;
+
+  transform-origin:
+    left center;
+
+  animation:
+    sgpa-alert-progress
+    var(
+      --sgpa-alert-duration,
+      2600ms
+    )
+    linear forwards;
+}
+
+
+/* =========================================================
+   CIERRE
+   ========================================================= */
+
+.sgpa-alert-dialog.sgpa-alert-closing
+.sgpa-alert {
+  animation:
+    sgpa-alert-exit
+    0.16s ease forwards;
+}
+
+
+/* =========================================================
+   ANIMACIONES
+   ========================================================= */
+
+@keyframes sgpa-alert-backdrop-in {
+
+  from {
+    opacity:
+      0;
+  }
+
+
+  to {
+    opacity:
+      1;
+  }
+
+}
+
+
+@keyframes sgpa-alert-enter {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      translateY(10px)
+      scale(0.965);
+  }
+
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+
+}
+
+
+@keyframes sgpa-alert-exit {
+
+  from {
+    opacity:
+      1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+
+
+  to {
+    opacity:
+      0;
+
+    transform:
+      translateY(5px)
+      scale(0.985);
+  }
+
+}
+
+
+@keyframes sgpa-alert-ring {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      scale(0.55);
+  }
+
+
+  65% {
+    opacity:
+      0.8;
+
+    transform:
+      scale(1.08);
+  }
+
+
+  to {
+    opacity:
+      0.65;
+
+    transform:
+      scale(1);
+  }
+
+}
+
+
+@keyframes sgpa-alert-icon-enter {
+
+  from {
+    opacity:
+      0;
+
+    transform:
+      scale(0.55)
+      rotate(-8deg);
+  }
+
+
+  70% {
+    opacity:
+      1;
+
+    transform:
+      scale(1.08)
+      rotate(2deg);
+  }
+
+
+  to {
+    opacity:
+      1;
+
+    transform:
+      scale(1)
+      rotate(0);
+  }
+
+}
+
+
+@keyframes sgpa-alert-error-icon {
+
+  0% {
+    opacity:
+      0;
+
+    transform:
+      scale(0.6);
+  }
+
+
+  55% {
+    opacity:
+      1;
+
+    transform:
+      scale(1.08)
+      translateX(0);
+  }
+
+
+  68% {
+    transform:
+      scale(1)
+      translateX(-2px);
+  }
+
+
+  82% {
+    transform:
+      scale(1)
+      translateX(2px);
+  }
+
+
+  100% {
+    opacity:
+      1;
+
+    transform:
+      scale(1)
+      translateX(0);
+  }
+
+}
+
+
+@keyframes sgpa-alert-progress {
+
+  from {
+    transform:
+      scaleX(1);
+  }
+
+
+  to {
+    transform:
+      scaleX(0);
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+  .sgpa-alert {
+    padding:
+      25px 21px
+      20px;
+  }
+
+
+  .sgpa-alert-content h3 {
+    font-size:
+      17px;
+  }
+
+
+  .sgpa-alert-button {
+    width:
+      100%;
+  }
+
+}

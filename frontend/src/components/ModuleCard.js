@@ -58,14 +58,6 @@ export function ModuleCard({
         </div>
 
 
-        <div class="module-card-arrow">
-
-          <i
-            data-lucide="arrow-up-right"
-            aria-hidden="true"
-          ></i>
-
-        </div>
 
       </div>
 

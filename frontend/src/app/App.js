@@ -73,29 +73,11 @@ import {
 
 let appRoot = null;
 
-let detenerObservadorRutas =
-  null;
+let detenerObservadorRutas = null;
 
 
 /* =========================================================
    PÁGINAS IMPLEMENTADAS
-   =========================================================
-
-   IMPORTANTE:
-
-   home
-       ↓
-   HomePage
-       ↓
-   estadísticas / indicadores
-
-
-   dashboard
-       ↓
-   ModulesPage
-       ↓
-   cards de módulos
-
    ========================================================= */
 
 const PAGE_RENDERERS = {
@@ -185,11 +167,6 @@ function mostrarLogin() {
         );
 
 
-        /*
-         * Al iniciar sesión SIEMPRE
-         * entramos a Home.
-         */
-
         reemplazarRuta(
           '/home'
         );
@@ -258,9 +235,6 @@ function mostrarAplicacion() {
     });
 
 
-  aplicarEstadoInicialSidebar();
-
-
   renderizarIconos();
 
 
@@ -271,153 +245,6 @@ function mostrarAplicacion() {
     observarRutas(
       renderizarRuta
     );
-
-}
-
-
-/* =========================================================
-   SIDEBAR - ESTADO INICIAL
-   ========================================================= */
-
-function aplicarEstadoInicialSidebar() {
-
-  const appShell =
-    document.getElementById(
-      'appShell'
-    );
-
-
-  if (!appShell) {
-    return;
-  }
-
-
-  const estadoGuardado =
-    localStorage.getItem(
-      'sgpa-sidebar-collapsed'
-    );
-
-
-  let collapsed;
-
-
-  if (
-    estadoGuardado !== null
-  ) {
-
-    collapsed =
-      estadoGuardado ===
-      'true';
-
-  } else {
-
-    collapsed =
-      window.innerWidth <= 900;
-
-  }
-
-
-  appShell.classList.toggle(
-    'sidebar-collapsed',
-    collapsed
-  );
-
-
-  actualizarBotonSidebar(
-    collapsed
-  );
-
-}
-
-
-/* =========================================================
-   SIDEBAR - ALTERNAR
-   ========================================================= */
-
-function alternarSidebar() {
-
-  const appShell =
-    document.getElementById(
-      'appShell'
-    );
-
-
-  if (!appShell) {
-    return;
-  }
-
-
-  const collapsed =
-    appShell.classList.toggle(
-      'sidebar-collapsed'
-    );
-
-
-  localStorage.setItem(
-    'sgpa-sidebar-collapsed',
-    String(collapsed)
-  );
-
-
-  actualizarBotonSidebar(
-    collapsed
-  );
-
-}
-
-
-/* =========================================================
-   BOTÓN SIDEBAR
-   ========================================================= */
-
-function actualizarBotonSidebar(
-  collapsed
-) {
-
-  const button =
-    document.getElementById(
-      'sidebarToggle'
-    );
-
-
-  if (!button) {
-    return;
-  }
-
-
-  button.setAttribute(
-    'aria-label',
-    collapsed
-      ? 'Expandir menú lateral'
-      : 'Contraer menú lateral'
-  );
-
-
-  button.setAttribute(
-    'title',
-    collapsed
-      ? 'Expandir menú'
-      : 'Contraer menú'
-  );
-
-
-  button.innerHTML =
-    collapsed
-      ? `
-        <i
-          data-lucide="chevron-right"
-          aria-hidden="true"
-        ></i>
-      `
-      : `
-        <i
-          data-lucide="chevron-left"
-          aria-hidden="true"
-        ></i>
-      `;
-
-
-  renderizarIconos();
 
 }
 
@@ -519,14 +346,11 @@ function renderizarRuta(
     ];
 
 
-  /*
-   * Para verificar visualmente durante desarrollo:
-   */
-
   console.log(
     '[SGPA ROUTER]',
     {
       route,
+
       module:
         module.id,
 
@@ -567,6 +391,10 @@ function renderizarRuta(
 
   renderizarIconos();
 
+
+  /* =======================================================
+     INICIALIZADORES DE PÁGINAS
+     ======================================================= */
 
   if (
     module.id === 'usuarios'
@@ -615,19 +443,13 @@ function actualizarNavegacion(
   module
 ) {
 
-  const pageTitle =
-    document.getElementById(
-      'pageTitle'
-    );
-
-
-  if (pageTitle) {
-
-    pageTitle.textContent =
-      module.title;
-
-  }
-
+  /*
+   * El Topbar mantiene siempre el nombre
+   * completo del sistema.
+   *
+   * El nombre del módulo se muestra dentro
+   * de su propia página.
+   */
 
   document.title =
     `SGPA | ${module.title}`;
@@ -653,31 +475,12 @@ function actualizarNavegacion(
 
 
 /* =========================================================
-   EVENTOS
+   EVENTOS GLOBALES
    ========================================================= */
 
 function manejarClickGlobal(
   event
 ) {
-
-  /* =======================================================
-     SIDEBAR
-     ======================================================= */
-
-  const sidebarToggle =
-    event.target.closest(
-      '#sidebarToggle'
-    );
-
-
-  if (sidebarToggle) {
-
-    alternarSidebar();
-
-    return;
-
-  }
-
 
   /* =======================================================
      CERRAR SESIÓN
@@ -770,6 +573,7 @@ async function cerrarSesion() {
 
   desmontarRouter();
 
+
   try {
 
     await logout();
@@ -788,7 +592,6 @@ async function cerrarSesion() {
     mostrarLogin();
 
   }
-
 
 }
 
