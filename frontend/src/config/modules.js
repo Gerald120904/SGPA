@@ -4,27 +4,27 @@ export const MODULES = [
      PRINCIPAL
      ======================================================= */
 
-  {
-    id: 'home',
-    title: 'SGPA',
-    navLabel: 'Inicio',
-    route: '/home',
-    icon: 'house',
-    section: 'Principal',
-    description:
-      'Resumen general del sistema'
-  },
+{
+  id: 'home',
+  title: 'Sistema de Gestión y Proyección Académica',
+  navLabel: 'Inicio',
+  route: '/home',
+  icon: 'house',
+  section: 'Principal',
+  description:
+    'Resumen general del sistema'
+},
 
-  {
-    id: 'dashboard',
-    title: 'Dashboard',
-    navLabel: 'Dashboard',
-    route: '/dashboard',
-    icon: 'layout-dashboard',
-    section: 'Principal',
-    description:
-      'Acceso a los módulos del sistema'
-  },
+{
+  id: 'dashboard',
+  title: 'Dashboard',
+  navLabel: 'Panel de gestión',
+  route: '/dashboard',
+  icon: 'layout-dashboard',
+  section: 'Principal',
+  description:
+    'Acceso a los módulos del sistema'
+},
 
 
   /* =======================================================

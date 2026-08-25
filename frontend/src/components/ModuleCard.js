@@ -4,47 +4,75 @@ import {
 
 
 export function ModuleCard({
-  route,
-  icon,
-  title,
-  description
+  module
 }) {
+
+  const title =
+    module.navLabel ||
+    module.title ||
+    'Módulo';
+
+
+  const description =
+    module.description ||
+    'Gestión del módulo';
+
+
+  const icon =
+    module.icon ||
+    'circle';
+
 
   return `
     <button
       class="module-card"
-      data-route="${route}"
+      data-route="${module.route}"
+      data-module="${module.id}"
       type="button"
-      title="Abrir ${escapeHtml(title)}"
+      aria-label="Abrir ${escapeHtml(title)}"
     >
 
-      <!-- =============================================== -->
-      <!-- ACENTO ROJO UNA -->
-      <!-- =============================================== -->
+      <!-- ============================================= -->
+      <!-- DECORACIÓN -->
+      <!-- ============================================= -->
 
       <span
-        class="module-card-accent"
+        class="module-card-decoration"
         aria-hidden="true"
       ></span>
 
 
-      <!-- =============================================== -->
-      <!-- ICONO -->
-      <!-- =============================================== -->
+      <!-- ============================================= -->
+      <!-- PARTE SUPERIOR -->
+      <!-- ============================================= -->
 
-      <div class="module-card-icon">
+      <div class="module-card-top">
 
-        <i
-          data-lucide="${icon}"
-          aria-hidden="true"
-        ></i>
+        <div class="module-card-icon">
+
+          <i
+            data-lucide="${icon}"
+            aria-hidden="true"
+          ></i>
+
+        </div>
+
+
+        <div class="module-card-arrow">
+
+          <i
+            data-lucide="arrow-up-right"
+            aria-hidden="true"
+          ></i>
+
+        </div>
 
       </div>
 
 
-      <!-- =============================================== -->
+      <!-- ============================================= -->
       <!-- INFORMACIÓN -->
-      <!-- =============================================== -->
+      <!-- ============================================= -->
 
       <div class="module-card-content">
 
@@ -59,14 +87,14 @@ export function ModuleCard({
       </div>
 
 
-      <!-- =============================================== -->
+      <!-- ============================================= -->
       <!-- ACCIÓN -->
-      <!-- =============================================== -->
+      <!-- ============================================= -->
 
       <div class="module-card-action">
 
         <span>
-          Ingresar
+          Abrir módulo
         </span>
 
         <i
@@ -75,6 +103,16 @@ export function ModuleCard({
         ></i>
 
       </div>
+
+
+      <!-- ============================================= -->
+      <!-- LÍNEA HOVER -->
+      <!-- ============================================= -->
+
+      <span
+        class="module-card-hover-line"
+        aria-hidden="true"
+      ></span>
 
     </button>
   `;

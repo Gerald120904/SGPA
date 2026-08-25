@@ -16,9 +16,7 @@ import {
 } from '../utils/html.js';
 
 
-function renderNavItem(
-  module
-) {
+function renderNavItem(module) {
 
   const label =
     module.navLabel ||
@@ -39,13 +37,12 @@ function renderNavItem(
         aria-hidden="true"
       ></i>
 
-      <span>
+      <span class="nav-item-label">
         ${escapeHtml(label)}
       </span>
 
     </button>
   `;
-
 }
 
 
@@ -72,10 +69,6 @@ export function Sidebar({
       usuario
     );
 
-  /*
-   * Solamente módulos a los que tiene
-   * acceso visual el usuario.
-   */
 
   const modulosVisibles =
     MODULES.filter(
@@ -86,11 +79,6 @@ export function Sidebar({
         )
     );
 
-
-  /*
-   * Secciones en el mismo orden
-   * definido en modules.js.
-   */
 
   const secciones = [
     ...new Set(
@@ -139,7 +127,7 @@ export function Sidebar({
     >
 
       <!-- =============================================== -->
-      <!-- LOGO -->
+      <!-- LOGO UNIVERSIDAD NACIONAL -->
       <!-- =============================================== -->
 
       <div class="sidebar-header">
@@ -147,39 +135,19 @@ export function Sidebar({
         <div class="sidebar-header-brand">
 
           <img
-            src="/AVI_horizontal.png"
-            alt="Universidad Nacional"
+            src="/Logo-UNA-Rojo_FondoTransparente.png"
+            alt="Universidad Nacional de Costa Rica"
             class="sidebar-logo"
             draggable="false"
           />
 
         </div>
 
-
-        <!-- ============================================= -->
-        <!-- COLAPSAR -->
-        <!-- ============================================= -->
-
-        <button
-          id="sidebarToggle"
-          class="sidebar-toggle"
-          type="button"
-          aria-label="Contraer menú lateral"
-          title="Contraer menú"
-        >
-
-          <i
-            data-lucide="chevron-left"
-            aria-hidden="true"
-          ></i>
-
-        </button>
-
       </div>
 
 
       <!-- =============================================== -->
-      <!-- SISTEMA -->
+      <!-- CONTEXTO DEL SISTEMA -->
       <!-- =============================================== -->
 
       <div class="sidebar-context">
@@ -200,7 +168,7 @@ export function Sidebar({
 
 
       <!-- =============================================== -->
-      <!-- MENÚ CON SCROLL -->
+      <!-- NAVEGACIÓN -->
       <!-- =============================================== -->
 
       <nav class="sidebar-nav">
@@ -261,5 +229,4 @@ export function Sidebar({
 
     </aside>
   `;
-
 }
