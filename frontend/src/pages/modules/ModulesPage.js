@@ -17,16 +17,14 @@ import {
 
 
 /* =========================================================
-   PANEL DE MÓDULOS
+   PANEL DE GESTIÓN
    =========================================================
-   Esta página corresponde a la opción "Dashboard"
-   del menú lateral.
+   Esta página corresponde a la opción
+   "Panel de gestión" del menú lateral.
 
-   NO contiene estadísticas.
-   NO utiliza DASHBOARD_MOCK.
-
-   Su única función es mostrar accesos grandes
-   a los distintos módulos del SGPA.
+   Su función es mostrar accesos visuales
+   a los distintos módulos disponibles
+   según los permisos del usuario.
    ========================================================= */
 
 export function ModulesPage() {
@@ -48,10 +46,10 @@ export function ModulesPage() {
      Se excluyen:
 
      - home
-       Porque es la página estadística inicial.
+       Corresponde al Dashboard principal.
 
      - dashboard
-       Porque esta misma página representa Dashboard.
+       Corresponde a esta misma pantalla.
      ======================================================= */
 
   const modulosDisponibles =
@@ -81,19 +79,7 @@ export function ModulesPage() {
         (module) => {
 
           return ModuleCard({
-
-            route:
-              module.route,
-
-            icon:
-              module.icon,
-
-            title:
-              module.title,
-
-            description:
-              module.description
-
+            module
           });
 
         }
@@ -117,7 +103,7 @@ export function ModulesPage() {
         <div>
 
           <span class="modules-dashboard-label">
-            Panel de módulos
+            Panel de gestión
           </span>
 
           <h2>
@@ -135,7 +121,7 @@ export function ModulesPage() {
 
 
       <!-- =============================================== -->
-      <!-- GRID -->
+      <!-- GRID DE MÓDULOS -->
       <!-- =============================================== -->
 
       <div class="modules-dashboard-grid">
