@@ -4,13 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
+import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
-import { Curso } from './entities/curso.entity';
+import { TipoPlanAsignatura } from '../planes-estudio/constants/tipo-plan-asignatura.constant';
+import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
+import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { CursosService } from './cursos.service';
+import { Curso } from './entities/curso.entity';
 
 describe('CursosService', () => {
   let service: CursosService;
-
   let cursoRepository: {
     find: jest.Mock;
     findOne: jest.Mock;
@@ -18,28 +21,73 @@ describe('CursosService', () => {
     save: jest.Mock;
     update: jest.Mock;
   };
-  let carreraRepository: {
+  let planAsignaturaRepository: {
     find: jest.Mock;
+    findOne: jest.Mock;
+    save: jest.Mock;
   };
 
-  const carreraInformatica = {
+  const carrera = {
     id: 1,
     codigo: 'EIF',
     nombre: 'Ingeniería en Sistemas',
-    gradoAcademico: 'BACHILLERATO',
+    grado: GradoAcademico.BACHILLERATO,
     descripcion: null,
     activo: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   } as Carrera;
 
+  const plan = {
+    id: 2,
+    carreraId: 1,
+    codigo: 'PLAN-2026',
+    nombre: 'Plan 2026',
+    descripcion: null,
+    activo: true,
+    carrera,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  } as PlanEstudio;
+
+  const crearPlanAsignatura = (
+    cambios: Partial<PlanAsignatura> = {},
+  ): PlanAsignatura => ({
+    id: 17,
+    planEstudioId: 2,
+    cursoId: null,
+    bloqueId: null,
+    nivel: 1,
+    ciclo: 1,
+    orden: 1,
+    creditos: 4,
+    horasTeoria: null,
+    horasPractica: null,
+    horasLaboratorio: null,
+    horasGira: null,
+    horasEstudioIndependiente: null,
+    horasTotales: null,
+    horasDocente: null,
+    observacionHoras: null,
+    tipo: TipoPlanAsignatura.OBLIGATORIA,
+    codigoReferencia: 'EIF201',
+    nombreReferencia: 'Programación I',
+    activo: true,
+    planEstudio: plan,
+    bloque: null,
+    curso: null,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    ...cambios,
+  });
+
   const crearCurso = (cambios: Partial<Curso> = {}): Curso => ({
-    id: 1,
+    id: 5,
     codigo: 'EIF201',
     nombre: 'Programación I',
-    descripcion: 'Curso de programación',
+    descripcion: 'Curso introductorio',
     activo: true,
-    carreras: [carreraInformatica],
+    carreras: [carrera],
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...cambios,
@@ -53,13 +101,15 @@ describe('CursosService', () => {
       save: jest.fn(),
       update: jest.fn(),
     };
-    carreraRepository = {
-      find: jest.fn().mockResolvedValue([carreraInformatica]),
+    planAsignaturaRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      save: jest.fn(),
     };
 
     service = new CursosService(
       cursoRepository as unknown as Repository<Curso>,
-      carreraRepository as unknown as Repository<Carrera>,
+      planAsignaturaRepository as unknown as Repository<PlanAsignatura>,
     );
 
     jest.clearAllMocks();
@@ -69,44 +119,32 @@ describe('CursosService', () => {
     const cursos = [
       crearCurso(),
       crearCurso({
-        id: 2,
+        id: 6,
         codigo: 'ETA400',
         nombre: 'Administración General',
       }),
     ];
-
     cursoRepository.find.mockResolvedValue(cursos);
 
     const resultado = await service.listar();
 
     expect(cursoRepository.find).toHaveBeenCalledWith({
-      relations: {
-        carreras: true,
-      },
-      order: {
-        codigo: 'ASC',
-      },
+      relations: { carreras: true },
+      order: { codigo: 'ASC' },
     });
-
     expect(resultado).toEqual(cursos);
   });
 
   it('obtiene un curso por id', async () => {
     const curso = crearCurso();
-
     cursoRepository.findOne.mockResolvedValue(curso);
 
-    const resultado = await service.obtenerPorId(1);
+    const resultado = await service.obtenerPorId(5);
 
     expect(cursoRepository.findOne).toHaveBeenCalledWith({
-      where: {
-        id: 1,
-      },
-      relations: {
-        carreras: true,
-      },
+      where: { id: 5 },
+      relations: { carreras: true },
     });
-
     expect(resultado).toEqual(curso);
   });
 
@@ -116,190 +154,215 @@ describe('CursosService', () => {
     await expect(service.obtenerPorId(999)).rejects.toThrow(NotFoundException);
   });
 
-  it('crea un curso normalizando el código', async () => {
+  it('crea un curso desde una asignatura del plan', async () => {
+    const planAsignatura = crearPlanAsignatura();
+    const curso = crearCurso();
+    planAsignaturaRepository.findOne.mockResolvedValue(planAsignatura);
     cursoRepository.findOne
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(crearCurso());
-
-    const cursoGuardado = crearCurso();
-
-    cursoRepository.save.mockResolvedValue(cursoGuardado);
+      .mockResolvedValueOnce(curso);
+    cursoRepository.save.mockResolvedValue(curso);
+    planAsignaturaRepository.save.mockResolvedValue({
+      ...planAsignatura,
+      cursoId: 5,
+      curso,
+    });
 
     const resultado = await service.crear({
-      codigo: ' eif201 ',
-      nombre: ' Programación I ',
-      descripcion: ' Curso de programación ',
-      carreraIds: [1],
+      planAsignaturaId: 17,
+      descripcion: ' Curso introductorio ',
     });
 
     expect(cursoRepository.create).toHaveBeenCalledWith({
       codigo: 'EIF201',
       nombre: 'Programación I',
-      descripcion: 'Curso de programación',
+      descripcion: 'Curso introductorio',
       activo: true,
-      carreras: [carreraInformatica],
+      carreras: [carrera],
     });
-
-    expect(carreraRepository.find).toHaveBeenCalledTimes(1);
-
-    expect(resultado).toEqual(cursoGuardado);
+    expect(planAsignaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 17,
+        cursoId: 5,
+      }),
+    );
+    expect(resultado).toEqual(curso);
   });
 
-  it('rechaza un código duplicado', async () => {
-    cursoRepository.findOne.mockResolvedValue(crearCurso());
+  it('rechaza una asignatura del plan inexistente', async () => {
+    planAsignaturaRepository.findOne.mockResolvedValue(null);
 
     await expect(
-      service.crear({
-        codigo: 'EIF201',
-        nombre: 'Otro curso',
-        carreraIds: [1],
+      service.crear({ planAsignaturaId: 999 }),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(cursoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una asignatura que ya está vinculada a un curso', async () => {
+    const curso = crearCurso();
+    planAsignaturaRepository.findOne.mockResolvedValue(
+      crearPlanAsignatura({
+        cursoId: 5,
+        curso,
       }),
+    );
+
+    await expect(
+      service.crear({ planAsignaturaId: 17 }),
     ).rejects.toThrow(ConflictException);
 
     expect(cursoRepository.save).not.toHaveBeenCalled();
   });
 
-  it('rechaza código vacío después de normalizar', async () => {
+  it('rechaza una asignatura o un plan inactivo', async () => {
+    planAsignaturaRepository.findOne.mockResolvedValueOnce(
+      crearPlanAsignatura({ activo: false }),
+    );
+
     await expect(
-      service.crear({
-        codigo: '   ',
-        nombre: 'Curso prueba',
-        carreraIds: [1],
-      }),
+      service.crear({ planAsignaturaId: 17 }),
     ).rejects.toThrow(BadRequestException);
 
-    expect(cursoRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('rechaza nombre vacío después de normalizar', async () => {
-    await expect(
-      service.crear({
-        codigo: 'EIF999',
-        nombre: '   ',
-        carreraIds: [1],
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(cursoRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('actualiza y normaliza un curso', async () => {
-    cursoRepository.findOne
-      .mockResolvedValueOnce(crearCurso())
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(
-        crearCurso({
-          codigo: 'EIF202',
-          nombre: 'Soporte Técnico',
-        }),
-      );
-
-    const resultado = await service.actualizar(1, {
-      codigo: ' eif202 ',
-      nombre: ' Soporte Técnico ',
-    });
-
-    expect(cursoRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        codigo: 'EIF202',
-        nombre: 'Soporte Técnico',
+    planAsignaturaRepository.findOne.mockResolvedValueOnce(
+      crearPlanAsignatura({
+        planEstudio: { ...plan, activo: false },
       }),
     );
 
-    expect(resultado.codigo).toBe('EIF202');
+    await expect(
+      service.crear({ planAsignaturaId: 17 }),
+    ).rejects.toThrow(BadRequestException);
   });
 
-  it('permite dejar la descripción en null', async () => {
+  it('reutiliza un curso existente con el mismo código y nombre', async () => {
+    const planAsignatura = crearPlanAsignatura();
+    const curso = crearCurso();
+    planAsignaturaRepository.findOne.mockResolvedValue(planAsignatura);
     cursoRepository.findOne
-      .mockResolvedValueOnce(crearCurso())
-      .mockResolvedValueOnce(
-        crearCurso({
-          descripcion: null,
-        }),
-      );
-
-    await service.actualizar(1, {
-      descripcion: '',
+      .mockResolvedValueOnce(curso)
+      .mockResolvedValueOnce(curso);
+    planAsignaturaRepository.save.mockResolvedValue({
+      ...planAsignatura,
+      cursoId: 5,
+      curso,
     });
 
-    expect(cursoRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        descripcion: null,
-      }),
+    const resultado = await service.crear({ planAsignaturaId: 17 });
+
+    expect(cursoRepository.create).not.toHaveBeenCalled();
+    expect(cursoRepository.save).not.toHaveBeenCalled();
+    expect(planAsignaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ cursoId: 5 }),
     );
+    expect(resultado).toEqual(curso);
   });
 
-  it('cambia el estado de un curso', async () => {
-    cursoRepository.findOne
-      .mockResolvedValueOnce(crearCurso())
-      .mockResolvedValueOnce(
-        crearCurso({
-          activo: false,
-        }),
-      );
+  it('rechaza un código existente con un nombre diferente', async () => {
+    planAsignaturaRepository.findOne.mockResolvedValue(crearPlanAsignatura());
+    cursoRepository.findOne.mockResolvedValue(
+      crearCurso({ nombre: 'Bases de Datos' }),
+    );
 
-    const resultado = await service.cambiarEstado(1, false);
+    await expect(
+      service.crear({ planAsignaturaId: 17 }),
+    ).rejects.toThrow(ConflictException);
 
-    expect(cursoRepository.update).toHaveBeenCalledWith(1, {
-      activo: false,
-    });
-
-    expect(resultado.activo).toBe(false);
+    expect(planAsignaturaRepository.save).not.toHaveBeenCalled();
   });
 
   it('convierte un duplicado de MySQL en conflicto', async () => {
+    planAsignaturaRepository.findOne.mockResolvedValue(crearPlanAsignatura());
     cursoRepository.findOne.mockResolvedValue(null);
+    cursoRepository.save.mockRejectedValue({ code: 'ER_DUP_ENTRY' });
 
-    cursoRepository.save.mockRejectedValue({
-      code: 'ER_DUP_ENTRY',
+    await expect(
+      service.crear({ planAsignaturaId: 17 }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(planAsignaturaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('lista únicamente asignaturas disponibles según los filtros', async () => {
+    const planAsignatura = crearPlanAsignatura();
+    planAsignaturaRepository.find.mockResolvedValue([planAsignatura]);
+
+    const resultado = await service.listarAsignaturasDisponibles({
+      carreraId: 1,
+      planId: 2,
+      nivel: 1,
+      ciclo: 1,
     });
 
-    await expect(
-      service.crear({
-        codigo: 'EIF201',
-        nombre: 'Programación I',
-        carreraIds: [1],
+    expect(planAsignaturaRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          activo: true,
+          planEstudioId: 2,
+          nivel: 1,
+          ciclo: 1,
+          planEstudio: {
+            activo: true,
+            carreraId: 1,
+          },
+        }),
       }),
-    ).rejects.toThrow(ConflictException);
+    );
+    expect(resultado).toEqual([planAsignatura]);
   });
 
-  it('rechaza carreras inexistentes al crear', async () => {
-    cursoRepository.findOne.mockResolvedValue(null);
-    carreraRepository.find.mockResolvedValue([]);
-
-    await expect(
-      service.crear({
-        codigo: 'EIF203',
-        nombre: 'Estructuras de datos',
-        carreraIds: [999],
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(cursoRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('reemplaza las carreras durante la actualización', async () => {
-    const carreraAdministracion = {
-      ...carreraInformatica,
-      id: 2,
-      codigo: 'ADM',
-      nombre: 'Administración',
-    };
-
+  it('actualiza solamente la descripción del curso', async () => {
+    const curso = crearCurso();
     cursoRepository.findOne
-      .mockResolvedValueOnce(crearCurso())
-      .mockResolvedValueOnce(crearCurso({ carreras: [carreraAdministracion] }));
-    carreraRepository.find.mockResolvedValue([carreraAdministracion]);
+      .mockResolvedValueOnce({ ...curso })
+      .mockResolvedValueOnce({
+        ...curso,
+        descripcion: 'Nueva descripción',
+      });
+    cursoRepository.save.mockResolvedValue({
+      ...curso,
+      descripcion: 'Nueva descripción',
+    });
 
-    const resultado = await service.actualizar(1, {
-      carreraIds: [2],
+    const resultado = await service.actualizar(5, {
+      descripcion: ' Nueva descripción ',
     });
 
     expect(cursoRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        carreras: [carreraAdministracion],
+        codigo: 'EIF201',
+        nombre: 'Programación I',
+        descripcion: 'Nueva descripción',
       }),
     );
-    expect(resultado.carreras).toEqual([carreraAdministracion]);
+    expect(resultado.descripcion).toBe('Nueva descripción');
+  });
+
+  it('permite dejar la descripción en null', async () => {
+    const curso = crearCurso();
+    cursoRepository.findOne
+      .mockResolvedValueOnce({ ...curso })
+      .mockResolvedValueOnce({ ...curso, descripcion: null });
+    cursoRepository.save.mockResolvedValue({ ...curso, descripcion: null });
+
+    const resultado = await service.actualizar(5, { descripcion: '' });
+
+    expect(cursoRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ descripcion: null }),
+    );
+    expect(resultado.descripcion).toBeNull();
+  });
+
+  it('cambia el estado de un curso', async () => {
+    const curso = crearCurso();
+    cursoRepository.findOne
+      .mockResolvedValueOnce(curso)
+      .mockResolvedValueOnce({ ...curso, activo: false });
+    cursoRepository.update.mockResolvedValue({ affected: 1 });
+
+    const resultado = await service.cambiarEstado(5, false);
+
+    expect(cursoRepository.update).toHaveBeenCalledWith(5, { activo: false });
+    expect(resultado.activo).toBe(false);
   });
 });

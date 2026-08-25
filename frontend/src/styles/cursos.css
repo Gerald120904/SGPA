@@ -309,6 +309,7 @@
 }
 
 .curso-form-grid input,
+.curso-form-grid select,
 .curso-form-grid textarea {
   width: 100%;
   padding: 11px 12px;
@@ -321,6 +322,7 @@
 }
 
 .curso-form-grid input:focus,
+.curso-form-grid select:focus,
 .curso-form-grid textarea:focus {
   border-color: #a8b0bc;
   box-shadow: 0 0 0 3px rgba(16, 24, 40, 0.06);
@@ -328,6 +330,37 @@
 
 .curso-form-grid textarea {
   resize: vertical;
+}
+
+.curso-form-grid select:disabled,
+.curso-form-grid input:disabled {
+  background: #f5f7fa;
+  color: #667085;
+  cursor: not-allowed;
+}
+
+.curso-asignatura-detalle:empty {
+  display: none;
+}
+
+.curso-selected-subject {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.curso-selected-subject strong {
+  color: #182235;
+  font-size: 14px;
+}
+
+.curso-selected-subject small {
+  color: #667085;
+  font-size: 12px;
 }
 
 .curso-form-wide {

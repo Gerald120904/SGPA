@@ -9,6 +9,11 @@ export async function listarCursos() {
   return window.sgpa.listarCursos();
 }
 
+export async function listarAsignaturasDisponiblesCurso(filtros = {}) {
+  validarApi('listarAsignaturasDisponiblesCurso');
+  return window.sgpa.listarAsignaturasDisponiblesCurso(filtros);
+}
+
 export async function obtenerCurso(id) {
   validarApi('obtenerCurso');
   return window.sgpa.obtenerCurso(id);

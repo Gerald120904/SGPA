@@ -31,11 +31,22 @@ export class PlanValidacionesService {
     private readonly salidas: Repository<SalidaAcademica>,
   ) {}
   private nombre(a: PlanAsignatura) {
+    const codigo =
+      a.codigoReferencia?.trim() || a.curso?.codigo?.trim() || '';
+    const nombre =
+      a.nombreReferencia?.trim() || a.curso?.nombre?.trim() || '';
+
+    if (codigo && nombre) {
+      return `${codigo} - ${nombre}`;
+    }
+
+    return codigo || nombre || `Asignatura #${a.id}`;
+  }
+  private codigo(a: PlanAsignatura) {
     return (
-      a.curso?.codigo ||
-      a.codigoReferencia ||
-      a.nombreReferencia ||
-      `Asignatura #${a.id}`
+      a.codigoReferencia?.trim().toUpperCase() ||
+      a.curso?.codigo?.trim().toUpperCase() ||
+      ''
     );
   }
   private despues(r: PlanAsignatura, a: PlanAsignatura) {
@@ -90,6 +101,17 @@ export class PlanValidacionesService {
       errores: Resultado[] = [],
       activas = asignaturas.filter((a) => a.activo);
     for (const a of activas) {
+      const nombreAsignatura =
+        a.nombreReferencia?.trim() || a.curso?.nombre?.trim() || '';
+
+      if (!nombreAsignatura)
+        errores.push({
+          codigo: 'ASIGNATURA_SIN_NOMBRE',
+          nivel: 'ERROR',
+          asignaturaId: a.id,
+          mensaje: `${this.nombre(a)} no tiene nombre curricular.`,
+        });
+
       if (a.bloqueId == null)
         advertencias.push({
           codigo: 'ASIGNATURA_SIN_BLOQUE',
@@ -124,18 +146,32 @@ export class PlanValidacionesService {
           bloqueId: b.id,
           mensaje: `El bloque "${b.nombre}" no contiene asignaturas activas.`,
         });
-    const usados = new Set<number>();
-    for (const a of activas)
-      if (a.cursoId) {
-        if (usados.has(a.cursoId))
-          errores.push({
-            codigo: 'CURSO_DUPLICADO',
-            nivel: 'ERROR',
-            asignaturaId: a.id,
-            mensaje: `${this.nombre(a)} aparece más de una vez dentro del mismo plan.`,
-          });
-        usados.add(a.cursoId);
+    const codigosUsados = new Set<string>();
+    for (const a of activas) {
+      const codigo = this.codigo(a);
+
+      if (!codigo) {
+        errores.push({
+          codigo: 'ASIGNATURA_SIN_CODIGO',
+          nivel: 'ERROR',
+          asignaturaId: a.id,
+          mensaje: `La asignatura #${a.id} no tiene código curricular.`,
+        });
+        continue;
       }
+
+      if (codigosUsados.has(codigo)) {
+        errores.push({
+          codigo: 'CODIGO_ASIGNATURA_DUPLICADO',
+          nivel: 'ERROR',
+          asignaturaId: a.id,
+          mensaje: `El código ${codigo} aparece más de una vez dentro del mismo plan.`,
+        });
+        continue;
+      }
+
+      codigosUsados.add(codigo);
+    }
     for (const r of requisitos.filter(
       (r) => r.tipo === TipoRequisito.REQUISITO,
     )) {

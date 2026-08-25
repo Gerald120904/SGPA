@@ -7,15 +7,11 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import { TipoPlanAsignatura } from '../constants/tipo-plan-asignatura.constant';
 
 export class CrearPlanAsignaturaDto {
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  cursoId?: number;
-
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -91,13 +87,13 @@ export class CrearPlanAsignaturaDto {
   @IsEnum(TipoPlanAsignatura)
   tipo!: TipoPlanAsignatura;
 
-  @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(30)
-  codigoReferencia?: string;
+  codigoReferencia!: string;
 
-  @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(150)
-  nombreReferencia?: string;
+  nombreReferencia!: string;
 }

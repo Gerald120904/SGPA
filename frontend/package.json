@@ -28,7 +28,11 @@
     "@electron-forge/plugin-fuses": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
+    "@nestjs/testing": "^11.2.1",
+    "@types/jest": "^30.0.0",
     "electron": "43.4.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.12",
     "vite": "^5.4.21"
   },
   "dependencies": {

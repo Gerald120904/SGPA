@@ -14,6 +14,7 @@ describe('CursosController', () => {
 
   const cursosService = {
     listar: jest.fn(),
+    listarAsignaturasDisponibles: jest.fn(),
     obtenerPorId: jest.fn(),
     crear: jest.fn(),
     actualizar: jest.fn(),
@@ -66,6 +67,7 @@ describe('CursosController', () => {
     jest.clearAllMocks();
 
     cursosService.listar.mockResolvedValue([]);
+    cursosService.listarAsignaturasDisponibles.mockResolvedValue([]);
     cursosService.obtenerPorId.mockResolvedValue({ id: 1 });
     cursosService.crear.mockResolvedValue({ id: 1 });
     cursosService.actualizar.mockResolvedValue({ id: 1 });
@@ -121,14 +123,12 @@ describe('CursosController', () => {
     expect(cursosService.listar).not.toHaveBeenCalled();
   });
 
-  it('crea un curso válido', async () => {
+  it('crea un curso desde una asignatura del plan', async () => {
     const token = await crearToken('COORDINADOR');
 
     const dto = {
-      codigo: 'EIF201',
-      nombre: 'Programación I',
+      planAsignaturaId: 17,
       descripcion: 'Curso introductorio',
-      carreraIds: [1],
     };
 
     await request(app.getHttpServer())
@@ -142,13 +142,43 @@ describe('CursosController', () => {
     expect(cursosService.crear).toHaveBeenCalledWith(dto);
   });
 
-  it('rechaza un curso sin código', async () => {
+  it('rechaza crear un curso sin planAsignaturaId', async () => {
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
       .post('/cursos')
       .set('Authorization', `Bearer ${token}`)
       .send({
+        descripcion: 'Curso de prueba',
+      })
+      .expect(400);
+
+    expect(cursosService.crear).not.toHaveBeenCalled();
+  });
+
+  it('rechaza planAsignaturaId menor a 1', async () => {
+    const token = await crearToken('COORDINADOR');
+
+    await request(app.getHttpServer())
+      .post('/cursos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        planAsignaturaId: 0,
+      })
+      .expect(400);
+
+    expect(cursosService.crear).not.toHaveBeenCalled();
+  });
+
+  it('rechaza código, nombre y carreraIds enviados manualmente', async () => {
+    const token = await crearToken('COORDINADOR');
+
+    await request(app.getHttpServer())
+      .post('/cursos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        planAsignaturaId: 17,
+        codigo: 'EIF201',
         nombre: 'Programación I',
         carreraIds: [1],
       })
@@ -157,37 +187,22 @@ describe('CursosController', () => {
     expect(cursosService.crear).not.toHaveBeenCalled();
   });
 
-  it('rechaza campos no permitidos', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
-
-    await request(app.getHttpServer())
-      .post('/cursos')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        codigo: 'EIF201',
-        nombre: 'Programación I',
-        carreraIds: [1],
-        carreraId: 1,
-      })
-      .expect(400);
-
-    expect(cursosService.crear).not.toHaveBeenCalled();
-  });
-
-  it('rechaza crear un curso sin carreras', async () => {
+  it('lista asignaturas disponibles para crear curso', async () => {
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
-      .post('/cursos')
+      .get(
+        '/cursos/asignaturas-disponibles?carreraId=1&planId=2&nivel=1&ciclo=2',
+      )
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        codigo: 'EIF201',
-        nombre: 'Programación I',
-        carreraIds: [],
-      })
-      .expect(400);
+      .expect(200, []);
 
-    expect(cursosService.crear).not.toHaveBeenCalled();
+    expect(cursosService.listarAsignaturasDisponibles).toHaveBeenCalledWith({
+      carreraId: 1,
+      planId: 2,
+      nivel: 1,
+      ciclo: 2,
+    });
   });
 
   it('consulta un curso por id', async () => {
@@ -214,11 +229,11 @@ describe('CursosController', () => {
     expect(cursosService.obtenerPorId).not.toHaveBeenCalled();
   });
 
-  it('actualiza un curso', async () => {
+  it('actualiza la descripción de un curso', async () => {
     const token = await crearToken('COORDINADOR');
 
     const dto = {
-      nombre: 'Programación I Actualizada',
+      descripcion: 'Descripción actualizada',
     };
 
     await request(app.getHttpServer())
@@ -230,6 +245,20 @@ describe('CursosController', () => {
       });
 
     expect(cursosService.actualizar).toHaveBeenCalledWith(1, dto);
+  });
+
+  it('rechaza modificar manualmente el código de un curso', async () => {
+    const token = await crearToken('COORDINADOR');
+
+    await request(app.getHttpServer())
+      .patch('/cursos/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        codigo: 'OTRO101',
+      })
+      .expect(400);
+
+    expect(cursosService.actualizar).not.toHaveBeenCalled();
   });
 
   it('cambia el estado del curso', async () => {

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
 import { Carrera } from '../carreras/entities/carrera.entity';
-import { Curso } from '../cursos/entities/curso.entity';
 import { BloquesPlanController } from './bloques-plan.controller';
 import { BloquesPlanService } from './bloques-plan.service';
 import { BloquePlan } from './entities/bloque-plan.entity';
@@ -34,7 +33,6 @@ import { SalidasAcademicasService } from './salidas-academicas.service';
       SalidaAcademica,
       BloquePlan,
       Carrera,
-      Curso,
     ]),
     SecurityModule,
   ],

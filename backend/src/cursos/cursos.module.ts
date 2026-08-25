@@ -1,13 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
-import { Carrera } from '../carreras/entities/carrera.entity';
+import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { CursosController } from './cursos.controller';
 import { CursosService } from './cursos.service';
 import { Curso } from './entities/curso.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Curso, Carrera]), SecurityModule],
+  imports: [
+    TypeOrmModule.forFeature([Curso, PlanAsignatura]),
+    SecurityModule,
+  ],
   controllers: [CursosController],
   providers: [CursosService],
   exports: [CursosService],
