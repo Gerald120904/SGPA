@@ -25,685 +25,6 @@
   --text-muted: #98a2b3;
 }
 
-
-/* =========================================================
-   CORRECCIÓN GENERAL DE SCROLL
-   ========================================================= */
-
-html,
-body,
-#app {
-  width: 100%;
-  height: 100%;
-
-  min-width: 0;
-  min-height: 0;
-}
-
-
-body {
-  overflow: hidden !important;
-}
-
-
-/*
- * La aplicación ocupa exactamente la ventana.
- *
- * El sidebar y el contenido manejarán sus
- * propios scrolls independientemente.
- */
-
-.app-shell {
-  width: 100%;
-  height: 100vh;
-
-  min-width: 0;
-  min-height: 0;
-
-  display: grid;
-
-  grid-template-columns:
-    245px minmax(0, 1fr);
-
-  overflow: hidden;
-
-  transition:
-    grid-template-columns
-    0.22s ease;
-}
-
-
-/* =========================================================
-   SIDEBAR CONTRAÍDO
-   ========================================================= */
-
-.app-shell.sidebar-collapsed {
-  grid-template-columns:
-    74px minmax(0, 1fr);
-}
-
-
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
-
-.sidebar {
-  position: relative;
-
-  width: 100%;
-  height: 100vh;
-
-  min-width: 0;
-  min-height: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  overflow: hidden;
-
-  background: #ffffff;
-
-  border-right: 1px solid var(--border-soft);
-}
-
-
-/*
- * Detalle institucional UNA.
- */
-
-.sidebar::before {
-  content: "";
-
-  position: absolute;
-
-  top: 0;
-  bottom: 0;
-  left: 0;
-
-  width: 3px;
-
-  background: var(--una-red);
-
-  z-index: 10;
-}
-
-
-/* =========================================================
-   HEADER SIDEBAR
-   ========================================================= */
-
-.sidebar-header {
-  flex: 0 0 78px;
-
-  width: 100%;
-
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-
-  gap: 10px;
-
-  padding:
-    10px 14px
-    10px 18px;
-
-  overflow: hidden;
-
-  border-bottom: 1px solid #eef1f5;
-}
-
-
-.sidebar-header-brand {
-  min-width: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-
-  overflow: hidden;
-}
-
-
-/*
- * Logo totalmente hacia la izquierda.
- */
-
-.sidebar-logo {
-  display: block;
-
-  width: 135px;
-  max-width: 135px;
-
-  height: auto;
-
-  object-fit: contain;
-  object-position: left center;
-}
-
-
-/* =========================================================
-   BOTÓN COLAPSAR
-   ========================================================= */
-
-.sidebar-toggle {
-  flex: 0 0 30px;
-
-  width: 30px;
-  height: 30px;
-
-  margin-left: auto;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;
-
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-
-  background: #ffffff;
-
-  color: #475467;
-
-  cursor: pointer;
-
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    color 0.15s ease;
-}
-
-
-.sidebar-toggle:hover {
-  background: #f2f4f7;
-
-  border-color: #d0d5dd;
-
-  color: #101828;
-}
-
-
-.sidebar-toggle svg {
-  width: 16px;
-  height: 16px;
-}
-
-
-/* =========================================================
-   CONTEXTO DEL SISTEMA
-   ========================================================= */
-
-.sidebar-context {
-  flex: 0 0 auto;
-
-  padding:
-    19px 24px
-    15px;
-}
-
-
-/* =========================================================
-   SCROLL INDEPENDIENTE DEL SIDEBAR
-   ========================================================= */
-
-/*
- * ESTA ES UNA DE LAS CORRECCIONES IMPORTANTES.
- *
- * Si el menú crece más que la altura disponible,
- * solamente esta zona tendrá scroll.
- *
- * Header y usuario quedan siempre visibles.
- */
-
-.sidebar-nav {
-  flex: 1 1 auto;
-
-  min-width: 0;
-  min-height: 0;
-
-  padding:
-    4px 14px
-    18px;
-
-  overflow-x: hidden;
-  overflow-y: auto;
-
-  overscroll-behavior: contain;
-
-  scrollbar-gutter: stable;
-}
-
-
-/* Scrollbar sutil */
-
-.sidebar-nav::-webkit-scrollbar {
-  width: 6px;
-}
-
-
-.sidebar-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-  background: #d0d5dd;
-
-  border-radius: 10px;
-}
-
-
-.sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: #98a2b3;
-}
-
-
-/* =========================================================
-   SECCIONES SIDEBAR
-   ========================================================= */
-
-.nav-section-title {
-  margin:
-    19px 10px
-    8px;
-
-  color: #98a2b3;
-
-  font-size: 10px;
-  font-weight: 700;
-
-  letter-spacing: 0.7px;
-
-  text-transform: uppercase;
-}
-
-
-/* =========================================================
-   ITEM ACTIVO
-   ========================================================= */
-
-.nav-item {
-  position: relative;
-}
-
-
-.nav-item.active::before {
-  content: "";
-
-  position: absolute;
-
-  top: 9px;
-  bottom: 9px;
-  left: 0;
-
-  width: 3px;
-
-  border-radius:
-    0 3px
-    3px 0;
-
-  background: var(--una-red);
-}
-
-
-/* =========================================================
-   FOOTER SIDEBAR
-   ========================================================= */
-
-.sidebar-footer {
-  flex: 0 0 auto;
-
-  background: #ffffff;
-}
-
-
-/* =========================================================
-   SIDEBAR COLAPSADO
-   ========================================================= */
-
-.sidebar-collapsed .sidebar-header {
-  justify-content: center;
-
-  padding:
-    10px 8px;
-}
-
-
-.sidebar-collapsed .sidebar-header-brand,
-.sidebar-collapsed .sidebar-logo,
-.sidebar-collapsed .sidebar-context,
-.sidebar-collapsed .nav-section-title,
-.sidebar-collapsed .nav-item span,
-.sidebar-collapsed .sidebar-user-info {
-  display: none;
-}
-
-
-.sidebar-collapsed .sidebar-toggle {
-  margin-left: 0;
-}
-
-
-.sidebar-collapsed .sidebar-nav {
-  padding:
-    14px 9px
-    18px;
-}
-
-
-.sidebar-collapsed .nav-item {
-  min-height: 44px;
-
-  justify-content: center;
-
-  gap: 0;
-
-  padding: 0;
-}
-
-
-.sidebar-collapsed .nav-item svg {
-  width: 19px;
-  height: 19px;
-}
-
-
-.sidebar-collapsed .sidebar-footer {
-  flex-direction: column;
-
-  justify-content: center;
-
-  gap: 8px;
-
-  padding:
-    12px 8px;
-}
-
-
-.sidebar-collapsed .sidebar-user {
-  justify-content: center;
-}
-
-
-/* =========================================================
-   CONTENIDO PRINCIPAL
-   ========================================================= */
-
-.app-main {
-  width: 100%;
-  height: 100vh;
-
-  min-width: 0;
-  min-height: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  overflow: hidden;
-}
-
-
-/* =========================================================
-   TOPBAR
-   ========================================================= */
-
-.topbar {
-  flex: 0 0 78px;
-
-  height: 78px;
-
-  padding:
-    0 30px;
-
-  background: #ffffff;
-
-  border-bottom:
-    1px solid #e9edf3;
-}
-
-
-.topbar-heading {
-  min-width: 0;
-}
-
-
-.topbar h1 {
-  margin: 0;
-
-  color: #172033;
-
-  font-size: 20px;
-  font-weight: 700;
-}
-
-
-.topbar-subtitle {
-  margin:
-    3px 0
-    0;
-
-  color: #7b8798;
-
-  font-size: 11.5px;
-}
-
-
-/* =========================================================
-   SCROLL DEL CONTENIDO
-   ========================================================= */
-
-/*
- * SEGUNDA CORRECCIÓN IMPORTANTE.
- *
- * Este scroll existe tanto si el sidebar
- * está abierto como si está cerrado.
- */
-
-.content-area {
-  flex: 1 1 auto;
-
-  width: 100%;
-
-  min-width: 0;
-  min-height: 0;
-
-  padding:
-    28px 30px
-    40px;
-
-  overflow-x: hidden;
-  overflow-y: auto;
-
-  scrollbar-gutter: stable;
-
-  overscroll-behavior: contain;
-}
-
-
-.content-area::-webkit-scrollbar {
-  width: 8px;
-}
-
-
-.content-area::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-
-.content-area::-webkit-scrollbar-thumb {
-  background: #d0d5dd;
-
-  border-radius: 10px;
-}
-
-
-.content-area::-webkit-scrollbar-thumb:hover {
-  background: #98a2b3;
-}
-
-
-/* =========================================================
-   HOME
-   ========================================================= */
-
-.home-page {
-  width: 100%;
-}
-
-
-.home-period {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  gap: 18px;
-
-  margin-bottom: 24px;
-
-  padding:
-    16px 19px;
-
-  border: 1px solid #e6e9ee;
-  border-radius: 13px;
-
-  background: #ffffff;
-}
-
-
-.home-period-main {
-  display: flex;
-  align-items: center;
-
-  gap: 12px;
-}
-
-
-.home-period-icon {
-  width: 40px;
-  height: 40px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 10px;
-
-  background: #f2f4f7;
-
-  color: #1f2937;
-}
-
-
-.home-period-icon svg {
-  width: 19px;
-  height: 19px;
-}
-
-
-.home-period span,
-.home-period strong {
-  display: block;
-}
-
-
-.home-period span {
-  color: #7b8798;
-
-  font-size: 11px;
-}
-
-
-.home-period strong {
-  margin-top: 2px;
-
-  color: #253347;
-
-  font-size: 14px;
-}
-
-
-.home-period-campus {
-  color: #667085;
-
-  font-size: 12px;
-}
-
-
-.home-section-header {
-  margin-bottom: 14px;
-}
-
-
-.home-section-header h2 {
-  margin: 0;
-
-  color: #253347;
-
-  font-size: 17px;
-  font-weight: 680;
-}
-
-
-.home-section-header p {
-  margin:
-    5px 0
-    0;
-
-  color: #8b96a7;
-
-  font-size: 12px;
-}
-
-
-.home-module-grid {
-  display: grid;
-
-  grid-template-columns:
-    repeat(3, minmax(0, 1fr));
-
-  gap: 13px;
-}
-
-
-/* =========================================================
-   ICONOS NEUTROS
-   ========================================================= */
-
-/*
- * Se elimina el fondo azul claro.
- *
- * Ahora:
- * Fondo gris claro
- * Icono gris oscuro / negro.
- */
-
-.stat-icon,
-.quick-card-icon,
-.dashboard-stat-icon {
-  background: #f2f4f7 !important;
-
-  color: #1f2937 !important;
-
-  border:
-    1px solid #eaecf0;
-}
-
-
-.stat-icon svg,
-.quick-card-icon svg,
-.dashboard-stat-icon svg {
-  color: #1f2937 !important;
-
-  stroke-width: 1.8;
-}
-
-
-.quick-card:hover .quick-card-icon {
-  background: #e9ecef !important;
-}
-
-
 /* =========================================================
    DASHBOARD V2
    ========================================================= */
@@ -1301,6 +622,914 @@ body {
   font-size: 11px;
 }
 
+/* =========================================================
+   LAYOUT PRINCIPAL SGPA
+   =========================================================
+   Sidebar automático:
+   - Contraído: 74px
+   - Hover: 245px
+   - El contenido se reajusta
+   - Sin JavaScript
+   - Sin botón de colapsar
+   ========================================================= */
+
+
+/* =========================================================
+   ESTRUCTURA GENERAL
+   ========================================================= */
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+}
+
+
+body {
+  overflow: hidden !important;
+}
+
+
+/* =========================================================
+   APP SHELL
+   ========================================================= */
+
+.app-shell {
+  width: 100%;
+  height: 100vh;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    74px minmax(0, 1fr);
+
+  overflow: hidden;
+
+  background: #f5f7fa;
+
+  transition:
+    grid-template-columns 0.25s ease;
+}
+
+
+/*
+ * Al colocar el mouse sobre el sidebar,
+ * la columna completa aumenta.
+ *
+ * El contenido principal se reajusta,
+ * no queda debajo del menú.
+ */
+
+.app-shell:has(.sidebar:hover) {
+  grid-template-columns:
+    245px minmax(0, 1fr);
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+  position: relative;
+
+  z-index: 10;
+
+  width: 100%;
+  height: 100vh;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border-right:
+    1px solid #e6e9ee;
+}
+
+
+/* =========================================================
+   LÍNEA INSTITUCIONAL
+   ========================================================= */
+
+.sidebar::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  bottom: 0;
+  left: 0;
+
+  z-index: 20;
+
+  width: 3px;
+
+  background:
+    var(--una-red);
+}
+
+
+/* =========================================================
+   HEADER SIDEBAR
+   ========================================================= */
+
+.sidebar-header {
+  flex: 0 0 78px;
+
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border-bottom:
+    1px solid #eef1f5;
+
+  transition:
+    padding 0.25s ease;
+}
+
+
+.sidebar-header-brand {
+  width: 100%;
+
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   LOGO
+   ========================================================= */
+
+.sidebar-logo {
+  display: block;
+
+  width: 48px;
+  height: 54px;
+
+  max-width: none;
+
+  object-fit: contain;
+  object-position: center;
+
+  user-select: none;
+
+  transition:
+    width 0.25s ease,
+    height 0.25s ease;
+}
+
+
+.sidebar:hover
+.sidebar-header {
+  justify-content: flex-start;
+
+  padding:
+    8px 20px;
+}
+
+
+.sidebar:hover
+.sidebar-header-brand {
+  justify-content: flex-start;
+}
+
+
+.sidebar:hover
+.sidebar-logo {
+  width: 120px;
+  height: 62px;
+
+  object-position:
+    left center;
+}
+
+
+/* =========================================================
+   CONTEXTO SGPA
+   ========================================================= */
+
+.sidebar-context {
+  display: none;
+
+  flex: 0 0 auto;
+
+  padding:
+    19px 24px
+    15px;
+
+  background: #ffffff;
+}
+
+
+.sidebar:hover
+.sidebar-context {
+  display: block;
+}
+
+
+.sidebar-context-label {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 700;
+
+  letter-spacing: 0.8px;
+
+  text-transform: uppercase;
+}
+
+
+.sidebar-context strong {
+  display: block;
+
+  color: #182235;
+
+  font-size: 18px;
+  font-weight: 700;
+}
+
+
+.sidebar-context small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+}
+
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+
+.sidebar-nav {
+  flex: 1 1 auto;
+
+  width: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding:
+    14px 9px
+    18px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  overscroll-behavior: contain;
+
+  transition:
+    padding 0.25s ease;
+}
+
+
+.sidebar:hover
+.sidebar-nav {
+  padding:
+    4px 14px
+    18px;
+}
+
+
+/* =========================================================
+   SCROLL SIDEBAR
+   ========================================================= */
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #d0d5dd;
+
+  border-radius: 10px;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #98a2b3;
+}
+
+
+/* =========================================================
+   TÍTULOS DE SECCIONES
+   ========================================================= */
+
+.nav-section-title {
+  display: none;
+
+  margin:
+    19px 10px
+    8px;
+
+  color: #98a2b3;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+
+  white-space: nowrap;
+}
+
+
+.sidebar:hover
+.nav-section-title {
+  display: block;
+}
+
+
+/* =========================================================
+   ITEMS DEL MENÚ
+   ========================================================= */
+
+.nav-item {
+  position: relative;
+
+  width: 100%;
+  min-height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 0;
+
+  margin-bottom: 3px;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 9px;
+
+  background: transparent;
+
+  color: #526174;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  text-align: left;
+
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    padding 0.25s ease,
+    gap 0.25s ease;
+}
+
+
+.nav-item-label {
+  display: none;
+}
+
+
+.nav-item svg {
+  flex: 0 0 auto;
+
+  width: 19px;
+  height: 19px;
+
+  stroke-width: 1.8;
+}
+
+
+.nav-item:hover {
+  background: #f6f7f9;
+
+  color: #253347;
+}
+
+
+/* =========================================================
+   ITEM ACTIVO
+   ========================================================= */
+
+.nav-item.active {
+  background:
+    rgba(207, 32, 41, 0.075);
+
+  color:
+    var(--una-red);
+
+  font-weight: 600;
+}
+
+
+.nav-item.active::before {
+  content: "";
+
+  position: absolute;
+
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+
+  width: 3px;
+
+  border-radius:
+    0 3px
+    3px 0;
+
+  background:
+    var(--una-red);
+}
+
+
+/* =========================================================
+   ITEMS ABIERTOS
+   ========================================================= */
+
+.sidebar:hover
+.nav-item {
+  min-height: 42px;
+
+  justify-content: flex-start;
+
+  gap: 11px;
+
+  padding:
+    0 12px;
+}
+
+
+.sidebar:hover
+.nav-item-label {
+  display: inline;
+
+  overflow: hidden;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+
+
+.sidebar:hover
+.nav-item svg {
+  width: 17px;
+  height: 17px;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.sidebar-footer {
+  flex: 0 0 auto;
+
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 8px;
+
+  padding:
+    12px 8px;
+
+  background: #ffffff;
+
+  border-top:
+    1px solid #edf0f4;
+
+  transition:
+    padding 0.25s ease;
+}
+
+
+/* =========================================================
+   USUARIO
+   ========================================================= */
+
+.sidebar-user {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+}
+
+
+.sidebar-user-info {
+  display: none;
+
+  min-width: 0;
+}
+
+
+.sidebar-user-info strong,
+.sidebar-user-info span {
+  display: block;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+.sidebar-user-info strong {
+  color: #273447;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.sidebar-user-info span {
+  margin-top: 2px;
+
+  color: #8b96a7;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   FOOTER ABIERTO
+   ========================================================= */
+
+.sidebar:hover
+.sidebar-footer {
+  flex-direction: row;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding:
+    14px 16px;
+}
+
+
+.sidebar:hover
+.sidebar-user {
+  justify-content: flex-start;
+}
+
+
+.sidebar:hover
+.sidebar-user-info {
+  display: block;
+}
+
+
+/* =========================================================
+   AVATAR
+   ========================================================= */
+
+.user-avatar {
+  flex: 0 0 auto;
+
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background:
+    rgba(207, 32, 41, 0.08);
+
+  color:
+    var(--una-red);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.logout-button {
+  flex: 0 0 auto;
+
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #7b8798;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.logout-button:hover {
+  background: #fff1f1;
+
+  color: #c62828;
+}
+
+
+.logout-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+
+/* =========================================================
+   APP MAIN
+   ========================================================= */
+
+.app-main {
+  width: 100%;
+  height: 100vh;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   TOPBAR
+   ========================================================= */
+
+.topbar {
+  flex: 0 0 88px;
+
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding:
+    0 28px;
+
+  background: #ffffff;
+
+  border-bottom:
+    1px solid #e9edf3;
+}
+
+
+.topbar-heading {
+  min-width: 0;
+}
+
+
+.topbar-system-title {
+  margin: 0;
+
+  color: #172033;
+
+  font-size: 20px;
+  font-weight: 700;
+
+  letter-spacing: -0.25px;
+}
+
+
+.topbar-subtitle {
+  margin:
+    4px 0
+    0;
+
+  color: #8b96a7;
+
+  font-size: 11px;
+}
+
+
+.topbar-user {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+
+.topbar-user-text {
+  text-align: right;
+}
+
+
+.topbar-user-text strong,
+.topbar-user-text span {
+  display: block;
+}
+
+
+.topbar-user-text strong {
+  color: #273447;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.topbar-user-text span {
+  margin-top: 2px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+
+.topbar-avatar {
+  width: 38px;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #edf4ff;
+
+  color: #1769e8;
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+
+/* =========================================================
+   CONTENIDO
+   ========================================================= */
+
+.content-area {
+  flex: 1 1 auto;
+
+  width: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding:
+    24px 28px
+    34px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  background: #f5f7fa;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+  .app-shell {
+    grid-template-columns:
+      70px minmax(0, 1fr);
+  }
+
+
+  .app-shell:has(.sidebar:hover) {
+    grid-template-columns:
+      220px minmax(0, 1fr);
+  }
+
+
+  .content-area {
+    padding:
+      22px 20px
+      34px;
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  .app-shell {
+    grid-template-columns:
+      66px minmax(0, 1fr);
+  }
+
+
+  .app-shell:has(.sidebar:hover) {
+    grid-template-columns:
+      210px minmax(0, 1fr);
+  }
+
+}
+
+
+@media (max-width: 600px) {
+
+  .app-shell {
+    grid-template-columns:
+      62px minmax(0, 1fr);
+  }
+
+
+  .app-shell:has(.sidebar:hover) {
+    grid-template-columns:
+      195px minmax(0, 1fr);
+  }
+
+
+  .content-area {
+    padding:
+      18px 14px
+      28px;
+  }
+
+
+  .topbar {
+    padding:
+      0 16px;
+  }
+
+
+  .topbar-user-text {
+    display: none;
+  }
+
+
+  .topbar-system-title {
+    font-size: 16px;
+  }
+
+}
+
 
 /* =========================================================
    ACCIONES DASHBOARD
@@ -1668,14 +1897,15 @@ body {
 
 
 /* =========================================================
-   MODULE CARD V2
+   MODULE CARD V2 - IDENTIDAD UNA
    =========================================================
    Componente reutilizable para módulos del SGPA.
-   Inspiración:
-   - minimalista
-   - interacción sutil
-   - blanco / gris / negro
-   - identidad institucional sin saturación
+
+   Diseño:
+   - Minimalista
+   - Institucional UNA
+   - Interacción sutil
+   - Sin saturación visual
    ========================================================= */
 
 
@@ -1751,9 +1981,7 @@ body {
 
   display: flex;
   align-items: center;
-  justify-content: space-between;
-
-  gap: 16px;
+  justify-content: flex-start;
 
   margin-bottom: 18px;
 }
@@ -1802,44 +2030,17 @@ body {
 
 
 /* =========================================================
-   FLECHA SUPERIOR
+   QUITAR FLECHA / CÍRCULO SUPERIOR DERECHO
    ========================================================= */
 
+/*
+ * Se mantiene esta regla por seguridad,
+ * por si el HTML anterior todavía contiene
+ * .module-card-arrow.
+ */
+
 .module-card-arrow {
-  width: 29px;
-  height: 29px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  flex: 0 0 auto;
-
-  border:
-    1px solid #e4e7ec;
-
-  border-radius: 50%;
-
-  background: #ffffff;
-
-  color: #98a2b3;
-
-  transition:
-    background-color 0.22s ease,
-    border-color 0.22s ease,
-    color 0.22s ease,
-    transform 0.22s ease;
-}
-
-
-.module-card-arrow svg {
-  width: 13px;
-  height: 13px;
-
-  stroke-width: 1.8;
-
-  transition:
-    transform 0.22s ease;
+  display: none !important;
 }
 
 
@@ -1869,6 +2070,9 @@ body {
   line-height: 1.3;
 
   letter-spacing: -0.15px;
+
+  transition:
+    color 0.22s ease;
 }
 
 
@@ -1936,12 +2140,14 @@ body {
 
 
 /* =========================================================
-   DECORACIÓN CIRCULAR
+   DECORACIÓN CIRCULAR INFERIOR
    ========================================================= */
 
 /*
- * Esta es la forma gris que se observa
- * discretamente en la esquina del ejemplo.
+ * Semicírculo rojo claro.
+ *
+ * Se mantiene parcialmente fuera del card
+ * para que no sature visualmente.
  */
 
 .module-card-decoration {
@@ -1958,12 +2164,12 @@ body {
   border-radius: 50%;
 
   background:
-    #f4f5f7;
+    rgba(207, 32, 41, 0.07);
 
   transform:
     scale(0.92);
 
-  opacity: 0.72;
+  opacity: 1;
 
   transition:
     transform 0.3s ease,
@@ -1988,7 +2194,7 @@ body {
   height: 2px;
 
   background:
-    #171717;
+    var(--una-red);
 
   transition:
     width 0.32s ease;
@@ -2004,7 +2210,7 @@ body {
     translateY(-2px);
 
   border-color:
-    #d5d9e0;
+    rgba(207, 32, 41, 0.32);
 
   background:
     #ffffff;
@@ -2022,10 +2228,10 @@ body {
 .module-card:hover
 .module-card-icon {
   border-color:
-    #171717;
+    var(--una-red);
 
   background:
-    #171717;
+    var(--una-red);
 
   color:
     #ffffff;
@@ -2043,26 +2249,20 @@ body {
 
 
 /* =========================================================
-   FLECHA HOVER
+   TÍTULO HOVER
    ========================================================= */
 
+/*
+ * Se mantiene oscuro.
+ *
+ * No hacemos todo rojo porque perdería
+ * el aspecto limpio del componente.
+ */
+
 .module-card:hover
-.module-card-arrow {
-  border-color:
-    #171717;
-
-  background:
-    #171717;
-
+.module-card-content strong {
   color:
-    #ffffff;
-}
-
-
-.module-card:hover
-.module-card-arrow svg {
-  transform:
-    translate(1px, -1px);
+    #182235;
 }
 
 
@@ -2073,7 +2273,7 @@ body {
 .module-card:hover
 .module-card-action {
   color:
-    #171717;
+    var(--una-red);
 }
 
 
@@ -2091,7 +2291,7 @@ body {
 .module-card:hover
 .module-card-decoration {
   background:
-    #edeef1;
+    rgba(207, 32, 41, 0.12);
 
   opacity: 1;
 
@@ -2103,11 +2303,6 @@ body {
 /* =========================================================
    LÍNEA HOVER
    ========================================================= */
-
-/*
- * No llega al 100 % para mantener
- * el detalle visual limpio del ejemplo.
- */
 
 .module-card:hover
 .module-card-hover-line {
@@ -2130,18 +2325,18 @@ body {
 
 
 /* =========================================================
-   TECLADO
+   ACCESIBILIDAD TECLADO
    ========================================================= */
 
 .module-card:focus-visible {
   outline: none;
 
   border-color:
-    #667085;
+    var(--una-red);
 
   box-shadow:
     0 0 0 3px
-    rgba(52, 64, 84, 0.1);
+    rgba(207, 32, 41, 0.10);
 }
 
 
@@ -2171,868 +2366,4 @@ body {
     min-height: 165px;
   }
 
-}
-
-/* =========================================================
-   SIDEBAR AUTOMÁTICO SGPA
-   =========================================================
-   - Contraído por defecto: 74px
-   - Hover: 245px
-   - El contenido principal se reajusta
-   - NO se superpone sobre el contenido
-   ========================================================= */
-
-
-/* =========================================================
-   LAYOUT PRINCIPAL
-   ========================================================= */
-
-.app-shell {
-  width: 100% !important;
-  height: 100vh !important;
-
-  min-width: 0 !important;
-  min-height: 0 !important;
-
-  display: grid !important;
-
-  grid-template-columns:
-    74px minmax(0, 1fr) !important;
-
-  background: #f5f7fa;
-
-  overflow: hidden !important;
-
-  transition:
-    grid-template-columns 0.25s ease;
-}
-
-
-/*
- * Cuando el mouse entra al sidebar,
- * la PRIMERA COLUMNA del layout aumenta.
- *
- * Esto hace que el contenido principal
- * se acomode automáticamente.
- */
-
-.app-shell:has(.sidebar:hover) {
-  grid-template-columns:
-    245px minmax(0, 1fr) !important;
-}
-
-
-/* =========================================================
-   SIDEBAR
-   ========================================================= */
-
-.sidebar {
-  position: relative;
-
-  z-index: 10;
-
-  width: 100% !important;
-  height: 100vh;
-
-  min-width: 0 !important;
-  min-height: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  overflow: hidden;
-
-  background: #ffffff;
-
-  border-right:
-    1px solid #e6e9ee;
-
-  box-shadow: none;
-}
-
-
-/*
- * Línea institucional roja.
- */
-
-.sidebar::before {
-  content: "";
-
-  position: absolute;
-
-  top: 0;
-  bottom: 0;
-  left: 0;
-
-  width: 3px;
-
-  background: #cf2029;
-
-  z-index: 20;
-}
-
-
-/* =========================================================
-   HEADER / LOGO
-   ========================================================= */
-
-.sidebar-header {
-  flex: 0 0 78px;
-
-  width: 100%;
-
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-
-  padding: 8px;
-
-  overflow: hidden;
-
-  background: #ffffff;
-
-  border-bottom:
-    1px solid #eef1f5;
-
-  transition:
-    padding 0.25s ease;
-}
-
-
-.sidebar-header-brand {
-  width: 100%;
-
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-
-  overflow: hidden;
-}
-
-
-/*
- * Logo contraído.
- */
-
-.sidebar-logo {
-  display: block !important;
-
-  width: 48px !important;
-  height: 54px !important;
-
-  max-width: none !important;
-
-  object-fit: contain;
-  object-position: center;
-
-  user-select: none;
-
-  transition:
-    width 0.25s ease,
-    height 0.25s ease;
-}
-
-
-/*
- * Logo desplegado.
- */
-
-.sidebar:hover .sidebar-header {
-  justify-content: flex-start;
-
-  padding:
-    8px 20px;
-}
-
-
-.sidebar:hover .sidebar-header-brand {
-  justify-content: flex-start;
-}
-
-
-.sidebar:hover .sidebar-logo {
-  width: 120px !important;
-  height: 62px !important;
-
-  object-position: left center;
-}
-
-
-/* =========================================================
-   CONTEXTO SGPA
-   ========================================================= */
-
-.sidebar-context {
-  display: none !important;
-
-  flex: 0 0 auto;
-
-  padding:
-    19px 24px
-    15px;
-
-  background: #ffffff;
-}
-
-
-.sidebar:hover .sidebar-context {
-  display: block !important;
-}
-
-
-.sidebar-context-label {
-  display: block;
-
-  margin-bottom: 4px;
-
-  color: #98a2b3;
-
-  font-size: 10.5px;
-  font-weight: 700;
-
-  letter-spacing: 0.8px;
-
-  text-transform: uppercase;
-}
-
-
-.sidebar-context strong {
-  display: block;
-
-  color: #182235;
-
-  font-size: 18px;
-  font-weight: 700;
-}
-
-
-.sidebar-context small {
-  display: block;
-
-  margin-top: 3px;
-
-  color: #7b8798;
-
-  font-size: 11.5px;
-}
-
-
-/* =========================================================
-   NAVEGACIÓN
-   ========================================================= */
-
-.sidebar-nav {
-  flex: 1 1 auto;
-
-  width: 100%;
-
-  min-width: 0;
-  min-height: 0;
-
-  padding:
-    14px 9px
-    18px;
-
-  overflow-x: hidden;
-  overflow-y: auto;
-
-  overscroll-behavior: contain;
-
-  transition:
-    padding 0.25s ease;
-}
-
-
-.sidebar:hover .sidebar-nav {
-  padding:
-    4px 14px
-    18px;
-}
-
-
-/* =========================================================
-   SCROLLBAR
-   ========================================================= */
-
-.sidebar-nav::-webkit-scrollbar {
-  width: 5px;
-}
-
-
-.sidebar-nav::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-  background: #d0d5dd;
-
-  border-radius: 10px;
-}
-
-
-.sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: #98a2b3;
-}
-
-
-/* =========================================================
-   TÍTULOS DE SECCIÓN
-   ========================================================= */
-
-.nav-section-title {
-  display: none !important;
-
-  margin:
-    19px 10px
-    8px;
-
-  color: #98a2b3;
-
-  font-size: 10px;
-  font-weight: 700;
-
-  letter-spacing: 0.7px;
-
-  text-transform: uppercase;
-
-  white-space: nowrap;
-}
-
-
-.sidebar:hover .nav-section-title {
-  display: block !important;
-}
-
-
-/* =========================================================
-   ITEMS DEL MENÚ
-   ========================================================= */
-
-.nav-item {
-  position: relative;
-
-  width: 100%;
-  min-height: 44px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  gap: 0;
-
-  margin-bottom: 3px;
-
-  padding: 0;
-
-  border: none;
-  border-radius: 9px;
-
-  background: transparent;
-
-  color: #526174;
-
-  font-size: 13px;
-  font-weight: 500;
-
-  text-align: left;
-
-  cursor: pointer;
-
-  white-space: nowrap;
-
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease,
-    padding 0.25s ease,
-    gap 0.25s ease;
-}
-
-
-.nav-item-label {
-  display: none !important;
-}
-
-
-.nav-item svg {
-  flex: 0 0 auto;
-
-  width: 19px;
-  height: 19px;
-
-  stroke-width: 1.8;
-}
-
-
-.nav-item:hover {
-  background: #f6f7f9;
-
-  color: #253347;
-}
-
-
-.nav-item.active {
-  background:
-    rgba(207, 32, 41, 0.075);
-
-  color: #cf2029;
-
-  font-weight: 600;
-}
-
-
-.nav-item.active::before {
-  content: "";
-
-  position: absolute;
-
-  top: 9px;
-  bottom: 9px;
-  left: 0;
-
-  width: 3px;
-
-  border-radius:
-    0 3px
-    3px 0;
-
-  background: #cf2029;
-}
-
-
-/* =========================================================
-   ITEMS CUANDO SIDEBAR ESTÁ ABIERTO
-   ========================================================= */
-
-.sidebar:hover .nav-item {
-  min-height: 42px;
-
-  justify-content: flex-start;
-
-  gap: 11px;
-
-  padding:
-    0 12px;
-}
-
-
-.sidebar:hover .nav-item-label {
-  display: inline !important;
-
-  overflow: hidden;
-
-  white-space: nowrap;
-
-  text-overflow: ellipsis;
-}
-
-
-.sidebar:hover .nav-item svg {
-  width: 17px;
-  height: 17px;
-}
-
-
-/* =========================================================
-   FOOTER
-   ========================================================= */
-
-.sidebar-footer {
-  flex: 0 0 auto;
-
-  width: 100%;
-
-  display: flex;
-  flex-direction: column;
-
-  align-items: center;
-  justify-content: center;
-
-  gap: 8px;
-
-  padding:
-    12px 8px;
-
-  background: #ffffff;
-
-  border-top:
-    1px solid #edf0f4;
-
-  transition:
-    padding 0.25s ease;
-}
-
-
-/* =========================================================
-   USUARIO
-   ========================================================= */
-
-.sidebar-user {
-  min-width: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  gap: 10px;
-}
-
-
-.sidebar-user-info {
-  display: none !important;
-
-  min-width: 0;
-}
-
-
-.sidebar-user-info strong,
-.sidebar-user-info span {
-  display: block;
-
-  overflow: hidden;
-
-  text-overflow: ellipsis;
-
-  white-space: nowrap;
-}
-
-
-.sidebar-user-info strong {
-  color: #273447;
-
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-
-.sidebar-user-info span {
-  margin-top: 2px;
-
-  color: #8b96a7;
-
-  font-size: 10.5px;
-}
-
-
-/* =========================================================
-   FOOTER DESPLEGADO
-   ========================================================= */
-
-.sidebar:hover .sidebar-footer {
-  flex-direction: row;
-
-  align-items: center;
-
-  justify-content: space-between;
-
-  gap: 10px;
-
-  padding:
-    14px 16px;
-}
-
-
-.sidebar:hover .sidebar-user {
-  justify-content: flex-start;
-}
-
-
-.sidebar:hover .sidebar-user-info {
-  display: block !important;
-}
-
-
-/* =========================================================
-   AVATAR
-   ========================================================= */
-
-.user-avatar {
-  flex: 0 0 auto;
-
-  width: 34px;
-  height: 34px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 50%;
-
-  background:
-    rgba(207, 32, 41, 0.08);
-
-  color: #cf2029;
-
-  font-size: 12px;
-  font-weight: 700;
-}
-
-
-/* =========================================================
-   LOGOUT
-   ========================================================= */
-
-.logout-button {
-  flex: 0 0 auto;
-
-  width: 34px;
-  height: 34px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;
-
-  border: none;
-  border-radius: 8px;
-
-  background: transparent;
-
-  color: #7b8798;
-
-  cursor: pointer;
-}
-
-
-.logout-button:hover {
-  background: #fff1f1;
-
-  color: #c62828;
-}
-
-
-.logout-button svg {
-  width: 17px;
-  height: 17px;
-}
-
-
-/* =========================================================
-   BOTÓN VIEJO
-   ========================================================= */
-
-.sidebar-toggle {
-  display: none !important;
-}
-
-
-/* =========================================================
-   CONTENIDO PRINCIPAL
-   ========================================================= */
-
-.app-main {
-  width: 100%;
-  height: 100vh;
-
-  min-width: 0;
-  min-height: 0;
-
-  display: flex;
-  flex-direction: column;
-
-  overflow: hidden;
-}
-
-
-/* =========================================================
-   RESPONSIVE
-   ========================================================= */
-
-@media (max-width: 900px) {
-
-  .app-shell {
-    grid-template-columns:
-      70px minmax(0, 1fr) !important;
-  }
-
-
-  .app-shell:has(.sidebar:hover) {
-    grid-template-columns:
-      220px minmax(0, 1fr) !important;
-  }
-
-}
-
-
-@media (max-width: 760px) {
-
-  .app-shell {
-    grid-template-columns:
-      66px minmax(0, 1fr) !important;
-  }
-
-
-  .app-shell:has(.sidebar:hover) {
-    grid-template-columns:
-      210px minmax(0, 1fr) !important;
-  }
-
-}
-
-
-@media (max-width: 600px) {
-
-  .app-shell {
-    grid-template-columns:
-      62px minmax(0, 1fr) !important;
-  }
-
-
-  .app-shell:has(.sidebar:hover) {
-    grid-template-columns:
-      195px minmax(0, 1fr) !important;
-  }
-
-} 
-
-/* =========================================================
-   MODULE CARD - IDENTIDAD UNA
-   =========================================================
-   Mantiene todas las animaciones actuales.
-   Sustituye negro/gris decorativo por rojo institucional.
-   ========================================================= */
-
-
-/* =========================================================
-   DECORACIÓN CIRCULAR
-   ========================================================= */
-
-.module-card-decoration {
-  background:
-    rgba(207, 32, 41, 0.07);
-
-  opacity: 1;
-}
-
-
-/*
- * Al hacer hover el círculo se hace
- * un poco más visible, manteniendo
- * un rojo muy suave.
- */
-
-.module-card:hover
-.module-card-decoration {
-  background:
-    rgba(207, 32, 41, 0.12);
-
-  opacity: 1;
-
-  transform:
-    scale(1.07);
-}
-
-
-/* =========================================================
-   ICONO HOVER
-   ========================================================= */
-
-.module-card:hover
-.module-card-icon {
-  border-color:
-    var(--una-red);
-
-  background:
-    var(--una-red);
-
-  color:
-    #ffffff;
-
-  transform:
-    translateY(-1px);
-}
-
-
-.module-card:hover
-.module-card-icon svg {
-  transform:
-    scale(1.04);
-}
-
-
-/* =========================================================
-   FLECHA SUPERIOR HOVER
-   ========================================================= */
-
-.module-card:hover
-.module-card-arrow {
-  border-color:
-    var(--una-red);
-
-  background:
-    var(--una-red);
-
-  color:
-    #ffffff;
-}
-
-
-.module-card:hover
-.module-card-arrow svg {
-  transform:
-    translate(1px, -1px);
-}
-
-
-/* =========================================================
-   TEXTO DE ACCIÓN HOVER
-   ========================================================= */
-
-.module-card:hover
-.module-card-action {
-  color:
-    var(--una-red);
-}
-
-
-/* =========================================================
-   LÍNEA INFERIOR HOVER
-   ========================================================= */
-
-.module-card-hover-line {
-  background:
-    var(--una-red);
-}
-
-
-.module-card:hover
-.module-card-hover-line {
-  width: 74%;
-}
-
-
-/* =========================================================
-   BORDE DE CARD HOVER
-   ========================================================= */
-
-.module-card:hover {
-  transform:
-    translateY(-2px);
-
-  border-color:
-    rgba(207, 32, 41, 0.32);
-
-  background:
-    #ffffff;
-
-  box-shadow:
-    0 9px 22px
-    rgba(16, 24, 40, 0.065);
-}
-
-
-/* =========================================================
-   FOCUS TECLADO
-   ========================================================= */
-
-.module-card:focus-visible {
-  outline: none;
-
-  border-color:
-    var(--una-red);
-
-  box-shadow:
-    0 0 0 3px
-    rgba(207, 32, 41, 0.10);
 }

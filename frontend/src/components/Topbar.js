@@ -24,12 +24,12 @@ export function Topbar({
     <header class="topbar">
 
       <!-- =============================================== -->
-      <!-- PÁGINA ACTUAL -->
+      <!-- SISTEMA -->
       <!-- =============================================== -->
 
       <div class="topbar-heading">
 
-        <h1 id="pageTitle">
+        <h1 class="topbar-system-title">
           Sistema de Gestión y Proyección Académica
         </h1>
 

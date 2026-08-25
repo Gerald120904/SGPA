@@ -7,6 +7,9 @@ import {
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 import { confirmarAccion } from '../../utils/confirm.js';
+import { DataTable } from '../../components/DataTable.js';
+import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
+import { mostrarExito, mostrarError } from '../../components/AlertModal.js';
 
 let carreras = [];
 let instanciaActual = 0;
@@ -82,26 +85,48 @@ export function CarrerasPage() {
         <div class="carreras-message">Cargando carreras...</div>
       </div>
 
-      <dialog id="carreraDialog" class="carrera-dialog">
-        <div id="carreraDialogContent"></div>
-      </dialog>
-    </section>
-  `;
+      <dialog
+  id="carreraDialog"
+  class="sgpa-form-dialog sgpa-form-dialog-md">
+      <div id="carreraDialogContent"></div>
+        </dialog> 
+    </section>`
+    ;
 }
 
-function mostrarFeedback(mensaje, tipo = 'success') {
-  const feedback = document.getElementById('carrerasFeedback');
+function mostrarFeedback(
+  mensaje,
+  tipo = 'success'
+) {
 
-  if (!feedback) {
+  if (
+    tipo === 'error'
+  ) {
+
+    mostrarError({
+
+      titulo:
+        'No se pudo completar la operación',
+
+      mensaje
+
+    });
+
+
     return;
+
   }
 
-  feedback.textContent = mensaje;
-  feedback.className = `carreras-feedback carreras-feedback-${tipo}`;
 
-  window.setTimeout(() => {
-    feedback.classList.add('hidden');
-  }, 3500);
+  mostrarExito({
+
+    titulo:
+      'Operación realizada correctamente',
+
+    mensaje
+
+  });
+
 }
 
 function obtenerCarrerasFiltradas() {
@@ -134,103 +159,174 @@ function obtenerCarrerasFiltradas() {
 }
 
 function renderizarCarreras() {
-  const contenedor = document.getElementById('carrerasContent');
+
+  const contenedor =
+    document.getElementById(
+      'carrerasContent'
+    );
+
 
   if (!contenedor) {
     return;
   }
 
-  const filtradas = obtenerCarrerasFiltradas();
 
-  if (filtradas.length === 0) {
-    contenedor.innerHTML = `
-      <div class="carreras-message">No se encontraron carreras.</div>
-    `;
-    return;
-  }
+  const filtradas =
+    obtenerCarrerasFiltradas();
 
-  const filas = filtradas
-    .map(
-      (carrera) => `
-        <tr>
-          <td>
-            <strong class="carrera-code">${escapeHtml(carrera.codigo)}</strong>
-          </td>
-          <td>
-            <div class="carrera-name">
-              <strong>${escapeHtml(carrera.nombre)}</strong>
-              ${
-                carrera.descripcion
-                  ? `<small>${escapeHtml(carrera.descripcion)}</small>`
-                  : ''
-              }
-            </div>
-          </td>
-          <td>${escapeHtml(formatearGrado(carrera.grado))}</td>
-          <td>
-            <span class="carrera-status ${
-              carrera.activo
-                ? 'carrera-status-active'
-                : 'carrera-status-inactive'
-            }">
-              ${carrera.activo ? 'Activa' : 'Inactiva'}
-            </span>
-          </td>
-          <td class="carreras-actions">
-            <button
-              class="carreras-icon-button"
-              data-action="editar"
-              data-id="${carrera.id}"
-              type="button"
-              title="Editar carrera"
-            >
-              <i data-lucide="pencil" aria-hidden="true"></i>
-            </button>
 
-            <button
-              class="carreras-icon-button ${
-                carrera.activo
-                  ? 'carreras-danger-button'
-                  : 'carreras-success-button'
-              }"
-              data-action="estado"
-              data-id="${carrera.id}"
-              type="button"
-              title="${
-                carrera.activo ? 'Desactivar carrera' : 'Activar carrera'
-              }"
-            >
-              <i
-                data-lucide="${
-                  carrera.activo ? 'circle-pause' : 'circle-check'
-                }"
-                aria-hidden="true"
-              ></i>
-            </button>
-          </td>
-        </tr>
-      `,
-    )
-    .join('');
-
-  contenedor.innerHTML = `
-    <div class="carreras-table-wrap">
-      <table class="carreras-table">
-        <thead>
+  const filas =
+    filtradas
+      .map(
+        (carrera) => `
           <tr>
-            <th>Código</th>
-            <th>Carrera</th>
-            <th>Grado académico</th>
-            <th>Estado</th>
-            <th>Acciones</th>
+
+            <td>
+
+              <strong class="carrera-code">
+                ${escapeHtml(carrera.codigo)}
+              </strong>
+
+            </td>
+
+
+            <td>
+
+              <div class="carrera-name">
+
+                <strong>
+                  ${escapeHtml(carrera.nombre)}
+                </strong>
+
+                ${
+                  carrera.descripcion
+                    ? `
+                        <small>
+                          ${escapeHtml(carrera.descripcion)}
+                        </small>
+                      `
+                    : ''
+                }
+
+              </div>
+
+            </td>
+
+
+            <td>
+              ${escapeHtml(
+                formatearGrado(
+                  carrera.grado
+                )
+              )}
+            </td>
+
+
+            <td>
+
+              <span
+                class="
+                  carrera-status
+                  ${
+                    carrera.activo
+                      ? 'carrera-status-active'
+                      : 'carrera-status-inactive'
+                  }
+                "
+              >
+
+                ${
+                  carrera.activo
+                    ? 'Activa'
+                    : 'Inactiva'
+                }
+
+              </span>
+
+            </td>
+
+
+            <td class="carreras-actions">
+
+              <button
+                class="carreras-icon-button"
+                data-action="editar"
+                data-id="${carrera.id}"
+                type="button"
+                title="Editar carrera"
+              >
+
+                <i
+                  data-lucide="pencil"
+                  aria-hidden="true"
+                ></i>
+
+              </button>
+
+
+              <button
+                class="
+                  carreras-icon-button
+                  ${
+                    carrera.activo
+                      ? 'carreras-danger-button'
+                      : 'carreras-success-button'
+                  }
+                "
+                data-action="estado"
+                data-id="${carrera.id}"
+                type="button"
+                title="${
+                  carrera.activo
+                    ? 'Desactivar carrera'
+                    : 'Activar carrera'
+                }"
+              >
+
+                <i
+                  data-lucide="${
+                    carrera.activo
+                      ? 'circle-pause'
+                      : 'circle-check'
+                  }"
+                  aria-hidden="true"
+                ></i>
+
+              </button>
+
+            </td>
+
           </tr>
-        </thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>
-  `;
+        `
+      )
+      .join('');
+
+
+  contenedor.innerHTML =
+    DataTable({
+
+      columns: [
+        'Código',
+        'Carrera',
+        'Grado académico',
+        'Estado',
+        'Acciones'
+      ],
+
+      rows:
+        filas,
+
+      emptyMessage:
+        'No se encontraron carreras con los filtros seleccionados.',
+
+      ariaLabel:
+        'Listado de carreras'
+
+    });
+
 
   renderizarIconos();
+
 }
 
 async function cargarCarreras(instancia) {
@@ -272,199 +368,379 @@ async function cargarCarreras(instancia) {
 }
 
 function abrirFormulario(carrera = null) {
-  const dialog = document.getElementById('carreraDialog');
-  const content = document.getElementById('carreraDialogContent');
 
-  if (!dialog || !content) {
+  const dialog =
+    document.getElementById(
+      'carreraDialog'
+    );
+
+
+  const content =
+    document.getElementById(
+      'carreraDialogContent'
+    );
+
+
+  if (
+    !dialog ||
+    !content
+  ) {
     return;
   }
 
-  const editando = Boolean(carrera);
-  const opcionesGrado = GRADOS.map(
-    (grado) => `
-      <option
-        value="${grado.value}"
-        ${carrera?.grado === grado.value ? 'selected' : ''}
-      >
-        ${escapeHtml(grado.label)}
-      </option>
-    `,
-  ).join('');
 
-  content.innerHTML = `
-    <form id="carreraForm" class="carrera-form">
-      <header class="carrera-dialog-header">
-        <div>
-          <h3>${editando ? 'Editar carrera' : 'Nueva carrera'}</h3>
-          <p>
+  const editando =
+    Boolean(carrera);
+
+
+  const opcionesGrado =
+    GRADOS
+      .map(
+        (grado) => `
+          <option
+            value="${grado.value}"
             ${
-              editando
-                ? 'Actualice la información académica.'
-                : 'Registre una nueva carrera en el SGPA.'
-            }
-          </p>
-        </div>
-
-        <button
-          id="cerrarCarreraDialog"
-          class="carreras-icon-button"
-          type="button"
-          aria-label="Cerrar"
-        >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
-
-      <div
-        id="carreraFormError"
-        class="carrera-form-error hidden"
-        role="alert"
-      ></div>
-
-      <div class="carrera-form-grid">
-        <label>
-          <span>Código</span>
-          <input
-            id="carreraCodigo"
-            name="codigo"
-            type="text"
-            maxlength="20"
-            value="${carrera ? escapeHtml(carrera.codigo) : ''}"
-            required
-          >
-        </label>
-
-        <label>
-          <span>Grado académico</span>
-          <select id="carreraGrado" name="grado" required>
-            ${
-              !editando
-                ? '<option value="" disabled selected>Seleccione...</option>'
+              carrera?.grado === grado.value
+                ? 'selected'
                 : ''
             }
-            ${opcionesGrado}
-          </select>
-        </label>
-
-        <label class="carrera-form-wide">
-          <span>Nombre</span>
-          <input
-            id="carreraNombre"
-            name="nombre"
-            type="text"
-            maxlength="150"
-            value="${carrera ? escapeHtml(carrera.nombre) : ''}"
-            required
           >
-        </label>
+            ${escapeHtml(grado.label)}
+          </option>
+        `
+      )
+      .join('');
 
-        <label class="carrera-form-wide">
-          <span>Descripción</span>
-          <textarea
-            id="carreraDescripcion"
-            name="descripcion"
-            maxlength="500"
-            rows="4"
-            placeholder="Descripción opcional de la carrera"
-          >${
-            carrera?.descripcion ? escapeHtml(carrera.descripcion) : ''
-          }</textarea>
-        </label>
-      </div>
 
-      <footer class="carrera-dialog-footer">
-        <button
-          id="cancelarCarreraButton"
-          class="carreras-secondary-button"
-          type="button"
-        >
-          Cancelar
-        </button>
+  const body = `
 
-        <button
-          id="guardarCarreraButton"
-          class="carreras-primary-button"
-          type="submit"
-        >
-          <i data-lucide="save" aria-hidden="true"></i>
-          <span>${editando ? 'Guardar cambios' : 'Crear carrera'}</span>
-        </button>
-      </footer>
-    </form>
+    <label>
+
+      <span>
+        Código
+      </span>
+
+      <input
+        id="carreraCodigo"
+        name="codigo"
+        type="text"
+        maxlength="20"
+        value="${
+          carrera
+            ? escapeHtml(carrera.codigo)
+            : ''
+        }"
+        placeholder="Ej. INFO"
+        required
+      >
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Grado académico
+      </span>
+
+      <select
+        id="carreraGrado"
+        name="grado"
+        required
+      >
+
+        ${
+          !editando
+            ? `
+                <option
+                  value=""
+                  disabled
+                  selected
+                >
+                  Seleccione...
+                </option>
+              `
+            : ''
+        }
+
+        ${opcionesGrado}
+
+      </select>
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Nombre
+      </span>
+
+      <input
+        id="carreraNombre"
+        name="nombre"
+        type="text"
+        maxlength="150"
+        value="${
+          carrera
+            ? escapeHtml(carrera.nombre)
+            : ''
+        }"
+        placeholder="Nombre de la carrera"
+        required
+      >
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Descripción
+      </span>
+
+      <textarea
+        id="carreraDescripcion"
+        name="descripcion"
+        maxlength="500"
+        rows="4"
+        placeholder="Descripción opcional de la carrera"
+      >${
+        carrera?.descripcion
+          ? escapeHtml(carrera.descripcion)
+          : ''
+      }</textarea>
+
+    </label>
+
   `;
 
+
+  content.innerHTML =
+FormDialog({
+
+  formId:
+    'carreraForm',
+
+  title:
+    editando
+      ? 'Editar carrera'
+      : 'Nueva carrera',
+
+  description:
+    editando
+      ? 'Actualice la información académica de la carrera.'
+      : 'Registre una nueva carrera académica en el SGPA.',
+
+  body,
+
+  errorId:
+    'carreraFormError',
+
+  cancelButtonId:
+    'cancelarCarreraButton',
+
+  submitButtonId:
+    'guardarCarreraButton',
+
+  submitText:
+    editando
+      ? 'Guardar cambios'
+      : 'Crear carrera'
+
+});
+
+
   renderizarIconos();
+
+
   dialog.showModal();
 
-  const cerrar = () => dialog.close();
+
+habilitarCierreExterior(
+  dialog
+);
+
+
+  const cerrar =
+    () => dialog.close();
+
 
   document
-    .getElementById('cerrarCarreraDialog')
-    ?.addEventListener('click', cerrar);
-  document
-    .getElementById('cancelarCarreraButton')
-    ?.addEventListener('click', cerrar);
+    .getElementById(
+      'cerrarCarreraDialog'
+    )
+    ?.addEventListener(
+      'click',
+      cerrar
+    );
+
 
   document
-    .getElementById('carreraForm')
-    ?.addEventListener('submit', async (event) => {
-      event.preventDefault();
+    .getElementById(
+      'cancelarCarreraButton'
+    )
+    ?.addEventListener(
+      'click',
+      cerrar
+    );
 
-      const errorBox = document.getElementById('carreraFormError');
-      const guardarButton = document.getElementById('guardarCarreraButton');
-      const codigoInput = document.getElementById('carreraCodigo');
-      const nombreInput = document.getElementById('carreraNombre');
-      const gradoInput = document.getElementById('carreraGrado');
-      const descripcionInput = document.getElementById('carreraDescripcion');
 
-      if (
-        !guardarButton ||
-        !codigoInput ||
-        !nombreInput ||
-        !gradoInput ||
-        !descripcionInput
-      ) {
-        return;
-      }
+  document
+    .getElementById(
+      'carreraForm'
+    )
+    ?.addEventListener(
+      'submit',
+      async (event) => {
 
-      const datos = {
-        codigo: codigoInput.value.trim(),
-        nombre: nombreInput.value.trim(),
-        grado: gradoInput.value,
-        descripcion: descripcionInput.value.trim(),
-      };
+        event.preventDefault();
 
-      errorBox?.classList.add('hidden');
-      guardarButton.disabled = true;
 
-      try {
-        const resultado = editando
-          ? await actualizarCarrera(carrera.id, datos)
-          : await crearCarrera(datos);
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || 'No fue posible guardar la carrera.',
+        const errorBox =
+          document.getElementById(
+            'carreraFormError'
           );
+
+
+        const guardarButton =
+          document.getElementById(
+            'guardarCarreraButton'
+          );
+
+
+        const codigoInput =
+          document.getElementById(
+            'carreraCodigo'
+          );
+
+
+        const nombreInput =
+          document.getElementById(
+            'carreraNombre'
+          );
+
+
+        const gradoInput =
+          document.getElementById(
+            'carreraGrado'
+          );
+
+
+        const descripcionInput =
+          document.getElementById(
+            'carreraDescripcion'
+          );
+
+
+        if (
+          !guardarButton ||
+          !codigoInput ||
+          !nombreInput ||
+          !gradoInput ||
+          !descripcionInput
+        ) {
+          return;
         }
 
-        cerrar();
-        mostrarFeedback(
-          editando
-            ? 'Carrera actualizada correctamente.'
-            : 'Carrera creada correctamente.',
-        );
-        await cargarCarreras(instanciaActual);
-      } catch (error) {
-        if (errorBox) {
-          errorBox.textContent =
-            error?.message || 'No fue posible guardar la carrera.';
-          errorBox.classList.remove('hidden');
+
+        const datos = {
+
+          codigo:
+            codigoInput
+              .value
+              .trim(),
+
+          nombre:
+            nombreInput
+              .value
+              .trim(),
+
+          grado:
+            gradoInput.value,
+
+          descripcion:
+            descripcionInput
+              .value
+              .trim()
+
+        };
+
+
+        errorBox
+          ?.classList
+          .add(
+            'hidden'
+          );
+
+
+        guardarButton.disabled =
+          true;
+
+
+        try {
+
+          const resultado =
+            editando
+              ? await actualizarCarrera(
+                  carrera.id,
+                  datos
+                )
+              : await crearCarrera(
+                  datos
+                );
+
+
+          if (!resultado?.ok) {
+
+            throw new Error(
+              resultado?.message ||
+              'No fue posible guardar la carrera.'
+            );
+
+          }
+
+
+          cerrar();
+
+
+          mostrarFeedback(
+            editando
+              ? 'Carrera actualizada correctamente.'
+              : 'Carrera creada correctamente.'
+          );
+
+
+          await cargarCarreras(
+            instanciaActual
+          );
+
+
+        }catch (error) {
+
+  mostrarError({
+
+    titulo:
+      editando
+        ? 'No se pudo actualizar la carrera'
+        : 'No se pudo crear la carrera',
+
+    mensaje:
+      error?.message ||
+      'No fue posible guardar la carrera.'
+
+  });
+
+} finally {
+
+          guardarButton.disabled =
+            false;
+
         }
-      } finally {
-        guardarButton.disabled = false;
+
       }
-    });
+    );
+
 }
 
 async function alternarEstado(carrera) {

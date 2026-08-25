@@ -1,0 +1,901 @@
+/* =========================================================
+   FORM DIALOG SGPA
+   =========================================================
+   Componente reutilizable de formularios/modales.
+
+   Diseño:
+   - Universidad Nacional
+   - Centrado real
+   - Logo institucional
+   - Responsive
+   - Scroll interno
+   - Campos y acciones reutilizables
+   ========================================================= */
+
+
+/* =========================================================
+   DIALOG
+   ========================================================= */
+
+.sgpa-form-dialog {
+  position: fixed;
+
+  inset: 0;
+
+  margin: auto;
+
+  padding: 0;
+
+  border: none;
+
+  border-radius: 16px;
+
+  background: transparent;
+
+  color: inherit;
+
+  overflow: visible;
+
+  outline: none;
+}
+
+
+/*
+ * Tamaños disponibles.
+ */
+
+.sgpa-form-dialog-md {
+  width:
+    min(
+      680px,
+      calc(100vw - 40px)
+    );
+}
+
+
+.sgpa-form-dialog-lg {
+  width:
+    min(
+      820px,
+      calc(100vw - 40px)
+    );
+}
+
+
+/* =========================================================
+   FONDO MODAL
+   ========================================================= */
+
+.sgpa-form-dialog::backdrop {
+  background:
+    rgba(15, 23, 42, 0.48);
+
+  backdrop-filter:
+    blur(2px);
+}
+
+
+/* =========================================================
+   CONTENEDOR FORM
+   ========================================================= */
+
+.sgpa-form {
+  position: relative;
+
+  width: 100%;
+
+  max-height:
+    calc(100vh - 44px);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius: 16px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 24px 60px
+    rgba(15, 23, 42, 0.20);
+
+  animation:
+    sgpa-form-enter
+    0.20s ease-out;
+}
+
+
+/* =========================================================
+   ANIMACIÓN
+   ========================================================= */
+
+@keyframes sgpa-form-enter {
+
+  from {
+    opacity: 0;
+
+    transform:
+      translateY(10px)
+      scale(0.985);
+  }
+
+
+  to {
+    opacity: 1;
+
+    transform:
+      translateY(0)
+      scale(1);
+  }
+
+}
+
+
+/* =========================================================
+   ACENTO ROJO SUPERIOR
+   ========================================================= */
+
+.sgpa-form-accent {
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  z-index: 5;
+
+  height: 4px;
+
+  background:
+    var(--una-red, #cf2029);
+}
+
+
+/* =========================================================
+   LOGO
+   ========================================================= */
+
+.sgpa-form-brand {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding:
+    22px 24px
+    8px;
+}
+
+
+.sgpa-form-logo {
+  display: block;
+
+  width: 92px;
+  height: 68px;
+
+  object-fit: contain;
+  object-position: center;
+
+  user-select: none;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.sgpa-form-header {
+  position: relative;
+
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 18px;
+
+  padding:
+    8px 30px
+    21px;
+
+  border-bottom:
+    1px solid #edf0f4;
+}
+
+
+.sgpa-form-heading {
+  min-width: 0;
+}
+
+
+.sgpa-form-eyebrow {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color:
+    var(--una-red, #cf2029);
+
+  font-size: 9.5px;
+  font-weight: 750;
+
+  letter-spacing: 0.75px;
+
+  text-transform: uppercase;
+}
+
+
+.sgpa-form-heading h3 {
+  margin: 0;
+
+  color: #182235;
+
+  font-size: 21px;
+  font-weight: 720;
+
+  line-height: 1.25;
+
+  letter-spacing: -0.3px;
+}
+
+
+.sgpa-form-heading p {
+  max-width: 560px;
+
+  margin:
+    6px 0
+    0;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   ZONA SCROLL
+   ========================================================= */
+
+.sgpa-form-scroll {
+  flex: 1 1 auto;
+
+  min-height: 0;
+
+  padding:
+    22px 30px
+    25px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  overscroll-behavior: contain;
+}
+
+
+.sgpa-form-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+
+.sgpa-form-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.sgpa-form-scroll::-webkit-scrollbar-thumb {
+  background: #d0d5dd;
+
+  border-radius: 10px;
+}
+
+
+.sgpa-form-scroll::-webkit-scrollbar-thumb:hover {
+  background: #98a2b3;
+}
+
+
+/* =========================================================
+   ERROR
+   ========================================================= */
+
+.sgpa-form-error {
+  margin-bottom: 18px;
+
+  padding:
+    11px 13px;
+
+  border:
+    1px solid #f3b8bb;
+
+  border-radius: 9px;
+
+  background:
+    #fff4f4;
+
+  color:
+    #b42318;
+
+  font-size: 11px;
+
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   GRID
+   ========================================================= */
+
+.sgpa-form-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap:
+    18px 20px;
+}
+
+
+/*
+ * Campo ancho.
+ */
+
+.sgpa-form-wide {
+  grid-column:
+    1 / -1;
+}
+
+
+/* =========================================================
+   LABELS
+   ========================================================= */
+
+.sgpa-form-grid > label {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+
+.sgpa-form-grid > label > span {
+  color:
+    #344054;
+
+  font-size:
+    11px;
+
+  font-weight:
+    650;
+}
+
+
+/* =========================================================
+   INPUTS / SELECTS / TEXTAREA
+   ========================================================= */
+
+.sgpa-form-grid input,
+.sgpa-form-grid select,
+.sgpa-form-grid textarea {
+  width: 100%;
+
+  min-width: 0;
+
+  border:
+    1px solid #d9dee7;
+
+  border-radius:
+    9px;
+
+  background:
+    #ffffff;
+
+  color:
+    #273447;
+
+  font-family:
+    inherit;
+
+  font-size:
+    12px;
+
+  outline:
+    none;
+
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+
+.sgpa-form-grid input,
+.sgpa-form-grid select {
+  min-height:
+    42px;
+
+  padding:
+    0 12px;
+}
+
+
+.sgpa-form-grid textarea {
+  min-height:
+    94px;
+
+  padding:
+    11px 12px;
+
+  resize:
+    vertical;
+
+  line-height:
+    1.45;
+}
+
+
+/* =========================================================
+   PLACEHOLDER
+   ========================================================= */
+
+.sgpa-form-grid input::placeholder,
+.sgpa-form-grid textarea::placeholder {
+  color:
+    #a6afbd;
+}
+
+
+/* =========================================================
+   FOCUS
+   ========================================================= */
+
+.sgpa-form-grid input:focus,
+.sgpa-form-grid select:focus,
+.sgpa-form-grid textarea:focus {
+  border-color:
+    rgba(207, 32, 41, 0.72);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(207, 32, 41, 0.09);
+}
+
+
+/* =========================================================
+   DISABLED
+   ========================================================= */
+
+.sgpa-form-grid input:disabled,
+.sgpa-form-grid select:disabled,
+.sgpa-form-grid textarea:disabled {
+  border-color:
+    #e4e7ec;
+
+  background:
+    #f4f5f7;
+
+  color:
+    #8b96a7;
+
+  cursor:
+    not-allowed;
+}
+
+
+/* =========================================================
+   TEXTO DE AYUDA
+   ========================================================= */
+
+.sgpa-field-help {
+  margin-top:
+    -1px;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    9.5px;
+
+  line-height:
+    1.4;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.sgpa-form-footer {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  padding:
+    17px 30px;
+
+  border-top:
+    1px solid #edf0f4;
+
+  background:
+    #fafbfc;
+}
+
+
+/* =========================================================
+   BOTÓN SECUNDARIO
+   ========================================================= */
+
+.sgpa-form-secondary {
+  min-height:
+    38px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding:
+    0 17px;
+
+  border:
+    1px solid #d9dee7;
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #475467;
+
+  font-size:
+    11px;
+
+  font-weight:
+    650;
+
+  cursor:
+    pointer;
+
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    color 0.16s ease;
+}
+
+
+.sgpa-form-secondary:hover {
+  border-color:
+    #c8ced8;
+
+  background:
+    #f5f6f8;
+
+  color:
+    #1f2937;
+}
+
+
+/* =========================================================
+   BOTÓN PRINCIPAL
+   ========================================================= */
+
+.sgpa-form-primary {
+  min-height:
+    38px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 7px;
+
+  padding:
+    0 18px;
+
+  border:
+    1px solid
+    var(--una-red, #cf2029);
+
+  border-radius:
+    8px;
+
+  background:
+    var(--una-red, #cf2029);
+
+  color:
+    #ffffff;
+
+  font-size:
+    11px;
+
+  font-weight:
+    680;
+
+  cursor:
+    pointer;
+
+  box-shadow:
+    0 3px 9px
+    rgba(207, 32, 41, 0.15);
+
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+
+.sgpa-form-primary:hover {
+  border-color:
+    var(--una-red-dark, #b71922);
+
+  background:
+    var(--una-red-dark, #b71922);
+
+  box-shadow:
+    0 5px 13px
+    rgba(207, 32, 41, 0.22);
+
+  transform:
+    translateY(-1px);
+}
+
+
+.sgpa-form-primary svg {
+  width:
+    15px;
+
+  height:
+    15px;
+}
+
+
+/* =========================================================
+   BOTÓN DESHABILITADO
+   ========================================================= */
+
+.sgpa-form-primary:disabled,
+.sgpa-form-secondary:disabled {
+  opacity:
+    0.55;
+
+  cursor:
+    not-allowed;
+
+  transform:
+    none;
+
+  box-shadow:
+    none;
+}
+
+
+/* =========================================================
+   DETALLES INTERNOS
+   ========================================================= */
+
+/*
+ * El formulario de Cursos utiliza este
+ * contenedor para mostrar la asignatura
+ * elegida.
+ */
+
+.sgpa-form-grid
+.curso-selected-subject {
+  padding:
+    12px 14px;
+
+  border:
+    1px solid
+    rgba(207, 32, 41, 0.14);
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(207, 32, 41, 0.045);
+}
+
+
+.sgpa-form-grid
+.curso-selected-subject strong,
+.sgpa-form-grid
+.curso-selected-subject small {
+  display:
+    block;
+}
+
+
+.sgpa-form-grid
+.curso-selected-subject strong {
+  color:
+    #344054;
+
+  font-size:
+    11px;
+}
+
+
+.sgpa-form-grid
+.curso-selected-subject small {
+  margin-top:
+    4px;
+
+  color:
+    #7b8798;
+
+  font-size:
+    9.5px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .sgpa-form-dialog-md,
+  .sgpa-form-dialog-lg {
+    width:
+      calc(100vw - 24px);
+  }
+
+
+  .sgpa-form {
+    max-height:
+      calc(100vh - 24px);
+  }
+
+
+  .sgpa-form-brand {
+    padding:
+      18px 18px
+      5px;
+  }
+
+
+  .sgpa-form-logo {
+    width:
+      78px;
+
+    height:
+      58px;
+  }
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.sgpa-form-header {
+  flex: 0 0 auto;
+
+  width: 100%;
+
+  display: block;
+
+  padding:
+    8px 30px
+    21px;
+
+  border-bottom:
+    1px solid #edf0f4;
+}
+
+
+.sgpa-form-heading {
+  width: 100%;
+
+  min-width: 0;
+}
+
+
+.sgpa-form-eyebrow {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color:
+    var(--una-red, #cf2029);
+
+  font-size: 9.5px;
+  font-weight: 750;
+
+  letter-spacing: 0.75px;
+
+  text-transform: uppercase;
+}
+
+
+.sgpa-form-heading h3 {
+  margin: 0;
+
+  color: #182235;
+
+  font-size: 21px;
+  font-weight: 720;
+
+  line-height: 1.25;
+
+  letter-spacing: -0.3px;
+}
+
+
+.sgpa-form-heading p {
+  max-width: 560px;
+
+  margin:
+    6px 0
+    0;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+
+  line-height: 1.5;
+}
+
+
+  .sgpa-form-scroll {
+    padding:
+      19px 20px
+      22px;
+  }
+
+
+  .sgpa-form-footer {
+    padding:
+      15px 20px;
+  }
+
+
+  .sgpa-form-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .sgpa-form-wide {
+    grid-column:
+      auto;
+  }
+
+}
+
+
+@media (max-width: 460px) {
+
+  .sgpa-form-footer {
+    align-items:
+      stretch;
+
+    flex-direction:
+      column-reverse;
+  }
+
+
+  .sgpa-form-primary,
+  .sgpa-form-secondary {
+    width:
+      100%;
+  }
+
+}

@@ -10,6 +10,9 @@ import { listarPlanesEstudio } from '../../services/planes-estudio.service.js';
 import { confirmarAccion } from '../../utils/confirm.js';
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
+import { DataTable } from '../../components/DataTable.js';
+import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
+import { mostrarExito, mostrarError } from '../../components/AlertModal.js';
 
 let cursos = [];
 let carrerasDisponibles = [];
@@ -68,26 +71,49 @@ export function CursosPage() {
         <div class="cursos-message">Cargando cursos...</div>
       </div>
 
-      <dialog id="cursoDialog" class="curso-dialog">
-        <div id="cursoDialogContent"></div>
-      </dialog>
+  <dialog
+    id="cursoDialog"
+    class="sgpa-form-dialog sgpa-form-dialog-lg"
+  >
+    <div id="cursoDialogContent"></div>
+     </dialog> 
     </section>
   `;
 }
 
-function mostrarFeedback(mensaje, tipo = 'success') {
-  const feedback = document.getElementById('cursosFeedback');
+function mostrarFeedback(
+  mensaje,
+  tipo = 'success'
+) {
 
-  if (!feedback) {
+  if (
+    tipo === 'error'
+  ) {
+
+    mostrarError({
+
+      titulo:
+        'No se pudo completar la operación',
+
+      mensaje
+
+    });
+
+
     return;
+
   }
 
-  feedback.textContent = mensaje;
-  feedback.className = `cursos-feedback cursos-feedback-${tipo}`;
 
-  window.setTimeout(() => {
-    feedback.classList.add('hidden');
-  }, 3500);
+  mostrarExito({
+
+    titulo:
+      'Operación realizada correctamente',
+
+    mensaje
+
+  });
+
 }
 
 function obtenerCursosFiltrados() {
@@ -119,119 +145,193 @@ function obtenerCursosFiltrados() {
 }
 
 function renderizarCursos() {
-  const contenedor = document.getElementById('cursosContent');
+
+  const contenedor =
+    document.getElementById(
+      'cursosContent'
+    );
+
 
   if (!contenedor) {
     return;
   }
 
-  const filtrados = obtenerCursosFiltrados();
 
-  if (filtrados.length === 0) {
-    contenedor.innerHTML = `
-      <div class="cursos-message">No se encontraron cursos.</div>
-    `;
-    return;
-  }
+  const filtrados =
+    obtenerCursosFiltrados();
 
-  const filas = filtrados
-    .map(
-      (curso) => `
-        <tr>
-          <td>
-            <strong class="curso-code">${escapeHtml(curso.codigo)}</strong>
-          </td>
-          <td>
-            <div class="curso-name">
-              <strong>${escapeHtml(curso.nombre)}</strong>
-              ${
-                curso.descripcion
-                  ? `<small>${escapeHtml(curso.descripcion)}</small>`
-                  : ''
-              }
-            </div>
-          </td>
-          <td>
-            <div class="curso-careers">
-              ${
-                Array.isArray(curso.carreras) && curso.carreras.length > 0
-                  ? curso.carreras
-                      .map(
-                        (carrera) => `
-                          <span class="curso-career-badge">
-                            ${escapeHtml(carrera.nombre)}
-                          </span>
-                        `,
-                      )
-                      .join('')
-                  : `
-                      <span class="curso-no-career">
-                        Sin carrera
-                      </span>
-                    `
-              }
-            </div>
-          </td>
-          <td>
-            <span class="curso-status ${
-              curso.activo ? 'curso-status-active' : 'curso-status-inactive'
-            }">
-              ${curso.activo ? 'Activo' : 'Inactivo'}
-            </span>
-          </td>
-          <td class="cursos-actions">
-            <button
-              class="cursos-icon-button"
-              data-action="editar"
-              data-id="${curso.id}"
-              type="button"
-              title="Editar curso"
-            >
-              <i data-lucide="pencil" aria-hidden="true"></i>
-            </button>
 
-            <button
-              class="cursos-icon-button ${
-                curso.activo
-                  ? 'cursos-danger-button'
-                  : 'cursos-success-button'
-              }"
-              data-action="estado"
-              data-id="${curso.id}"
-              type="button"
-              title="${curso.activo ? 'Desactivar curso' : 'Activar curso'}"
-            >
-              <i
-                data-lucide="${
-                  curso.activo ? 'circle-pause' : 'circle-check'
-                }"
-                aria-hidden="true"
-              ></i>
-            </button>
-          </td>
-        </tr>
-      `,
-    )
-    .join('');
-
-  contenedor.innerHTML = `
-    <div class="cursos-table-wrap">
-      <table class="cursos-table">
-        <thead>
+  const filas =
+    filtrados
+      .map(
+        (curso) => `
           <tr>
-            <th>Código</th>
-            <th>Curso</th>
-            <th>Carreras</th>
-            <th>Estado</th>
-            <th>Acciones</th>
+
+            <td>
+
+              <strong class="curso-code">
+                ${escapeHtml(curso.codigo)}
+              </strong>
+
+            </td>
+
+
+            <td>
+
+              <div class="curso-name">
+
+                <strong>
+                  ${escapeHtml(curso.nombre)}
+                </strong>
+
+                ${
+                  curso.descripcion
+                    ? `
+                        <small>
+                          ${escapeHtml(curso.descripcion)}
+                        </small>
+                      `
+                    : ''
+                }
+
+              </div>
+
+            </td>
+
+
+            <td>
+
+              <div class="curso-careers">
+
+                ${
+                  Array.isArray(curso.carreras) &&
+                  curso.carreras.length > 0
+                    ? curso.carreras
+                        .map(
+                          (carrera) => `
+                            <span class="curso-career-badge">
+                              ${escapeHtml(carrera.nombre)}
+                            </span>
+                          `
+                        )
+                        .join('')
+                    : `
+                        <span class="curso-no-career">
+                          Sin carrera
+                        </span>
+                      `
+                }
+
+              </div>
+
+            </td>
+
+
+            <td>
+
+              <span
+                class="
+                  curso-status
+                  ${
+                    curso.activo
+                      ? 'curso-status-active'
+                      : 'curso-status-inactive'
+                  }
+                "
+              >
+
+                ${
+                  curso.activo
+                    ? 'Activo'
+                    : 'Inactivo'
+                }
+
+              </span>
+
+            </td>
+
+
+            <td class="cursos-actions">
+
+              <button
+                class="cursos-icon-button"
+                data-action="editar"
+                data-id="${curso.id}"
+                type="button"
+                title="Editar curso"
+              >
+
+                <i
+                  data-lucide="pencil"
+                  aria-hidden="true"
+                ></i>
+
+              </button>
+
+
+              <button
+                class="
+                  cursos-icon-button
+                  ${
+                    curso.activo
+                      ? 'cursos-danger-button'
+                      : 'cursos-success-button'
+                  }
+                "
+                data-action="estado"
+                data-id="${curso.id}"
+                type="button"
+                title="${
+                  curso.activo
+                    ? 'Desactivar curso'
+                    : 'Activar curso'
+                }"
+              >
+
+                <i
+                  data-lucide="${
+                    curso.activo
+                      ? 'circle-pause'
+                      : 'circle-check'
+                  }"
+                  aria-hidden="true"
+                ></i>
+
+              </button>
+
+            </td>
+
           </tr>
-        </thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>
-  `;
+        `
+      )
+      .join('');
+
+
+  contenedor.innerHTML =
+    DataTable({
+
+      columns: [
+        'Código',
+        'Curso',
+        'Carreras',
+        'Estado',
+        'Acciones'
+      ],
+
+      rows:
+        filas,
+
+      emptyMessage:
+        'No se encontraron cursos con los filtros seleccionados.',
+
+      ariaLabel:
+        'Listado de cursos'
+
+    });
+
 
   renderizarIconos();
+
 }
 
 async function cargarCursos(instancia) {
@@ -306,573 +406,1206 @@ async function cargarPlanesDisponibles() {
 }
 
 async function abrirFormulario(curso = null) {
-  const dialog = document.getElementById('cursoDialog');
-  const content = document.getElementById('cursoDialogContent');
 
-  if (!dialog || !content) {
+  const dialog =
+    document.getElementById(
+      'cursoDialog'
+    );
+
+
+  const content =
+    document.getElementById(
+      'cursoDialogContent'
+    );
+
+
+  if (
+    !dialog ||
+    !content
+  ) {
     return;
   }
 
-  const editando = Boolean(curso);
+
+  const editando =
+    Boolean(curso);
+
+
+  /* =======================================================
+     EDITAR
+     ======================================================= */
 
   if (editando) {
-    content.innerHTML = `
-      <form id="cursoForm" class="curso-form">
-        <header class="curso-dialog-header">
-          <div>
-            <h3>Editar curso</h3>
-            <p>
-              El código y nombre provienen del plan de estudio.
-              Solamente puede modificar la descripción.
-            </p>
-          </div>
 
-          <button
-            id="cerrarCursoDialog"
-            class="cursos-icon-button"
-            type="button"
-            aria-label="Cerrar"
-          >
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
-        </header>
+    const body = `
 
-        <div
-          id="cursoFormError"
-          class="curso-form-error hidden"
-          role="alert"
-        ></div>
+      <label>
 
-        <div class="curso-form-grid">
-          <label>
-            <span>Código</span>
-            <input
-              type="text"
-              value="${escapeHtml(curso.codigo)}"
-              disabled
-            >
-          </label>
+        <span>
+          Código
+        </span>
 
-          <label class="curso-form-wide">
-            <span>Nombre</span>
-            <input
-              type="text"
-              value="${escapeHtml(curso.nombre)}"
-              disabled
-            >
-          </label>
+        <input
+          type="text"
+          value="${escapeHtml(curso.codigo)}"
+          disabled
+        >
 
-          <label class="curso-form-wide">
-            <span>Descripción</span>
-            <textarea
-              id="cursoDescripcion"
-              maxlength="500"
-              rows="4"
-              placeholder="Descripción opcional del curso"
-            >${curso.descripcion ? escapeHtml(curso.descripcion) : ''}</textarea>
-          </label>
-        </div>
+      </label>
 
-        <footer class="curso-dialog-footer">
-          <button
-            id="cancelarCursoButton"
-            class="cursos-secondary-button"
-            type="button"
-          >
-            Cancelar
-          </button>
 
-          <button
-            id="guardarCursoButton"
-            class="cursos-primary-button"
-            type="submit"
-          >
-            <i data-lucide="save" aria-hidden="true"></i>
-            Guardar cambios
-          </button>
-        </footer>
-      </form>
+      <label class="sgpa-form-wide">
+
+        <span>
+          Nombre
+        </span>
+
+        <input
+          type="text"
+          value="${escapeHtml(curso.nombre)}"
+          disabled
+        >
+
+      </label>
+
+
+      <label class="sgpa-form-wide">
+
+        <span>
+          Descripción
+        </span>
+
+        <textarea
+          id="cursoDescripcion"
+          maxlength="500"
+          rows="4"
+          placeholder="Descripción opcional del curso"
+        >${
+          curso.descripcion
+            ? escapeHtml(curso.descripcion)
+            : ''
+        }</textarea>
+
+      </label>
+
     `;
+
+
+content.innerHTML = FormDialog({
+  formId: 'cursoForm',
+  title: 'Nuevo curso',
+  description:
+    'Seleccione una asignatura existente dentro de un plan de estudio.',
+  body,
+  errorId: 'cursoFormError',
+  cancelButtonId: 'cancelarCursoButton',
+  submitButtonId: 'guardarCursoButton',
+  submitText: 'Crear curso',
+});
+
 
     renderizarIconos();
     dialog.showModal();
+    habilitarCierreExterior(dialog);
+
 
     const cerrar = () => dialog.close();
 
     document
-      .getElementById('cerrarCursoDialog')
-      ?.addEventListener('click', cerrar);
-    document
-      .getElementById('cancelarCursoButton')
-      ?.addEventListener('click', cerrar);
+  .getElementById('cancelarCursoButton')
+  ?.addEventListener('click', cerrar);
 
     document
-      .getElementById('cursoForm')
-      ?.addEventListener('submit', async (event) => {
+      .getElementById(
+        'cursoForm'
+      )
+      ?.addEventListener(
+        'submit',
+        async (event) => {
+
+          event.preventDefault();
+
+
+          const descripcionInput =
+            document.getElementById(
+              'cursoDescripcion'
+            );
+
+
+          const guardarButton =
+            document.getElementById(
+              'guardarCursoButton'
+            );
+
+
+          const errorBox =
+            document.getElementById(
+              'cursoFormError'
+            );
+
+
+          if (
+            !descripcionInput ||
+            !guardarButton
+          ) {
+            return;
+          }
+
+
+          guardarButton.disabled =
+            true;
+
+
+          errorBox
+            ?.classList
+            .add(
+              'hidden'
+            );
+
+
+          try {
+
+            const resultado =
+              await actualizarCurso(
+                curso.id,
+                {
+                  descripcion:
+                    descripcionInput
+                      .value
+                      .trim()
+                }
+              );
+
+
+            if (!resultado?.ok) {
+
+              throw new Error(
+                resultado?.message ||
+                'No fue posible actualizar el curso.'
+              );
+
+            }
+
+
+            cerrar();
+
+
+            mostrarFeedback(
+              'Curso actualizado correctamente.'
+            );
+
+
+            await cargarCursos(
+              instanciaActual
+            );
+
+
+          } catch (error) {
+
+mostrarError({
+
+  titulo:
+    editando
+      ? 'No se pudo actualizar el curso'
+      : 'No se pudo crear el curso',
+
+  mensaje:
+    error?.message ||
+    'No fue posible guardar el curso.'
+
+});
+
+
+          } finally {
+
+            guardarButton.disabled =
+              false;
+
+          }
+
+        }
+      );
+
+
+    return;
+
+  }
+
+
+  /* =======================================================
+     CARGAR INFORMACIÓN PARA NUEVO CURSO
+     ======================================================= */
+
+  try {
+
+    if (
+      carrerasDisponibles.length === 0
+    ) {
+
+      await cargarCarrerasDisponibles();
+
+    }
+
+
+    if (
+      planesDisponibles.length === 0
+    ) {
+
+      await cargarPlanesDisponibles();
+
+    }
+
+
+  } catch (error) {
+
+    mostrarFeedback(
+      error?.message ||
+      'No fue posible cargar la información académica.',
+      'error'
+    );
+
+
+    return;
+
+  }
+
+
+  const carrerasActivas =
+    carrerasDisponibles.filter(
+      (carrera) =>
+        carrera.activo === true
+    );
+
+
+  const opcionesCarrera =
+    carrerasActivas
+      .map(
+        (carrera) => `
+          <option value="${carrera.id}">
+            ${escapeHtml(carrera.codigo)}
+            -
+            ${escapeHtml(carrera.nombre)}
+          </option>
+        `
+      )
+      .join('');
+
+
+  const body = `
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Carrera
+      </span>
+
+      <select
+        id="cursoCarrera"
+        required
+      >
+
+        <option value="">
+          Seleccione una carrera
+        </option>
+
+        ${opcionesCarrera}
+
+      </select>
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Plan de estudio
+      </span>
+
+      <select
+        id="cursoPlan"
+        required
+        disabled
+      >
+
+        <option value="">
+          Primero seleccione una carrera
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Nivel / Año
+      </span>
+
+      <select
+        id="cursoNivel"
+        required
+        disabled
+      >
+
+        <option value="">
+          Seleccione un plan
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Ciclo / Semestre
+      </span>
+
+      <select
+        id="cursoCiclo"
+        required
+        disabled
+      >
+
+        <option value="">
+          Seleccione un nivel
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Asignatura del plan
+      </span>
+
+      <select
+        id="cursoAsignatura"
+        required
+        disabled
+      >
+
+        <option value="">
+          Seleccione un ciclo
+        </option>
+
+      </select>
+
+    </label>
+
+
+    <div
+      id="cursoAsignaturaDetalle"
+      class="
+        sgpa-form-wide
+        curso-asignatura-detalle
+      "
+    ></div>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Descripción
+      </span>
+
+      <textarea
+        id="cursoDescripcion"
+        maxlength="500"
+        rows="4"
+        placeholder="Descripción opcional del curso"
+      ></textarea>
+
+    </label>
+
+  `;
+
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        'cursoForm',
+
+      title:
+        'Nuevo curso',
+
+      description:
+        'Seleccione una asignatura existente dentro de un plan de estudio.',
+
+      body,
+
+      errorId:
+        'cursoFormError',
+
+      closeButtonId:
+        'cerrarCursoDialog',
+
+      cancelButtonId:
+        'cancelarCursoButton',
+
+      submitButtonId:
+        'guardarCursoButton',
+
+      submitText:
+        'Crear curso'
+
+    });
+
+
+  renderizarIconos();
+
+
+  dialog.showModal();
+
+
+  const carreraSelect =
+    document.getElementById(
+      'cursoCarrera'
+    );
+
+
+  const planSelect =
+    document.getElementById(
+      'cursoPlan'
+    );
+
+
+  const nivelSelect =
+    document.getElementById(
+      'cursoNivel'
+    );
+
+
+  const cicloSelect =
+    document.getElementById(
+      'cursoCiclo'
+    );
+
+
+  const asignaturaSelect =
+    document.getElementById(
+      'cursoAsignatura'
+    );
+
+
+  const detalle =
+    document.getElementById(
+      'cursoAsignaturaDetalle'
+    );
+
+
+  const descripcionInput =
+    document.getElementById(
+      'cursoDescripcion'
+    );
+
+
+  const errorBox =
+    document.getElementById(
+      'cursoFormError'
+    );
+
+
+  const guardarButton =
+    document.getElementById(
+      'guardarCursoButton'
+    );
+
+
+  const cerrar =
+    () => dialog.close();
+
+
+  document
+    .getElementById(
+      'cerrarCursoDialog'
+    )
+    ?.addEventListener(
+      'click',
+      cerrar
+    );
+
+
+  document
+    .getElementById(
+      'cancelarCursoButton'
+    )
+    ?.addEventListener(
+      'click',
+      cerrar
+    );
+
+
+  /* =======================================================
+     CARRERA
+     ======================================================= */
+
+  carreraSelect
+    ?.addEventListener(
+      'change',
+      () => {
+
+        const carreraId =
+          Number(
+            carreraSelect.value
+          );
+
+
+        asignaturasDisponibles =
+          [];
+
+
+        nivelSelect.innerHTML =
+          '<option value="">Seleccione un plan</option>';
+
+
+        nivelSelect.disabled =
+          true;
+
+
+        cicloSelect.innerHTML =
+          '<option value="">Seleccione un nivel</option>';
+
+
+        cicloSelect.disabled =
+          true;
+
+
+        asignaturaSelect.innerHTML =
+          '<option value="">Seleccione un ciclo</option>';
+
+
+        asignaturaSelect.disabled =
+          true;
+
+
+        detalle.innerHTML =
+          '';
+
+
+        errorBox
+          ?.classList
+          .add(
+            'hidden'
+          );
+
+
+        if (!carreraId) {
+
+          planSelect.innerHTML =
+            '<option value="">Primero seleccione una carrera</option>';
+
+
+          planSelect.disabled =
+            true;
+
+
+          return;
+
+        }
+
+
+        const planesCarrera =
+          planesDisponibles.filter(
+            (plan) =>
+              plan.activo === true &&
+              Number(plan.carreraId) ===
+                carreraId
+          );
+
+
+        if (
+          planesCarrera.length === 0
+        ) {
+
+          planSelect.innerHTML = `
+            <option value="">
+              No existen planes activos para esta carrera
+            </option>
+          `;
+
+
+          planSelect.disabled =
+            true;
+
+
+          return;
+
+        }
+
+
+        planSelect.innerHTML = `
+          <option value="">
+            Seleccione un plan
+          </option>
+
+          ${
+            planesCarrera
+              .map(
+                (plan) => `
+                  <option value="${plan.id}">
+                    ${escapeHtml(plan.codigo)}
+                    -
+                    ${escapeHtml(plan.nombre)}
+                  </option>
+                `
+              )
+              .join('')
+          }
+        `;
+
+
+        planSelect.disabled =
+          false;
+
+      }
+    );
+
+
+  /* =======================================================
+     PLAN
+     ======================================================= */
+
+  planSelect
+    ?.addEventListener(
+      'change',
+      async () => {
+
+        const carreraId =
+          Number(
+            carreraSelect.value
+          );
+
+
+        const planId =
+          Number(
+            planSelect.value
+          );
+
+
+        asignaturasDisponibles =
+          [];
+
+
+        nivelSelect.disabled =
+          true;
+
+
+        cicloSelect.innerHTML =
+          '<option value="">Seleccione un nivel</option>';
+
+
+        cicloSelect.disabled =
+          true;
+
+
+        asignaturaSelect.innerHTML =
+          '<option value="">Seleccione un ciclo</option>';
+
+
+        asignaturaSelect.disabled =
+          true;
+
+
+        detalle.innerHTML =
+          '';
+
+
+        errorBox
+          ?.classList
+          .add(
+            'hidden'
+          );
+
+
+        if (!planId) {
+
+          nivelSelect.innerHTML =
+            '<option value="">Seleccione un plan</option>';
+
+
+          return;
+
+        }
+
+
+        nivelSelect.innerHTML =
+          '<option value="">Cargando...</option>';
+
+
+        try {
+
+          const resultado =
+            await listarAsignaturasDisponiblesCurso({
+              carreraId,
+              planId
+            });
+
+
+          if (
+            Number(planSelect.value) !==
+            planId
+          ) {
+            return;
+          }
+
+
+          if (!resultado?.ok) {
+
+            throw new Error(
+              resultado?.message ||
+              'No fue posible consultar las asignaturas.'
+            );
+
+          }
+
+
+          asignaturasDisponibles =
+            Array.isArray(
+              resultado.asignaturas
+            )
+              ? resultado.asignaturas
+              : [];
+
+
+          if (
+            asignaturasDisponibles.length === 0
+          ) {
+
+            nivelSelect.innerHTML = `
+              <option value="">
+                Este plan no tiene asignaturas disponibles
+              </option>
+            `;
+
+
+            return;
+
+          }
+
+
+          const niveles = [
+            ...new Set(
+              asignaturasDisponibles.map(
+                (item) =>
+                  Number(item.nivel)
+              )
+            )
+          ]
+            .sort(
+              (a, b) =>
+                a - b
+            );
+
+
+          nivelSelect.innerHTML = `
+            <option value="">
+              Seleccione un nivel
+            </option>
+
+            ${
+              niveles
+                .map(
+                  (nivel) => `
+                    <option value="${nivel}">
+                      Nivel ${nivel}
+                    </option>
+                  `
+                )
+                .join('')
+            }
+          `;
+
+
+          nivelSelect.disabled =
+            false;
+
+
+        } catch (error) {
+
+          if (
+            Number(planSelect.value) !==
+            planId
+          ) {
+            return;
+          }
+
+
+          nivelSelect.innerHTML =
+            '<option value="">Error cargando asignaturas</option>';
+
+
+          if (errorBox) {
+
+            errorBox.textContent =
+              error?.message ||
+              'No fue posible consultar las asignaturas.';
+
+
+            errorBox.classList.remove(
+              'hidden'
+            );
+
+          }
+
+        }
+
+      }
+    );
+
+
+  /* =======================================================
+     NIVEL
+     ======================================================= */
+
+  nivelSelect
+    ?.addEventListener(
+      'change',
+      () => {
+
+        const nivel =
+          Number(
+            nivelSelect.value
+          );
+
+
+        detalle.innerHTML =
+          '';
+
+
+        asignaturaSelect.innerHTML =
+          '<option value="">Seleccione un ciclo</option>';
+
+
+        asignaturaSelect.disabled =
+          true;
+
+
+        if (!nivel) {
+
+          cicloSelect.innerHTML =
+            '<option value="">Seleccione un nivel</option>';
+
+
+          cicloSelect.disabled =
+            true;
+
+
+          return;
+
+        }
+
+
+        const ciclos = [
+          ...new Set(
+            asignaturasDisponibles
+              .filter(
+                (item) =>
+                  Number(item.nivel) ===
+                  nivel
+              )
+              .map(
+                (item) =>
+                  Number(item.ciclo)
+              )
+          )
+        ]
+          .sort(
+            (a, b) =>
+              a - b
+          );
+
+
+        cicloSelect.innerHTML = `
+          <option value="">
+            Seleccione un ciclo
+          </option>
+
+          ${
+            ciclos
+              .map(
+                (ciclo) => `
+                  <option value="${ciclo}">
+                    Ciclo ${ciclo}
+                  </option>
+                `
+              )
+              .join('')
+          }
+        `;
+
+
+        cicloSelect.disabled =
+          false;
+
+      }
+    );
+
+
+  /* =======================================================
+     CICLO
+     ======================================================= */
+
+  cicloSelect
+    ?.addEventListener(
+      'change',
+      () => {
+
+        const nivel =
+          Number(
+            nivelSelect.value
+          );
+
+
+        const ciclo =
+          Number(
+            cicloSelect.value
+          );
+
+
+        detalle.innerHTML =
+          '';
+
+
+        if (!ciclo) {
+
+          asignaturaSelect.innerHTML =
+            '<option value="">Seleccione un ciclo</option>';
+
+
+          asignaturaSelect.disabled =
+            true;
+
+
+          return;
+
+        }
+
+
+        const asignaturas =
+          asignaturasDisponibles.filter(
+            (item) =>
+              Number(item.nivel) ===
+                nivel &&
+              Number(item.ciclo) ===
+                ciclo
+          );
+
+
+        asignaturaSelect.innerHTML = `
+          <option value="">
+            Seleccione una asignatura
+          </option>
+
+          ${
+            asignaturas
+              .map(
+                (item) => `
+                  <option value="${item.id}">
+                    ${escapeHtml(item.codigoReferencia)}
+                    -
+                    ${escapeHtml(item.nombreReferencia)}
+                  </option>
+                `
+              )
+              .join('')
+          }
+        `;
+
+
+        asignaturaSelect.disabled =
+          asignaturas.length === 0;
+
+      }
+    );
+
+
+  /* =======================================================
+     ASIGNATURA
+     ======================================================= */
+
+  asignaturaSelect
+    ?.addEventListener(
+      'change',
+      () => {
+
+        const asignaturaId =
+          Number(
+            asignaturaSelect.value
+          );
+
+
+        const asignatura =
+          asignaturasDisponibles.find(
+            (item) =>
+              Number(item.id) ===
+              asignaturaId
+          );
+
+
+        if (!asignatura) {
+
+          detalle.innerHTML =
+            '';
+
+
+          return;
+
+        }
+
+
+        detalle.innerHTML = `
+          <div class="curso-selected-subject">
+
+            <strong>
+              ${escapeHtml(asignatura.codigoReferencia)}
+              -
+              ${escapeHtml(asignatura.nombreReferencia)}
+            </strong>
+
+            <small>
+              Nivel ${asignatura.nivel}
+              ·
+              Ciclo ${asignatura.ciclo}
+              ·
+              ${asignatura.creditos} créditos
+            </small>
+
+          </div>
+        `;
+
+      }
+    );
+
+
+  /* =======================================================
+     GUARDAR
+     ======================================================= */
+
+  document
+    .getElementById(
+      'cursoForm'
+    )
+    ?.addEventListener(
+      'submit',
+      async (event) => {
+
         event.preventDefault();
 
-        const descripcionInput = document.getElementById('cursoDescripcion');
-        const guardarButton = document.getElementById('guardarCursoButton');
-        const errorBox = document.getElementById('cursoFormError');
 
-        if (!descripcionInput || !guardarButton) {
+        const planAsignaturaId =
+          Number(
+            asignaturaSelect.value
+          );
+
+
+        if (!planAsignaturaId) {
+
+          if (errorBox) {
+
+            errorBox.textContent =
+              'Debe seleccionar una asignatura del plan.';
+
+
+            errorBox.classList.remove(
+              'hidden'
+            );
+
+          }
+
+
+          return;
+
+        }
+
+
+        if (!guardarButton) {
           return;
         }
 
-        guardarButton.disabled = true;
-        errorBox?.classList.add('hidden');
+
+        errorBox
+          ?.classList
+          .add(
+            'hidden'
+          );
+
+
+        guardarButton.disabled =
+          true;
+
 
         try {
-          const resultado = await actualizarCurso(curso.id, {
-            descripcion: descripcionInput.value.trim(),
-          });
+
+          const resultado =
+            await crearCurso({
+
+              planAsignaturaId,
+
+              descripcion:
+                descripcionInput
+                  ?.value
+                  ?.trim() ||
+                ''
+
+            });
+
 
           if (!resultado?.ok) {
+
             throw new Error(
-              resultado?.message || 'No fue posible actualizar el curso.',
+              resultado?.message ||
+              'No fue posible crear el curso.'
             );
+
           }
+
 
           cerrar();
-          mostrarFeedback('Curso actualizado correctamente.');
-          await cargarCursos(instanciaActual);
-        } catch (error) {
-          if (errorBox) {
-            errorBox.textContent =
-              error?.message || 'No fue posible actualizar el curso.';
-            errorBox.classList.remove('hidden');
-          }
-        } finally {
-          guardarButton.disabled = false;
-        }
-      });
 
-    return;
-  }
 
-  try {
-    if (carrerasDisponibles.length === 0) {
-      await cargarCarrerasDisponibles();
-    }
-
-    if (planesDisponibles.length === 0) {
-      await cargarPlanesDisponibles();
-    }
-  } catch (error) {
-    mostrarFeedback(
-      error?.message || 'No fue posible cargar la información académica.',
-      'error',
-    );
-    return;
-  }
-
-  const carrerasActivas = carrerasDisponibles.filter(
-    (carrera) => carrera.activo === true,
-  );
-
-  const opcionesCarrera = carrerasActivas
-    .map(
-      (carrera) => `
-        <option value="${carrera.id}">
-          ${escapeHtml(carrera.codigo)} - ${escapeHtml(carrera.nombre)}
-        </option>
-      `,
-    )
-    .join('');
-
-  content.innerHTML = `
-    <form id="cursoForm" class="curso-form">
-      <header class="curso-dialog-header">
-        <div>
-          <h3>Nuevo curso</h3>
-          <p>
-            Seleccione una asignatura existente dentro de un plan de estudio.
-          </p>
-        </div>
-
-        <button
-          id="cerrarCursoDialog"
-          class="cursos-icon-button"
-          type="button"
-          aria-label="Cerrar"
-        >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
-
-      <div
-        id="cursoFormError"
-        class="curso-form-error hidden"
-        role="alert"
-      ></div>
-
-      <div class="curso-form-grid">
-        <label class="curso-form-wide">
-          <span>Carrera</span>
-          <select id="cursoCarrera" required>
-            <option value="">Seleccione una carrera</option>
-            ${opcionesCarrera}
-          </select>
-        </label>
-
-        <label class="curso-form-wide">
-          <span>Plan de estudio</span>
-          <select id="cursoPlan" required disabled>
-            <option value="">Primero seleccione una carrera</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Nivel / Año</span>
-          <select id="cursoNivel" required disabled>
-            <option value="">Seleccione un plan</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Ciclo / Semestre</span>
-          <select id="cursoCiclo" required disabled>
-            <option value="">Seleccione un nivel</option>
-          </select>
-        </label>
-
-        <label class="curso-form-wide">
-          <span>Asignatura del plan</span>
-          <select id="cursoAsignatura" required disabled>
-            <option value="">Seleccione un ciclo</option>
-          </select>
-        </label>
-
-        <div
-          id="cursoAsignaturaDetalle"
-          class="curso-form-wide curso-asignatura-detalle"
-        ></div>
-
-        <label class="curso-form-wide">
-          <span>Descripción</span>
-          <textarea
-            id="cursoDescripcion"
-            maxlength="500"
-            rows="4"
-            placeholder="Descripción opcional del curso"
-          ></textarea>
-        </label>
-      </div>
-
-      <footer class="curso-dialog-footer">
-        <button
-          id="cancelarCursoButton"
-          class="cursos-secondary-button"
-          type="button"
-        >
-          Cancelar
-        </button>
-
-        <button
-          id="guardarCursoButton"
-          class="cursos-primary-button"
-          type="submit"
-        >
-          <i data-lucide="save" aria-hidden="true"></i>
-          Crear curso
-        </button>
-      </footer>
-    </form>
-  `;
-
-  renderizarIconos();
-  dialog.showModal();
-
-  const carreraSelect = document.getElementById('cursoCarrera');
-  const planSelect = document.getElementById('cursoPlan');
-  const nivelSelect = document.getElementById('cursoNivel');
-  const cicloSelect = document.getElementById('cursoCiclo');
-  const asignaturaSelect = document.getElementById('cursoAsignatura');
-  const detalle = document.getElementById('cursoAsignaturaDetalle');
-  const descripcionInput = document.getElementById('cursoDescripcion');
-  const errorBox = document.getElementById('cursoFormError');
-  const guardarButton = document.getElementById('guardarCursoButton');
-
-  const cerrar = () => dialog.close();
-
-  document
-    .getElementById('cerrarCursoDialog')
-    ?.addEventListener('click', cerrar);
-  document
-    .getElementById('cancelarCursoButton')
-    ?.addEventListener('click', cerrar);
-
-  carreraSelect?.addEventListener('change', () => {
-    const carreraId = Number(carreraSelect.value);
-
-    asignaturasDisponibles = [];
-    nivelSelect.innerHTML = '<option value="">Seleccione un plan</option>';
-    nivelSelect.disabled = true;
-    cicloSelect.innerHTML = '<option value="">Seleccione un nivel</option>';
-    cicloSelect.disabled = true;
-    asignaturaSelect.innerHTML =
-      '<option value="">Seleccione un ciclo</option>';
-    asignaturaSelect.disabled = true;
-    detalle.innerHTML = '';
-    errorBox?.classList.add('hidden');
-
-    if (!carreraId) {
-      planSelect.innerHTML =
-        '<option value="">Primero seleccione una carrera</option>';
-      planSelect.disabled = true;
-      return;
-    }
-
-    const planesCarrera = planesDisponibles.filter(
-      (plan) =>
-        plan.activo === true && Number(plan.carreraId) === carreraId,
-    );
-
-    if (planesCarrera.length === 0) {
-      planSelect.innerHTML = `
-        <option value="">No existen planes activos para esta carrera</option>
-      `;
-      planSelect.disabled = true;
-      return;
-    }
-
-    planSelect.innerHTML = `
-      <option value="">Seleccione un plan</option>
-      ${planesCarrera
-        .map(
-          (plan) => `
-            <option value="${plan.id}">
-              ${escapeHtml(plan.codigo)} - ${escapeHtml(plan.nombre)}
-            </option>
-          `,
-        )
-        .join('')}
-    `;
-    planSelect.disabled = false;
-  });
-
-  planSelect?.addEventListener('change', async () => {
-    const carreraId = Number(carreraSelect.value);
-    const planId = Number(planSelect.value);
-
-    asignaturasDisponibles = [];
-    nivelSelect.disabled = true;
-    cicloSelect.innerHTML = '<option value="">Seleccione un nivel</option>';
-    cicloSelect.disabled = true;
-    asignaturaSelect.innerHTML =
-      '<option value="">Seleccione un ciclo</option>';
-    asignaturaSelect.disabled = true;
-    detalle.innerHTML = '';
-    errorBox?.classList.add('hidden');
-
-    if (!planId) {
-      nivelSelect.innerHTML = '<option value="">Seleccione un plan</option>';
-      return;
-    }
-
-    nivelSelect.innerHTML = '<option value="">Cargando...</option>';
-
-    try {
-      const resultado = await listarAsignaturasDisponiblesCurso({
-        carreraId,
-        planId,
-      });
-
-      if (Number(planSelect.value) !== planId) {
-        return;
-      }
-
-      if (!resultado?.ok) {
-        throw new Error(
-          resultado?.message || 'No fue posible consultar las asignaturas.',
-        );
-      }
-
-      asignaturasDisponibles = Array.isArray(resultado.asignaturas)
-        ? resultado.asignaturas
-        : [];
-
-      if (asignaturasDisponibles.length === 0) {
-        nivelSelect.innerHTML = `
-          <option value="">Este plan no tiene asignaturas disponibles</option>
-        `;
-        return;
-      }
-
-      const niveles = [
-        ...new Set(
-          asignaturasDisponibles.map((item) => Number(item.nivel)),
-        ),
-      ].sort((a, b) => a - b);
-
-      nivelSelect.innerHTML = `
-        <option value="">Seleccione un nivel</option>
-        ${niveles
-          .map(
-            (nivel) => `
-              <option value="${nivel}">Nivel ${nivel}</option>
-            `,
-          )
-          .join('')}
-      `;
-      nivelSelect.disabled = false;
-    } catch (error) {
-      if (Number(planSelect.value) !== planId) {
-        return;
-      }
-
-      nivelSelect.innerHTML =
-        '<option value="">Error cargando asignaturas</option>';
-
-      if (errorBox) {
-        errorBox.textContent =
-          error?.message || 'No fue posible consultar las asignaturas.';
-        errorBox.classList.remove('hidden');
-      }
-    }
-  });
-
-  nivelSelect?.addEventListener('change', () => {
-    const nivel = Number(nivelSelect.value);
-
-    detalle.innerHTML = '';
-    asignaturaSelect.innerHTML =
-      '<option value="">Seleccione un ciclo</option>';
-    asignaturaSelect.disabled = true;
-
-    if (!nivel) {
-      cicloSelect.innerHTML = '<option value="">Seleccione un nivel</option>';
-      cicloSelect.disabled = true;
-      return;
-    }
-
-    const ciclos = [
-      ...new Set(
-        asignaturasDisponibles
-          .filter((item) => Number(item.nivel) === nivel)
-          .map((item) => Number(item.ciclo)),
-      ),
-    ].sort((a, b) => a - b);
-
-    cicloSelect.innerHTML = `
-      <option value="">Seleccione un ciclo</option>
-      ${ciclos
-        .map(
-          (ciclo) => `
-            <option value="${ciclo}">Ciclo ${ciclo}</option>
-          `,
-        )
-        .join('')}
-    `;
-    cicloSelect.disabled = false;
-  });
-
-  cicloSelect?.addEventListener('change', () => {
-    const nivel = Number(nivelSelect.value);
-    const ciclo = Number(cicloSelect.value);
-
-    detalle.innerHTML = '';
-
-    if (!ciclo) {
-      asignaturaSelect.innerHTML =
-        '<option value="">Seleccione un ciclo</option>';
-      asignaturaSelect.disabled = true;
-      return;
-    }
-
-    const asignaturas = asignaturasDisponibles.filter(
-      (item) =>
-        Number(item.nivel) === nivel && Number(item.ciclo) === ciclo,
-    );
-
-    asignaturaSelect.innerHTML = `
-      <option value="">Seleccione una asignatura</option>
-      ${asignaturas
-        .map(
-          (item) => `
-            <option value="${item.id}">
-              ${escapeHtml(item.codigoReferencia)} -
-              ${escapeHtml(item.nombreReferencia)}
-            </option>
-          `,
-        )
-        .join('')}
-    `;
-    asignaturaSelect.disabled = asignaturas.length === 0;
-  });
-
-  asignaturaSelect?.addEventListener('change', () => {
-    const asignaturaId = Number(asignaturaSelect.value);
-    const asignatura = asignaturasDisponibles.find(
-      (item) => Number(item.id) === asignaturaId,
-    );
-
-    if (!asignatura) {
-      detalle.innerHTML = '';
-      return;
-    }
-
-    detalle.innerHTML = `
-      <div class="curso-selected-subject">
-        <strong>
-          ${escapeHtml(asignatura.codigoReferencia)} -
-          ${escapeHtml(asignatura.nombreReferencia)}
-        </strong>
-        <small>
-          Nivel ${asignatura.nivel} · Ciclo ${asignatura.ciclo} ·
-          ${asignatura.creditos} créditos
-        </small>
-      </div>
-    `;
-  });
-
-  document
-    .getElementById('cursoForm')
-    ?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-
-      const planAsignaturaId = Number(asignaturaSelect.value);
-
-      if (!planAsignaturaId) {
-        if (errorBox) {
-          errorBox.textContent = 'Debe seleccionar una asignatura del plan.';
-          errorBox.classList.remove('hidden');
-        }
-        return;
-      }
-
-      if (!guardarButton) {
-        return;
-      }
-
-      errorBox?.classList.add('hidden');
-      guardarButton.disabled = true;
-
-      try {
-        const resultado = await crearCurso({
-          planAsignaturaId,
-          descripcion: descripcionInput?.value?.trim() || '',
-        });
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || 'No fue posible crear el curso.',
+          mostrarFeedback(
+            'Curso creado correctamente.'
           );
+
+
+          await cargarCursos(
+            instanciaActual
+          );
+
+
+        } catch (error) {
+
+          if (errorBox) {
+
+            errorBox.textContent =
+              error?.message ||
+              'No fue posible crear el curso.';
+
+
+            errorBox.classList.remove(
+              'hidden'
+            );
+
+          }
+
+
+        } finally {
+
+          guardarButton.disabled =
+            false;
+
         }
 
-        cerrar();
-        mostrarFeedback('Curso creado correctamente.');
-        await cargarCursos(instanciaActual);
-      } catch (error) {
-        if (errorBox) {
-          errorBox.textContent =
-            error?.message || 'No fue posible crear el curso.';
-          errorBox.classList.remove('hidden');
-        }
-      } finally {
-        guardarButton.disabled = false;
       }
-    });
+    );
+
 }
 
 async function alternarEstado(curso) {
