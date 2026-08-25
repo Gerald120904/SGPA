@@ -1,0 +1,4181 @@
+import {
+  MODULES
+} from '../config/modules.js';
+
+import {
+  puedeAcceder
+} from '../config/permissions.js';
+
+import {
+  formatearRol,
+  obtenerRolPrincipal
+} from '../app/session.js';
+
+import {
+  escapeHtml
+} from '../utils/html.js';
+
+
+function renderNavItem(
+  module
+) {
+
+  const label =
+    module.navLabel ||
+    module.title;
+
+
+  return `
+    <button
+      class="nav-item"
+      data-module="${module.id}"
+      data-route="${module.route}"
+      type="button"
+      title="${escapeHtml(label)}"
+    >
+
+      <i
+        data-lucide="${module.icon}"
+        aria-hidden="true"
+      ></i>
+
+      <span>
+        ${escapeHtml(label)}
+      </span>
+
+    </button>
+  `;
+
+}
+
+
+export function Sidebar({
+  usuario,
+  roles
+}) {
+
+  const nombre =
+    usuario?.nombres ||
+    'Usuario';
+
+
+  const inicial =
+    nombre
+      .trim()
+      .charAt(0)
+      .toUpperCase() ||
+    'A';
+
+
+  const rolPrincipal =
+    obtenerRolPrincipal(
+      usuario
+    );
+
+  /*
+   * Solamente módulos a los que tiene
+   * acceso visual el usuario.
+   */
+
+  const modulosVisibles =
+    MODULES.filter(
+      (module) =>
+        puedeAcceder(
+          roles,
+          module.id
+        )
+    );
+
+
+  /*
+   * Secciones en el mismo orden
+   * definido en modules.js.
+   */
+
+  const secciones = [
+    ...new Set(
+      modulosVisibles
+        .map(
+          (module) =>
+            module.section
+        )
+        .filter(Boolean)
+    )
+  ];
+
+
+  const navegacion =
+    secciones
+      .map(
+        (section) => {
+
+          const modules =
+            modulosVisibles.filter(
+              (module) =>
+                module.section ===
+                section
+            );
+
+
+          return `
+            <div class="nav-section-title">
+              ${escapeHtml(section)}
+            </div>
+
+            ${modules
+              .map(renderNavItem)
+              .join('')}
+          `;
+
+        }
+      )
+      .join('');
+
+
+  return `
+    <aside
+      id="sidebar"
+      class="sidebar"
+    >
+
+      <!-- =============================================== -->
+      <!-- LOGO -->
+      <!-- =============================================== -->
+
+      <div class="sidebar-header">
+
+        <div class="sidebar-header-brand">
+
+          <img
+            src="/AVI_horizontal.png"
+            alt="Universidad Nacional"
+            class="sidebar-logo"
+            draggable="false"
+          />
+
+        </div>
+
+
+        <!-- ============================================= -->
+        <!-- COLAPSAR -->
+        <!-- ============================================= -->
+
+        <button
+          id="sidebarToggle"
+          class="sidebar-toggle"
+          type="button"
+          aria-label="Contraer menú lateral"
+          title="Contraer menú"
+        >
+
+          <i
+            data-lucide="chevron-left"
+            aria-hidden="true"
+          ></i>
+
+        </button>
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- SISTEMA -->
+      <!-- =============================================== -->
+
+      <div class="sidebar-context">
+
+        <span class="sidebar-context-label">
+          Sistema
+        </span>
+
+        <strong>
+          SGPA
+        </strong>
+
+        <small>
+          Campus Nicoya
+        </small>
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- MENÚ CON SCROLL -->
+      <!-- =============================================== -->
+
+      <nav class="sidebar-nav">
+
+        ${navegacion}
+
+      </nav>
+
+
+      <!-- =============================================== -->
+      <!-- USUARIO -->
+      <!-- =============================================== -->
+
+      <div class="sidebar-footer">
+
+        <div class="sidebar-user">
+
+          <div class="user-avatar">
+            ${escapeHtml(inicial)}
+          </div>
+
+
+          <div class="sidebar-user-info">
+
+            <strong>
+              ${escapeHtml(nombre)}
+            </strong>
+
+            <span>
+              ${escapeHtml(
+                formatearRol(
+                  rolPrincipal
+                )
+              )}
+            </span>
+
+          </div>
+
+        </div>
+
+
+        <button
+          id="logoutButton"
+          class="logout-button"
+          type="button"
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
+        >
+
+          <i
+            data-lucide="log-out"
+            aria-hidden="true"
+          ></i>
+
+        </button>
+
+      </div>
+
+    </aside>
+  `;
+
+}
+import {
+  escapeHtml
+} from '../utils/html.js';
+
+
+export function Topbar({
+  usuario
+}) {
+
+  const nombre =
+    usuario?.nombres ||
+    'Usuario';
+
+
+  const inicial =
+    nombre
+      .trim()
+      .charAt(0)
+      .toUpperCase() ||
+    'A';
+
+
+  return `
+    <header class="topbar">
+
+      <!-- =============================================== -->
+      <!-- PÁGINA ACTUAL -->
+      <!-- =============================================== -->
+
+      <div class="topbar-heading">
+
+        <h1 id="pageTitle">
+          SGPA
+        </h1>
+
+        <p class="topbar-subtitle">
+          Campus Nicoya
+        </p>
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- USUARIO -->
+      <!-- =============================================== -->
+
+      <div class="topbar-user">
+
+        <div class="topbar-user-text">
+
+          <strong>
+            ${escapeHtml(nombre)}
+          </strong>
+
+          <span>
+            Campus Nicoya
+          </span>
+
+        </div>
+
+
+        <div class="topbar-avatar">
+          ${escapeHtml(inicial)}
+        </div>
+
+      </div>
+
+    </header>
+  `;
+
+}
+import {
+  Sidebar
+} from '../components/Sidebar.js';
+
+import {
+  Topbar
+} from '../components/Topbar.js';
+
+
+export function AppLayout({
+  usuario,
+  roles
+}) {
+
+  return `
+    <main
+      id="appShell"
+      class="app-shell"
+    >
+
+      ${Sidebar({
+        usuario,
+        roles
+      })}
+
+
+      <section class="app-main">
+
+        ${Topbar({
+          usuario
+        })}
+
+
+        <div
+          id="contentArea"
+          class="content-area"
+        ></div>
+
+      </section>
+
+    </main>
+  `;
+
+}
+import {
+  DASHBOARD_MOCK
+} from '../../data/dashboard.mock.js';
+
+import {
+  escapeHtml
+} from '../../utils/html.js';
+
+import {
+  obtenerModuloPorRuta
+} from '../../config/modules.js';
+
+import {
+  puedeAcceder
+} from '../../config/permissions.js';
+
+import {
+  obtenerRolesUsuario
+} from '../../app/session.js';
+
+
+/* =========================================================
+   HOME
+   =========================================================
+   Esta es la página inicial del SGPA.
+
+   Actualmente utiliza datos MOCK / TEMPORALES
+   mientras el Product Owner entrega los datos reales.
+
+   Cuando exista el backend correspondiente,
+   dashboard.mock.js será sustituido por un servicio.
+   ========================================================= */
+
+
+/* =========================================================
+   ESTADO DEL PERIODO
+   ========================================================= */
+
+function obtenerClaseEstado(
+  estado
+) {
+
+  switch (estado) {
+
+    case 'ABIERTA':
+      return 'period-status-open';
+
+    case 'ADMINISTRATIVA':
+      return 'period-status-admin';
+
+    case 'CERRADA':
+      return 'period-status-closed';
+
+    default:
+      return 'period-status-open';
+
+  }
+
+}
+
+
+/* =========================================================
+   INDICADORES
+   ========================================================= */
+
+function renderIndicadores() {
+
+  return DASHBOARD_MOCK
+    .indicadores
+    .map(
+      (item) => {
+
+        return `
+          <article class="dashboard-stat-card">
+
+            <div class="dashboard-stat-icon">
+
+              <i
+                data-lucide="${item.icon}"
+                aria-hidden="true"
+              ></i>
+
+            </div>
+
+
+            <div class="dashboard-stat-data">
+
+              <strong>
+                ${escapeHtml(item.value)}
+              </strong>
+
+              <span>
+                ${escapeHtml(item.label)}
+              </span>
+
+              <small>
+                ${escapeHtml(item.detail)}
+              </small>
+
+            </div>
+
+          </article>
+        `;
+
+      }
+    )
+    .join('');
+
+}
+
+
+/* =========================================================
+   DEMANDA
+   ========================================================= */
+
+function renderDemanda() {
+
+  const valores =
+    DASHBOARD_MOCK
+      .demandaCarreras
+      .map(
+        (item) =>
+          item.estudiantes
+      );
+
+
+  const maximo =
+    Math.max(
+      ...valores,
+      1
+    );
+
+
+  return DASHBOARD_MOCK
+    .demandaCarreras
+    .map(
+      (item) => {
+
+        const porcentaje =
+          Math.round(
+            (
+              item.estudiantes /
+              maximo
+            ) * 100
+          );
+
+
+        return `
+          <div class="demand-row">
+
+            <span class="demand-name">
+              ${escapeHtml(
+                item.carrera
+              )}
+            </span>
+
+
+            <div class="demand-track">
+
+              <div
+                class="demand-bar"
+                style="--demand-width: ${porcentaje}%"
+              ></div>
+
+            </div>
+
+
+            <span class="demand-value">
+              ${item.estudiantes}
+            </span>
+
+          </div>
+        `;
+
+      }
+    )
+    .join('');
+
+}
+
+
+/* =========================================================
+   ALERTAS
+   ========================================================= */
+
+function renderAlertas() {
+
+  return DASHBOARD_MOCK
+    .alertas
+    .map(
+      (alerta) => {
+
+        return `
+          <div class="academic-alert">
+
+            <i
+              data-lucide="triangle-alert"
+              class="alert-${alerta.type}"
+              aria-hidden="true"
+            ></i>
+
+
+            <span>
+              ${escapeHtml(
+                alerta.text
+              )}
+            </span>
+
+
+            <i
+              data-lucide="chevron-right"
+              class="alert-arrow"
+              aria-hidden="true"
+            ></i>
+
+          </div>
+        `;
+
+      }
+    )
+    .join('');
+
+}
+
+
+/* =========================================================
+   ACTIVIDAD
+   ========================================================= */
+
+function renderActividad() {
+
+  return DASHBOARD_MOCK
+    .actividad
+    .map(
+      (item) => {
+
+        return `
+          <div class="activity-row">
+
+            <div class="activity-icon">
+
+              <i
+                data-lucide="${item.icon}"
+                aria-hidden="true"
+              ></i>
+
+            </div>
+
+
+            <span class="activity-time">
+              ${escapeHtml(
+                item.time
+              )}
+            </span>
+
+
+            <span class="activity-text">
+              ${escapeHtml(
+                item.text
+              )}
+            </span>
+
+          </div>
+        `;
+
+      }
+    )
+    .join('');
+
+}
+
+
+/* =========================================================
+   ACCIONES
+   ========================================================= */
+
+function renderAcciones() {
+
+  const roles =
+    obtenerRolesUsuario();
+
+  return DASHBOARD_MOCK
+    .acciones
+    .filter(
+      (action) => {
+
+        const module =
+          obtenerModuloPorRuta(
+            action.route
+          );
+
+
+        return (
+          module &&
+          puedeAcceder(
+            roles,
+            module.id
+          )
+        );
+
+      }
+    )
+    .map(
+      (action) => {
+
+        return `
+          <button
+            class="dashboard-action"
+            data-route="${action.route}"
+            type="button"
+          >
+
+            <i
+              data-lucide="${action.icon}"
+              aria-hidden="true"
+            ></i>
+
+
+            <span>
+              ${escapeHtml(
+                action.title
+              )}
+            </span>
+
+
+            <i
+              data-lucide="chevron-right"
+              class="action-arrow"
+              aria-hidden="true"
+            ></i>
+
+          </button>
+        `;
+
+      }
+    )
+    .join('');
+
+}
+
+
+/* =========================================================
+   HOME PAGE
+   ========================================================= */
+
+export function HomePage() {
+
+  const periodo =
+    DASHBOARD_MOCK.periodo;
+
+
+  const estadoClass =
+    obtenerClaseEstado(
+      periodo.estado
+    );
+
+
+  return `
+    <section class="dashboard-page">
+
+      <!-- =================================================
+           DATOS TEMPORALES
+
+           Todos los valores numéricos mostrados actualmente
+           provienen de:
+
+           src/data/dashboard.mock.js
+
+           Se eliminarán cuando existan datos reales.
+           ================================================= -->
+
+
+      <!-- =============================================== -->
+      <!-- ENCABEZADO -->
+      <!-- =============================================== -->
+
+      <div class="dashboard-page-header">
+
+        <div>
+
+          <h2>
+            SGPA
+          </h2>
+
+          <p>
+            Periodo actual:
+            ${escapeHtml(
+              periodo.nombre
+            )}
+            ·
+            ${escapeHtml(
+              periodo.campus
+            )}
+          </p>
+
+        </div>
+
+
+        <div class="dashboard-updated">
+
+          <i
+            data-lucide="clock"
+            aria-hidden="true"
+          ></i>
+
+          <span>
+            ${escapeHtml(
+              DASHBOARD_MOCK
+                .ultimaActualizacion
+            )}
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- INDICADORES -->
+      <!-- =============================================== -->
+
+      <div class="dashboard-kpis">
+
+        ${renderIndicadores()}
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- INFORMACIÓN -->
+      <!-- =============================================== -->
+
+      <div class="dashboard-insights-grid">
+
+
+        <!-- DEMANDA -->
+
+        <article class="dashboard-card">
+
+          <header class="dashboard-card-header">
+
+            <h3>
+              Demanda por carrera
+            </h3>
+
+          </header>
+
+
+          <div class="dashboard-card-body">
+
+            <div class="demand-list">
+
+              ${renderDemanda()}
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+
+        <!-- ESTADO DEL PERIODO -->
+
+        <article class="dashboard-card">
+
+          <header class="dashboard-card-header">
+
+            <h3>
+              Estado del periodo
+            </h3>
+
+          </header>
+
+
+          <div class="dashboard-card-body">
+
+            <div
+              class="period-status ${estadoClass}"
+            >
+
+              <span
+                class="period-status-dot"
+              ></span>
+
+              ${escapeHtml(
+                periodo.estadoTexto
+              )}
+
+            </div>
+
+
+            <div class="period-meta">
+
+              <span>
+
+                <strong>
+                  Inicio:
+                </strong>
+
+                ${escapeHtml(
+                  periodo.fechaInicio
+                )}
+
+              </span>
+
+
+              <span>
+
+                <strong>
+                  Fin:
+                </strong>
+
+                ${escapeHtml(
+                  periodo.fechaFin
+                )}
+
+              </span>
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+
+        <!-- OFERTA ACADÉMICA -->
+
+        <article class="dashboard-card">
+
+          <header class="dashboard-card-header">
+
+            <h3>
+              Oferta académica
+            </h3>
+
+          </header>
+
+
+          <div class="dashboard-card-body">
+
+            <div class="offer-summary">
+
+              <div class="offer-row">
+
+                <strong>
+                  ${
+                    DASHBOARD_MOCK
+                      .oferta
+                      .cursosOfertados
+                  }
+                </strong>
+
+                <span>
+                  cursos ofertados
+                </span>
+
+              </div>
+
+
+              <div class="offer-row">
+
+                <strong>
+                  ${
+                    DASHBOARD_MOCK
+                      .oferta
+                      .gruposAbiertos
+                  }
+                </strong>
+
+                <span>
+                  grupos abiertos
+                </span>
+
+              </div>
+
+
+              <div class="offer-row">
+
+                <strong>
+                  ${
+                    DASHBOARD_MOCK
+                      .oferta
+                      .pendientes
+                  }
+                </strong>
+
+                <span>
+                  pendientes
+                </span>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+
+        <!-- ALERTAS -->
+
+        <article class="dashboard-card">
+
+          <header class="dashboard-card-header">
+
+            <h3>
+              Alertas académicas
+            </h3>
+
+          </header>
+
+
+          <div class="dashboard-card-body">
+
+            <div class="alert-list">
+
+              ${renderAlertas()}
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- PARTE INFERIOR -->
+      <!-- =============================================== -->
+
+      <div class="dashboard-bottom-grid">
+
+
+        <!-- ACTIVIDAD -->
+
+        <article class="dashboard-card">
+
+          <header class="dashboard-card-header">
+
+            <h3>
+              Actividad reciente
+            </h3>
+
+          </header>
+
+
+          <div class="dashboard-card-body">
+
+            <div class="activity-list">
+
+              ${renderActividad()}
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+
+        <!-- ACCIONES -->
+
+        <article class="dashboard-card">
+
+          <header class="dashboard-card-header">
+
+            <h3>
+              Accesos rápidos
+            </h3>
+
+          </header>
+
+
+          <div class="dashboard-card-body">
+
+            <div class="dashboard-actions">
+
+              ${renderAcciones()}
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+      </div>
+
+    </section>
+  `;
+
+}
+export const MODULES = [
+
+  /* =======================================================
+     PRINCIPAL
+     ======================================================= */
+
+  {
+    id: 'home',
+    title: 'SGPA',
+    navLabel: 'Inicio',
+    route: '/home',
+    icon: 'house',
+    section: 'Principal',
+    description:
+      'Resumen general del sistema'
+  },
+
+  {
+    id: 'dashboard',
+    title: 'Dashboard',
+    navLabel: 'Dashboard',
+    route: '/dashboard',
+    icon: 'layout-dashboard',
+    section: 'Principal',
+    description:
+      'Acceso a los módulos del sistema'
+  },
+
+
+  /* =======================================================
+     GESTIÓN ACADÉMICA
+     ======================================================= */
+
+  {
+    id: 'estudiantes',
+    title: 'Estudiantes',
+    route: '/estudiantes',
+    icon: 'users',
+    section: 'Gestión académica',
+    description:
+      'Gestión de estudiantes y avance curricular'
+  },
+
+  {
+    id: 'carreras',
+    title: 'Carreras',
+    route: '/carreras',
+    icon: 'graduation-cap',
+    section: 'Gestión académica',
+    description:
+      'Administración de carreras y planes académicos'
+  },
+
+  {
+    id: 'planes-estudio',
+    title: 'Planes de estudio',
+    route: '/planes-estudio',
+    icon: 'clipboard-list',
+    section: 'Gestión académica',
+    description:
+      'Planes académicos y estructura curricular'
+  },
+
+  {
+    id: 'cursos',
+    title: 'Cursos',
+    route: '/cursos',
+    icon: 'book-open',
+    section: 'Gestión académica',
+    description:
+      'Cursos, malla curricular y requisitos'
+  },
+
+  {
+    id: 'profesores',
+    title: 'Profesores',
+    route: '/profesores',
+    icon: 'briefcase',
+    section: 'Gestión académica',
+    description:
+      'Gestión docente y disponibilidad'
+  },
+
+  {
+    id: 'aulas',
+    title: 'Aulas',
+    route: '/aulas',
+    icon: 'door-open',
+    section: 'Gestión académica',
+    description:
+      'Espacios, capacidades y disponibilidad'
+  },
+
+  {
+    id: 'periodos',
+    title: 'Periodos académicos',
+    route: '/periodos',
+    icon: 'calendar-days',
+    section: 'Gestión académica',
+    description:
+      'Administración de periodos y ciclos académicos'
+  },
+
+  {
+    id: 'oferta',
+    title: 'Oferta académica',
+    route: '/oferta',
+    icon: 'clipboard-list',
+    section: 'Gestión académica',
+    description:
+      'Planificación de grupos, horarios y oferta'
+  },
+
+
+  /* =======================================================
+     PLANIFICACIÓN
+     ======================================================= */
+
+  {
+    id: 'proyeccion',
+    title: 'Proyección',
+    route: '/proyeccion',
+    icon: 'line-chart',
+    section: 'Planificación',
+    description:
+      'Proyección de matrícula y análisis de demanda'
+  },
+
+
+  /* =======================================================
+     ADMINISTRACIÓN
+     ======================================================= */
+
+  {
+    id: 'usuarios',
+    title: 'Usuarios',
+    route: '/usuarios',
+    icon: 'user-cog',
+    section: 'Administración',
+    description:
+      'Usuarios, roles y acceso al sistema'
+  }
+
+];
+
+
+export function obtenerModuloPorRuta(
+  route
+) {
+
+  return MODULES.find(
+    (module) =>
+      module.route === route
+  );
+
+}
+
+
+export function obtenerModuloPorId(
+  id
+) {
+
+  return MODULES.find(
+    (module) =>
+      module.id === id
+  );
+
+}
+/* =========================================================
+   APP
+   ========================================================= */
+
+.app-shell {
+  width: 100%;
+  height: 100vh;
+
+  display: grid;
+  grid-template-columns: 245px 1fr;
+
+  background: #f5f7fa;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+
+  border-right: 1px solid #e9edf3;
+}
+
+
+.sidebar-header {
+  height: 78px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 24px;
+
+  border-bottom: 1px solid #eef1f5;
+}
+
+
+.sidebar-logo {
+  display: block;
+
+  width: 135px;
+  height: auto;
+
+  user-select: none;
+}
+
+
+.sidebar-context {
+  padding: 21px 24px 18px;
+}
+
+
+.sidebar-context-label {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 700;
+
+  letter-spacing: 0.8px;
+
+  text-transform: uppercase;
+}
+
+
+.sidebar-context strong {
+  display: block;
+
+  color: #182235;
+
+  font-size: 18px;
+  font-weight: 700;
+}
+
+
+.sidebar-context small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+}
+
+
+/* =========================================================
+   NAVEGACIÓN
+   ========================================================= */
+
+.sidebar-nav {
+  flex: 1;
+
+  min-height: 0;
+
+  padding: 4px 14px 20px;
+
+  overflow-y: auto;
+}
+
+
+.nav-section-title {
+  margin: 20px 10px 8px;
+
+  color: #98a2b3;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+}
+
+
+.nav-item {
+  width: 100%;
+  min-height: 42px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  margin-bottom: 3px;
+
+  padding: 0 12px;
+
+  border-radius: 9px;
+
+  background: transparent;
+
+  color: #526174;
+
+  font-size: 13px;
+  font-weight: 500;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.nav-item svg {
+  flex: 0 0 auto;
+
+  width: 17px;
+  height: 17px;
+
+  stroke-width: 1.8;
+}
+
+
+.nav-item:hover {
+  background: #f4f7fb;
+
+  color: #253347;
+}
+
+
+.nav-item.active {
+  background: #edf4ff;
+
+  color: #1769e8;
+
+  font-weight: 600;
+}
+
+
+/* =========================================================
+   USUARIO SIDEBAR
+   ========================================================= */
+
+.sidebar-footer {
+  min-height: 74px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding: 14px 16px;
+
+  border-top: 1px solid #edf0f4;
+}
+
+
+.sidebar-user {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+.sidebar-user-info {
+  min-width: 0;
+}
+
+
+.sidebar-user-info strong,
+.sidebar-user-info span {
+  display: block;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.sidebar-user-info strong {
+  color: #273447;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.sidebar-user-info span {
+  margin-top: 2px;
+
+  color: #8b96a7;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   AVATARES
+   ========================================================= */
+
+.user-avatar,
+.topbar-avatar {
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #eaf2ff;
+
+  color: #1769e8;
+
+  font-weight: 700;
+}
+
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+
+  font-size: 12px;
+}
+
+
+.topbar-avatar {
+  width: 36px;
+  height: 36px;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   LOGOUT
+   ========================================================= */
+
+.logout-button {
+  flex: 0 0 auto;
+
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: #7b8798;
+
+  cursor: pointer;
+}
+
+
+.logout-button:hover {
+  background: #fff1f1;
+
+  color: #c62828;
+}
+
+
+.logout-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+
+/* =========================================================
+   CONTENIDO
+   ========================================================= */
+
+.app-main {
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   TOPBAR
+   ========================================================= */
+
+.topbar {
+  height: 78px;
+
+  flex: 0 0 78px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  padding: 0 32px;
+
+  background: #ffffff;
+
+  border-bottom: 1px solid #e9edf3;
+}
+
+
+.topbar-kicker {
+  margin: 0 0 2px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+
+.topbar h1 {
+  margin: 0;
+
+  color: #182235;
+
+  font-size: 20px;
+  font-weight: 680;
+}
+
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+.topbar-user-text {
+  text-align: right;
+}
+
+
+.topbar-user-text strong,
+.topbar-user-text span {
+  display: block;
+}
+
+
+.topbar-user-text strong {
+  color: #344054;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.topbar-user-text span {
+  margin-top: 2px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   ÁREA CONTENIDO
+   ========================================================= */
+
+.content-area {
+  flex: 1;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding: 28px 32px 36px;
+
+  overflow-y: auto;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+  .app-shell {
+    grid-template-columns: 215px 1fr;
+  }
+
+  .content-area {
+    padding: 24px 24px 32px;
+  }
+
+  .topbar {
+    padding: 0 24px;
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  .app-shell {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .sidebar-header,
+  .sidebar-context,
+  .nav-section-title,
+  .nav-item span,
+  .sidebar-user-info {
+    display: none;
+  }
+
+  .sidebar-nav {
+    padding: 14px 10px;
+  }
+
+  .nav-item {
+    justify-content: center;
+
+    padding: 0;
+  }
+
+  .sidebar-footer {
+    flex-direction: column;
+
+    padding: 12px 8px;
+  }
+
+  .content-area {
+    padding: 18px;
+  }
+
+}
+
+
+@media (max-width: 560px) {
+
+  .topbar-user-text {
+    display: none;
+  }
+
+}/* =========================================================
+   SGPA - DASHBOARD V2
+   =========================================================
+   Este archivo complementa el CSS existente.
+   NO sustituye src/styles/index.css.
+   ========================================================= */
+
+
+/* =========================================================
+   COLORES INSTITUCIONALES
+   ========================================================= */
+
+:root {
+  --una-red: #cf2029;
+  --una-red-dark: #b71922;
+  --una-red-soft: rgba(207, 32, 41, 0.07);
+
+  --surface: #ffffff;
+  --surface-soft: #f7f8fa;
+
+  --border-soft: #e6e9ee;
+
+  --text-main: #172033;
+  --text-secondary: #667085;
+  --text-muted: #98a2b3;
+}
+
+
+/* =========================================================
+   CORRECCIÓN GENERAL DE SCROLL
+   ========================================================= */
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+
+  min-width: 0;
+  min-height: 0;
+}
+
+
+body {
+  overflow: hidden !important;
+}
+
+
+/*
+ * La aplicación ocupa exactamente la ventana.
+ *
+ * El sidebar y el contenido manejarán sus
+ * propios scrolls independientemente.
+ */
+
+.app-shell {
+  width: 100%;
+  height: 100vh;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: grid;
+
+  grid-template-columns:
+    245px minmax(0, 1fr);
+
+  overflow: hidden;
+
+  transition:
+    grid-template-columns
+    0.22s ease;
+}
+
+
+/* =========================================================
+   SIDEBAR CONTRAÍDO
+   ========================================================= */
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns:
+    74px minmax(0, 1fr);
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+  position: relative;
+
+  width: 100%;
+  height: 100vh;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  background: #ffffff;
+
+  border-right: 1px solid var(--border-soft);
+}
+
+
+/*
+ * Detalle institucional UNA.
+ */
+
+.sidebar::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  bottom: 0;
+  left: 0;
+
+  width: 3px;
+
+  background: var(--una-red);
+
+  z-index: 10;
+}
+
+
+/* =========================================================
+   HEADER SIDEBAR
+   ========================================================= */
+
+.sidebar-header {
+  flex: 0 0 78px;
+
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 10px;
+
+  padding:
+    10px 14px
+    10px 18px;
+
+  overflow: hidden;
+
+  border-bottom: 1px solid #eef1f5;
+}
+
+
+.sidebar-header-brand {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  overflow: hidden;
+}
+
+
+/*
+ * Logo totalmente hacia la izquierda.
+ */
+
+.sidebar-logo {
+  display: block;
+
+  width: 135px;
+  max-width: 135px;
+
+  height: auto;
+
+  object-fit: contain;
+  object-position: left center;
+}
+
+
+/* =========================================================
+   BOTÓN COLAPSAR
+   ========================================================= */
+
+.sidebar-toggle {
+  flex: 0 0 30px;
+
+  width: 30px;
+  height: 30px;
+
+  margin-left: auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #475467;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.sidebar-toggle:hover {
+  background: #f2f4f7;
+
+  border-color: #d0d5dd;
+
+  color: #101828;
+}
+
+
+.sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+/* =========================================================
+   CONTEXTO DEL SISTEMA
+   ========================================================= */
+
+.sidebar-context {
+  flex: 0 0 auto;
+
+  padding:
+    19px 24px
+    15px;
+}
+
+
+/* =========================================================
+   SCROLL INDEPENDIENTE DEL SIDEBAR
+   ========================================================= */
+
+/*
+ * ESTA ES UNA DE LAS CORRECCIONES IMPORTANTES.
+ *
+ * Si el menú crece más que la altura disponible,
+ * solamente esta zona tendrá scroll.
+ *
+ * Header y usuario quedan siempre visibles.
+ */
+
+.sidebar-nav {
+  flex: 1 1 auto;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding:
+    4px 14px
+    18px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  overscroll-behavior: contain;
+
+  scrollbar-gutter: stable;
+}
+
+
+/* Scrollbar sutil */
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #d0d5dd;
+
+  border-radius: 10px;
+}
+
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #98a2b3;
+}
+
+
+/* =========================================================
+   SECCIONES SIDEBAR
+   ========================================================= */
+
+.nav-section-title {
+  margin:
+    19px 10px
+    8px;
+
+  color: #98a2b3;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+}
+
+
+/* =========================================================
+   ITEM ACTIVO
+   ========================================================= */
+
+.nav-item {
+  position: relative;
+}
+
+
+.nav-item.active::before {
+  content: "";
+
+  position: absolute;
+
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+
+  width: 3px;
+
+  border-radius:
+    0 3px
+    3px 0;
+
+  background: var(--una-red);
+}
+
+
+/* =========================================================
+   FOOTER SIDEBAR
+   ========================================================= */
+
+.sidebar-footer {
+  flex: 0 0 auto;
+
+  background: #ffffff;
+}
+
+
+/* =========================================================
+   SIDEBAR COLAPSADO
+   ========================================================= */
+
+.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+
+  padding:
+    10px 8px;
+}
+
+
+.sidebar-collapsed .sidebar-header-brand,
+.sidebar-collapsed .sidebar-logo,
+.sidebar-collapsed .sidebar-context,
+.sidebar-collapsed .nav-section-title,
+.sidebar-collapsed .nav-item span,
+.sidebar-collapsed .sidebar-user-info {
+  display: none;
+}
+
+
+.sidebar-collapsed .sidebar-toggle {
+  margin-left: 0;
+}
+
+
+.sidebar-collapsed .sidebar-nav {
+  padding:
+    14px 9px
+    18px;
+}
+
+
+.sidebar-collapsed .nav-item {
+  min-height: 44px;
+
+  justify-content: center;
+
+  gap: 0;
+
+  padding: 0;
+}
+
+
+.sidebar-collapsed .nav-item svg {
+  width: 19px;
+  height: 19px;
+}
+
+
+.sidebar-collapsed .sidebar-footer {
+  flex-direction: column;
+
+  justify-content: center;
+
+  gap: 8px;
+
+  padding:
+    12px 8px;
+}
+
+
+.sidebar-collapsed .sidebar-user {
+  justify-content: center;
+}
+
+
+/* =========================================================
+   CONTENIDO PRINCIPAL
+   ========================================================= */
+
+.app-main {
+  width: 100%;
+  height: 100vh;
+
+  min-width: 0;
+  min-height: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   TOPBAR
+   ========================================================= */
+
+.topbar {
+  flex: 0 0 78px;
+
+  height: 78px;
+
+  padding:
+    0 30px;
+
+  background: #ffffff;
+
+  border-bottom:
+    1px solid #e9edf3;
+}
+
+
+.topbar-heading {
+  min-width: 0;
+}
+
+
+.topbar h1 {
+  margin: 0;
+
+  color: #172033;
+
+  font-size: 20px;
+  font-weight: 700;
+}
+
+
+.topbar-subtitle {
+  margin:
+    3px 0
+    0;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+}
+
+
+/* =========================================================
+   SCROLL DEL CONTENIDO
+   ========================================================= */
+
+/*
+ * SEGUNDA CORRECCIÓN IMPORTANTE.
+ *
+ * Este scroll existe tanto si el sidebar
+ * está abierto como si está cerrado.
+ */
+
+.content-area {
+  flex: 1 1 auto;
+
+  width: 100%;
+
+  min-width: 0;
+  min-height: 0;
+
+  padding:
+    28px 30px
+    40px;
+
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  scrollbar-gutter: stable;
+
+  overscroll-behavior: contain;
+}
+
+
+.content-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+
+.content-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+.content-area::-webkit-scrollbar-thumb {
+  background: #d0d5dd;
+
+  border-radius: 10px;
+}
+
+
+.content-area::-webkit-scrollbar-thumb:hover {
+  background: #98a2b3;
+}
+
+
+/* =========================================================
+   HOME
+   ========================================================= */
+
+.home-page {
+  width: 100%;
+}
+
+
+.home-period {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 18px;
+
+  margin-bottom: 24px;
+
+  padding:
+    16px 19px;
+
+  border: 1px solid #e6e9ee;
+  border-radius: 13px;
+
+  background: #ffffff;
+}
+
+
+.home-period-main {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+
+.home-period-icon {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #f2f4f7;
+
+  color: #1f2937;
+}
+
+
+.home-period-icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+
+.home-period span,
+.home-period strong {
+  display: block;
+}
+
+
+.home-period span {
+  color: #7b8798;
+
+  font-size: 11px;
+}
+
+
+.home-period strong {
+  margin-top: 2px;
+
+  color: #253347;
+
+  font-size: 14px;
+}
+
+
+.home-period-campus {
+  color: #667085;
+
+  font-size: 12px;
+}
+
+
+.home-section-header {
+  margin-bottom: 14px;
+}
+
+
+.home-section-header h2 {
+  margin: 0;
+
+  color: #253347;
+
+  font-size: 17px;
+  font-weight: 680;
+}
+
+
+.home-section-header p {
+  margin:
+    5px 0
+    0;
+
+  color: #8b96a7;
+
+  font-size: 12px;
+}
+
+
+.home-module-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 13px;
+}
+
+
+/* =========================================================
+   ICONOS NEUTROS
+   ========================================================= */
+
+/*
+ * Se elimina el fondo azul claro.
+ *
+ * Ahora:
+ * Fondo gris claro
+ * Icono gris oscuro / negro.
+ */
+
+.stat-icon,
+.quick-card-icon,
+.dashboard-stat-icon {
+  background: #f2f4f7 !important;
+
+  color: #1f2937 !important;
+
+  border:
+    1px solid #eaecf0;
+}
+
+
+.stat-icon svg,
+.quick-card-icon svg,
+.dashboard-stat-icon svg {
+  color: #1f2937 !important;
+
+  stroke-width: 1.8;
+}
+
+
+.quick-card:hover .quick-card-icon {
+  background: #e9ecef !important;
+}
+
+
+/* =========================================================
+   DASHBOARD V2
+   ========================================================= */
+
+.dashboard-page {
+  width: 100%;
+}
+
+
+/* =========================================================
+   ENCABEZADO DASHBOARD
+   ========================================================= */
+
+.dashboard-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 20px;
+}
+
+
+.dashboard-page-header h2 {
+  margin: 0;
+
+  color: #172033;
+
+  font-size: 24px;
+  font-weight: 700;
+}
+
+
+.dashboard-page-header p {
+  margin:
+    5px 0
+    0;
+
+  color: #667085;
+
+  font-size: 12.5px;
+}
+
+
+.dashboard-updated {
+  display: flex;
+  align-items: center;
+
+  gap: 6px;
+
+  color: #7b8798;
+
+  font-size: 11px;
+}
+
+
+.dashboard-updated svg {
+  width: 15px;
+  height: 15px;
+}
+
+
+/* =========================================================
+   INDICADORES
+   ========================================================= */
+
+.dashboard-kpis {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 14px;
+
+  margin-bottom: 18px;
+}
+
+
+.dashboard-stat-card {
+  position: relative;
+
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 15px;
+
+  padding:
+    18px 18px
+    18px 21px;
+
+  overflow: hidden;
+
+  border:
+    1px solid #e5e8ed;
+
+  border-radius: 13px;
+
+  background: #ffffff;
+}
+
+
+/*
+ * Todos los indicadores principales
+ * mantienen la orilla roja UNA.
+ */
+
+.dashboard-stat-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: 11px;
+  bottom: 11px;
+  left: 0;
+
+  width: 4px;
+
+  border-radius:
+    0 4px
+    4px 0;
+
+  background: var(--una-red);
+}
+
+
+.dashboard-stat-icon {
+  flex: 0 0 auto;
+
+  width: 43px;
+  height: 43px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+}
+
+
+.dashboard-stat-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+
+.dashboard-stat-data {
+  min-width: 0;
+}
+
+
+.dashboard-stat-data strong,
+.dashboard-stat-data span,
+.dashboard-stat-data small {
+  display: block;
+}
+
+
+.dashboard-stat-data strong {
+  color: #172033;
+
+  font-size: 21px;
+  font-weight: 700;
+}
+
+
+.dashboard-stat-data span {
+  margin-top: 2px;
+
+  color: #475467;
+
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+
+.dashboard-stat-data small {
+  margin-top: 5px;
+
+  color: #98a2b3;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   CARDS SECUNDARIOS
+   ========================================================= */
+
+.dashboard-card {
+  min-width: 0;
+
+  overflow: hidden;
+
+  border:
+    1px solid #e5e8ed;
+
+  border-radius: 13px;
+
+  background: #ffffff;
+}
+
+
+.dashboard-card-header {
+  padding:
+    14px 16px;
+
+  border-bottom:
+    1px solid #eef0f3;
+}
+
+
+.dashboard-card-header h3 {
+  margin: 0;
+
+  color: #253347;
+
+  font-size: 13.5px;
+  font-weight: 680;
+}
+
+
+.dashboard-card-body {
+  padding: 16px;
+}
+
+
+/* =========================================================
+   GRID DE INFORMACIÓN
+   ========================================================= */
+
+.dashboard-insights-grid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(300px, 1.55fr)
+    minmax(210px, 0.9fr)
+    minmax(210px, 0.9fr)
+    minmax(240px, 1.05fr);
+
+  gap: 14px;
+
+  margin-bottom: 18px;
+}
+
+
+/* =========================================================
+   DEMANDA POR CARRERA
+   ========================================================= */
+
+.demand-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 14px;
+}
+
+
+.demand-row {
+  display: grid;
+
+  grid-template-columns:
+    95px minmax(0, 1fr) 42px;
+
+  align-items: center;
+
+  gap: 10px;
+}
+
+
+.demand-name {
+  color: #475467;
+
+  font-size: 11px;
+}
+
+
+.demand-track {
+  height: 9px;
+
+  overflow: hidden;
+
+  border-radius: 10px;
+
+  background: #f0f1f3;
+}
+
+
+.demand-bar {
+  width: var(--demand-width);
+
+  height: 100%;
+
+  border-radius: 10px;
+
+  background:
+    linear-gradient(
+      90deg,
+      #cf2029,
+      #b71922
+    );
+}
+
+
+.demand-value {
+  color: #667085;
+
+  font-size: 10.5px;
+
+  text-align: right;
+}
+
+
+/* =========================================================
+   ESTADO PERIODO
+   ========================================================= */
+
+.period-status {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  margin-bottom: 18px;
+
+  padding:
+    12px 13px;
+
+  border-radius: 9px;
+
+  font-size: 12px;
+  font-weight: 650;
+}
+
+
+.period-status-dot {
+  width: 8px;
+  height: 8px;
+
+  flex: 0 0 auto;
+
+  border-radius: 50%;
+
+  background: currentColor;
+}
+
+
+/* MATRÍCULA ABIERTA */
+
+.period-status-open {
+  border:
+    1px solid #b7e5c0;
+
+  background: #edf9ef;
+
+  color: #287a37;
+}
+
+
+/* MATRÍCULA ADMINISTRATIVA */
+
+.period-status-admin {
+  border:
+    1px solid #f3d58a;
+
+  background: #fff8e5;
+
+  color: #9a6700;
+}
+
+
+/* MATRÍCULA CERRADA */
+
+.period-status-closed {
+  border:
+    1px solid #f3b8bb;
+
+  background: #fff0f1;
+
+  color: #b42318;
+}
+
+
+.period-meta {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+
+  color: #667085;
+
+  font-size: 11px;
+}
+
+
+.period-meta strong {
+  color: #344054;
+}
+
+
+/* =========================================================
+   OFERTA
+   ========================================================= */
+
+.offer-summary {
+  display: flex;
+  flex-direction: column;
+}
+
+
+.offer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding:
+    12px 0;
+
+  border-bottom:
+    1px solid #eef0f3;
+}
+
+
+.offer-row:first-child {
+  padding-top: 0;
+}
+
+
+.offer-row:last-child {
+  padding-bottom: 0;
+
+  border-bottom: none;
+}
+
+
+.offer-row strong {
+  color: #172033;
+
+  font-size: 18px;
+}
+
+
+.offer-row span {
+  color: #667085;
+
+  font-size: 10.5px;
+}
+
+
+/* =========================================================
+   ALERTAS
+   ========================================================= */
+
+.alert-list {
+  margin:
+    -16px;
+
+  display: flex;
+  flex-direction: column;
+}
+
+
+.academic-alert {
+  display: grid;
+
+  grid-template-columns:
+    auto 1fr auto;
+
+  align-items: center;
+
+  gap: 9px;
+
+  padding:
+    13px 15px;
+
+  border-bottom:
+    1px solid #eef0f3;
+}
+
+
+.academic-alert:last-child {
+  border-bottom: none;
+}
+
+
+.academic-alert svg {
+  width: 18px;
+  height: 18px;
+}
+
+
+.academic-alert span {
+  color: #475467;
+
+  font-size: 11px;
+}
+
+
+.alert-warning {
+  color: #d97706;
+}
+
+
+.alert-danger {
+  color: #c62828;
+}
+
+
+.alert-attention {
+  color: #ca8a04;
+}
+
+
+.alert-arrow {
+  color: #98a2b3 !important;
+
+  width: 15px !important;
+  height: 15px !important;
+}
+
+
+/* =========================================================
+   PARTE INFERIOR
+   ========================================================= */
+
+.dashboard-bottom-grid {
+  display: grid;
+
+  grid-template-columns:
+    minmax(0, 2fr)
+    minmax(280px, 0.95fr);
+
+  gap: 14px;
+}
+
+
+/* =========================================================
+   ACTIVIDAD RECIENTE
+   ========================================================= */
+
+.activity-list {
+  margin:
+    -16px;
+}
+
+
+.activity-row {
+  display: grid;
+
+  grid-template-columns:
+    24px 65px minmax(0, 1fr);
+
+  align-items: center;
+
+  gap: 10px;
+
+  padding:
+    11px 16px;
+
+  border-bottom:
+    1px solid #eef0f3;
+}
+
+
+.activity-row:last-child {
+  border-bottom: none;
+}
+
+
+.activity-icon {
+  color: #667085;
+}
+
+
+.activity-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+
+.activity-time {
+  color: #667085;
+
+  font-size: 10.5px;
+}
+
+
+.activity-text {
+  color: #475467;
+
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   ACCIONES DASHBOARD
+   ========================================================= */
+
+.dashboard-actions {
+  display: flex;
+  flex-direction: column;
+
+  gap: 9px;
+}
+
+
+.dashboard-action {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    auto 1fr auto;
+
+  align-items: center;
+
+  gap: 10px;
+
+  padding:
+    12px 13px;
+
+  border:
+    1px solid #e1e5ea;
+
+  border-radius: 9px;
+
+  background: #ffffff;
+
+  color: #344054;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+
+.dashboard-action:hover {
+  border-color: #cdd3dc;
+
+  background: #f8f9fb;
+}
+
+
+.dashboard-action > svg:first-child {
+  width: 17px;
+  height: 17px;
+
+  color: #344054;
+}
+
+
+.dashboard-action span {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+
+.dashboard-action .action-arrow {
+  width: 14px;
+  height: 14px;
+
+  color: #98a2b3;
+}
+
+
+/* =========================================================
+   HOME / QUICK CARDS
+   ========================================================= */
+
+.home-module-grid .quick-card {
+  position: relative;
+
+  overflow: hidden;
+}
+
+
+.home-module-grid .quick-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: 11px;
+  bottom: 11px;
+  left: 0;
+
+  width: 3px;
+
+  border-radius:
+    0 4px
+    4px 0;
+
+  background: var(--una-red);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1400px) {
+
+  .dashboard-insights-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+@media (max-width: 1200px) {
+
+  .home-module-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+
+  .dashboard-kpis {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+@media (max-width: 900px) {
+
+  .app-shell {
+    grid-template-columns:
+      220px minmax(0, 1fr);
+  }
+
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns:
+      70px minmax(0, 1fr);
+  }
+
+
+  .content-area {
+    padding:
+      22px 20px
+      34px;
+  }
+
+
+  .dashboard-bottom-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  /*
+   * Anulamos reglas responsive antiguas
+   * que ocultaban siempre el sidebar.
+   *
+   * Ahora solo se oculta con
+   * .sidebar-collapsed.
+   */
+
+  .app-shell {
+    grid-template-columns:
+      210px minmax(0, 1fr);
+  }
+
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns:
+      66px minmax(0, 1fr);
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .sidebar-header {
+    display: flex;
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .sidebar-logo {
+    display: block;
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .sidebar-context {
+    display: block;
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .nav-section-title {
+    display: block;
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .nav-item {
+    justify-content: flex-start;
+
+    padding:
+      0 12px;
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .nav-item span {
+    display: inline;
+  }
+
+
+  .app-shell:not(.sidebar-collapsed)
+  .sidebar-user-info {
+    display: block;
+  }
+
+
+  .dashboard-insights-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .dashboard-page-header {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+}
+
+
+@media (max-width: 600px) {
+
+  .app-shell {
+    grid-template-columns:
+      195px minmax(0, 1fr);
+  }
+
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns:
+      62px minmax(0, 1fr);
+  }
+
+
+  .home-module-grid,
+  .dashboard-kpis {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .home-period {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+
+  .content-area {
+    padding:
+      18px 14px
+      28px;
+  }
+
+
+  .topbar {
+    padding:
+      0 16px;
+  }
+
+}
+
+/* =========================================================
+   DASHBOARD DE MÓDULOS
+   ========================================================= */
+
+.modules-dashboard {
+  width: 100%;
+}
+
+
+/* =========================================================
+   ENCABEZADO
+   ========================================================= */
+
+.modules-dashboard-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-bottom: 24px;
+}
+
+
+.modules-dashboard-label {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: var(--una-red);
+
+  font-size: 10.5px;
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+}
+
+
+.modules-dashboard-header h2 {
+  margin: 0;
+
+  color: #172033;
+
+  font-size: 25px;
+  font-weight: 700;
+
+  letter-spacing: -0.4px;
+}
+
+
+.modules-dashboard-header p {
+  margin:
+    6px 0
+    0;
+
+  color: #7b8798;
+
+  font-size: 12.5px;
+}
+
+
+/* =========================================================
+   GRID DE MÓDULOS
+   ========================================================= */
+
+.modules-dashboard-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+
+  gap: 18px;
+}
+
+
+/* =========================================================
+   MODULE CARD
+   ========================================================= */
+
+.module-card {
+  position: relative;
+
+  min-width: 0;
+  min-height: 190px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  padding:
+    24px 24px
+    20px 27px;
+
+  overflow: hidden;
+
+  border:
+    1px solid #e2e6eb;
+
+  border-radius: 15px;
+
+  background: #ffffff;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 2px 5px
+    rgba(15, 23, 42, 0.015);
+
+  transition:
+    transform 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    background-color 0.22s ease;
+}
+
+
+/* =========================================================
+   LÍNEA ROJA
+   ========================================================= */
+
+.module-card-accent {
+  position: absolute;
+
+  top: 17px;
+  bottom: 17px;
+  left: 0;
+
+  width: 4px;
+
+  border-radius:
+    0 4px
+    4px 0;
+
+  background:
+    var(--una-red);
+
+  transition:
+    top 0.22s ease,
+    bottom 0.22s ease,
+    width 0.22s ease;
+}
+
+
+/* =========================================================
+   ICONO
+   ========================================================= */
+
+.module-card-icon {
+  width: 48px;
+  height: 48px;
+
+  flex: 0 0 auto;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 20px;
+
+  border:
+    1px solid #e5e7eb;
+
+  border-radius: 11px;
+
+  background: #f3f4f6;
+
+  color: #1f2937;
+
+  transition:
+    transform 0.22s ease,
+    background-color 0.22s ease,
+    border-color 0.22s ease;
+}
+
+
+.module-card-icon svg {
+  width: 22px;
+  height: 22px;
+
+  stroke-width: 1.7;
+
+  transition:
+    transform 0.22s ease;
+}
+
+
+/* =========================================================
+   TEXTO
+   ========================================================= */
+
+.module-card-content {
+  min-width: 0;
+}
+
+
+.module-card-content strong {
+  display: block;
+
+  color: #1d2939;
+
+  font-size: 15px;
+  font-weight: 650;
+
+  line-height: 1.25;
+}
+
+
+.module-card-content p {
+  max-width: 290px;
+
+  margin:
+    7px 0
+    0;
+
+  color: #7b8798;
+
+  font-size: 11.5px;
+
+  line-height: 1.55;
+}
+
+
+/* =========================================================
+   ACCIÓN
+   ========================================================= */
+
+.module-card-action {
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+
+  margin-top: auto;
+  padding-top: 18px;
+
+  color: #667085;
+
+  font-size: 11px;
+  font-weight: 600;
+
+  transition:
+    color 0.22s ease;
+}
+
+
+.module-card-action svg {
+  width: 14px;
+  height: 14px;
+
+  transition:
+    transform 0.22s ease;
+}
+
+
+/* =========================================================
+   HOVER
+   ========================================================= */
+
+/*
+ * Animación deliberadamente minimalista:
+ *
+ * - sube solamente 3px
+ * - sombra suave
+ * - línea UNA se hace ligeramente más grande
+ * - icono se mueve muy poco
+ * - flecha avanza
+ */
+
+.module-card:hover {
+  transform:
+    translateY(-3px);
+
+  border-color:
+    #d3d8df;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 10px 24px
+    rgba(15, 23, 42, 0.065);
+}
+
+
+.module-card:hover
+.module-card-accent {
+  top: 11px;
+  bottom: 11px;
+
+  width: 5px;
+}
+
+
+.module-card:hover
+.module-card-icon {
+  transform:
+    translateY(-1px);
+
+  border-color:
+    #d6dae0;
+
+  background:
+    #eceef1;
+}
+
+
+.module-card:hover
+.module-card-icon svg {
+  transform:
+    scale(1.04);
+}
+
+
+.module-card:hover
+.module-card-action {
+  color:
+    #1f2937;
+}
+
+
+.module-card:hover
+.module-card-action svg {
+  transform:
+    translateX(4px);
+}
+
+
+/* =========================================================
+   CLICK
+   ========================================================= */
+
+.module-card:active {
+  transform:
+    translateY(-1px);
+
+  box-shadow:
+    0 5px 14px
+    rgba(15, 23, 42, 0.05);
+}
+
+
+/* =========================================================
+   ACCESIBILIDAD TECLADO
+   ========================================================= */
+
+.module-card:focus-visible {
+  outline: none;
+
+  border-color:
+    #9ca3af;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(107, 114, 128, 0.12);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1250px) {
+
+  .modules-dashboard-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  .module-card {
+    min-height: 175px;
+  }
+
+}
+
+
+@media (max-width: 620px) {
+
+  .modules-dashboard-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .module-card {
+    min-height: 165px;
+  }
+
+}/* =========================================================
+   BIENVENIDA
+   ========================================================= */
+
+.dashboard-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 30px;
+
+  padding: 26px 28px;
+
+  border: 1px solid #e6ebf1;
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 5px 18px
+    rgba(15, 23, 42, 0.025);
+}
+
+
+.welcome-label {
+  display: block;
+
+  margin-bottom: 7px;
+
+  color: #1769e8;
+
+  font-size: 11px;
+  font-weight: 700;
+
+  letter-spacing: 0.7px;
+
+  text-transform: uppercase;
+}
+
+
+.dashboard-welcome h2 {
+  margin: 0;
+
+  color: #172033;
+
+  font-size: 25px;
+  font-weight: 680;
+
+  letter-spacing: -0.5px;
+}
+
+
+.dashboard-welcome p {
+  margin: 7px 0 0;
+
+  color: #667085;
+
+  font-size: 13px;
+}
+
+
+.welcome-badge {
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  padding: 11px 14px;
+
+  border: 1px solid #dce8fa;
+  border-radius: 11px;
+
+  background: #f5f9ff;
+}
+
+
+.welcome-badge > svg {
+  width: 20px;
+  height: 20px;
+
+  color: #1769e8;
+}
+
+
+.welcome-badge span,
+.welcome-badge strong {
+  display: block;
+}
+
+
+.welcome-badge span {
+  color: #7b8798;
+
+  font-size: 10.5px;
+}
+
+
+.welcome-badge strong {
+  margin-top: 1px;
+
+  color: #344054;
+
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   ESTADÍSTICAS
+   ========================================================= */
+
+.dashboard-stats {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 16px;
+
+  margin-top: 20px;
+}
+
+
+/* =========================================================
+   SECCIÓN
+   ========================================================= */
+
+.dashboard-section {
+  margin-top: 25px;
+}
+
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 13px;
+}
+
+
+.section-heading h3 {
+  margin: 0;
+
+  color: #253347;
+
+  font-size: 15px;
+  font-weight: 650;
+}
+
+
+.section-heading p {
+  margin: 4px 0 0;
+
+  color: #8b96a7;
+
+  font-size: 11.5px;
+}
+
+
+/* =========================================================
+   ACCESOS
+   ========================================================= */
+
+.quick-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 13px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+  .dashboard-stats {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+}
+
+
+@media (max-width: 760px) {
+
+  .dashboard-welcome {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+  .quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+
+@media (max-width: 560px) {
+
+  .dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+
+}/* =========================================================
+   STAT CARD
+   ========================================================= */
+
+.stat-card {
+  min-width: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+
+  padding: 18px;
+
+  border: 1px solid #e7ebf0;
+  border-radius: 14px;
+
+  background: #ffffff;
+}
+
+
+.stat-icon {
+  flex: 0 0 auto;
+
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #f0f5fd;
+
+  color: #1769e8;
+}
+
+
+.stat-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+
+.stat-card span,
+.stat-card strong,
+.stat-card small {
+  display: block;
+}
+
+
+.stat-card span {
+  color: #697586;
+
+  font-size: 11.5px;
+}
+
+
+.stat-card strong {
+  margin-top: 2px;
+
+  color: #202b3c;
+
+  font-size: 21px;
+  font-weight: 700;
+}
+
+
+.stat-card small {
+  margin-top: 1px;
+
+  color: #a0a9b6;
+
+  font-size: 10px;
+}
+
+
+/* =========================================================
+   QUICK CARD
+   ========================================================= */
+
+.quick-card {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    auto 1fr auto;
+
+  align-items: center;
+
+  gap: 13px;
+
+  padding: 16px;
+
+  border: 1px solid #e6ebf1;
+  border-radius: 13px;
+
+  background: #ffffff;
+
+  text-align: left;
+
+  cursor: pointer;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+.quick-card:hover {
+  border-color: #ccd9eb;
+
+  box-shadow:
+    0 5px 14px
+    rgba(15, 23, 42, 0.04);
+
+  transform: translateY(-1px);
+}
+
+
+.quick-card-icon {
+  width: 38px;
+  height: 38px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #f3f6fb;
+
+  color: #1769e8;
+}
+
+
+.quick-card-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+
+.quick-card strong,
+.quick-card span {
+  display: block;
+}
+
+
+.quick-card strong {
+  color: #344054;
+
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+
+.quick-card span {
+  margin-top: 3px;
+
+  color: #8b96a7;
+
+  font-size: 10.5px;
+}
+
+
+.quick-arrow {
+  width: 16px;
+  height: 16px;
+
+  color: #98a2b3;
+}
+
+
+/* =========================================================
+   PLACEHOLDER
+   ========================================================= */
+
+.module-placeholder {
+  min-height: 420px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 50px;
+
+  border: 1px solid #e6ebf1;
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  text-align: center;
+}
+
+
+.placeholder-icon {
+  width: 52px;
+  height: 52px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 15px;
+
+  border-radius: 13px;
+
+  background: #f2f5f9;
+
+  color: #667085;
+}
+
+
+.placeholder-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+
+.module-placeholder h2 {
+  margin: 0;
+
+  color: #253347;
+
+  font-size: 20px;
+}
+
+
+.module-placeholder p {
+  max-width: 430px;
+
+  margin: 8px 0 0;
+
+  color: #7b8798;
+
+  font-size: 12.5px;
+
+  line-height: 1.6;
+}

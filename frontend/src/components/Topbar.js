@@ -30,7 +30,7 @@ export function Topbar({
       <div class="topbar-heading">
 
         <h1 id="pageTitle">
-          SGPA
+          Sistema de Gestión y Proyección Académica
         </h1>
 
         <p class="topbar-subtitle">

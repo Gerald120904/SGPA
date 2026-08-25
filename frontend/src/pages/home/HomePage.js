@@ -379,7 +379,7 @@ export function HomePage() {
         <div>
 
           <h2>
-            SGPA
+            Dashboard
           </h2>
 
           <p>
