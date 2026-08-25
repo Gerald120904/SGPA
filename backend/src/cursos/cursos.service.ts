@@ -5,10 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Carrera } from '../carreras/entities/carrera.entity';
+import { IsNull, Repository } from 'typeorm';
+import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { ActualizarCursoDto } from './dto/actualizar-curso.dto';
 import { CrearCursoDto } from './dto/crear-curso.dto';
+import { ListarAsignaturasDisponiblesDto } from './dto/listar-asignaturas-disponibles.dto';
 import { Curso } from './entities/curso.entity';
 
 @Injectable()
@@ -16,9 +17,69 @@ export class CursosService {
   constructor(
     @InjectRepository(Curso)
     private readonly cursoRepository: Repository<Curso>,
-    @InjectRepository(Carrera)
-    private readonly carreraRepository: Repository<Carrera>,
+    @InjectRepository(PlanAsignatura)
+    private readonly planAsignaturaRepository: Repository<PlanAsignatura>,
   ) {}
+
+  private async obtenerAsignaturaFuente(
+    planAsignaturaId: number,
+  ): Promise<PlanAsignatura> {
+    const asignatura = await this.planAsignaturaRepository.findOne({
+      where: {
+        id: planAsignaturaId,
+      },
+      relations: {
+        planEstudio: {
+          carrera: true,
+        },
+        curso: true,
+      },
+    });
+
+    if (!asignatura) {
+      throw new NotFoundException(
+        'La asignatura seleccionada no existe en el plan de estudio.',
+      );
+    }
+
+    if (!asignatura.activo) {
+      throw new BadRequestException(
+        'No se puede crear un curso desde una asignatura inactiva.',
+      );
+    }
+
+    if (!asignatura.planEstudio?.activo) {
+      throw new BadRequestException(
+        'No se puede crear un curso desde un plan de estudio inactivo.',
+      );
+    }
+
+    if (!asignatura.planEstudio.carrera?.activo) {
+      throw new BadRequestException(
+        'La carrera asociada al plan se encuentra inactiva.',
+      );
+    }
+
+    if (asignatura.cursoId !== null) {
+      throw new ConflictException(
+        'Esta asignatura del plan ya está vinculada a un curso.',
+      );
+    }
+
+    if (!asignatura.codigoReferencia?.trim()) {
+      throw new BadRequestException(
+        'La asignatura del plan no tiene un código válido.',
+      );
+    }
+
+    if (!asignatura.nombreReferencia?.trim()) {
+      throw new BadRequestException(
+        'La asignatura del plan no tiene un nombre válido.',
+      );
+    }
+
+    return asignatura;
+  }
 
   private async obtenerEntidadPorId(id: number): Promise<Curso> {
     const curso = await this.cursoRepository.findOne({
@@ -33,46 +94,6 @@ export class CursosService {
     }
 
     return curso;
-  }
-
-  private async obtenerCarreras(carreraIds: number[]): Promise<Carrera[]> {
-    const ids = [...new Set(carreraIds)];
-
-    if (ids.length === 0) {
-      throw new BadRequestException(
-        'El curso debe pertenecer al menos a una carrera.',
-      );
-    }
-
-    const carreras = await this.carreraRepository.find({
-      where: {
-        id: In(ids),
-      },
-      order: {
-        nombre: 'ASC',
-      },
-    });
-
-    if (carreras.length !== ids.length) {
-      throw new BadRequestException(
-        'Una o más carreras seleccionadas no existen.',
-      );
-    }
-
-    return carreras;
-  }
-
-  private async validarCodigoDuplicado(
-    codigo: string,
-    excluirId?: number,
-  ): Promise<void> {
-    const existente = await this.cursoRepository.findOne({
-      where: { codigo },
-    });
-
-    if (existente && existente.id !== excluirId) {
-      throw new ConflictException('El código del curso ya está registrado.');
-    }
   }
 
   private relanzarErrorPersistencia(error: unknown): never {
@@ -103,86 +124,127 @@ export class CursosService {
     });
   }
 
+  async listarAsignaturasDisponibles(
+    filtros: ListarAsignaturasDisponiblesDto,
+  ): Promise<PlanAsignatura[]> {
+    return this.planAsignaturaRepository.find({
+      where: {
+        activo: true,
+        cursoId: IsNull(),
+        ...(filtros.planId !== undefined
+          ? {
+              planEstudioId: filtros.planId,
+            }
+          : {}),
+        ...(filtros.nivel !== undefined
+          ? {
+              nivel: filtros.nivel,
+            }
+          : {}),
+        ...(filtros.ciclo !== undefined
+          ? {
+              ciclo: filtros.ciclo,
+            }
+          : {}),
+        planEstudio: {
+          activo: true,
+          ...(filtros.carreraId !== undefined
+            ? {
+                carreraId: filtros.carreraId,
+              }
+            : {}),
+        },
+      },
+      relations: {
+        planEstudio: {
+          carrera: true,
+        },
+        bloque: true,
+      },
+      order: {
+        nivel: 'ASC',
+        ciclo: 'ASC',
+        orden: 'ASC',
+      },
+    });
+  }
+
   async obtenerPorId(id: number): Promise<Curso> {
     return this.obtenerEntidadPorId(id);
   }
 
   async crear(dto: CrearCursoDto): Promise<Curso> {
-    const codigo = dto.codigo.trim().toUpperCase();
-    const nombre = dto.nombre.trim();
+    const asignatura = await this.obtenerAsignaturaFuente(
+      dto.planAsignaturaId,
+    );
+
+    const codigo = asignatura.codigoReferencia!.trim().toUpperCase();
+    const nombre = asignatura.nombreReferencia!.trim();
     const descripcion = dto.descripcion?.trim() || null;
+    const carrera = asignatura.planEstudio.carrera;
 
-    if (!codigo) {
-      throw new BadRequestException('El código del curso es obligatorio.');
-    }
-
-    if (!nombre) {
-      throw new BadRequestException('El nombre del curso es obligatorio.');
-    }
-
-    await this.validarCodigoDuplicado(codigo);
-    const carreras = await this.obtenerCarreras(dto.carreraIds);
-
-    const curso = this.cursoRepository.create({
-      codigo,
-      nombre,
-      descripcion,
-      activo: true,
-      carreras,
+    let curso = await this.cursoRepository.findOne({
+      where: {
+        codigo,
+      },
+      relations: {
+        carreras: true,
+      },
     });
 
-    try {
-      const guardado = await this.cursoRepository.save(curso);
-      return this.obtenerEntidadPorId(guardado.id);
-    } catch (error) {
-      this.relanzarErrorPersistencia(error);
+    if (curso) {
+      if (curso.nombre.trim().toLowerCase() !== nombre.toLowerCase()) {
+        throw new ConflictException(
+          `Ya existe el curso ${codigo}, pero tiene un nombre diferente.`,
+        );
+      }
+
+      if (!curso.activo) {
+        throw new BadRequestException(
+          'El curso correspondiente ya existe, pero se encuentra inactivo.',
+        );
+      }
+
+      const yaPerteneceCarrera = (curso.carreras ?? []).some(
+        (item) => item.id === carrera.id,
+      );
+
+      if (!yaPerteneceCarrera) {
+        curso.carreras = [...(curso.carreras ?? []), carrera];
+        curso = await this.cursoRepository.save(curso);
+      }
+    } else {
+      const nuevoCurso = this.cursoRepository.create({
+        codigo,
+        nombre,
+        descripcion,
+        activo: true,
+        carreras: [carrera],
+      });
+
+      try {
+        curso = await this.cursoRepository.save(nuevoCurso);
+      } catch (error) {
+        this.relanzarErrorPersistencia(error);
+      }
     }
+
+    asignatura.cursoId = curso.id;
+    asignatura.curso = curso;
+
+    await this.planAsignaturaRepository.save(asignatura);
+
+    return this.obtenerEntidadPorId(curso.id);
   }
 
   async actualizar(id: number, dto: ActualizarCursoDto): Promise<Curso> {
     const curso = await this.obtenerEntidadPorId(id);
 
-    const codigo =
-      dto.codigo !== undefined ? dto.codigo.trim().toUpperCase() : undefined;
-    const nombre = dto.nombre !== undefined ? dto.nombre.trim() : undefined;
-
-    if (codigo !== undefined && !codigo) {
-      throw new BadRequestException(
-        'El código del curso no puede estar vacío.',
-      );
-    }
-
-    if (nombre !== undefined && !nombre) {
-      throw new BadRequestException(
-        'El nombre del curso no puede estar vacío.',
-      );
-    }
-
-    if (codigo !== undefined) {
-      await this.validarCodigoDuplicado(codigo, id);
-    }
-
-    if (codigo !== undefined) {
-      curso.codigo = codigo;
-    }
-
-    if (nombre !== undefined) {
-      curso.nombre = nombre;
-    }
-
     if (dto.descripcion !== undefined) {
       curso.descripcion = dto.descripcion?.trim() || null;
     }
 
-    if (dto.carreraIds !== undefined) {
-      curso.carreras = await this.obtenerCarreras(dto.carreraIds);
-    }
-
-    try {
-      await this.cursoRepository.save(curso);
-    } catch (error) {
-      this.relanzarErrorPersistencia(error);
-    }
+    await this.cursoRepository.save(curso);
 
     return this.obtenerEntidadPorId(id);
   }

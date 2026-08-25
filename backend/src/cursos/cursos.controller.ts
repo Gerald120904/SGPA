@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { RolSistema } from '../auth/constants/roles.constants';
@@ -15,6 +16,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ActualizarCursoDto } from './dto/actualizar-curso.dto';
 import { CambiarEstadoCursoDto } from './dto/cambiar-estado-curso.dto';
 import { CrearCursoDto } from './dto/crear-curso.dto';
+import { ListarAsignaturasDisponiblesDto } from './dto/listar-asignaturas-disponibles.dto';
 import { CursosService } from './cursos.service';
 
 @Controller('cursos')
@@ -26,6 +28,13 @@ export class CursosController {
   @Get()
   listar() {
     return this.cursosService.listar();
+  }
+
+  @Get('asignaturas-disponibles')
+  listarAsignaturasDisponibles(
+    @Query() filtros: ListarAsignaturasDisponiblesDto,
+  ) {
+    return this.cursosService.listarAsignaturasDisponibles(filtros);
   }
 
   @Get(':id')

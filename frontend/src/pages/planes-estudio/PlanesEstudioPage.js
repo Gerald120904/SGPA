@@ -31,7 +31,6 @@ import {
   reemplazarAsignaturasSalida,
 } from "../../services/salidas-academicas.service.js";
 import { listarCarreras } from "../../services/carreras.service.js";
-import { listarCursos } from "../../services/cursos.service.js";
 import { obtenerResumenPlan } from "../../services/plan-resumen.service.js";
 import { validarPlanEstudio } from "../../services/plan-validaciones.service.js";
 import {
@@ -47,8 +46,6 @@ import { renderizarIconos } from "../../utils/icons.js";
 let planes = [];
 let carrerasDisponibles = [];
 let asignaturasPlan = [];
-let cursosDisponibles = [];
-let filasCargaRapida = [];
 let filasRequisitosRapidos = [];
 let requisitosPlan = [];
 let bloquesPlan = [];
@@ -639,14 +636,12 @@ async function abrirDetallePlan(plan) {
   try {
     const [
       resultadoAsignaturas,
-      resultadoCursos,
       resultadoRequisitos,
       resultadoBloques,
       resultadoSalidas,
       resultadoResumen,
     ] = await Promise.all([
       listarPlanAsignaturas(plan.id),
-      listarCursos(),
       listarPlanRequisitos(plan.id),
       listarBloquesPlan(plan.id),
       listarSalidasAcademicas(plan.id),
@@ -657,12 +652,6 @@ async function abrirDetallePlan(plan) {
       throw new Error(
         resultadoAsignaturas?.message ||
           "No fue posible consultar las asignaturas del plan.",
-      );
-    }
-
-    if (!resultadoCursos?.ok) {
-      throw new Error(
-        resultadoCursos?.message || "No fue posible consultar los cursos.",
       );
     }
 
@@ -696,9 +685,6 @@ async function abrirDetallePlan(plan) {
 
     asignaturasPlan = Array.isArray(resultadoAsignaturas.asignaturas)
       ? resultadoAsignaturas.asignaturas
-      : [];
-    cursosDisponibles = Array.isArray(resultadoCursos.cursos)
-      ? resultadoCursos.cursos
       : [];
     requisitosPlan = Array.isArray(resultadoRequisitos.requisitos)
       ? resultadoRequisitos.requisitos
@@ -740,8 +726,6 @@ function volverListadoPlanes() {
   filtroBloquePlan = "";
   planSeleccionado = null;
   asignaturasPlan = [];
-  cursosDisponibles = [];
-  filasCargaRapida = [];
   filasRequisitosRapidos = [];
   requisitosPlan = [];
   bloquesPlan = [];
@@ -760,16 +744,10 @@ function volverListadoPlanes() {
 }
 
 function obtenerDatosAsignatura(asignatura) {
-  if (asignatura.curso) {
-    return {
-      codigo: asignatura.curso.codigo,
-      nombre: asignatura.curso.nombre,
-    };
-  }
-
   return {
-    codigo: asignatura.codigoReferencia || "",
-    nombre: asignatura.nombreReferencia || "Espacio del plan",
+    codigo: asignatura.codigoReferencia || asignatura.curso?.codigo || "",
+    nombre:
+      asignatura.nombreReferencia || asignatura.curso?.nombre || "Sin nombre",
   };
 }
 
@@ -2124,42 +2102,74 @@ function renderizarGrupoAsignaturas(grupo) {
   `;
 }
 
-function obtenerCursosCargaRapida() {
-  if (!planSeleccionado) {
-    return [];
-  }
+function crearFilaCargaRapidaAsignatura(indice) {
+  return `
+    <div class="plan-bulk-row" data-asignatura-carga>
+      <label>
+        <span>Código</span>
+        <input
+          type="text"
+          class="carga-asignatura-codigo"
+          maxlength="30"
+          placeholder="EIF101"
+          required
+        >
+      </label>
 
-  const idsYaUtilizados = new Set(
-    asignaturasPlan
-      .filter((asignatura) => asignatura.cursoId)
-      .map((asignatura) => Number(asignatura.cursoId)),
-  );
+      <label>
+        <span>Nombre</span>
+        <input
+          type="text"
+          class="carga-asignatura-nombre"
+          maxlength="150"
+          placeholder="Programación I"
+          required
+        >
+      </label>
 
-  return cursosDisponibles
-    .filter((curso) => {
-      if (!curso.activo || idsYaUtilizados.has(Number(curso.id))) {
-        return false;
-      }
+      <label>
+        <span>Créditos</span>
+        <input
+          type="number"
+          class="carga-asignatura-creditos"
+          min="0"
+          max="30"
+          value="3"
+          required
+        >
+      </label>
 
-      return (
-        Array.isArray(curso.carreras) &&
-        curso.carreras.some(
-          (carrera) =>
-            Number(carrera.id) === Number(planSeleccionado.carreraId),
-        )
-      );
-    })
-    .sort((a, b) => String(a.codigo).localeCompare(String(b.codigo), "es"));
-}
+      <label>
+        <span>Orden</span>
+        <input
+          type="number"
+          class="carga-asignatura-orden"
+          min="1"
+          max="999"
+          value="${indice + 1}"
+          required
+        >
+      </label>
 
-function crearFilaCargaRapida() {
-  return {
-    id: `${Date.now()}-${Math.random()}`,
-    cursoId: "",
-    creditos: "",
-    orden: filasCargaRapida.length + 1,
-    tipo: "OBLIGATORIA",
-  };
+      <label>
+        <span>Tipo</span>
+        <select class="carga-asignatura-tipo" required>
+          <option value="OBLIGATORIA">Obligatoria</option>
+          <option value="OPTATIVA">Optativa</option>
+          <option value="OTRA">Otra</option>
+        </select>
+      </label>
+
+      <button
+        type="button"
+        class="planes-icon-button carga-eliminar-fila"
+        title="Eliminar fila"
+        aria-label="Eliminar fila"
+      >
+        <i data-lucide="trash-2" aria-hidden="true"></i>
+      </button>
+    </div>
+  `;
 }
 
 function abrirCargaRapida() {
@@ -2169,7 +2179,6 @@ function abrirCargaRapida() {
     return;
   }
 
-  filasCargaRapida = [crearFilaCargaRapida()];
   renderizarCargaRapida();
 
   if (!dialog.open) {
@@ -2211,15 +2220,41 @@ function renderizarCargaRapida() {
         role="alert"
       ></div>
 
-      <div class="carga-rapida-config">
+      <div class="plan-form-grid carga-rapida-config">
         <label>
+          <span>Nivel / Año</span>
+          <input
+            id="cargaAsignaturaNivel"
+            type="number"
+            min="1"
+            max="20"
+            value="1"
+            required
+          >
+        </label>
+
+        <label>
+          <span>Ciclo / Semestre</span>
+          <input
+            id="cargaAsignaturaCiclo"
+            type="number"
+            min="1"
+            max="20"
+            value="1"
+            required
+          >
+        </label>
+
+        <label class="plan-form-wide">
           <span>Bloque</span>
-          <select id="cargaRapidaBloque">
+          <select id="cargaAsignaturaBloque">
             <option value="">Sin bloque</option>
             ${bloques
               .map(
                 (bloque) => `
                   <option value="${bloque.id}">
+                    ${escapeHtml(bloque.codigo)}
+                    -
                     ${escapeHtml(bloque.nombre)}
                   </option>
                 `,
@@ -2227,53 +2262,27 @@ function renderizarCargaRapida() {
               .join("")}
           </select>
         </label>
-
-        <label>
-          <span>Nivel</span>
-          <input
-            id="cargaRapidaNivel"
-            type="number"
-            min="1"
-            max="20"
-            value="1"
-          >
-        </label>
-
-        <label>
-          <span>Ciclo</span>
-          <input
-            id="cargaRapidaCiclo"
-            type="number"
-            min="1"
-            max="20"
-            value="1"
-          >
-        </label>
       </div>
 
-      <div class="carga-rapida-table-wrapper">
-        <table class="carga-rapida-table">
-          <thead>
-            <tr>
-              <th>Curso</th>
-              <th>Créditos</th>
-              <th>Orden</th>
-              <th>Tipo</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="cargaRapidaBody"></tbody>
-        </table>
+      <div class="plan-bulk-header">
+        <div>
+          <h4>Asignaturas</h4>
+          <p>Agregue las asignaturas que pertenecen a este nivel y ciclo.</p>
+        </div>
+
+        <button
+          id="agregarFilaCargaAsignatura"
+          class="planes-secondary-button"
+          type="button"
+        >
+          <i data-lucide="plus" aria-hidden="true"></i>
+          Agregar fila
+        </button>
       </div>
 
-      <button
-        id="agregarFilaCargaRapida"
-        class="planes-secondary-button"
-        type="button"
-      >
-        <i data-lucide="plus" aria-hidden="true"></i>
-        Agregar fila
-      </button>
+      <div id="cargaAsignaturasFilas" class="plan-bulk-rows">
+        ${crearFilaCargaRapidaAsignatura(0)}
+      </div>
 
       <footer class="plan-dialog-footer">
         <button
@@ -2294,7 +2303,6 @@ function renderizarCargaRapida() {
     </div>
   `;
 
-  renderizarFilasCargaRapida();
   renderizarIconos();
 
   const cerrar = () => document.getElementById("asignaturaDialog")?.close();
@@ -2306,169 +2314,70 @@ function renderizarCargaRapida() {
     .getElementById("cancelarCargaRapida")
     ?.addEventListener("click", cerrar);
   document
-    .getElementById("agregarFilaCargaRapida")
-    ?.addEventListener("click", agregarFilaCargaRapida);
+    .getElementById("agregarFilaCargaAsignatura")
+    ?.addEventListener("click", () => {
+      const filasContainer = document.getElementById("cargaAsignaturasFilas");
+
+      if (!filasContainer) {
+        return;
+      }
+
+      const total = filasContainer.querySelectorAll(
+        "[data-asignatura-carga]",
+      ).length;
+
+      if (total >= 200) {
+        const errorBox = document.getElementById("cargaRapidaError");
+
+        if (errorBox) {
+          errorBox.textContent =
+            "La carga rápida admite hasta 200 asignaturas.";
+          errorBox.classList.remove("hidden");
+        }
+        return;
+      }
+
+      filasContainer.insertAdjacentHTML(
+        "beforeend",
+        crearFilaCargaRapidaAsignatura(total),
+      );
+      renderizarIconos();
+    });
+
+  document
+    .getElementById("cargaAsignaturasFilas")
+    ?.addEventListener("click", (event) => {
+      const button = event.target.closest(".carga-eliminar-fila");
+
+      if (!button) {
+        return;
+      }
+
+      const filasContainer = document.getElementById("cargaAsignaturasFilas");
+      const filas = filasContainer?.querySelectorAll(
+        "[data-asignatura-carga]",
+      );
+
+      if (!filasContainer || !filas || filas.length <= 1) {
+        return;
+      }
+
+      button.closest("[data-asignatura-carga]")?.remove();
+    });
   document
     .getElementById("guardarCargaRapida")
     ?.addEventListener("click", guardarCargaRapida);
 }
 
-function renderizarFilasCargaRapida() {
-  const body = document.getElementById("cargaRapidaBody");
-
-  if (!body) {
-    return;
-  }
-
-  const cursos = obtenerCursosCargaRapida();
-
-  body.innerHTML = filasCargaRapida
-    .map(
-      (fila) => `
-        <tr data-fila-carga="${fila.id}">
-          <td>
-            <select data-campo="cursoId">
-              <option value="">Seleccionar curso</option>
-              ${cursos
-                .map(
-                  (curso) => `
-                    <option
-                      value="${curso.id}"
-                      ${
-                        Number(fila.cursoId) === Number(curso.id)
-                          ? "selected"
-                          : ""
-                      }
-                    >
-                      ${escapeHtml(curso.codigo)} - ${escapeHtml(curso.nombre)}
-                    </option>
-                  `,
-                )
-                .join("")}
-            </select>
-          </td>
-
-          <td>
-            <input
-              data-campo="creditos"
-              type="number"
-              min="0"
-              max="30"
-              value="${fila.creditos}"
-              placeholder="0"
-            >
-          </td>
-
-          <td>
-            <input
-              data-campo="orden"
-              type="number"
-              min="1"
-              max="999"
-              value="${fila.orden}"
-            >
-          </td>
-
-          <td>
-            <select data-campo="tipo">
-              <option
-                value="OBLIGATORIA"
-                ${fila.tipo === "OBLIGATORIA" ? "selected" : ""}
-              >
-                Obligatoria
-              </option>
-              <option
-                value="OPTATIVA"
-                ${fila.tipo === "OPTATIVA" ? "selected" : ""}
-              >
-                Optativa
-              </option>
-              <option
-                value="OTRA"
-                ${fila.tipo === "OTRA" ? "selected" : ""}
-              >
-                Otra
-              </option>
-            </select>
-          </td>
-
-          <td>
-            <button
-              type="button"
-              class="planes-icon-button"
-              data-eliminar-fila="${fila.id}"
-              title="Quitar fila"
-              aria-label="Quitar fila"
-            >
-              <i data-lucide="trash-2" aria-hidden="true"></i>
-            </button>
-          </td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  body.querySelectorAll("[data-fila-carga]").forEach((row) => {
-    const id = row.dataset.filaCarga;
-
-    row.querySelectorAll("[data-campo]").forEach((input) => {
-      const actualizar = () =>
-        actualizarFilaCargaRapida(id, input.dataset.campo, input.value);
-
-      input.addEventListener("change", actualizar);
-      input.addEventListener("input", actualizar);
-    });
-  });
-
-  body.querySelectorAll("[data-eliminar-fila]").forEach((button) => {
-    button.addEventListener("click", () => {
-      eliminarFilaCargaRapida(button.dataset.eliminarFila);
-    });
-  });
-
-  renderizarIconos();
-}
-
-function actualizarFilaCargaRapida(id, campo, valor) {
-  const fila = filasCargaRapida.find((item) => item.id === id);
-
-  if (fila) {
-    fila[campo] = valor;
-  }
-}
-
-function agregarFilaCargaRapida() {
-  if (filasCargaRapida.length >= 200) {
-    const errorBox = document.getElementById("cargaRapidaError");
-
-    if (errorBox) {
-      errorBox.textContent = "La carga rápida admite hasta 200 asignaturas.";
-      errorBox.classList.remove("hidden");
-    }
-
-    return;
-  }
-
-  filasCargaRapida.push(crearFilaCargaRapida());
-  renderizarFilasCargaRapida();
-}
-
-function eliminarFilaCargaRapida(id) {
-  if (filasCargaRapida.length <= 1) {
-    return;
-  }
-
-  filasCargaRapida = filasCargaRapida.filter((fila) => fila.id !== id);
-  filasCargaRapida.forEach((fila, index) => {
-    fila.orden = index + 1;
-  });
-  renderizarFilasCargaRapida();
-}
-
 function construirCargaRapida() {
-  const nivel = Number(document.getElementById("cargaRapidaNivel")?.value);
-  const ciclo = Number(document.getElementById("cargaRapidaCiclo")?.value);
-  const bloqueValue = document.getElementById("cargaRapidaBloque")?.value || "";
+  const nivel = Number(document.getElementById("cargaAsignaturaNivel")?.value);
+  const ciclo = Number(document.getElementById("cargaAsignaturaCiclo")?.value);
+  const bloqueValue =
+    document.getElementById("cargaAsignaturaBloque")?.value || "";
+  const bloqueId = bloqueValue ? Number(bloqueValue) : undefined;
+  const filas = [
+    ...document.querySelectorAll("[data-asignatura-carga]"),
+  ];
 
   if (!Number.isInteger(nivel) || nivel < 1 || nivel > 20) {
     throw new Error("Debe indicar un nivel válido entre 1 y 20.");
@@ -2478,25 +2387,44 @@ function construirCargaRapida() {
     throw new Error("Debe indicar un ciclo válido entre 1 y 20.");
   }
 
-  if (filasCargaRapida.length === 0 || filasCargaRapida.length > 200) {
+  if (filas.length === 0 || filas.length > 200) {
     throw new Error("Debe cargar entre 1 y 200 asignaturas.");
   }
 
-  const cursosSeleccionados = new Set();
+  const codigosUtilizados = new Set();
 
-  return filasCargaRapida.map((fila, index) => {
-    const cursoId = Number(fila.cursoId);
-    const creditos = Number(fila.creditos);
-    const orden = Number(fila.orden);
+  return filas.map((fila, index) => {
+    const codigoReferencia =
+      fila
+        .querySelector(".carga-asignatura-codigo")
+        ?.value?.trim()
+        .toUpperCase() || "";
+    const nombreReferencia =
+      fila.querySelector(".carga-asignatura-nombre")?.value?.trim() || "";
+    const creditos = Number(
+      fila.querySelector(".carga-asignatura-creditos")?.value,
+    );
+    const orden = Number(
+      fila.querySelector(".carga-asignatura-orden")?.value,
+    );
+    const tipo =
+      fila.querySelector(".carga-asignatura-tipo")?.value || "OBLIGATORIA";
 
-    if (!Number.isInteger(cursoId) || cursoId < 1) {
-      throw new Error(`Fila ${index + 1}: debe seleccionar un curso.`);
+    if (!codigoReferencia) {
+      throw new Error(`Fila ${index + 1}: debe indicar el código.`);
     }
 
-    if (cursosSeleccionados.has(cursoId)) {
-      throw new Error(`Fila ${index + 1}: el curso está repetido.`);
+    if (!nombreReferencia) {
+      throw new Error(`Fila ${index + 1}: debe indicar el nombre.`);
     }
-    cursosSeleccionados.add(cursoId);
+
+    if (codigosUtilizados.has(codigoReferencia)) {
+      throw new Error(
+        `Fila ${index + 1}: el código ${codigoReferencia} está repetido.`,
+      );
+    }
+
+    codigosUtilizados.add(codigoReferencia);
 
     if (!Number.isInteger(creditos) || creditos < 0 || creditos > 30) {
       throw new Error(
@@ -2509,16 +2437,17 @@ function construirCargaRapida() {
     }
 
     const datos = {
-      cursoId,
+      codigoReferencia,
+      nombreReferencia,
       nivel,
       ciclo,
       orden,
       creditos,
-      tipo: fila.tipo || "OBLIGATORIA",
+      tipo,
     };
 
-    if (bloqueValue) {
-      datos.bloqueId = Number(bloqueValue);
+    if (bloqueId) {
+      datos.bloqueId = bloqueId;
     }
 
     return datos;
@@ -2573,27 +2502,7 @@ function abrirFormularioAsignatura(asignatura = null) {
   }
 
   const editando = Boolean(asignatura);
-  const usaCurso = editando ? asignatura.cursoId !== null : true;
-  const cursosCarrera = cursosDisponibles.filter(
-    (curso) =>
-      curso.activo === true &&
-      Array.isArray(curso.carreras) &&
-      curso.carreras.some(
-        (carrera) => Number(carrera.id) === Number(planSeleccionado.carreraId),
-      ),
-  );
-  const opcionesCursos = cursosCarrera
-    .map(
-      (curso) => `
-        <option
-          value="${curso.id}"
-          ${Number(asignatura?.cursoId) === Number(curso.id) ? "selected" : ""}
-        >
-          ${escapeHtml(curso.codigo)} - ${escapeHtml(curso.nombre)}
-        </option>
-      `,
-    )
-    .join("");
+  const vinculadaACurso = Boolean(asignatura?.cursoId);
 
   content.innerHTML = `
     <form id="asignaturaForm" class="plan-form">
@@ -2661,56 +2570,51 @@ function abrirFormularioAsignatura(asignatura = null) {
           }
         </label>
 
-        <div class="plan-form-wide asignatura-mode">
+        <div class="plan-reference-fields plan-form-wide">
           <label>
-            <input
-              type="radio"
-              name="asignaturaModo"
-              value="CURSO"
-              ${usaCurso ? "checked" : ""}
-            >
-            Curso existente
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="asignaturaModo"
-              value="ESPACIO"
-              ${usaCurso ? "" : "checked"}
-            >
-            Espacio del plan / Optativa
-          </label>
-        </div>
-
-        <label id="cursoAsignaturaField" class="plan-form-wide">
-          <span>Curso</span>
-          <select id="asignaturaCurso">
-            <option value="">Seleccione...</option>
-            ${opcionesCursos}
-          </select>
-        </label>
-
-        <div
-          id="referenciaAsignaturaFields"
-          class="plan-reference-fields plan-form-wide"
-        >
-          <label>
-            <span>Nombre</span>
-            <input
-              id="asignaturaNombreReferencia"
-              maxlength="150"
-              value="${escapeHtml(asignatura?.nombreReferencia || "")}"
-              placeholder="Ej. Optativa"
-            >
-          </label>
-          <label>
-            <span>Código de referencia</span>
+            <span>Código de la asignatura</span>
             <input
               id="asignaturaCodigoReferencia"
               maxlength="30"
-              value="${escapeHtml(asignatura?.codigoReferencia || "")}"
-              placeholder="Opcional"
+              value="${escapeHtml(
+                asignatura?.codigoReferencia || asignatura?.curso?.codigo || "",
+              )}"
+              placeholder="Ej. EIF201"
+              ${vinculadaACurso ? "disabled" : ""}
+              required
             >
+            ${
+              vinculadaACurso
+                ? `
+                    <small class="plan-field-help">
+                      Esta asignatura ya está vinculada a un curso.
+                      Su código no puede modificarse desde la malla.
+                    </small>
+                  `
+                : ""
+            }
+          </label>
+          <label>
+            <span>Nombre de la asignatura</span>
+            <input
+              id="asignaturaNombreReferencia"
+              maxlength="150"
+              value="${escapeHtml(
+                asignatura?.nombreReferencia || asignatura?.curso?.nombre || "",
+              )}"
+              placeholder="Ej. Programación I"
+              ${vinculadaACurso ? "disabled" : ""}
+              required
+            >
+            ${
+              vinculadaACurso
+                ? `
+                    <small class="plan-field-help">
+                      El nombre quedó vinculado al curso creado.
+                    </small>
+                  `
+                : ""
+            }
           </label>
         </div>
 
@@ -2999,24 +2903,6 @@ function abrirFormularioAsignatura(asignatura = null) {
 
   actualizarReferenciaHoras();
 
-  const actualizarModo = () => {
-    const modo = document.querySelector(
-      'input[name="asignaturaModo"]:checked',
-    )?.value;
-
-    document
-      .getElementById("cursoAsignaturaField")
-      ?.classList.toggle("hidden", modo !== "CURSO");
-    document
-      .getElementById("referenciaAsignaturaFields")
-      ?.classList.toggle("hidden", modo !== "ESPACIO");
-  };
-
-  document.querySelectorAll('input[name="asignaturaModo"]').forEach((radio) => {
-    radio.addEventListener("change", actualizarModo);
-  });
-  actualizarModo();
-
   const cerrar = () => dialog.close();
   document
     .getElementById("cerrarAsignaturaDialog")
@@ -3035,15 +2921,31 @@ function abrirFormularioAsignatura(asignatura = null) {
 async function guardarAsignatura(asignatura, cerrar) {
   const errorBox = document.getElementById("asignaturaFormError");
   const button = document.getElementById("guardarAsignaturaButton");
-  const modo = document.querySelector(
-    'input[name="asignaturaModo"]:checked',
-  )?.value;
 
   if (!errorBox || !button || !planSeleccionado) {
     return;
   }
 
+  const codigoInput = document.getElementById("asignaturaCodigoReferencia");
+  const nombreInput = document.getElementById("asignaturaNombreReferencia");
+  const codigoReferencia = codigoInput?.value?.trim().toUpperCase() || "";
+  const nombreReferencia = nombreInput?.value?.trim() || "";
+
+  if (!codigoReferencia) {
+    errorBox.textContent = "Debe indicar el código de la asignatura.";
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  if (!nombreReferencia) {
+    errorBox.textContent = "Debe indicar el nombre de la asignatura.";
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
   const datos = {
+    codigoReferencia,
+    nombreReferencia,
     nivel: Number(document.getElementById("asignaturaNivel")?.value),
     ciclo: Number(document.getElementById("asignaturaCiclo")?.value),
     creditos: Number(document.getElementById("asignaturaCreditos")?.value),
@@ -3079,38 +2981,6 @@ async function guardarAsignatura(asignatura, cerrar) {
     datos.bloqueId = Number(bloqueValue);
   } else if (asignatura) {
     datos.bloqueId = null;
-  }
-
-  if (modo === "CURSO") {
-    const cursoId = Number(document.getElementById("asignaturaCurso")?.value);
-
-    if (!cursoId) {
-      errorBox.textContent = "Debe seleccionar un curso.";
-      errorBox.classList.remove("hidden");
-      return;
-    }
-
-    datos.cursoId = cursoId;
-
-    if (asignatura) {
-      datos.codigoReferencia = null;
-      datos.nombreReferencia = null;
-    }
-  } else {
-    const nombre = document
-      .getElementById("asignaturaNombreReferencia")
-      ?.value.trim();
-
-    if (!nombre) {
-      errorBox.textContent = "Debe indicar el nombre del espacio del plan.";
-      errorBox.classList.remove("hidden");
-      return;
-    }
-
-    datos.cursoId = null;
-    datos.nombreReferencia = nombre;
-    datos.codigoReferencia =
-      document.getElementById("asignaturaCodigoReferencia")?.value.trim() || "";
   }
 
   button.disabled = true;

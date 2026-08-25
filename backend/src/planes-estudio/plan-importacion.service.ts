@@ -5,8 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
-import { Curso } from '../cursos/entities/curso.entity';
+import { DataSource, Repository } from 'typeorm';
 import { TipoBloquePlan } from './constants/tipo-bloque-plan.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
@@ -35,8 +34,6 @@ export class PlanImportacionService {
   constructor(
     @InjectRepository(PlanEstudio)
     private readonly planRepository: Repository<PlanEstudio>,
-    @InjectRepository(Curso)
-    private readonly cursoRepository: Repository<Curso>,
     @InjectRepository(BloquePlan)
     private readonly bloqueRepository: Repository<BloquePlan>,
     @InjectRepository(PlanAsignatura)
@@ -161,35 +158,22 @@ export class PlanImportacionService {
     return codigos;
   }
 
-  private async validarAsignaturas(
-    plan: PlanEstudio,
+  private validarAsignaturas(
     filas: Fila[],
     bloques: Set<string>,
     problemas: ProblemaImportacion[],
   ) {
     const claves = new Set<string>();
-    const codigos = [
-      ...new Set(
-        filas.map((fila) => this.mayuscula(fila.CODIGO_CURSO)).filter(Boolean),
-      ),
-    ];
-    const cursos = codigos.length
-      ? await this.cursoRepository.find({
-          where: { codigo: In(codigos) },
-          relations: { carreras: true },
-        })
-      : [];
-    const porCodigo = new Map(
-      cursos.map((curso) => [this.mayuscula(curso.codigo), curso]),
-    );
+    const codigos = new Set<string>();
     const tipos = new Set(Object.values(TipoPlanAsignatura));
-    const usados = new Set<string>();
 
     for (const fila of filas) {
       const clave = this.mayuscula(fila.CLAVE);
-      const codigoCurso = this.mayuscula(fila.CODIGO_CURSO);
+      const codigo = this.mayuscula(fila.CODIGO);
+      const nombre = this.texto(fila.NOMBRE);
       const bloque = this.mayuscula(fila.BLOQUE);
       const tipo = this.mayuscula(fila.TIPO);
+
       if (!clave)
         this.agregar(
           problemas,
@@ -209,61 +193,38 @@ export class PlanImportacionService {
           `La clave "${clave}" está repetida.`,
         );
       if (clave) claves.add(clave);
-      if (!codigoCurso && !this.texto(fila.NOMBRE_REFERENCIA))
+
+      if (!codigo)
         this.agregar(
           problemas,
           'ERROR',
-          'ASIGNATURA_SIN_CURSO_NI_NOMBRE',
+          'ASIGNATURA_SIN_CODIGO',
           'ASIGNATURAS',
           fila,
-          'Debe indicar CODIGO_CURSO o NOMBRE_REFERENCIA.',
+          'Toda asignatura debe indicar un código.',
         );
-      if (codigoCurso) {
-        const curso = porCodigo.get(codigoCurso);
-        if (!curso)
-          this.agregar(
-            problemas,
-            'ERROR',
-            'CURSO_NO_EXISTE',
-            'ASIGNATURAS',
-            fila,
-            `El curso "${codigoCurso}" no existe en el catálogo.`,
-          );
-        else {
-          if (!curso.activo)
-            this.agregar(
-              problemas,
-              'ERROR',
-              'CURSO_INACTIVO',
-              'ASIGNATURAS',
-              fila,
-              `El curso "${codigoCurso}" está inactivo.`,
-            );
-          if (
-            !curso.carreras.some(
-              (carrera) => Number(carrera.id) === Number(plan.carreraId),
-            )
-          )
-            this.agregar(
-              problemas,
-              'ERROR',
-              'CURSO_NO_PERTENECE_CARRERA',
-              'ASIGNATURAS',
-              fila,
-              `El curso "${codigoCurso}" no está asociado a la carrera de este plan.`,
-            );
-        }
-        if (usados.has(codigoCurso))
-          this.agregar(
-            problemas,
-            'ERROR',
-            'CURSO_DUPLICADO',
-            'ASIGNATURAS',
-            fila,
-            `El curso "${codigoCurso}" aparece más de una vez en el plan.`,
-          );
-        usados.add(codigoCurso);
-      }
+
+      if (codigo && codigos.has(codigo))
+        this.agregar(
+          problemas,
+          'ERROR',
+          'CODIGO_ASIGNATURA_DUPLICADO',
+          'ASIGNATURAS',
+          fila,
+          `El código "${codigo}" aparece más de una vez en el plan.`,
+        );
+      if (codigo) codigos.add(codigo);
+
+      if (!nombre)
+        this.agregar(
+          problemas,
+          'ERROR',
+          'ASIGNATURA_SIN_NOMBRE',
+          'ASIGNATURAS',
+          fila,
+          'Toda asignatura debe indicar un nombre.',
+        );
+
       if (!bloque)
         this.agregar(
           problemas,
@@ -271,7 +232,7 @@ export class PlanImportacionService {
           'ASIGNATURA_SIN_BLOQUE',
           'ASIGNATURAS',
           fila,
-          `La asignatura "${clave || '?'}" no tiene bloque.`,
+          `La asignatura "${codigo || clave || '?'}" no tiene bloque.`,
         );
       else if (!bloques.has(bloque))
         this.agregar(
@@ -541,8 +502,7 @@ export class PlanImportacionService {
         'La importación completa solo puede realizarse sobre un plan sin bloques, asignaturas ni salidas académicas.',
       );
     const bloques = this.validarBloques(dto.bloques, problemas);
-    const asignaturas = await this.validarAsignaturas(
-      plan,
+    const asignaturas = this.validarAsignaturas(
       dto.asignaturas,
       bloques,
       problemas,
@@ -588,7 +548,6 @@ export class PlanImportacionService {
     try {
       const resumen = await this.dataSource.transaction(async (manager) => {
         const planRepo = manager.getRepository(PlanEstudio);
-        const cursoRepo = manager.getRepository(Curso);
         const bloqueRepo = manager.getRepository(BloquePlan);
         const asignaturaRepo = manager.getRepository(PlanAsignatura);
         const requisitoRepo = manager.getRepository(PlanRequisito);
@@ -629,51 +588,21 @@ export class PlanImportacionService {
           bloques.map((bloque) => [this.mayuscula(bloque.codigo), bloque]),
         );
 
-        const codigosCurso = [
-          ...new Set(
-            dto.asignaturas
-              .map((fila) => this.mayuscula(fila.CODIGO_CURSO))
-              .filter(Boolean),
-          ),
-        ];
-        const cursos = codigosCurso.length
-          ? await cursoRepo.find({
-              where: { codigo: In(codigosCurso) },
-              relations: { carreras: true },
-            })
-          : [];
-        const cursoPorCodigo = new Map(
-          cursos.map((curso) => [this.mayuscula(curso.codigo), curso]),
-        );
-        for (const codigo of codigosCurso) {
-          if (!cursoPorCodigo.has(codigo)) {
-            throw new BadRequestException(
-              `El curso "${codigo}" dejó de estar disponible durante la importación.`,
-            );
-          }
-        }
-
         const asignaturas = await asignaturaRepo.save(
           asignaturaRepo.create(
             dto.asignaturas.map((fila) => {
-              const clave = this.mayuscula(fila.CLAVE);
-              const curso = cursoPorCodigo.get(
-                this.mayuscula(fila.CODIGO_CURSO),
-              );
               const bloque = bloquePorCodigo.get(this.mayuscula(fila.BLOQUE));
               return {
                 planEstudioId: planId,
-                cursoId: curso?.id ?? null,
+                cursoId: null,
                 bloqueId: bloque?.id ?? null,
                 nivel: Number(this.numero(fila.NIVEL)),
                 ciclo: Number(this.numero(fila.CICLO)),
                 orden: Number(this.numero(fila.ORDEN)),
                 creditos: Number(this.numero(fila.CREDITOS)),
                 tipo: this.mayuscula(fila.TIPO) as TipoPlanAsignatura,
-                codigoReferencia: curso ? null : clave,
-                nombreReferencia: curso
-                  ? null
-                  : this.texto(fila.NOMBRE_REFERENCIA) || null,
+                codigoReferencia: this.mayuscula(fila.CODIGO),
+                nombreReferencia: this.texto(fila.NOMBRE),
                 horasTeoria: this.numero(fila.T),
                 horasPractica: this.numero(fila.P),
                 horasLaboratorio: this.numero(fila.L),

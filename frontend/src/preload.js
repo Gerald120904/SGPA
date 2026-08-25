@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("sgpa", {
   cambiarEstadoCarrera: (id, activo) =>
     ipcRenderer.invoke("carreras:cambiar-estado", id, activo),
   listarCursos: () => ipcRenderer.invoke("cursos:listar"),
+  listarAsignaturasDisponiblesCurso: (filtros) =>
+    ipcRenderer.invoke("cursos:asignaturas-disponibles", filtros),
   obtenerCurso: (id) => ipcRenderer.invoke("cursos:obtener", id),
   crearCurso: (datos) => ipcRenderer.invoke("cursos:crear", datos),
   actualizarCurso: (id, datos) =>

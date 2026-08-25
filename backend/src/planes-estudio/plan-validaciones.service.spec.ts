@@ -27,13 +27,15 @@ describe('PlanValidacionesService', () => {
     planes.findOne.mockResolvedValue(null);
     await expect(service.validar(99)).rejects.toThrow(NotFoundException);
   });
-  it('detecta advertencias y curso duplicado', async () => {
+  it('detecta advertencias y código curricular duplicado', async () => {
     planes.findOne.mockResolvedValue({ id: 1 });
     asignaturas.find.mockResolvedValue([
       {
         id: 1,
-        cursoId: 10,
-        curso: { codigo: 'MAT030' },
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'MAT030',
+        nombreReferencia: 'Matemática',
         bloqueId: null,
         nivel: 1,
         ciclo: 1,
@@ -47,8 +49,10 @@ describe('PlanValidacionesService', () => {
       },
       {
         id: 2,
-        cursoId: 10,
-        curso: { codigo: 'MAT030' },
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'mat030',
+        nombreReferencia: 'Matemática repetida',
         bloqueId: 1,
         nivel: 1,
         ciclo: 2,
@@ -69,8 +73,100 @@ describe('PlanValidacionesService', () => {
     );
     expect(r.errores).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ codigo: 'CURSO_DUPLICADO' }),
+        expect.objectContaining({ codigo: 'CODIGO_ASIGNATURA_DUPLICADO' }),
       ]),
     );
+  });
+
+  it('detecta una asignatura activa sin código curricular', async () => {
+    planes.findOne.mockResolvedValue({ id: 1 });
+    asignaturas.find.mockResolvedValue([
+      {
+        id: 3,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: null,
+        nombreReferencia: 'Seminario',
+        bloqueId: null,
+        nivel: 1,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+    ]);
+    bloques.find.mockResolvedValue([]);
+    requisitos.find.mockResolvedValue([]);
+    salidas.find.mockResolvedValue([]);
+
+    const r = await service.validar(1);
+
+    expect(r.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: 'ASIGNATURA_SIN_CODIGO',
+          asignaturaId: 3,
+        }),
+      ]),
+    );
+  });
+
+  it('detecta una asignatura activa sin nombre curricular', async () => {
+    planes.findOne.mockResolvedValue({ id: 1 });
+    asignaturas.find.mockResolvedValue([
+      {
+        id: 4,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'SEM101',
+        nombreReferencia: null,
+        bloqueId: null,
+        nivel: 1,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+    ]);
+    bloques.find.mockResolvedValue([]);
+    requisitos.find.mockResolvedValue([]);
+    salidas.find.mockResolvedValue([]);
+
+    const r = await service.validar(1);
+
+    expect(r.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: 'ASIGNATURA_SIN_NOMBRE',
+          asignaturaId: 4,
+        }),
+      ]),
+    );
+  });
+
+  it('mantiene compatibilidad con código y nombre de un curso ya vinculado', async () => {
+    planes.findOne.mockResolvedValue({ id: 1 });
+    asignaturas.find.mockResolvedValue([
+      {
+        id: 5,
+        cursoId: 20,
+        curso: { codigo: 'LEG101', nombre: 'Asignatura legada' },
+        codigoReferencia: null,
+        nombreReferencia: null,
+        bloqueId: null,
+        nivel: 1,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+    ]);
+    bloques.find.mockResolvedValue([]);
+    requisitos.find.mockResolvedValue([]);
+    salidas.find.mockResolvedValue([]);
+
+    const r = await service.validar(1);
+
+    const codigosError = r.errores.map((item) => item.codigo);
+    expect(codigosError).not.toContain('ASIGNATURA_SIN_CODIGO');
+    expect(codigosError).not.toContain('ASIGNATURA_SIN_NOMBRE');
+    expect(r.valido).toBe(true);
   });
 });

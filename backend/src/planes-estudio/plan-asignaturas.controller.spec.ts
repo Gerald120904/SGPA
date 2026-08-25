@@ -96,14 +96,15 @@ describe('PlanAsignaturasController', () => {
     expect(service.listar).not.toHaveBeenCalled();
   });
 
-  it('crea una asignatura con curso real', async () => {
+  it('crea una asignatura con código y nombre de referencia', async () => {
     const dto = {
-      cursoId: 5,
       nivel: 1,
       ciclo: 1,
       orden: 1,
       creditos: 3,
       tipo: TipoPlanAsignatura.OBLIGATORIA,
+      codigoReferencia: 'EIF201',
+      nombreReferencia: 'Programación I',
     };
 
     await request(app.getHttpServer())
@@ -115,14 +116,34 @@ describe('PlanAsignaturasController', () => {
     expect(service.crear).toHaveBeenCalledWith(1, dto);
   });
 
+  it('rechaza cursoId al crear una asignatura', async () => {
+    await request(app.getHttpServer())
+      .post('/planes-estudio/1/asignaturas')
+      .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
+      .send({
+        cursoId: 5,
+        nivel: 1,
+        ciclo: 1,
+        orden: 1,
+        creditos: 3,
+        tipo: TipoPlanAsignatura.OBLIGATORIA,
+        codigoReferencia: 'EIF201',
+        nombreReferencia: 'Programación I',
+      })
+      .expect(400);
+
+    expect(service.crear).not.toHaveBeenCalled();
+  });
+
   it('acepta horas académicas con hasta dos decimales', async () => {
     const dto = {
-      cursoId: 5,
       nivel: 1,
       ciclo: 1,
       orden: 1,
       creditos: 3,
       tipo: TipoPlanAsignatura.OBLIGATORIA,
+      codigoReferencia: 'EIF201',
+      nombreReferencia: 'Programación I',
       horasTeoria: 2.5,
       horasPractica: 1.25,
       horasGira: 0,
@@ -143,20 +164,22 @@ describe('PlanAsignaturasController', () => {
     const dto = {
       asignaturas: [
         {
-          cursoId: 5,
           nivel: 1,
           ciclo: 1,
           orden: 1,
           creditos: 3,
           tipo: TipoPlanAsignatura.OBLIGATORIA,
+          codigoReferencia: 'EIF201',
+          nombreReferencia: 'Programación I',
         },
         {
-          cursoId: 11,
           nivel: 1,
           ciclo: 1,
           orden: 2,
           creditos: 4,
           tipo: TipoPlanAsignatura.OBLIGATORIA,
+          codigoReferencia: 'MAT030',
+          nombreReferencia: 'Matemática para informática',
         },
       ],
     };
@@ -177,8 +200,9 @@ describe('PlanAsignaturasController', () => {
       .send({
         asignaturas: [
           {
-            cursoId: 5,
             nivel: 0,
+            codigoReferencia: 'EIF201',
+            nombreReferencia: 'Programación I',
           },
         ],
       })
@@ -189,12 +213,13 @@ describe('PlanAsignaturasController', () => {
 
   it('rechaza cargas masivas de más de 200 asignaturas', async () => {
     const asignatura = {
-      cursoId: 5,
       nivel: 1,
       ciclo: 1,
       orden: 1,
       creditos: 3,
       tipo: TipoPlanAsignatura.OBLIGATORIA,
+      codigoReferencia: 'EIF201',
+      nombreReferencia: 'Programación I',
     };
 
     await request(app.getHttpServer())
@@ -213,12 +238,13 @@ describe('PlanAsignaturasController', () => {
       .post('/planes-estudio/1/asignaturas')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
       .send({
-        cursoId: 5,
         nivel: 1,
         ciclo: 1,
         orden: 1,
         creditos: 3,
         tipo: TipoPlanAsignatura.OBLIGATORIA,
+        codigoReferencia: 'EIF201',
+        nombreReferencia: 'Programación I',
         horasTeoria: -1,
         horasTotales: 7.777,
       })
@@ -234,6 +260,7 @@ describe('PlanAsignaturasController', () => {
       orden: 3,
       creditos: 3,
       tipo: TipoPlanAsignatura.OPTATIVA,
+      codigoReferencia: 'OPT-1',
       nombreReferencia: 'Optativa',
     };
 
@@ -256,6 +283,7 @@ describe('PlanAsignaturasController', () => {
         orden: 1000,
         creditos: 31,
         tipo: TipoPlanAsignatura.OBLIGATORIA,
+        codigoReferencia: 'PRU-1',
         nombreReferencia: 'Prueba',
       })
       .expect(400);
@@ -273,6 +301,7 @@ describe('PlanAsignaturasController', () => {
         orden: 1,
         creditos: 3,
         tipo: 'INVENTADA',
+        codigoReferencia: 'PRU-1',
         nombreReferencia: 'Prueba',
       })
       .expect(400);
@@ -287,11 +316,10 @@ describe('PlanAsignaturasController', () => {
     expect(service.obtenerPorId).toHaveBeenCalledWith(1, 10);
   });
 
-  it('actualiza una asignatura y permite cursoId null', async () => {
+  it('actualiza el código y nombre de una asignatura', async () => {
     const dto = {
-      cursoId: null,
-      nombreReferencia: 'Optativa',
-      tipo: TipoPlanAsignatura.OPTATIVA,
+      codigoReferencia: 'EIF202',
+      nombreReferencia: 'Programación II',
     };
 
     await request(app.getHttpServer())
@@ -301,6 +329,20 @@ describe('PlanAsignaturasController', () => {
       .expect(200, { id: 10 });
 
     expect(service.actualizar).toHaveBeenCalledWith(1, 10, dto);
+  });
+
+  it('rechaza cursoId al actualizar una asignatura', async () => {
+    const dto = {
+      cursoId: 5,
+    };
+
+    await request(app.getHttpServer())
+      .patch('/planes-estudio/1/asignaturas/10')
+      .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
+      .send(dto)
+      .expect(400);
+
+    expect(service.actualizar).not.toHaveBeenCalled();
   });
 
   it('actualiza créditos y orden de una asignatura', async () => {

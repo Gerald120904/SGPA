@@ -76,8 +76,8 @@ async function leerArchivoPlanExcel(filePath) {
     ]),
     asignaturas: leerHojaExcel(workbook, "ASIGNATURAS", [
       "CLAVE",
-      "CODIGO_CURSO",
-      "NOMBRE_REFERENCIA",
+      "CODIGO",
+      "NOMBRE",
       "BLOQUE",
       "NIVEL",
       "CICLO",
@@ -197,10 +197,10 @@ async function crearPlantillaExcelPlan(destino) {
   ]);
 
   const asignaturas = prepararHoja(workbook, "ASIGNATURAS", [
-    { header: "CLAVE", key: "clave" },
-    { header: "CODIGO_CURSO", key: "codigoCurso", width: 20 },
-    { header: "NOMBRE_REFERENCIA", key: "nombreReferencia", width: 34 },
-    { header: "BLOQUE", key: "bloque" },
+    { header: "CLAVE", key: "clave", width: 18 },
+    { header: "CODIGO", key: "codigo", width: 20 },
+    { header: "NOMBRE", key: "nombre", width: 36 },
+    { header: "BLOQUE", key: "bloque", width: 18 },
     { header: "NIVEL", key: "nivel", width: 10 },
     { header: "CICLO", key: "ciclo", width: 10 },
     { header: "ORDEN", key: "orden", width: 10 },
@@ -217,8 +217,9 @@ async function crearPlantillaExcelPlan(destino) {
   ]);
   asignaturas.addRows([
     {
-      clave: "EIF200",
-      codigoCurso: "EIF200",
+      clave: "EIF101",
+      codigo: "EIF101",
+      nombre: "Fundamentos de Informática",
       bloque: "TC",
       nivel: 1,
       ciclo: 1,
@@ -226,16 +227,28 @@ async function crearPlantillaExcelPlan(destino) {
       creditos: 4,
       tipo: "OBLIGATORIA",
       t: 3,
-      p: 2,
+      p: 1,
       l: 0,
-      ei: 7,
-      ht: 12,
-      hd: 5,
-      observacionHoras: "Fila de ejemplo.",
+      ei: 6,
+      ht: 10,
+      hd: 4,
+      observacionHoras: "Fila de ejemplo. Puede eliminarla.",
+    },
+    {
+      clave: "EIF102",
+      codigo: "EIF102",
+      nombre: "Programación I",
+      bloque: "TC",
+      nivel: 1,
+      ciclo: 1,
+      orden: 2,
+      creditos: 4,
+      tipo: "OBLIGATORIA",
     },
     {
       clave: "OPT-01",
-      nombreReferencia: "Optativa",
+      codigo: "OPT-01",
+      nombre: "Optativa",
       bloque: "TC",
       nivel: 2,
       ciclo: 1,
@@ -261,8 +274,8 @@ async function crearPlantillaExcelPlan(destino) {
     { header: "TIPO", key: "tipo" },
   ]);
   requisitos.addRow({
-    asignatura: "EIF201",
-    relacionada: "EIF200",
+    asignatura: "EIF102",
+    relacionada: "EIF101",
     tipo: "REQUISITO",
   });
   aplicarValidacionLista(requisitos, "C", 1000, ["REQUISITO", "CORREQUISITO"]);
@@ -307,8 +320,9 @@ async function crearPlantillaExcelPlan(destino) {
     { header: "ASIGNATURA_CLAVE", key: "asignatura", width: 24 },
   ]);
   salidaAsignaturas.addRows([
-    { salida: "DIP", asignatura: "EIF200" },
-    { salida: "BACH", asignatura: "EIF200" },
+    { salida: "DIP", asignatura: "EIF101" },
+    { salida: "BACH", asignatura: "EIF101" },
+    { salida: "BACH", asignatura: "EIF102" },
   ]);
 
   const instrucciones = workbook.addWorksheet("INSTRUCCIONES");
@@ -322,11 +336,11 @@ async function crearPlantillaExcelPlan(destino) {
     ],
     [
       "ASIGNATURAS",
-      "CLAVE identifica cada fila dentro del Excel. CODIGO_CURSO corresponde al catálogo de cursos de SGPA.",
+      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan.",
     ],
     [
-      "Espacios especiales",
-      "Si no existe un curso real, deje CODIGO_CURSO vacío y utilice NOMBRE_REFERENCIA. Ejemplo: OPT-01 / Optativa.",
+      "Asignaturas",
+      "Todas las asignaturas se crean primero dentro del plan de estudio. No es necesario que exista previamente un curso en el catálogo de SGPA.",
     ],
     [
       "REQUISITOS",
@@ -786,6 +800,44 @@ ipcMain.handle("cursos:listar", async () => {
     cursos: resultado.data,
   };
 });
+
+ipcMain.handle(
+  "cursos:asignaturas-disponibles",
+  async (_event, filtros = {}) => {
+    const params = new URLSearchParams();
+
+    if (filtros.carreraId) {
+      params.set("carreraId", String(filtros.carreraId));
+    }
+
+    if (filtros.planId) {
+      params.set("planId", String(filtros.planId));
+    }
+
+    if (filtros.nivel) {
+      params.set("nivel", String(filtros.nivel));
+    }
+
+    if (filtros.ciclo) {
+      params.set("ciclo", String(filtros.ciclo));
+    }
+
+    const query = params.toString();
+
+    const resultado = await ejecutarPeticionAutenticada(
+      `/cursos/asignaturas-disponibles${query ? `?${query}` : ""}`,
+    );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      asignaturas: resultado.data,
+    };
+  },
+);
 
 ipcMain.handle("cursos:obtener", async (_event, id) => {
   return ejecutarPeticionAutenticada(`/cursos/${id}`);

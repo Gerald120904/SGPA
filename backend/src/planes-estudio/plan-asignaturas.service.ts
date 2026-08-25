@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { Curso } from '../cursos/entities/curso.entity';
 import { ActualizarPlanAsignaturaDto } from './dto/actualizar-plan-asignatura.dto';
 import { CargaMasivaPlanAsignaturasDto } from './dto/carga-masiva-plan-asignaturas.dto';
 import { CrearPlanAsignaturaDto } from './dto/crear-plan-asignatura.dto';
@@ -21,8 +20,6 @@ export class PlanAsignaturasService {
     private readonly asignaturaRepository: Repository<PlanAsignatura>,
     @InjectRepository(PlanEstudio)
     private readonly planRepository: Repository<PlanEstudio>,
-    @InjectRepository(Curso)
-    private readonly cursoRepository: Repository<Curso>,
     @InjectRepository(BloquePlan)
     private readonly bloqueRepository: Repository<BloquePlan>,
     private readonly dataSource: DataSource,
@@ -95,55 +92,21 @@ export class PlanAsignaturasService {
     return bloque;
   }
 
-  private async obtenerCursoValido(
-    cursoId: number,
-    carreraId: number,
-  ): Promise<Curso> {
-    const curso = await this.cursoRepository.findOne({
-      where: { id: cursoId },
-      relations: {
-        carreras: true,
-      },
-    });
-
-    if (!curso) {
-      throw new BadRequestException('El curso seleccionado no existe.');
-    }
-
-    if (!curso.activo) {
-      throw new BadRequestException(
-        'No se puede agregar un curso inactivo al plan.',
-      );
-    }
-
-    const perteneceCarrera = (curso.carreras ?? []).some(
-      (carrera) => carrera.id === carreraId,
-    );
-
-    if (!perteneceCarrera) {
-      throw new BadRequestException(
-        'El curso seleccionado no está asociado a la carrera de este plan.',
-      );
-    }
-
-    return curso;
-  }
-
-  private async validarCursoDuplicado(
+  private async validarCodigoDuplicado(
     planId: number,
-    cursoId: number,
+    codigo: string,
     excluirId?: number,
   ): Promise<void> {
     const existente = await this.asignaturaRepository.findOne({
       where: {
         planEstudioId: planId,
-        cursoId,
+        codigoReferencia: codigo,
       },
     });
 
     if (existente && existente.id !== excluirId) {
       throw new ConflictException(
-        'El curso ya está incluido en este plan de estudio.',
+        'Ya existe una asignatura con ese código en este plan de estudio.',
       );
     }
   }
@@ -153,36 +116,34 @@ export class PlanAsignaturasService {
     dto: CrearPlanAsignaturaDto,
   ): Promise<PlanAsignatura> {
     let bloque: BloquePlan | null = null;
-    let curso: Curso | null = null;
-    let codigoReferencia: string | null = null;
-    let nombreReferencia: string | null = null;
 
     if (dto.bloqueId !== undefined) {
       bloque = await this.obtenerBloqueValido(plan.id, dto.bloqueId);
     }
 
-    if (dto.cursoId !== undefined) {
-      curso = await this.obtenerCursoValido(dto.cursoId, plan.carreraId);
-      await this.validarCursoDuplicado(plan.id, curso.id);
+    const codigoReferencia = dto.codigoReferencia.trim().toUpperCase();
+    const nombreReferencia = dto.nombreReferencia.trim();
+
+    if (!codigoReferencia) {
+      throw new BadRequestException(
+        'El código de la asignatura es obligatorio.',
+      );
     }
 
-    if (!curso) {
-      nombreReferencia = dto.nombreReferencia?.trim() || null;
-      codigoReferencia = dto.codigoReferencia?.trim().toUpperCase() || null;
-
-      if (!nombreReferencia) {
-        throw new BadRequestException(
-          'Cuando no se selecciona un curso debe indicar el nombre de la asignatura o espacio del plan.',
-        );
-      }
+    if (!nombreReferencia) {
+      throw new BadRequestException(
+        'El nombre de la asignatura es obligatorio.',
+      );
     }
+
+    await this.validarCodigoDuplicado(plan.id, codigoReferencia);
 
     return this.asignaturaRepository.create({
       planEstudioId: plan.id,
       bloqueId: bloque?.id ?? null,
       bloque,
-      cursoId: curso?.id ?? null,
-      curso,
+      cursoId: null,
+      curso: null,
       nivel: dto.nivel,
       ciclo: dto.ciclo,
       orden: dto.orden,
@@ -239,14 +200,14 @@ export class PlanAsignaturasService {
 
   async cargaMasiva(planId: number, dto: CargaMasivaPlanAsignaturasDto) {
     const plan = await this.obtenerPlan(planId, true);
-    const cursoIds = dto.asignaturas
-      .map((item) => item.cursoId)
-      .filter((id): id is number => id !== undefined);
-    const cursosUnicos = new Set(cursoIds);
+    const codigos = dto.asignaturas.map((item) =>
+      item.codigoReferencia.trim().toUpperCase(),
+    );
+    const codigosUnicos = new Set(codigos);
 
-    if (cursosUnicos.size !== cursoIds.length) {
+    if (codigosUnicos.size !== codigos.length) {
       throw new BadRequestException(
-        'La carga contiene el mismo curso más de una vez.',
+        'La carga contiene el mismo código de asignatura más de una vez.',
       );
     }
 
@@ -289,7 +250,7 @@ export class PlanAsignaturasService {
     id: number,
     dto: ActualizarPlanAsignaturaDto,
   ): Promise<PlanAsignatura> {
-    const plan = await this.obtenerPlan(planId, true);
+    await this.obtenerPlan(planId, true);
     const asignatura = await this.obtenerAsignatura(planId, id);
 
     if (dto.bloqueId !== undefined) {
@@ -300,22 +261,6 @@ export class PlanAsignaturasService {
         const bloque = await this.obtenerBloqueValido(planId, dto.bloqueId);
         asignatura.bloqueId = bloque.id;
         asignatura.bloque = bloque;
-      }
-    }
-
-    if (dto.cursoId !== undefined) {
-      if (dto.cursoId === null) {
-        asignatura.cursoId = null;
-        asignatura.curso = null;
-      } else {
-        const curso = await this.obtenerCursoValido(
-          dto.cursoId,
-          plan.carreraId,
-        );
-
-        await this.validarCursoDuplicado(planId, curso.id, id);
-        asignatura.cursoId = curso.id;
-        asignatura.curso = curso;
       }
     }
 
@@ -350,22 +295,40 @@ export class PlanAsignaturasService {
     if (dto.tipo !== undefined) asignatura.tipo = dto.tipo;
 
     if (dto.codigoReferencia !== undefined) {
-      asignatura.codigoReferencia =
-        dto.codigoReferencia?.trim().toUpperCase() || null;
+      const codigoReferencia =
+        dto.codigoReferencia?.trim().toUpperCase() ?? '';
+
+      if (!codigoReferencia) {
+        throw new BadRequestException(
+          'El código de la asignatura no puede estar vacío.',
+        );
+      }
+
+      await this.validarCodigoDuplicado(planId, codigoReferencia, id);
+      asignatura.codigoReferencia = codigoReferencia;
     }
 
     if (dto.nombreReferencia !== undefined) {
-      asignatura.nombreReferencia = dto.nombreReferencia?.trim() || null;
+      const nombreReferencia = dto.nombreReferencia?.trim() ?? '';
+
+      if (!nombreReferencia) {
+        throw new BadRequestException(
+          'El nombre de la asignatura no puede estar vacío.',
+        );
+      }
+
+      asignatura.nombreReferencia = nombreReferencia;
     }
 
-    if (asignatura.cursoId !== null) {
-      asignatura.codigoReferencia = null;
-      asignatura.nombreReferencia = null;
-    }
-
-    if (asignatura.cursoId === null && !asignatura.nombreReferencia) {
+    if (!asignatura.codigoReferencia) {
       throw new BadRequestException(
-        'Una asignatura sin curso debe tener un nombre de referencia.',
+        'La asignatura debe tener un código.',
+      );
+    }
+
+    if (!asignatura.nombreReferencia) {
+      throw new BadRequestException(
+        'La asignatura debe tener un nombre.',
       );
     }
 
