@@ -8,100 +8,281 @@
   gap: 18px;
 }
 
+/* =========================================================
+   TOOLBAR
+   ========================================================= */
+
 .planes-toolbar {
   display: flex;
-  align-items: flex-start;
+
+  align-items: center;
   justify-content: space-between;
+
   gap: 20px;
 }
 
+
+/* =========================================================
+   TÍTULO DEL MÓDULO
+   ========================================================= */
+
 .planes-toolbar h2 {
   margin: 0;
+
   color: #1d2939;
+
   font-size: 24px;
   font-weight: 700;
+
+  line-height: 1.3;
 }
+
 
 .planes-toolbar p {
   margin: 5px 0 0;
+
   color: #667085;
+
   font-size: 13px;
+  font-weight: 400;
+
+  line-height: 1.5;
 }
+
+
+/* =========================================================
+   BASE DE BOTONES
+   ========================================================= */
 
 .planes-primary-button,
 .planes-secondary-button,
 .planes-icon-button {
   border: 0;
+
   font: inherit;
+
   cursor: pointer;
 }
 
+
+/* =========================================================
+   BOTÓN PRINCIPAL
+   =========================================================
+   Igual que:
+   - Nueva carrera
+   - Nuevo curso
+   ========================================================= */
+
 .planes-primary-button {
-  min-height: 40px;
+  min-height: 42px;
+
   display: inline-flex;
+
   align-items: center;
   justify-content: center;
+
   gap: 8px;
-  padding: 0 15px;
-  border-radius: 8px;
-  background: #b5121b;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 600;
+
+  padding:
+    0 16px;
+
+  border-radius:
+    9px;
+
+  background:
+    #b5121b;
+
+  color:
+    #ffffff;
+
+  font-weight:
+    600;
+
+  transition:
+    background-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
+
 
 .planes-primary-button:hover {
-  filter: brightness(0.96);
+  background:
+    #951019;
+
+  box-shadow:
+    0 4px 11px
+    rgba(181, 18, 27, 0.16);
+
+  transform:
+    translateY(-1px);
 }
+
+
+.planes-primary-button:active {
+  transform:
+    translateY(0);
+}
+
 
 .planes-primary-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
+  opacity:
+    0.6;
+
+  cursor:
+    not-allowed;
+
+  transform:
+    none;
+
+  box-shadow:
+    none;
 }
+
 
 .planes-primary-button svg {
-  width: 17px;
-  height: 17px;
+  width:
+    18px;
+
+  height:
+    18px;
 }
+
+
+/* =========================================================
+   BOTÓN SECUNDARIO
+   ========================================================= */
 
 .planes-secondary-button {
-  min-height: 40px;
-  padding: 0 15px;
-  border: 1px solid #d0d5dd;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #344054;
-  font-size: 13px;
-  font-weight: 600;
+  min-height:
+    42px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    7px;
+
+  padding:
+    0 16px;
+
+  border:
+    1px solid #d9dee7;
+
+  border-radius:
+    9px;
+
+  background:
+    #ffffff;
+
+  color:
+    #344054;
+
+  font-weight:
+    600;
+
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
 }
+
+
+.planes-secondary-button:hover {
+  border-color:
+    #c8ced8;
+
+  background:
+    #f8f9fb;
+}
+
+
+/* =========================================================
+   BOTONES DE ICONO GENERALES DE PLANES
+   ========================================================= */
 
 .planes-icon-button {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #e4e7ec;
-  border-radius: 7px;
-  background: #ffffff;
-  color: #475467;
+  width:
+    36px;
+
+  height:
+    36px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    0;
+
+  border:
+    0;
+
+  border-radius:
+    8px;
+
+  background:
+    #f3f5f7;
+
+  color:
+    #475467;
+
+  vertical-align:
+    middle;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
 }
+
 
 .planes-icon-button:hover {
-  background: #f9fafb;
+  background:
+    #e8ebef;
+
+  transform:
+    translateY(-1px);
 }
+
+
+.planes-icon-button:active {
+  transform:
+    translateY(0);
+}
+
 
 .planes-icon-button svg {
-  width: 16px;
-  height: 16px;
+  width:
+    17px;
+
+  height:
+    17px;
 }
+
+
+/* =========================================================
+   COLORES SEMÁNTICOS
+   ========================================================= */
 
 .planes-danger-button {
-  color: #b42318;
+  color:
+    #b42318;
 }
 
+
 .planes-success-button {
-  color: #067647;
+  color:
+    #067647;
 }
 
 .planes-feedback {
@@ -248,20 +429,6 @@
   border-color: #fecdca;
 }
 
-.plan-dialog {
-  width: min(650px, calc(100vw - 30px));
-  max-height: calc(100vh - 40px);
-  padding: 0;
-  border: 0;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 20px 35px rgba(16, 24, 40, 0.16);
-}
-
-.plan-dialog::backdrop {
-  background: rgba(16, 24, 40, 0.46);
-}
-
 .plan-form {
   display: flex;
   flex-direction: column;
@@ -386,53 +553,6 @@
 /* =========================================================
    DETALLE DEL PLAN
    ========================================================= */
-
-.plan-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-.plan-detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.plan-detail-header h2 {
-  margin: 8px 0 6px;
-  color: #1d2939;
-  font-size: 24px;
-}
-
-.plan-back-button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #667085;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-}
-
-.plan-back-button:hover {
-  color: #b5121b;
-}
-
-.plan-detail-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.plan-detail-meta span {
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #667085;
-  font-size: 11px;
-}
 
 .plan-semesters {
   display: grid;
@@ -649,39 +769,6 @@
   font-size: 12px;
 }
 
-.plan-detail-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.bloques-plan-content {
-  padding: 20px 22px;
-}
-
-.bloques-plan-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.bloques-plan-toolbar > div {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.bloques-plan-toolbar strong {
-  color: #344054;
-  font-size: 13px;
-}
-
-.bloques-plan-toolbar small {
-  color: #667085;
-  font-size: 11px;
-}
 
 .bloques-plan-list {
   display: grid;
@@ -741,57 +828,19 @@
 }
 
 @media (max-width: 700px) {
-  .plan-detail-actions,
-  .bloques-plan-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
 
   .bloque-plan-row {
     align-items: flex-start;
   }
+
 }
 
 /* RESUMEN DEL PLAN */
-.plan-summary {
-  display: grid;
-  gap: 12px;
-  margin: 18px 0;
-}
-.plan-summary-cards {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-}
-.plan-summary-card {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #eaecf0;
-  border-radius: 9px;
-  background: #fff;
-}
-.plan-summary-icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 8px;
-  background: #f2f4f7;
-  color: #475467;
-}
 .plan-summary-icon svg {
   width: 16px;
   height: 16px;
 }
-.plan-summary-card-content {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
+
 .plan-summary-card-content strong {
   color: #101828;
   font-size: 18px;
@@ -811,22 +860,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.plan-summary-warning {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
-  border-radius: 7px;
-  background: #fffaeb;
-  color: #b54708;
-  font-size: 10px;
-}
-.plan-summary-outcomes {
-  padding: 12px;
-  border: 1px solid #eaecf0;
-  border-radius: 9px;
-  background: #fff;
-}
+
 .plan-summary-outcomes > header {
   margin-bottom: 10px;
 }
@@ -838,24 +872,10 @@
   color: #98a2b3;
   font-size: 9px;
 }
-.plan-summary-outcomes-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-.plan-summary-outcome {
-  display: grid;
-  gap: 7px;
-  padding: 9px;
-  border-radius: 7px;
-  background: #f9fafb;
-}
+
 .plan-summary-outcome-top,
 .plan-summary-progress,
-.plan-summary-status {
-  display: flex;
-  align-items: center;
-}
+
 .plan-summary-outcome-top {
   justify-content: space-between;
   gap: 10px;
@@ -883,28 +903,13 @@
   background: #fffaeb;
   color: #b54708;
 }
-.plan-summary-progress {
-  height: 5px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #eaecf0;
-  color: #7f56d9;
-}
+
 .plan-summary-progress span {
   height: 100%;
   border-radius: inherit;
   background: currentColor;
 }
-.plan-summary-details-button {
-  width: fit-content;
-  border: 0;
-  background: transparent;
-  color: #475467;
-  cursor: pointer;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 600;
-}
+
 .plan-summary-detail {
   min-width: min(720px, calc(100vw - 40px));
 }
@@ -969,15 +974,8 @@
   font-size: 10px;
   font-weight: 600;
 }
-@media (max-width: 1000px) {
-  .plan-summary-cards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
+
 @media (max-width: 700px) {
-  .plan-summary-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .plan-summary-hours {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -986,47 +984,6 @@
 /* =========================================================
    SELECTOR LISTA / MALLA
    ========================================================= */
-
-.plan-view-switch {
-  width: fit-content;
-  display: inline-flex;
-  padding: 3px;
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-  background: #f9fafb;
-}
-
-.plan-view-button {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: #667085;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.plan-view-button svg {
-  width: 15px;
-  height: 15px;
-}
-
-.plan-view-button:hover {
-  color: #344054;
-}
-
-.plan-view-button.active {
-  background: #ffffff;
-  color: #b5121b;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
-}
 
 .malla-legend {
   display: flex;
@@ -1307,13 +1264,6 @@
     gap: 55px;
   }
 
-  .plan-view-switch {
-    width: 100%;
-  }
-
-  .plan-view-button {
-    flex: 1;
-  }
 }
 
 /* =========================================================
@@ -1610,9 +1560,7 @@
    CARGA RÁPIDA
    ========================================================= */
 
-.carga-rapida {
-  min-width: min(1040px, calc(100vw - 40px));
-}
+
 
 .carga-rapida-config {
   border-bottom: 1px solid #eaecf0;
@@ -1715,9 +1663,7 @@
    REQUISITOS RÁPIDOS
    ========================================================= */
 
-.requisitos-rapidos {
-  min-width: min(980px, calc(100vw - 40px));
-}
+
 
 .requisitos-rapidos-intro {
   padding: 14px 22px;
@@ -1780,38 +1726,6 @@
 /* =========================================================
    SALIDAS ACADÉMICAS
    ========================================================= */
-
-.salidas-academicas-dialog {
-  min-width: min(820px, calc(100vw - 40px));
-}
-
-.salidas-academicas-content {
-  padding: 20px 22px;
-}
-
-.salidas-academicas-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.salidas-academicas-toolbar > div {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.salidas-academicas-toolbar strong {
-  color: #344054;
-  font-size: 13px;
-}
-
-.salidas-academicas-toolbar small {
-  color: #667085;
-  font-size: 10px;
-}
 
 .salidas-academicas-list {
   display: grid;
@@ -1951,23 +1865,22 @@
 }
 
 @media (max-width: 700px) {
-  .salidas-academicas-toolbar,
+
   .salida-academica-card {
     align-items: stretch;
     flex-direction: column;
   }
 
+
   .salida-academica-actions {
     flex-wrap: wrap;
   }
+
 }
 /* =========================================================
    REVISIÓN / VALIDACIONES DEL PLAN
    ========================================================= */
 
-.plan-review-dialog {
-  min-width: min(760px, calc(100vw - 40px));
-}
 
 .plan-review-content {
   display: grid;
@@ -2325,3 +2238,6 @@
   font-size: 9px;
   line-height: 1.5;
 }
+
+
+

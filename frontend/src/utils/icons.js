@@ -1,6 +1,10 @@
 import {
   createIcons,
 
+  /* =======================================================
+     USUARIOS / SESIÓN
+     ======================================================= */
+
   User,
   UserCog,
   UserPlus,
@@ -10,15 +14,34 @@ import {
   Eye,
   EyeOff,
 
-  House,
   Mail,
   KeyRound,
+
+  LogOut,
+
+  /* =======================================================
+     NAVEGACIÓN
+     ======================================================= */
+
+  House,
   LayoutDashboard,
+
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+
+  ArrowUpRight,
+
+  /* =======================================================
+     MÓDULOS
+     ======================================================= */
 
   Users,
   GraduationCap,
 
   BookOpen,
+  BookMarked,
+
   Briefcase,
 
   DoorOpen,
@@ -29,38 +52,100 @@ import {
 
   ClipboardList,
 
-  LogOut,
+  /* =======================================================
+     PLANES DE ESTUDIO
+     ======================================================= */
 
-  ShieldCheck,
+  Blocks,
+  Layers,
 
-  ChevronRight,
-  ChevronLeft,
+  SquareArrowRightExit,
+
+  Zap,
 
   Construction,
 
-  TriangleAlert,
+  ShieldCheck,
 
-  CirclePlus,
+  Import,
+
+  FileSpreadsheet,
+  FileDown,
+
+  GitBranch,
+
+  List,
+  ListChecks,
+
+  BadgeCheck,
+
+  ChartNoAxesColumn,
+
+  /* =======================================================
+     ACCIONES
+     ======================================================= */
 
   Plus,
+  CirclePlus,
+
   Save,
-  CirclePause,
-  CircleCheck,
 
   Search,
+
   Pencil,
+
+  Trash2,
+
   Power,
+
   X,
 
-  Clock
+  Check,
+
+  CircleCheck,
+  CircleCheckBig,
+
+  CirclePause,
+
+  CircleX,
+  CircleAlert,
+
+  TriangleAlert,
+
+  /* =======================================================
+     ESTADOS / SISTEMA
+     ======================================================= */
+
+  Clock,
+  Clock3,
+
+  LoaderCircle,
+
+  Database,
+  DatabaseBackup,
+
+  Info,
+
+  RefreshCw,
+
+  Circle
+
 } from 'lucide';
 
+
+/* =========================================================
+   RENDERIZAR ICONOS
+   ========================================================= */
 
 export function renderizarIconos() {
 
   createIcons({
 
     icons: {
+
+      /* ===================================================
+         USUARIOS / SESIÓN
+         =================================================== */
 
       User,
       UserCog,
@@ -70,16 +155,37 @@ export function renderizarIconos() {
 
       Eye,
       EyeOff,
+
       Mail,
       KeyRound,
 
+      LogOut,
+
+
+      /* ===================================================
+         NAVEGACIÓN
+         =================================================== */
+
       House,
       LayoutDashboard,
+
+      ChevronRight,
+      ChevronLeft,
+      ChevronDown,
+
+      ArrowUpRight,
+
+
+      /* ===================================================
+         MÓDULOS
+         =================================================== */
 
       Users,
       GraduationCap,
 
       BookOpen,
+      BookMarked,
+
       Briefcase,
 
       DoorOpen,
@@ -90,30 +196,86 @@ export function renderizarIconos() {
 
       ClipboardList,
 
-      LogOut,
 
-      ShieldCheck,
+      /* ===================================================
+         PLANES DE ESTUDIO
+         =================================================== */
 
-      ChevronRight,
-      ChevronLeft,
+      Blocks,
+      Layers,
+
+      SquareArrowRightExit,
+
+      Zap,
 
       Construction,
 
-      TriangleAlert,
+      ShieldCheck,
 
-      CirclePlus,
+      Import,
+
+      FileSpreadsheet,
+      FileDown,
+
+      GitBranch,
+
+      List,
+      ListChecks,
+
+      BadgeCheck,
+
+      ChartNoAxesColumn,
+
+
+      /* ===================================================
+         ACCIONES
+         =================================================== */
 
       Plus,
+      CirclePlus,
+
       Save,
-      CirclePause,
-      CircleCheck,
 
       Search,
+
       Pencil,
+
+      Trash2,
+
       Power,
+
       X,
 
-      Clock
+      Check,
+
+      CircleCheck,
+      CircleCheckBig,
+
+      CirclePause,
+
+      CircleX,
+      CircleAlert,
+
+      TriangleAlert,
+
+
+      /* ===================================================
+         ESTADOS / SISTEMA
+         =================================================== */
+
+      Clock,
+      Clock3,
+
+      LoaderCircle,
+
+      Database,
+      DatabaseBackup,
+
+      Info,
+
+      RefreshCw,
+
+      Circle
 
     }
 
