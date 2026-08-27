@@ -899,3 +899,801 @@
   }
 
 }
+
+/* =========================================================
+   FORM DIALOG - CONTENIDO COMPLEJO
+   =========================================================
+   Utilizado por herramientas de Planes de estudio:
+   - Bloques
+   - Salidas
+   - Carga rápida
+   - Requisitos
+   - Revisión
+   ========================================================= */
+
+
+/* =========================================================
+   BODY LIBRE
+   ========================================================= */
+
+.sgpa-form-body {
+  width: 100%;
+  min-width: 0;
+}
+
+
+/* =========================================================
+   TOOLBAR INTERNO
+   ========================================================= */
+
+.sgpa-form-tool-toolbar {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  margin-bottom: 16px;
+}
+
+
+.sgpa-form-tool-toolbar > div {
+  min-width: 0;
+}
+
+
+.sgpa-form-tool-toolbar strong {
+  display: block;
+
+  color: #344054;
+
+  font-size: 12px;
+  font-weight: 650;
+}
+
+
+.sgpa-form-tool-toolbar small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #98a2b3;
+
+  font-size: 9.5px;
+
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   QUITAR PADDING DUPLICADO
+   ========================================================= */
+
+.sgpa-form-body
+.bloques-plan-content,
+
+.sgpa-form-body
+.salidas-academicas-content,
+
+.sgpa-form-body
+.plan-review-content {
+  padding: 0 !important;
+}
+
+
+/* =========================================================
+   CARGA RÁPIDA
+   ========================================================= */
+
+.sgpa-form-body
+.carga-rapida-config {
+  margin-bottom: 20px;
+}
+
+
+/* =========================================================
+   REQUISITOS RÁPIDOS
+   ========================================================= */
+
+.sgpa-form-body
+.requisitos-rapidos-intro {
+  margin-bottom: 16px;
+}
+
+
+/* =========================================================
+   FOOTER PERSONALIZADO
+   ========================================================= */
+
+.sgpa-form-footer
+.sgpa-form-footer-left {
+  margin-right: auto;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .sgpa-form-tool-toolbar {
+    align-items: stretch;
+
+    flex-direction: column;
+  }
+
+
+  .sgpa-form-tool-toolbar
+  .sgpa-form-primary {
+    align-self: flex-start;
+  }
+
+}
+
+
+/* =========================================================
+   DIALOG DE HERRAMIENTAS - PLANES DE ESTUDIO
+   =========================================================
+   Utilizado por:
+   - Bloques
+   - Salidas académicas
+   - Carga rápida
+   - Requisitos rápidos
+   - Revisión
+   - Agregar / editar asignatura
+
+   IMPORTANTE:
+   El dialog exterior solamente ocupa el tamaño
+   real de la tarjeta. No se estira verticalmente.
+   ========================================================= */
+
+
+/* =========================================================
+   DIALOG EXTERIOR
+   ========================================================= */
+
+.sgpa-form-dialog-tools {
+  position:
+    fixed !important;
+
+  /*
+   * NO usamos inset: 0.
+   *
+   * inset: 0 + height:auto hacía que el
+   * dialog transparente se extendiera
+   * verticalmente por la pantalla.
+   */
+
+  top:
+    50% !important;
+
+  left:
+    50% !important;
+
+  right:
+    auto !important;
+
+  bottom:
+    auto !important;
+
+
+  transform:
+    translate(
+      -50%,
+      -50%
+    ) !important;
+
+
+  width:
+    min(
+      900px,
+      calc(100vw - 48px)
+    ) !important;
+
+
+  max-width:
+    calc(
+      100vw - 48px
+    ) !important;
+
+
+  /*
+   * El tamaño vertical depende
+   * exclusivamente del contenido.
+   */
+
+  height:
+    fit-content !important;
+
+  min-height:
+    0 !important;
+
+
+  max-height:
+    calc(
+      100vh - 48px
+    ) !important;
+
+
+  margin:
+    0 !important;
+
+
+  padding:
+    0 !important;
+
+
+  border:
+    0 !important;
+
+
+  border-radius:
+    16px !important;
+
+
+  background:
+    transparent !important;
+
+
+  /*
+   * El dialog exterior NO crea
+   * una segunda caja visual.
+   */
+
+  overflow:
+    visible !important;
+
+
+  box-shadow:
+    none !important;
+
+
+  color:
+    inherit;
+
+
+  outline:
+    none;
+
+
+  box-sizing:
+    border-box;
+}
+
+
+/* =========================================================
+   BACKDROP
+   ========================================================= */
+
+.sgpa-form-dialog-tools::backdrop {
+  background:
+    rgba(
+      15,
+      23,
+      42,
+      0.46
+    );
+
+  backdrop-filter:
+    blur(2px);
+}
+
+
+/* =========================================================
+   CONTENEDOR INTERMEDIO
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-dialog-content {
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+
+
+  height:
+    auto;
+
+  min-height:
+    0;
+
+
+  max-height:
+    calc(
+      100vh - 48px
+    );
+
+
+  margin:
+    0;
+
+
+  padding:
+    0;
+
+
+  background:
+    transparent;
+
+
+  overflow:
+    visible;
+}
+
+
+/* =========================================================
+   TARJETA BLANCA REAL
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form {
+  position:
+    relative;
+
+
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+
+
+  height:
+    auto;
+
+  min-height:
+    0;
+
+
+  max-height:
+    calc(
+      100vh - 48px
+    );
+
+
+  margin:
+    0;
+
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+
+  overflow:
+    hidden;
+
+
+  border:
+    1px solid #e4e7ec;
+
+
+  border-radius:
+    16px;
+
+
+  background:
+    #ffffff;
+
+
+  box-shadow:
+    0 24px 60px
+    rgba(
+      15,
+      23,
+      42,
+      0.20
+    );
+}
+
+
+/* =========================================================
+   LOGO
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-brand {
+  flex:
+    0 0 auto;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-header {
+  flex:
+    0 0 auto;
+}
+
+
+/* =========================================================
+   CONTENIDO CON SCROLL
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-scroll {
+  flex:
+    1 1 auto;
+
+
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+
+
+  min-height:
+    0;
+
+
+  overflow-x:
+    hidden;
+
+  overflow-y:
+    auto;
+
+
+  overscroll-behavior:
+    contain;
+}
+
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-scroll::-webkit-scrollbar {
+  width:
+    7px;
+}
+
+
+.sgpa-form-dialog-tools
+.sgpa-form-scroll::-webkit-scrollbar-track {
+  background:
+    transparent;
+}
+
+
+.sgpa-form-dialog-tools
+.sgpa-form-scroll::-webkit-scrollbar-thumb {
+  background:
+    #d0d5dd;
+
+  border-radius:
+    20px;
+}
+
+
+.sgpa-form-dialog-tools
+.sgpa-form-scroll::-webkit-scrollbar-thumb:hover {
+  background:
+    #98a2b3;
+}
+
+
+/* =========================================================
+   BODY LIBRE
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-body {
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+
+
+  overflow:
+    visible;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-footer {
+  flex:
+    0 0 auto;
+
+
+  position:
+    relative;
+
+
+  z-index:
+    2;
+
+
+  background:
+    #ffffff;
+}
+
+
+/* =========================================================
+   BLOQUES INTERNOS
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.bloques-plan-content,
+
+.sgpa-form-dialog-tools
+.salidas-academicas-content,
+
+.sgpa-form-dialog-tools
+.plan-review-content,
+
+.sgpa-form-dialog-tools
+.requisitos-rapidos,
+
+.sgpa-form-dialog-tools
+.carga-rapida {
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+}
+
+
+/* =========================================================
+   TABLAS INTERNAS
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.requisitos-rapidos-table-wrapper {
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+
+  overflow-x:
+    auto;
+
+  overflow-y:
+    hidden;
+}
+
+
+/* =========================================================
+   CARGA RÁPIDA
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.plan-bulk-rows {
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+}
+
+
+/* =========================================================
+   TOOLBAR INTERNO
+   ========================================================= */
+
+.sgpa-form-dialog-tools
+.sgpa-form-tool-toolbar {
+  width:
+    100%;
+
+  max-width:
+    100%;
+
+  min-width:
+    0;
+}
+
+
+/* =========================================================
+   FORMULARIO DE ASIGNATURA
+   ========================================================= */
+
+.asignatura-plan-form
+.plan-reference-fields
+label {
+  min-width:
+    0;
+
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+
+  gap:
+    7px;
+}
+
+
+.asignatura-plan-form
+.plan-reference-fields
+label > span {
+  color:
+    #344054;
+
+
+  font-size:
+    11px;
+
+  font-weight:
+    650;
+}
+
+
+/*
+ * La sección de horas ocupa
+ * las dos columnas.
+ */
+
+.asignatura-plan-form
+.plan-hours-section {
+  grid-column:
+    1 / -1;
+}
+
+
+/* =========================================================
+   RESPONSIVE - 1000
+   ========================================================= */
+
+@media (max-width: 1000px) {
+
+  .sgpa-form-dialog-tools {
+    width:
+      min(
+        820px,
+        calc(
+          100vw - 36px
+        )
+      ) !important;
+
+
+    max-width:
+      calc(
+        100vw - 36px
+      ) !important;
+
+
+    max-height:
+      calc(
+        100vh - 36px
+      ) !important;
+  }
+
+
+  .sgpa-form-dialog-tools
+  .sgpa-form-dialog-content,
+
+  .sgpa-form-dialog-tools
+  .sgpa-form {
+    max-height:
+      calc(
+        100vh - 36px
+      );
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE - 700
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .sgpa-form-dialog-tools {
+    width:
+      calc(
+        100vw - 24px
+      ) !important;
+
+
+    max-width:
+      calc(
+        100vw - 24px
+      ) !important;
+
+
+    max-height:
+      calc(
+        100vh - 24px
+      ) !important;
+  }
+
+
+  .sgpa-form-dialog-tools
+  .sgpa-form-dialog-content,
+
+  .sgpa-form-dialog-tools
+  .sgpa-form {
+    max-height:
+      calc(
+        100vh - 24px
+      );
+  }
+
+
+  .asignatura-plan-form
+  .plan-reference-fields {
+    grid-template-columns:
+      1fr;
+  }
+
+}
+
+
+/* =========================================================
+   RESPONSIVE - 480
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+  .sgpa-form-dialog-tools {
+    width:
+      calc(
+        100vw - 16px
+      ) !important;
+
+
+    max-width:
+      calc(
+        100vw - 16px
+      ) !important;
+
+
+    max-height:
+      calc(
+        100vh - 16px
+      ) !important;
+  }
+
+
+  .sgpa-form-dialog-tools
+  .sgpa-form-dialog-content,
+
+  .sgpa-form-dialog-tools
+  .sgpa-form {
+    max-height:
+      calc(
+        100vh - 16px
+      );
+  }
+
+}

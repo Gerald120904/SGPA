@@ -45,6 +45,7 @@ import { renderizarIconos } from "../../utils/icons.js";
 import { DataTable } from "../../components/DataTable.js";
 import { FormDialog, habilitarCierreExterior, } from "../../components/FormDialog.js";
 import { mostrarExito, mostrarError } from "../../components/AlertModal.js";
+import { VerPlanPage } from "./VerPlanPage.js";
 
 let planes = [];
 let carrerasDisponibles = [];
@@ -59,6 +60,39 @@ let instanciaActual = 0;
 let vistaDetallePlan = "LISTA";
 let filtroBloquePlan = "";
 let observerMalla = null;
+
+/* =========================================================
+   ABRIR DIALOG DE HERRAMIENTAS
+   ========================================================= */
+
+function mostrarDialogHerramienta() {
+
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
+
+
+  if (!dialog) {
+    return null;
+  }
+
+
+  if (!dialog.open) {
+
+    dialog.showModal();
+
+  }
+
+
+  habilitarCierreExterior(
+    dialog
+  );
+
+
+  return dialog;
+
+}
 
 export function PlanesEstudioPage() {
   return `
@@ -308,17 +342,19 @@ function renderizarPlanes() {
 
             <td class="planes-actions">
 
-              <button
-                class="planes-view-button"
+            <button
+                class="planes-icon-button"
                 data-action="ver-plan"
                 data-id="${plan.id}"
                 type="button"
-                title="Ver asignaturas del plan"
-              >
-
-                Ver plan
-
-              </button>
+                title="Ver plan"
+                aria-label="Ver plan"
+            >
+              <i
+                  data-lucide="eye"
+                  aria-hidden="true"
+                ></i>
+            </button>
 
 
               <button
@@ -1193,24 +1229,88 @@ function agruparAsignaturasPorBloque() {
   });
 }
 
-function renderizarListaAsignaturas(grupos) {
-  const mensajeVacio = filtroBloquePlan
-    ? "No hay asignaturas para el bloque seleccionado."
-    : "Este plan todavía no tiene asignaturas.";
+function renderizarListaAsignaturas(
+  grupos
+) {
+
+  const mensajeVacio =
+    filtroBloquePlan
+      ? "No hay asignaturas para el bloque seleccionado."
+      : "Este plan todavía no tiene asignaturas.";
+
+
+  if (
+    grupos.length === 0
+  ) {
+
+    return `
+      <div class="ver-plan-empty">
+
+        <div class="ver-plan-empty-icon">
+
+          <i
+            data-lucide="book-open"
+            aria-hidden="true"
+          ></i>
+
+        </div>
+
+
+        <strong>
+          ${
+            filtroBloquePlan
+              ? "Sin asignaturas en este bloque"
+              : "El plan aún está vacío"
+          }
+        </strong>
+
+
+        <p>
+          ${mensajeVacio}
+        </p>
+
+
+        ${
+          !filtroBloquePlan
+            ? `
+                <button
+                  id="agregarPrimeraAsignaturaButton"
+                  class="ver-plan-empty-action"
+                  type="button"
+                >
+
+                  <i
+                    data-lucide="plus"
+                    aria-hidden="true"
+                  ></i>
+
+                  Agregar primera asignatura
+
+                </button>
+              `
+            : ""
+        }
+
+      </div>
+    `;
+
+  }
+
 
   return `
     <div class="plan-semesters">
+
       ${
-        grupos.length > 0
-          ? grupos.map(renderizarGrupoAsignaturas).join("")
-          : `
-              <div class="planes-message">
-                ${mensajeVacio}
-              </div>
-            `
+        grupos
+          .map(
+            renderizarGrupoAsignaturas
+          )
+          .join("")
       }
+
     </div>
   `;
+
 }
 
 function renderizarTarjetaMalla(asignatura) {
@@ -1483,40 +1583,205 @@ function conectarEventosMalla() {
 }
 
 async function descargarPlantillaPlan() {
-  const button = document.getElementById("plantillaExcelPlanButton");
-  const htmlOriginal = button?.innerHTML;
-  if (button) {
-    button.disabled = true;
-    button.innerHTML = '<i data-lucide="loader-circle"></i> Generando...';
+
+  const button =
+    document.getElementById(
+      "plantillaExcelPlanButton"
+    );
+
+
+  const htmlOriginal =
+    button?.innerHTML ||
+    "";
+
+
+  const cambiarContenido = (
+    icono,
+    texto
+  ) => {
+
+    if (!button) {
+      return;
+    }
+
+
+    button.innerHTML = `
+
+      <span class="ver-plan-tool-icon">
+
+        <i
+          data-lucide="${icono}"
+          aria-hidden="true"
+        ></i>
+
+      </span>
+
+
+      <span class="ver-plan-tool-label">
+        ${texto}
+      </span>
+
+    `;
+
+
     renderizarIconos();
+
+  };
+
+
+  if (button) {
+
+    button.disabled =
+      true;
+
+
+    button.classList.add(
+      "is-loading"
+    );
+
+
+    cambiarContenido(
+      "loader-circle",
+      "Generando..."
+    );
+
   }
+
+
   try {
-    const resultado = await guardarPlantillaExcelPlan();
-    if (resultado?.cancelado) return;
+
+    const resultado =
+      await guardarPlantillaExcelPlan();
+
+
+    /*
+     * Si el usuario cancela la ventana
+     * de guardado, restauramos el botón.
+     */
+
+    if (
+      resultado?.cancelado
+    ) {
+
+      if (button) {
+
+        button.innerHTML =
+          htmlOriginal;
+
+        renderizarIconos();
+
+      }
+
+
+      return;
+
+    }
+
+
     if (!resultado?.ok) {
+
       throw new Error(
-        resultado?.message || "No fue posible crear la plantilla.",
+        resultado?.message ||
+        "No fue posible crear la plantilla."
       );
+
     }
+
+
     if (button) {
-      button.innerHTML = '<i data-lucide="check"></i> Plantilla guardada';
-      renderizarIconos();
-      window.setTimeout(() => {
-        if (button.isConnected) {
-          button.innerHTML = htmlOriginal || "";
-          renderizarIconos();
-        }
-      }, 2000);
+
+      button.classList.remove(
+        "is-loading"
+      );
+
+
+      cambiarContenido(
+        "check",
+        "Guardada"
+      );
+
+
+      window.setTimeout(
+        () => {
+
+          if (
+            button.isConnected
+          ) {
+
+            button.innerHTML =
+              htmlOriginal;
+
+
+            renderizarIconos();
+
+          }
+
+        },
+        1800
+      );
+
     }
+
+
   } catch (error) {
-    console.error("Error generando plantilla:", error);
+
+    console.error(
+      "Error generando plantilla:",
+      error
+    );
+
+
     if (button) {
-      button.innerHTML = '<i data-lucide="circle-x"></i> Error al generar';
-      renderizarIconos();
+
+      button.classList.remove(
+        "is-loading"
+      );
+
+
+      cambiarContenido(
+        "circle-x",
+        "Error"
+      );
+
+
+      window.setTimeout(
+        () => {
+
+          if (
+            button.isConnected
+          ) {
+
+            button.innerHTML =
+              htmlOriginal;
+
+
+            renderizarIconos();
+
+          }
+
+        },
+        1800
+      );
+
     }
+
+
   } finally {
-    if (button) button.disabled = false;
+
+    if (button) {
+
+      button.disabled =
+        false;
+
+
+      button.classList.remove(
+        "is-loading"
+      );
+
+    }
+
   }
+
 }
 
 async function seleccionarExcelParaPlan() {
@@ -1794,33 +2059,129 @@ function mostrarPrevisualizacionExcel(archivo, datos) {
 }
 
 async function abrirRevisionPlan() {
-  if (!planSeleccionado) return;
 
-  const button = document.getElementById("revisarPlanButton");
-  if (button) {
-    button.disabled = true;
-    button.innerHTML =
-      '<i data-lucide="loader-circle" aria-hidden="true"></i> Revisando...';
-    renderizarIconos();
+  if (!planSeleccionado) {
+    return;
   }
+
+
+  const button =
+    document.getElementById(
+      "revisarPlanButton"
+    );
+
+
+  /*
+   * Guardamos la estructura original del botón.
+   *
+   * Esto es importante porque contiene:
+   *
+   * .ver-plan-tool-icon
+   * .ver-plan-tool-label
+   */
+
+  const htmlOriginal =
+    button?.innerHTML ||
+    "";
+
+
+  if (button) {
+
+    button.disabled =
+      true;
+
+
+    button.classList.add(
+      "is-loading"
+    );
+
+
+    button.innerHTML = `
+
+      <span class="ver-plan-tool-icon">
+
+        <i
+          data-lucide="loader-circle"
+          aria-hidden="true"
+        ></i>
+
+      </span>
+
+
+      <span class="ver-plan-tool-label">
+        Revisando...
+      </span>
+
+    `;
+
+
+    renderizarIconos();
+
+  }
+
 
   try {
-    const resultado = await validarPlanEstudio(planSeleccionado.id);
+
+    const resultado =
+      await validarPlanEstudio(
+        planSeleccionado.id
+      );
+
+
     if (!resultado?.ok) {
-      throw new Error(resultado?.message || "No fue posible revisar el plan.");
+
+      throw new Error(
+        resultado?.message ||
+        "No fue posible revisar el plan."
+      );
+
     }
-    mostrarResultadoRevision(resultado.validacion);
+
+
+    mostrarResultadoRevision(
+      resultado.validacion
+    );
+
+
   } catch (error) {
-    console.error("Error revisando plan:", error);
-    mostrarErrorRevision(error?.message || "No fue posible revisar el plan.");
+
+    console.error(
+      "Error revisando plan:",
+      error
+    );
+
+
+    mostrarErrorRevision(
+
+      error?.message ||
+      "No fue posible revisar el plan."
+
+    );
+
+
   } finally {
+
     if (button) {
-      button.disabled = false;
+
+      button.disabled =
+        false;
+
+
+      button.classList.remove(
+        "is-loading"
+      );
+
+
       button.innerHTML =
-        '<i data-lucide="shield-check" aria-hidden="true"></i> Revisar plan';
+        htmlOriginal;
+
+
       renderizarIconos();
+
     }
+
   }
+
 }
 
 function renderizarEstadoGeneralRevision(validacion) {
@@ -1875,405 +2236,711 @@ function renderizarGrupoRevision(titulo, descripcion, items, tipo) {
 }
 
 function mostrarResultadoRevision(validacion) {
-  const dialog = document.getElementById("asignaturaDialog");
-  const content = document.getElementById("asignaturaDialogContent");
-  if (!dialog || !content || !planSeleccionado) return;
 
-  const errores = Array.isArray(validacion?.errores) ? validacion.errores : [];
-  const advertencias = Array.isArray(validacion?.advertencias)
-    ? validacion.advertencias
-    : [];
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
 
-  content.innerHTML = `
-    <div class="plan-form plan-review-dialog">
-      <header class="plan-dialog-header"><div><h3>Revisión del plan</h3><p>${escapeHtml(planSeleccionado.nombre)}</p></div><button id="cerrarRevisionPlan" class="planes-icon-button" type="button"><i data-lucide="x"></i></button></header>
-      <div class="plan-review-content">
-        ${renderizarEstadoGeneralRevision(validacion)}
-        <div class="plan-review-counters"><article><strong>${errores.length}</strong><span>Errores</span></article><article><strong>${advertencias.length}</strong><span>Advertencias</span></article></div>
-        ${errores.length ? renderizarGrupoRevision("Errores", "Estos problemas deben corregirse.", errores, "ERROR") : ""}
-        ${advertencias.length ? renderizarGrupoRevision("Advertencias", "Revise estos puntos contra el documento oficial.", advertencias, "ADVERTENCIA") : ""}
-        ${errores.length === 0 && advertencias.length === 0 ? '<div class="plan-review-empty"><i data-lucide="circle-check-big"></i><div><strong>No se detectaron inconsistencias</strong><p>Las validaciones automáticas del plan no encontraron problemas.</p></div></div>' : ""}
-      </div>
-      <footer class="plan-dialog-footer"><button id="volverEjecutarRevision" class="planes-secondary-button" type="button"><i data-lucide="refresh-cw"></i> Revisar nuevamente</button><button id="cerrarRevisionPlanFooter" class="planes-primary-button" type="button">Cerrar</button></footer>
-    </div>`;
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
 
-  renderizarIconos();
-  if (!dialog.open) dialog.showModal();
-  const cerrar = () => dialog.close();
-  document
-    .getElementById("cerrarRevisionPlan")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("cerrarRevisionPlanFooter")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("volverEjecutarRevision")
-    ?.addEventListener("click", () => {
-      dialog.close();
-      abrirRevisionPlan();
-    });
-}
 
-function mostrarErrorRevision(mensaje) {
-  const dialog = document.getElementById("asignaturaDialog");
-  const content = document.getElementById("asignaturaDialogContent");
-  if (!dialog || !content) return;
-
-  content.innerHTML = `
-    <div class="plan-form"><header class="plan-dialog-header"><div><h3>Revisión del plan</h3><p>No fue posible completar la revisión.</p></div></header><div class="plan-review-request-error"><i data-lucide="circle-alert"></i><p>${escapeHtml(mensaje)}</p></div><footer class="plan-dialog-footer"><button id="cerrarErrorRevision" class="planes-primary-button" type="button">Cerrar</button></footer></div>`;
-  renderizarIconos();
-  if (!dialog.open) dialog.showModal();
-  document
-    .getElementById("cerrarErrorRevision")
-    ?.addEventListener("click", () => dialog.close());
-}
-
-function renderizarTarjetaResumen(icono, valor, titulo, detalle) {
-  return `
-    <article class="plan-summary-card">
-      <div class="plan-summary-icon"><i data-lucide="${icono}"></i></div>
-      <div class="plan-summary-card-content">
-        <strong>${escapeHtml(String(valor))}</strong>
-        <span>${escapeHtml(titulo)}</span>
-        <small>${escapeHtml(detalle)}</small>
-      </div>
-    </article>
-  `;
-}
-
-function renderizarResumenSalidas(salidas) {
-  const activas = salidas.filter((salida) => salida.activo);
-  if (!activas.length) return "";
-
-  return `
-    <div class="plan-summary-outcomes">
-      <header><div><strong>Salidas académicas</strong><small>Créditos asociados frente a créditos requeridos.</small></div></header>
-      <div class="plan-summary-outcomes-list">
-        ${activas
-          .map((salida) => {
-            const porcentaje = salida.creditosRequeridos
-              ? Math.min(
-                  100,
-                  (Number(salida.creditosAsociados || 0) /
-                    Number(salida.creditosRequeridos)) *
-                    100,
-                )
-              : 0;
-            return `
-              <div class="plan-summary-outcome">
-                <div class="plan-summary-outcome-top">
-                  <div><strong>${escapeHtml(salida.nombre)}</strong><small>${escapeHtml(formatearTipoSalida(salida.tipo))}</small></div>
-                  <span class="plan-summary-status ${salida.cumpleCreditos ? "is-complete" : "is-pending"}">
-                    <i data-lucide="${salida.cumpleCreditos ? "check" : "clock-3"}"></i>
-                    ${salida.creditosAsociados} / ${salida.creditosRequeridos}
-                  </span>
-                </div>
-                <div class="plan-summary-progress"><span style="width: ${porcentaje}%;"></span></div>
-              </div>`;
-          })
-          .join("")}
-      </div>
-    </div>`;
-}
-
-function renderizarResumenPlan() {
-  if (!resumenPlan) return "";
-  const asignaturas = resumenPlan.asignaturas || {};
-  const creditos = resumenPlan.creditos || {};
-  const relaciones = resumenPlan.relaciones || {};
-  const bloques = resumenPlan.bloques || {};
-  const salidas = Array.isArray(resumenPlan.salidas) ? resumenPlan.salidas : [];
-
-  return `
-    <section class="plan-summary">
-      <div class="plan-summary-cards">
-        ${renderizarTarjetaResumen("book-open", asignaturas.activas ?? 0, "Asignaturas", asignaturas.inactivas ? `${asignaturas.inactivas} inactivas` : "Activas en el plan")}
-        ${renderizarTarjetaResumen("badge-check", creditos.total ?? 0, "Créditos", "Total registrado")}
-        ${renderizarTarjetaResumen("git-branch", relaciones.requisitos ?? 0, "Requisitos", `${relaciones.correquisitos ?? 0} correquisitos`)}
-        ${renderizarTarjetaResumen("layers", bloques.activos ?? 0, "Bloques", `${bloques.total ?? 0} registrados`)}
-        ${renderizarTarjetaResumen("graduation-cap", salidas.filter((item) => item.activo).length, "Salidas", `${salidas.length} registradas`)}
-      </div>
-      ${asignaturas.sinBloque > 0 ? `<div class="plan-summary-warning"><i data-lucide="triangle-alert"></i>${asignaturas.sinBloque} asignatura${asignaturas.sinBloque === 1 ? "" : "s"} sin bloque.</div>` : ""}
-      ${salidas.length ? renderizarResumenSalidas(salidas) : ""}
-      <button id="verDetalleResumenButton" class="plan-summary-details-button" type="button"><i data-lucide="chart-no-axes-column"></i>Ver detalle del resumen</button>
-    </section>`;
-}
-
-function renderizarDetallePlan() {
-  const contenedor = document.getElementById("planesEstudioPage");
-
-  if (!contenedor || !planSeleccionado) {
+  if (
+    !dialog ||
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  const grupos = agruparAsignaturas();
-  const creditosTotales = asignaturasPlan
-    .filter((item) => item.activo)
-    .reduce((total, item) => total + Number(item.creditos || 0), 0);
 
-  contenedor.innerHTML = `
-    <section class="plan-detail">
-      <header class="plan-detail-header">
-        <div>
-          <button
-            id="volverPlanesButton"
-            class="plan-back-button"
-            type="button"
-          >
-            ← Planes de estudio
-          </button>
+  const errores =
+    Array.isArray(
+      validacion?.errores
+    )
+      ? validacion.errores
+      : [];
 
-          <h2>${escapeHtml(planSeleccionado.nombre)}</h2>
 
-          <div class="plan-detail-meta">
-            <span>${escapeHtml(planSeleccionado.codigo)}</span>
-            <span>${escapeHtml(planSeleccionado.carrera?.nombre || "")}</span>
-            <span>${creditosTotales} créditos registrados</span>
-          </div>
-        </div>
+  const advertencias =
+    Array.isArray(
+      validacion?.advertencias
+    )
+      ? validacion.advertencias
+      : [];
 
-        <div class="plan-detail-actions">
-          <button
-            id="administrarBloquesButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="layers" aria-hidden="true"></i>
-            Administrar bloques
-          </button>
 
-          <button
-            id="salidasAcademicasButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="graduation-cap" aria-hidden="true"></i>
-            Salidas académicas
-          </button>
+  const body = `
 
-          <button
-            id="cargaRapidaButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="zap" aria-hidden="true"></i>
-            Carga rápida
-          </button>
+    <div class="plan-review-content">
 
-          <button
-            id="requisitosRapidosButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="git-branch" aria-hidden="true"></i>
-            Requisitos rápidos
-          </button>
+      ${renderizarEstadoGeneralRevision(
+        validacion
+      )}
 
-          <button
-            id="revisarPlanButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="shield-check" aria-hidden="true"></i>
-            Revisar plan
-          </button>
 
-          <button
-            id="importarExcelPlanButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
-            Importar Excel
-          </button>
+      <div class="plan-review-counters">
 
-          <button
-            id="plantillaExcelPlanButton"
-            class="planes-secondary-button"
-            type="button"
-          >
-            <i data-lucide="file-down" aria-hidden="true"></i>
-            Descargar plantilla
-          </button>
+        <article>
 
-          <button
-            id="agregarAsignaturaButton"
-            class="planes-primary-button"
-            type="button"
-          >
-            <i data-lucide="plus" aria-hidden="true"></i>
-            Agregar asignatura
-          </button>
-        </div>
-      </header>
+          <strong>
+            ${errores.length}
+          </strong>
 
-      ${renderizarResumenPlan()}
+          <span>
+            Errores
+          </span>
 
-      <div
-        id="planDetalleFeedback"
-        class="planes-feedback hidden"
-        role="status"
-      ></div>
+        </article>
 
-      <div class="plan-view-switch" aria-label="Vista del plan">
-        <button
-          class="plan-view-button ${
-            vistaDetallePlan === "LISTA" ? "active" : ""
-          }"
-          data-plan-view="LISTA"
-          type="button"
-          aria-pressed="${vistaDetallePlan === "LISTA"}"
-        >
-          <i data-lucide="list" aria-hidden="true"></i>
-          Lista
-        </button>
-        <button
-          class="plan-view-button ${
-            vistaDetallePlan === "MALLA" ? "active" : ""
-          }"
-          data-plan-view="MALLA"
-          type="button"
-          aria-pressed="${vistaDetallePlan === "MALLA"}"
-        >
-          <i data-lucide="git-branch" aria-hidden="true"></i>
-          Malla curricular
-        </button>
+
+        <article>
+
+          <strong>
+            ${advertencias.length}
+          </strong>
+
+          <span>
+            Advertencias
+          </span>
+
+        </article>
+
       </div>
 
-      <div class="plan-block-filter">
-        <label>
-          <span>Bloque</span>
-          <select id="filtroBloquePlan">
-            <option value="">Todos los bloques</option>
-            <option
-              value="SIN_BLOQUE"
-              ${filtroBloquePlan === "SIN_BLOQUE" ? "selected" : ""}
-            >
-              Sin bloque
-            </option>
-            ${bloquesPlan
-              .filter((bloque) => bloque.activo)
-              .sort((a, b) => a.orden - b.orden)
-              .map(
-                (bloque) => `
-                  <option
-                    value="${bloque.id}"
-                    ${
-                      String(bloque.id) === String(filtroBloquePlan)
-                        ? "selected"
-                        : ""
-                    }
-                  >
-                    ${escapeHtml(bloque.nombre)}
-                  </option>
-                `,
-              )
-              .join("")}
-          </select>
-        </label>
-      </div>
 
-      <div id="planVistaContenido">
-        ${
-          vistaDetallePlan === "MALLA"
-            ? renderizarMallaCurricular()
-            : renderizarListaAsignaturas(grupos)
-        }
-      </div>
+      ${
+        errores.length
 
-      <dialog id="asignaturaDialog" class="plan-dialog">
-        <div id="asignaturaDialogContent"></div>
-      </dialog>
-    </section>
+          ? renderizarGrupoRevision(
+              "Errores",
+              "Estos problemas deben corregirse.",
+              errores,
+              "ERROR"
+            )
+
+          : ""
+      }
+
+
+      ${
+        advertencias.length
+
+          ? renderizarGrupoRevision(
+              "Advertencias",
+              "Revise estos puntos contra el documento oficial.",
+              advertencias,
+              "ADVERTENCIA"
+            )
+
+          : ""
+      }
+
+
+      ${
+        errores.length === 0 &&
+        advertencias.length === 0
+
+          ? `
+              <div class="plan-review-empty">
+
+                <i
+                  data-lucide="circle-check-big"
+                  aria-hidden="true"
+                ></i>
+
+
+                <div>
+
+                  <strong>
+                    No se detectaron inconsistencias
+                  </strong>
+
+                  <p>
+                    Las validaciones automáticas
+                    del plan no encontraron problemas.
+                  </p>
+
+                </div>
+
+              </div>
+            `
+
+          : ""
+      }
+
+    </div>
+
   `;
+
+
+  const footerHtml = `
+
+    <button
+      id="volverEjecutarRevision"
+      class="sgpa-form-secondary sgpa-form-footer-left"
+      type="button"
+    >
+
+      <i
+        data-lucide="refresh-cw"
+        aria-hidden="true"
+      ></i>
+
+      Revisar nuevamente
+
+    </button>
+
+
+    <button
+      id="cerrarRevisionPlanFooter"
+      class="sgpa-form-primary"
+      type="button"
+    >
+
+      <span>
+        Cerrar
+      </span>
+
+    </button>
+
+  `;
+
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "revisionPlanForm",
+
+      title:
+        "Revisión del plan",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      layout:
+        "custom",
+
+      formClass:
+        "plan-review-dialog",
+
+      footerHtml
+
+    });
+
 
   renderizarIconos();
 
-  document
-    .getElementById("verDetalleResumenButton")
-    ?.addEventListener("click", abrirDetalleResumenPlan);
+
+  mostrarDialogHerramienta();
+
+
+  const cerrar =
+    () => dialog.close();
+
 
   document
-    .getElementById("filtroBloquePlan")
-    ?.addEventListener("change", (event) => {
-      filtroBloquePlan = event.target.value;
-      renderizarDetallePlan();
-    });
+    .getElementById(
+      "cerrarRevisionPlanFooter"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
 
-  document.querySelectorAll("[data-plan-view]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const vista = button.dataset.planView;
 
-      if (vista !== "LISTA" && vista !== "MALLA") {
-        return;
+  document
+    .getElementById(
+      "volverEjecutarRevision"
+    )
+    ?.addEventListener(
+      "click",
+      () => {
+
+        dialog.close();
+
+
+        abrirRevisionPlan();
+
       }
+    );
 
-      vistaDetallePlan = vista;
-      renderizarDetallePlan();
-    });
-  });
+}
 
-  document
-    .getElementById("volverPlanesButton")
-    ?.addEventListener("click", volverListadoPlanes);
-  document
-    .getElementById("administrarBloquesButton")
-    ?.addEventListener("click", abrirAdministradorBloques);
-  document
-    .getElementById("salidasAcademicasButton")
-    ?.addEventListener("click", abrirAdministradorSalidas);
-  document
-    .getElementById("cargaRapidaButton")
-    ?.addEventListener("click", abrirCargaRapida);
-  document
-    .getElementById("requisitosRapidosButton")
-    ?.addEventListener("click", abrirRequisitosRapidos);
-  document
-    .getElementById("revisarPlanButton")
-    ?.addEventListener("click", abrirRevisionPlan);
-  document
-    .getElementById("importarExcelPlanButton")
-    ?.addEventListener("click", seleccionarExcelParaPlan);
-  document
-    .getElementById("plantillaExcelPlanButton")
-    ?.addEventListener("click", descargarPlantillaPlan);
-  document
-    .getElementById("agregarAsignaturaButton")
-    ?.addEventListener("click", () => abrirFormularioAsignatura());
-  document.querySelectorAll("[data-asignatura-action]").forEach((button) => {
-    button.addEventListener("click", manejarAccionAsignatura);
-  });
+function mostrarErrorRevision(mensaje) {
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
 
-  const dialog = document.getElementById("asignaturaDialog");
-  dialog?.addEventListener("click", (event) => {
-    if (event.target === dialog) {
-      dialog.close();
-    }
-  });
-
-  observerMalla?.disconnect();
-  observerMalla = null;
-
-  if (vistaDetallePlan === "MALLA") {
-    window.requestAnimationFrame(() => {
-      dibujarConexionesMalla();
-      conectarEventosMalla();
-
-      const canvas = document.getElementById("mallaCanvas");
-      const scroll = document.getElementById("mallaScroll");
-
-      if (canvas && typeof ResizeObserver !== "undefined") {
-        observerMalla = new ResizeObserver(() => {
-          dibujarConexionesMalla();
-        });
-        observerMalla.observe(canvas);
-
-        if (scroll) {
-          observerMalla.observe(scroll);
-        }
-      }
-    });
+  if (
+    !dialog ||
+    !content
+  ) {
+    return;
   }
+
+  const body = `
+
+    <div class="plan-review-request-error">
+
+      <i
+        data-lucide="circle-alert"
+        aria-hidden="true"
+      ></i>
+
+
+      <p>
+        ${escapeHtml(mensaje)}
+      </p>
+
+    </div>
+
+  `;
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "revisionPlanErrorForm",
+
+      title:
+        "Revisión del plan",
+
+      description:
+        "No fue posible completar la revisión.",
+
+      body,
+
+      cancelButtonId:
+        "cerrarErrorRevision",
+
+      cancelText:
+        "Cerrar",
+
+      layout:
+        "custom"
+
+    });
+
+  renderizarIconos();
+  mostrarDialogHerramienta();
+  document
+    .getElementById(
+      "cerrarErrorRevision"
+    )
+    ?.addEventListener(
+      "click",
+      () =>
+        dialog.close()
+    );
+}
+
+
+function renderizarDetallePlan() {
+
+  const contenedor =
+    document.getElementById(
+      "planesEstudioPage"
+    );
+
+
+  if (
+    !contenedor ||
+    !planSeleccionado
+  ) {
+    return;
+  }
+
+
+  /* =======================================================
+     DATOS PARA LA VISTA
+     ======================================================= */
+
+  const grupos =
+    agruparAsignaturas();
+
+
+  const creditosTotales =
+    asignaturasPlan
+      .filter(
+        (item) =>
+          item.activo
+      )
+      .reduce(
+        (total, item) =>
+          total +
+          Number(
+            item.creditos || 0
+          ),
+        0
+      );
+
+
+  const contenidoVista =
+    vistaDetallePlan === "MALLA"
+      ? renderizarMallaCurricular()
+      : renderizarListaAsignaturas(
+          grupos
+        );
+
+
+  /* =======================================================
+     RENDER PAGE
+     ======================================================= */
+
+  contenedor.innerHTML =
+    VerPlanPage({
+
+      plan:
+        planSeleccionado,
+
+      resumenPlan,
+
+      creditosTotales,
+
+      vista:
+        vistaDetallePlan,
+
+      filtroBloque:
+        filtroBloquePlan,
+
+      bloques:
+        bloquesPlan,
+
+      contenidoVista
+
+    });
+
+
+  renderizarIconos();
+
+
+  /* =======================================================
+     RESUMEN
+     ======================================================= */
+
+  document
+    .getElementById(
+      "verDetalleResumenButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirDetalleResumenPlan
+    );
+
+
+  /* =======================================================
+     FILTRO DE BLOQUE
+     ======================================================= */
+
+  document
+    .getElementById(
+      "filtroBloquePlan"
+    )
+    ?.addEventListener(
+      "change",
+      (event) => {
+
+        filtroBloquePlan =
+          event.target.value;
+
+
+        renderizarDetallePlan();
+
+      }
+    );
+
+
+  /* =======================================================
+     CAMBIO LISTA / MALLA
+     ======================================================= */
+
+  document
+    .querySelectorAll(
+      "[data-plan-view]"
+    )
+    .forEach(
+      (button) => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            const vista =
+              button.dataset.planView;
+
+
+            if (
+              vista !== "LISTA" &&
+              vista !== "MALLA"
+            ) {
+              return;
+            }
+
+
+            vistaDetallePlan =
+              vista;
+
+
+            renderizarDetallePlan();
+
+          }
+        );
+
+      }
+    );
+
+
+  /* =======================================================
+     VOLVER
+     ======================================================= */
+
+  document
+    .getElementById(
+      "volverPlanesButton"
+    )
+    ?.addEventListener(
+      "click",
+      volverListadoPlanes
+    );
+
+
+  /* =======================================================
+     HERRAMIENTAS
+     ======================================================= */
+
+  document
+    .getElementById(
+      "administrarBloquesButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirAdministradorBloques
+    );
+
+
+  document
+    .getElementById(
+      "salidasAcademicasButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirAdministradorSalidas
+    );
+
+
+  document
+    .getElementById(
+      "cargaRapidaButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirCargaRapida
+    );
+
+
+  document
+    .getElementById(
+      "requisitosRapidosButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirRequisitosRapidos
+    );
+
+
+  document
+    .getElementById(
+      "revisarPlanButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirRevisionPlan
+    );
+
+
+  document
+    .getElementById(
+      "importarExcelPlanButton"
+    )
+    ?.addEventListener(
+      "click",
+      seleccionarExcelParaPlan
+    );
+
+
+  document
+    .getElementById(
+      "plantillaExcelPlanButton"
+    )
+    ?.addEventListener(
+      "click",
+      descargarPlantillaPlan
+    );
+
+
+  /* =======================================================
+     AGREGAR ASIGNATURA
+     ======================================================= */
+
+  document
+    .getElementById(
+      "agregarAsignaturaButton"
+    )
+    ?.addEventListener(
+      "click",
+      () =>
+        abrirFormularioAsignatura()
+    );
+
+
+  /*
+   * CTA del estado vacío.
+   */
+
+  document
+    .getElementById(
+      "agregarPrimeraAsignaturaButton"
+    )
+    ?.addEventListener(
+      "click",
+      () =>
+        abrirFormularioAsignatura()
+    );
+
+
+  /* =======================================================
+     ACCIONES DE ASIGNATURAS
+     ======================================================= */
+
+  document
+    .querySelectorAll(
+      "[data-asignatura-action]"
+    )
+    .forEach(
+      (button) => {
+
+        button.addEventListener(
+          "click",
+          manejarAccionAsignatura
+        );
+
+      }
+    );
+
+
+  /* =======================================================
+     DIALOG
+     ======================================================= */
+
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
+
+
+  dialog
+    ?.addEventListener(
+      "click",
+      (event) => {
+
+        if (
+          event.target === dialog
+        ) {
+
+          dialog.close();
+
+        }
+
+      }
+    );
+
+
+  /* =======================================================
+     MALLA
+     ======================================================= */
+
+  observerMalla
+    ?.disconnect();
+
+
+  observerMalla =
+    null;
+
+
+  if (
+    vistaDetallePlan ===
+    "MALLA"
+  ) {
+
+    window.requestAnimationFrame(
+      () => {
+
+        dibujarConexionesMalla();
+
+
+        conectarEventosMalla();
+
+
+        const canvas =
+          document.getElementById(
+            "mallaCanvas"
+          );
+
+
+        const scroll =
+          document.getElementById(
+            "mallaScroll"
+          );
+
+
+        if (
+          canvas &&
+          typeof ResizeObserver !==
+            "undefined"
+        ) {
+
+          observerMalla =
+            new ResizeObserver(
+              () => {
+
+                dibujarConexionesMalla();
+
+              }
+            );
+
+
+          observerMalla.observe(
+            canvas
+          );
+
+
+          if (scroll) {
+
+            observerMalla.observe(
+              scroll
+            );
+
+          }
+
+        }
+
+      }
+    );
+
+  }
+
 }
 
 function renderizarGrupoAsignaturas(grupo) {
@@ -2464,202 +3131,381 @@ function crearFilaCargaRapidaAsignatura(indice) {
 }
 
 function abrirCargaRapida() {
-  const dialog = document.getElementById("asignaturaDialog");
 
-  if (!dialog || !planSeleccionado) {
+  if (!planSeleccionado) {
     return;
   }
+
 
   renderizarCargaRapida();
 
-  if (!dialog.open) {
-    dialog.showModal();
-  }
 }
 
 function renderizarCargaRapida() {
-  const content = document.getElementById("asignaturaDialogContent");
 
-  if (!content || !planSeleccionado) {
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  const bloques = bloquesPlan
-    .filter((bloque) => bloque.activo)
-    .sort((a, b) => a.orden - b.orden);
 
-  content.innerHTML = `
-    <div class="plan-form carga-rapida">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>Carga rápida</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
-        </div>
-        <button
-          id="cerrarCargaRapidaButton"
-          class="planes-icon-button"
-          type="button"
-          aria-label="Cerrar"
+  const bloques =
+    bloquesPlan
+      .filter(
+        (bloque) =>
+          bloque.activo
+      )
+      .sort(
+        (a, b) =>
+          a.orden -
+          b.orden
+      );
+
+
+  const body = `
+
+    <!-- =============================================== -->
+    <!-- CONFIGURACIÓN -->
+    <!-- =============================================== -->
+
+    <div class="sgpa-form-grid carga-rapida-config">
+
+      <label>
+
+        <span>
+          Nivel / Año
+        </span>
+
+        <input
+          id="cargaAsignaturaNivel"
+          type="number"
+          min="1"
+          max="20"
+          value="1"
+          required
         >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
 
-      <div
-        id="cargaRapidaError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
+      </label>
 
-      <div class="plan-form-grid carga-rapida-config">
-        <label>
-          <span>Nivel / Año</span>
-          <input
-            id="cargaAsignaturaNivel"
-            type="number"
-            min="1"
-            max="20"
-            value="1"
-            required
-          >
-        </label>
 
-        <label>
-          <span>Ciclo / Semestre</span>
-          <input
-            id="cargaAsignaturaCiclo"
-            type="number"
-            min="1"
-            max="20"
-            value="1"
-            required
-          >
-        </label>
+      <label>
 
-        <label class="plan-form-wide">
-          <span>Bloque</span>
-          <select id="cargaAsignaturaBloque">
-            <option value="">Sin bloque</option>
-            ${bloques
+        <span>
+          Ciclo / Semestre
+        </span>
+
+        <input
+          id="cargaAsignaturaCiclo"
+          type="number"
+          min="1"
+          max="20"
+          value="1"
+          required
+        >
+
+      </label>
+
+
+      <label class="sgpa-form-wide">
+
+        <span>
+          Bloque
+        </span>
+
+        <select
+          id="cargaAsignaturaBloque"
+        >
+
+          <option value="">
+            Sin bloque
+          </option>
+
+
+          ${
+            bloques
               .map(
                 (bloque) => `
                   <option value="${bloque.id}">
-                    ${escapeHtml(bloque.codigo)}
+
+                    ${escapeHtml(
+                      bloque.codigo
+                    )}
+
                     -
-                    ${escapeHtml(bloque.nombre)}
+
+                    ${escapeHtml(
+                      bloque.nombre
+                    )}
+
                   </option>
-                `,
+                `
               )
-              .join("")}
-          </select>
-        </label>
-      </div>
+              .join("")
+          }
 
-      <div class="plan-bulk-header">
-        <div>
-          <h4>Asignaturas</h4>
-          <p>Agregue las asignaturas que pertenecen a este nivel y ciclo.</p>
-        </div>
+        </select>
 
-        <button
-          id="agregarFilaCargaAsignatura"
-          class="planes-secondary-button"
-          type="button"
-        >
-          <i data-lucide="plus" aria-hidden="true"></i>
-          Agregar fila
-        </button>
-      </div>
+      </label>
 
-      <div id="cargaAsignaturasFilas" class="plan-bulk-rows">
-        ${crearFilaCargaRapidaAsignatura(0)}
-      </div>
-
-      <footer class="plan-dialog-footer">
-        <button
-          id="cancelarCargaRapida"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Cancelar
-        </button>
-        <button
-          id="guardarCargaRapida"
-          class="planes-primary-button"
-          type="button"
-        >
-          Cargar asignaturas
-        </button>
-      </footer>
     </div>
+
+
+    <!-- =============================================== -->
+    <!-- ASIGNATURAS -->
+    <!-- =============================================== -->
+
+    <div class="plan-bulk-header">
+
+      <div>
+
+        <h4>
+          Asignaturas
+        </h4>
+
+        <p>
+          Agregue las asignaturas
+          que pertenecen a este nivel y ciclo.
+        </p>
+
+      </div>
+
+
+      <button
+        id="agregarFilaCargaAsignatura"
+        class="sgpa-form-secondary"
+        type="button"
+      >
+
+        <i
+          data-lucide="plus"
+          aria-hidden="true"
+        ></i>
+
+        Agregar fila
+
+      </button>
+
+    </div>
+
+
+    <div
+      id="cargaAsignaturasFilas"
+      class="plan-bulk-rows"
+    >
+
+      ${crearFilaCargaRapidaAsignatura(0)}
+
+    </div>
+
   `;
+
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "cargaRapidaForm",
+
+      title:
+        "Carga rápida",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      errorId:
+        "cargaRapidaError",
+
+      cancelButtonId:
+        "cancelarCargaRapida",
+
+      cancelText:
+        "Cancelar",
+
+      submitButtonId:
+        "guardarCargaRapida",
+
+      submitText:
+        "Cargar asignaturas",
+
+      submitButtonType:
+        "button",
+
+      submitIcon:
+        "save",
+
+      layout:
+        "custom",
+
+      formClass:
+        "carga-rapida"
+
+    });
+
 
   renderizarIconos();
 
-  const cerrar = () => document.getElementById("asignaturaDialog")?.close();
+
+  mostrarDialogHerramienta();
+
+
+  const cerrar =
+    () =>
+      document
+        .getElementById(
+          "asignaturaDialog"
+        )
+        ?.close();
+
 
   document
-    .getElementById("cerrarCargaRapidaButton")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "cancelarCargaRapida"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
+
+
   document
-    .getElementById("cancelarCargaRapida")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("agregarFilaCargaAsignatura")
-    ?.addEventListener("click", () => {
-      const filasContainer = document.getElementById("cargaAsignaturasFilas");
+    .getElementById(
+      "agregarFilaCargaAsignatura"
+    )
+    ?.addEventListener(
+      "click",
+      () => {
 
-      if (!filasContainer) {
-        return;
-      }
+        const filasContainer =
+          document.getElementById(
+            "cargaAsignaturasFilas"
+          );
 
-      const total = filasContainer.querySelectorAll(
-        "[data-asignatura-carga]",
-      ).length;
 
-      if (total >= 200) {
-        const errorBox = document.getElementById("cargaRapidaError");
-
-        if (errorBox) {
-          errorBox.textContent =
-            "La carga rápida admite hasta 200 asignaturas.";
-          errorBox.classList.remove("hidden");
+        if (!filasContainer) {
+          return;
         }
-        return;
-      }
 
-      filasContainer.insertAdjacentHTML(
-        "beforeend",
-        crearFilaCargaRapidaAsignatura(total),
-      );
-      renderizarIconos();
-    });
+
+        const total =
+          filasContainer
+            .querySelectorAll(
+              "[data-asignatura-carga]"
+            )
+            .length;
+
+
+        if (total >= 200) {
+
+          const errorBox =
+            document.getElementById(
+              "cargaRapidaError"
+            );
+
+
+          if (errorBox) {
+
+            errorBox.textContent =
+              "La carga rápida admite hasta 200 asignaturas.";
+
+
+            errorBox.classList.remove(
+              "hidden"
+            );
+
+          }
+
+
+          return;
+
+        }
+
+
+        filasContainer
+          .insertAdjacentHTML(
+            "beforeend",
+            crearFilaCargaRapidaAsignatura(
+              total
+            )
+          );
+
+
+        renderizarIconos();
+
+      }
+    );
+
 
   document
-    .getElementById("cargaAsignaturasFilas")
-    ?.addEventListener("click", (event) => {
-      const button = event.target.closest(".carga-eliminar-fila");
+    .getElementById(
+      "cargaAsignaturasFilas"
+    )
+    ?.addEventListener(
+      "click",
+      (event) => {
 
-      if (!button) {
-        return;
+        const button =
+          event.target.closest(
+            ".carga-eliminar-fila"
+          );
+
+
+        if (!button) {
+          return;
+        }
+
+
+        const filasContainer =
+          document.getElementById(
+            "cargaAsignaturasFilas"
+          );
+
+
+        const filas =
+          filasContainer
+            ?.querySelectorAll(
+              "[data-asignatura-carga]"
+            );
+
+
+        if (
+          !filasContainer ||
+          !filas ||
+          filas.length <= 1
+        ) {
+          return;
+        }
+
+
+        button
+          .closest(
+            "[data-asignatura-carga]"
+          )
+          ?.remove();
+
       }
+    );
 
-      const filasContainer = document.getElementById("cargaAsignaturasFilas");
-      const filas = filasContainer?.querySelectorAll(
-        "[data-asignatura-carga]",
-      );
 
-      if (!filasContainer || !filas || filas.length <= 1) {
-        return;
-      }
-
-      button.closest("[data-asignatura-carga]")?.remove();
-    });
   document
-    .getElementById("guardarCargaRapida")
-    ?.addEventListener("click", guardarCargaRapida);
+    .getElementById(
+      "guardarCargaRapida"
+    )
+    ?.addEventListener(
+      "click",
+      guardarCargaRapida
+    );
+
 }
-
 function construirCargaRapida() {
   const nivel = Number(document.getElementById("cargaAsignaturaNivel")?.value);
   const ciclo = Number(document.getElementById("cargaAsignaturaCiclo")?.value);
@@ -2784,429 +3630,905 @@ async function guardarCargaRapida() {
   }
 }
 
-function abrirFormularioAsignatura(asignatura = null) {
-  const dialog = document.getElementById("asignaturaDialog");
-  const content = document.getElementById("asignaturaDialogContent");
+function abrirFormularioAsignatura(
+  asignatura = null
+) {
 
-  if (!dialog || !content || !planSeleccionado) {
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
+
+
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !dialog ||
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  const editando = Boolean(asignatura);
-  const vinculadaACurso = Boolean(asignatura?.cursoId);
 
-  content.innerHTML = `
-    <form id="asignaturaForm" class="plan-form">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>${editando ? "Editar asignatura" : "Agregar asignatura"}</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
-        </div>
-        <button
-          id="cerrarAsignaturaDialog"
-          class="planes-icon-button"
-          type="button"
-          aria-label="Cerrar"
+  const editando =
+    Boolean(asignatura);
+
+
+  const vinculadaACurso =
+    Boolean(
+      asignatura?.cursoId
+    );
+
+
+  /* =======================================================
+     BLOQUES DISPONIBLES
+     ======================================================= */
+
+  const opcionesBloques =
+    bloquesPlan
+      .filter(
+        (bloque) =>
+          bloque.activo === true ||
+          Number(bloque.id) ===
+            Number(
+              asignatura?.bloqueId
+            )
+      )
+      .sort(
+        (a, b) =>
+          Number(a.orden) -
+          Number(b.orden)
+      )
+      .map(
+        (bloque) => `
+          <option
+            value="${bloque.id}"
+            ${
+              Number(
+                asignatura?.bloqueId
+              ) ===
+              Number(
+                bloque.id
+              )
+                ? "selected"
+                : ""
+            }
+          >
+
+            ${escapeHtml(
+              bloque.nombre
+            )}
+
+            ·
+
+            ${escapeHtml(
+              formatearTipoBloque(
+                bloque.tipo
+              )
+            )}
+
+            ${
+              bloque.activo
+                ? ""
+                : " (Inactivo)"
+            }
+
+          </option>
+        `
+      )
+      .join("");
+
+
+  /* =======================================================
+     BODY
+     ======================================================= */
+
+  const body = `
+
+    <div class="sgpa-form-grid">
+
+
+      <!-- =============================================== -->
+      <!-- BLOQUE -->
+      <!-- =============================================== -->
+
+      <label class="sgpa-form-wide">
+
+        <span>
+          Bloque del plan
+        </span>
+
+
+        <select
+          id="asignaturaBloque"
         >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
+
+          <option value="">
+            Sin bloque
+          </option>
+
+          ${opcionesBloques}
+
+        </select>
+
+
+        ${
+          bloquesPlan.length === 0
+            ? `
+                <small class="sgpa-field-help">
+
+                  Este plan todavía no tiene bloques.
+                  Puede dejar la asignatura sin bloque
+                  y organizarla después.
+
+                </small>
+              `
+            : ""
+        }
+
+      </label>
+
+
+      <!-- =============================================== -->
+      <!-- CÓDIGO Y NOMBRE -->
+      <!-- =============================================== -->
 
       <div
-        id="asignaturaFormError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
+        class="
+          plan-reference-fields
+          sgpa-form-wide
+        "
+      >
 
-      <div class="plan-form-grid">
-        <label class="plan-form-wide">
-          <span>Bloque del plan</span>
-          <select id="asignaturaBloque">
-            <option value="">Sin bloque</option>
-            ${bloquesPlan
-              .filter(
-                (bloque) =>
-                  bloque.activo === true ||
-                  Number(bloque.id) === Number(asignatura?.bloqueId),
-              )
-              .sort((a, b) => a.orden - b.orden)
-              .map(
-                (bloque) => `
-                  <option
-                    value="${bloque.id}"
-                    ${
-                      Number(asignatura?.bloqueId) === Number(bloque.id)
-                        ? "selected"
-                        : ""
-                    }
-                  >
-                    ${escapeHtml(bloque.nombre)}
-                    ·
-                    ${escapeHtml(formatearTipoBloque(bloque.tipo))}
-                    ${bloque.activo ? "" : " (Inactivo)"}
-                  </option>
-                `,
-              )
-              .join("")}
-          </select>
+        <label>
+
+          <span>
+            Código de la asignatura
+          </span>
+
+
+          <input
+            id="asignaturaCodigoReferencia"
+            maxlength="30"
+            value="${escapeHtml(
+              asignatura?.codigoReferencia ||
+              asignatura?.curso?.codigo ||
+              ""
+            )}"
+            placeholder="Ej. EIF201"
+            ${
+              vinculadaACurso
+                ? "disabled"
+                : ""
+            }
+            required
+          >
+
+
           ${
-            bloquesPlan.length === 0
+            vinculadaACurso
               ? `
-                  <small class="plan-field-help">
-                    Este plan todavía no tiene bloques. Puede dejar la
-                    asignatura sin bloque y organizarla después.
+                  <small class="sgpa-field-help">
+
+                    Esta asignatura ya está vinculada
+                    a un curso. Su código no puede
+                    modificarse desde la malla.
+
                   </small>
                 `
               : ""
           }
+
         </label>
 
-        <div class="plan-reference-fields plan-form-wide">
-          <label>
-            <span>Código de la asignatura</span>
-            <input
-              id="asignaturaCodigoReferencia"
-              maxlength="30"
-              value="${escapeHtml(
-                asignatura?.codigoReferencia || asignatura?.curso?.codigo || "",
-              )}"
-              placeholder="Ej. EIF201"
-              ${vinculadaACurso ? "disabled" : ""}
-              required
-            >
+
+        <label>
+
+          <span>
+            Nombre de la asignatura
+          </span>
+
+
+          <input
+            id="asignaturaNombreReferencia"
+            maxlength="150"
+            value="${escapeHtml(
+              asignatura?.nombreReferencia ||
+              asignatura?.curso?.nombre ||
+              ""
+            )}"
+            placeholder="Ej. Programación I"
             ${
               vinculadaACurso
-                ? `
-                    <small class="plan-field-help">
-                      Esta asignatura ya está vinculada a un curso.
-                      Su código no puede modificarse desde la malla.
-                    </small>
-                  `
+                ? "disabled"
                 : ""
             }
-          </label>
-          <label>
-            <span>Nombre de la asignatura</span>
-            <input
-              id="asignaturaNombreReferencia"
-              maxlength="150"
-              value="${escapeHtml(
-                asignatura?.nombreReferencia || asignatura?.curso?.nombre || "",
-              )}"
-              placeholder="Ej. Programación I"
-              ${vinculadaACurso ? "disabled" : ""}
-              required
-            >
-            ${
-              vinculadaACurso
-                ? `
-                    <small class="plan-field-help">
-                      El nombre quedó vinculado al curso creado.
-                    </small>
-                  `
-                : ""
-            }
-          </label>
-        </div>
+            required
+          >
 
-        <label>
-          <span>Nivel</span>
-          <input
-            id="asignaturaNivel"
-            type="number"
-            min="1"
-            max="20"
-            value="${asignatura?.nivel || 1}"
-            required
-          >
-        </label>
-        <label>
-          <span>Ciclo</span>
-          <input
-            id="asignaturaCiclo"
-            type="number"
-            min="1"
-            max="20"
-            value="${asignatura?.ciclo || 1}"
-            required
-          >
-        </label>
-        <label>
-          <span>Créditos</span>
-          <input
-            id="asignaturaCreditos"
-            type="number"
-            min="0"
-            max="30"
-            value="${asignatura?.creditos ?? 0}"
-            required
-          >
-        </label>
-        <label>
-          <span>Orden</span>
-          <input
-            id="asignaturaOrden"
-            type="number"
-            min="1"
-            max="999"
-            value="${asignatura?.orden || 1}"
-            required
-          >
-        </label>
 
-        <label class="plan-form-wide">
-          <span>Tipo</span>
-          <select id="asignaturaTipo" required>
-            <option
-              value="OBLIGATORIA"
-              ${
-                (asignatura?.tipo || "OBLIGATORIA") === "OBLIGATORIA"
-                  ? "selected"
-                  : ""
-              }
-            >
-              Obligatoria
-            </option>
-            <option
-              value="OPTATIVA"
-              ${asignatura?.tipo === "OPTATIVA" ? "selected" : ""}
-            >
-              Optativa
-            </option>
-            <option
-              value="OTRA"
-              ${asignatura?.tipo === "OTRA" ? "selected" : ""}
-            >
-              Otra
-            </option>
-          </select>
-        </label>
-
-        <details
-          class="plan-hours-section plan-form-wide"
           ${
-            asignatura &&
-            [
-              asignatura.horasTeoria,
-              asignatura.horasPractica,
-              asignatura.horasLaboratorio,
-              asignatura.horasGira,
-              asignatura.horasEstudioIndependiente,
-              asignatura.horasTotales,
-              asignatura.horasDocente,
-            ].some((valor) => valor !== null && valor !== undefined)
-              ? "open"
+            vinculadaACurso
+              ? `
+                  <small class="sgpa-field-help">
+
+                    El nombre quedó vinculado
+                    al curso creado.
+
+                  </small>
+                `
               : ""
           }
-        >
-          <summary>
-            <div>
-              <strong>Información de horas</strong>
-              <small>
-                Datos académicos específicos de esta asignatura dentro del
-                plan.
-              </small>
-            </div>
-            <i data-lucide="chevron-down" aria-hidden="true"></i>
-          </summary>
 
-          <div class="plan-hours-content">
-            <div class="plan-hours-grid">
-              <label>
-                <span>T · Teoría</span>
-                <input
-                  id="asignaturaHorasTeoria"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasTeoria ?? ""}"
-                  placeholder="-"
-                >
-              </label>
+        </label>
 
-              <label>
-                <span>P · Práctica</span>
-                <input
-                  id="asignaturaHorasPractica"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasPractica ?? ""}"
-                  placeholder="-"
-                >
-              </label>
-
-              <label>
-                <span>L · Laboratorio</span>
-                <input
-                  id="asignaturaHorasLaboratorio"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasLaboratorio ?? ""}"
-                  placeholder="-"
-                >
-              </label>
-
-              <label>
-                <span>G · Gira</span>
-                <input
-                  id="asignaturaHorasGira"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasGira ?? ""}"
-                  placeholder="-"
-                >
-              </label>
-
-              <label>
-                <span>EI · Estudio independiente</span>
-                <input
-                  id="asignaturaHorasEI"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasEstudioIndependiente ?? ""}"
-                  placeholder="-"
-                >
-              </label>
-
-              <label>
-                <span>HT · Horas totales</span>
-                <input
-                  id="asignaturaHorasTotales"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasTotales ?? ""}"
-                  placeholder="-"
-                >
-              </label>
-
-              <label>
-                <span>HD · Horas docente</span>
-                <input
-                  id="asignaturaHorasDocente"
-                  type="number"
-                  min="0"
-                  max="999"
-                  step="0.01"
-                  value="${asignatura?.horasDocente ?? ""}"
-                  placeholder="-"
-                >
-              </label>
-            </div>
-
-            <div
-              id="horasReferencia"
-              class="plan-hours-reference hidden"
-            ></div>
-
-            <label class="plan-hours-observation">
-              <span>Observación</span>
-              <textarea
-                id="asignaturaObservacionHoras"
-                maxlength="250"
-                rows="2"
-                placeholder="Ej. Incluye gira, laboratorio especial, dato indicado con asterisco en el plan..."
-              >${escapeHtml(asignatura?.observacionHoras || "")}</textarea>
-            </label>
-          </div>
-        </details>
       </div>
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="cancelarAsignaturaButton"
-          class="planes-secondary-button"
-          type="button"
+
+      <!-- =============================================== -->
+      <!-- NIVEL -->
+      <!-- =============================================== -->
+
+      <label>
+
+        <span>
+          Nivel
+        </span>
+
+
+        <input
+          id="asignaturaNivel"
+          type="number"
+          min="1"
+          max="20"
+          value="${
+            asignatura?.nivel ||
+            1
+          }"
+          required
         >
-          Cancelar
-        </button>
-        <button
-          id="guardarAsignaturaButton"
-          class="planes-primary-button"
-          type="submit"
+
+      </label>
+
+
+      <!-- =============================================== -->
+      <!-- CICLO -->
+      <!-- =============================================== -->
+
+      <label>
+
+        <span>
+          Ciclo
+        </span>
+
+
+        <input
+          id="asignaturaCiclo"
+          type="number"
+          min="1"
+          max="20"
+          value="${
+            asignatura?.ciclo ||
+            1
+          }"
+          required
         >
-          Guardar
-        </button>
-      </footer>
-    </form>
+
+      </label>
+
+
+      <!-- =============================================== -->
+      <!-- CRÉDITOS -->
+      <!-- =============================================== -->
+
+      <label>
+
+        <span>
+          Créditos
+        </span>
+
+
+        <input
+          id="asignaturaCreditos"
+          type="number"
+          min="0"
+          max="30"
+          value="${
+            asignatura?.creditos ??
+            0
+          }"
+          required
+        >
+
+      </label>
+
+
+      <!-- =============================================== -->
+      <!-- ORDEN -->
+      <!-- =============================================== -->
+
+      <label>
+
+        <span>
+          Orden
+        </span>
+
+
+        <input
+          id="asignaturaOrden"
+          type="number"
+          min="1"
+          max="999"
+          value="${
+            asignatura?.orden ||
+            1
+          }"
+          required
+        >
+
+      </label>
+
+
+      <!-- =============================================== -->
+      <!-- TIPO -->
+      <!-- =============================================== -->
+
+      <label class="sgpa-form-wide">
+
+        <span>
+          Tipo
+        </span>
+
+
+        <select
+          id="asignaturaTipo"
+          required
+        >
+
+          <option
+            value="OBLIGATORIA"
+            ${
+              (
+                asignatura?.tipo ||
+                "OBLIGATORIA"
+              ) ===
+              "OBLIGATORIA"
+                ? "selected"
+                : ""
+            }
+          >
+            Obligatoria
+          </option>
+
+
+          <option
+            value="OPTATIVA"
+            ${
+              asignatura?.tipo ===
+              "OPTATIVA"
+                ? "selected"
+                : ""
+            }
+          >
+            Optativa
+          </option>
+
+
+          <option
+            value="OTRA"
+            ${
+              asignatura?.tipo ===
+              "OTRA"
+                ? "selected"
+                : ""
+            }
+          >
+            Otra
+          </option>
+
+        </select>
+
+      </label>
+
+
+      <!-- =============================================== -->
+      <!-- HORAS ACADÉMICAS -->
+      <!-- =============================================== -->
+
+      <details
+        class="
+          plan-hours-section
+          sgpa-form-wide
+        "
+        ${
+          asignatura &&
+          [
+            asignatura.horasTeoria,
+            asignatura.horasPractica,
+            asignatura.horasLaboratorio,
+            asignatura.horasGira,
+            asignatura.horasEstudioIndependiente,
+            asignatura.horasTotales,
+            asignatura.horasDocente
+          ].some(
+            (valor) =>
+              valor !== null &&
+              valor !== undefined
+          )
+            ? "open"
+            : ""
+        }
+      >
+
+        <summary>
+
+          <div>
+
+            <strong>
+              Información de horas
+            </strong>
+
+            <small>
+              Datos académicos específicos de
+              esta asignatura dentro del plan.
+            </small>
+
+          </div>
+
+
+          <i
+            data-lucide="chevron-down"
+            aria-hidden="true"
+          ></i>
+
+        </summary>
+
+
+        <div class="plan-hours-content">
+
+          <div class="plan-hours-grid">
+
+
+            <label>
+
+              <span>
+                T · Teoría
+              </span>
+
+              <input
+                id="asignaturaHorasTeoria"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura?.horasTeoria ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+
+            <label>
+
+              <span>
+                P · Práctica
+              </span>
+
+              <input
+                id="asignaturaHorasPractica"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura?.horasPractica ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+
+            <label>
+
+              <span>
+                L · Laboratorio
+              </span>
+
+              <input
+                id="asignaturaHorasLaboratorio"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura?.horasLaboratorio ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+
+            <label>
+
+              <span>
+                G · Gira
+              </span>
+
+              <input
+                id="asignaturaHorasGira"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura?.horasGira ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+
+            <label>
+
+              <span>
+                EI · Estudio independiente
+              </span>
+
+              <input
+                id="asignaturaHorasEI"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura
+                    ?.horasEstudioIndependiente ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+
+            <label>
+
+              <span>
+                HT · Horas totales
+              </span>
+
+              <input
+                id="asignaturaHorasTotales"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura?.horasTotales ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+
+            <label>
+
+              <span>
+                HD · Horas docente
+              </span>
+
+              <input
+                id="asignaturaHorasDocente"
+                type="number"
+                min="0"
+                max="999"
+                step="0.01"
+                value="${
+                  asignatura?.horasDocente ??
+                  ""
+                }"
+                placeholder="-"
+              >
+
+            </label>
+
+          </div>
+
+
+          <!-- =========================================== -->
+          <!-- REFERENCIA -->
+          <!-- =========================================== -->
+
+          <div
+            id="horasReferencia"
+            class="
+              plan-hours-reference
+              hidden
+            "
+          ></div>
+
+
+          <!-- =========================================== -->
+          <!-- OBSERVACIÓN -->
+          <!-- =========================================== -->
+
+          <label class="plan-hours-observation">
+
+            <span>
+              Observación
+            </span>
+
+
+            <textarea
+              id="asignaturaObservacionHoras"
+              maxlength="250"
+              rows="2"
+              placeholder="Ej. Incluye gira, laboratorio especial, dato indicado con asterisco en el plan..."
+            >${escapeHtml(
+              asignatura
+                ?.observacionHoras ||
+              ""
+            )}</textarea>
+
+          </label>
+
+        </div>
+
+      </details>
+
+    </div>
+
   `;
 
+
+  /* =======================================================
+     FORM DIALOG REUTILIZABLE
+     ======================================================= */
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "asignaturaForm",
+
+      title:
+        editando
+          ? "Editar asignatura"
+          : "Agregar asignatura",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      errorId:
+        "asignaturaFormError",
+
+      cancelButtonId:
+        "cancelarAsignaturaButton",
+
+      cancelText:
+        "Cancelar",
+
+      submitButtonId:
+        "guardarAsignaturaButton",
+
+      submitText:
+        editando
+          ? "Guardar cambios"
+          : "Agregar asignatura",
+
+      submitIcon:
+        "save",
+
+      layout:
+        "custom",
+
+      formClass:
+        "asignatura-plan-form"
+
+    });
+
+
   renderizarIconos();
-  dialog.showModal();
+
+
+  /*
+   * Utiliza el mismo dialog centrado
+   * de las herramientas.
+   */
+
+  mostrarDialogHerramienta();
+
+
+  /* =======================================================
+     CÁLCULO DE HORAS
+     ======================================================= */
 
   const camposHoras = [
+
     "asignaturaHorasTeoria",
+
     "asignaturaHorasPractica",
+
     "asignaturaHorasLaboratorio",
+
     "asignaturaHorasGira",
-    "asignaturaHorasEI",
+
+    "asignaturaHorasEI"
+
   ];
 
+
   function actualizarReferenciaHoras() {
-    const referencia = document.getElementById("horasReferencia");
+
+    const referencia =
+      document.getElementById(
+        "horasReferencia"
+      );
+
 
     if (!referencia) {
       return;
     }
 
-    const valores = camposHoras
-      .map((id) => {
-        const input = document.getElementById(id);
 
-        if (!input || input.value.trim() === "") {
-          return null;
-        }
+    const valores =
+      camposHoras
+        .map(
+          (id) => {
 
-        return Number(input.value);
-      })
-      .filter((valor) => valor !== null && !Number.isNaN(valor));
+            const input =
+              document.getElementById(
+                id
+              );
 
-    if (valores.length === 0) {
-      referencia.textContent = "";
-      referencia.classList.add("hidden");
+
+            if (
+              !input ||
+              input.value.trim() ===
+                ""
+            ) {
+              return null;
+            }
+
+
+            return Number(
+              input.value
+            );
+
+          }
+        )
+        .filter(
+          (valor) =>
+            valor !== null &&
+            !Number.isNaN(
+              valor
+            )
+        );
+
+
+    if (
+      valores.length === 0
+    ) {
+
+      referencia.textContent =
+        "";
+
+
+      referencia.classList.add(
+        "hidden"
+      );
+
+
       return;
+
     }
 
-    const suma = valores.reduce((total, valor) => total + valor, 0);
-    const sumaFormateada = Number(suma.toFixed(2));
+
+    const suma =
+      valores.reduce(
+        (total, valor) =>
+          total + valor,
+        0
+      );
+
+
+    const sumaFormateada =
+      Number(
+        suma.toFixed(2)
+      );
+
 
     referencia.textContent =
       `Referencia: T + P + L + G + EI = ${sumaFormateada}. ` +
       "HT se guarda según el documento oficial.";
-    referencia.classList.remove("hidden");
+
+
+    referencia.classList.remove(
+      "hidden"
+    );
+
   }
 
-  for (const id of camposHoras) {
+
+  for (
+    const id of camposHoras
+  ) {
+
     document
-      .getElementById(id)
-      ?.addEventListener("input", actualizarReferenciaHoras);
+      .getElementById(
+        id
+      )
+      ?.addEventListener(
+        "input",
+        actualizarReferenciaHoras
+      );
+
   }
+
 
   actualizarReferenciaHoras();
 
-  const cerrar = () => dialog.close();
+
+  /* =======================================================
+     CERRAR
+     ======================================================= */
+
+  const cerrar =
+    () =>
+      dialog.close();
+
+
   document
-    .getElementById("cerrarAsignaturaDialog")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "cancelarAsignaturaButton"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
+
+
+  /* =======================================================
+     GUARDAR
+     ======================================================= */
+
   document
-    .getElementById("cancelarAsignaturaButton")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("asignaturaForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await guardarAsignatura(asignatura, cerrar);
-    });
+    .getElementById(
+      "asignaturaForm"
+    )
+    ?.addEventListener(
+      "submit",
+      async (event) => {
+
+        event.preventDefault();
+
+
+        await guardarAsignatura(
+          asignatura,
+          cerrar
+        );
+
+      }
+    );
+
 }
 
 async function guardarAsignatura(asignatura, cerrar) {
@@ -3400,117 +4722,194 @@ function crearFilaRequisitoRapido() {
 }
 
 function abrirRequisitosRapidos() {
-  const dialog = document.getElementById("asignaturaDialog");
 
-  if (!dialog || !planSeleccionado) {
+  if (!planSeleccionado) {
     return;
   }
 
-  filasRequisitosRapidos = [crearFilaRequisitoRapido()];
+
+  filasRequisitosRapidos = [
+    crearFilaRequisitoRapido()
+  ];
+
+
   renderizarRequisitosRapidos();
 
-  if (!dialog.open) {
-    dialog.showModal();
-  }
 }
 
 function renderizarRequisitosRapidos() {
-  const content = document.getElementById("asignaturaDialogContent");
 
-  if (!content || !planSeleccionado) {
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  content.innerHTML = `
-    <div class="plan-form requisitos-rapidos">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>Requisitos rápidos</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
-        </div>
 
-        <button
-          id="cerrarRequisitosRapidos"
-          class="planes-icon-button"
-          type="button"
-          title="Cerrar"
-          aria-label="Cerrar"
-        >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
+  const body = `
 
-      <div class="requisitos-rapidos-intro">
-        Configure varias relaciones académicas y guárdelas en una sola
-        operación.
-      </div>
+    <div class="requisitos-rapidos-intro">
 
-      <div
-        id="requisitosRapidosError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
+      Configure varias relaciones
+      académicas y guárdelas
+      en una sola operación.
 
-      <div class="requisitos-rapidos-table-wrapper">
-        <table class="requisitos-rapidos-table">
-          <thead>
-            <tr>
-              <th>Asignatura</th>
-              <th>Relación</th>
-              <th>Asignatura relacionada</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="requisitosRapidosBody"></tbody>
-        </table>
-      </div>
-
-      <button
-        id="agregarFilaRequisitoRapido"
-        class="planes-secondary-button"
-        type="button"
-      >
-        <i data-lucide="plus" aria-hidden="true"></i>
-        Agregar relación
-      </button>
-
-      <footer class="plan-dialog-footer">
-        <button
-          id="cancelarRequisitosRapidos"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Cancelar
-        </button>
-
-        <button
-          id="guardarRequisitosRapidos"
-          class="planes-primary-button"
-          type="button"
-        >
-          Guardar relaciones
-        </button>
-      </footer>
     </div>
+
+
+    <div class="requisitos-rapidos-table-wrapper">
+
+      <table class="requisitos-rapidos-table">
+
+        <thead>
+
+          <tr>
+
+            <th>
+              Asignatura
+            </th>
+
+            <th>
+              Relación
+            </th>
+
+            <th>
+              Asignatura relacionada
+            </th>
+
+            <th>
+            </th>
+
+          </tr>
+
+        </thead>
+
+
+        <tbody
+          id="requisitosRapidosBody"
+        ></tbody>
+
+      </table>
+
+    </div>
+
+
+    <button
+      id="agregarFilaRequisitoRapido"
+      class="sgpa-form-secondary"
+      type="button"
+    >
+
+      <i
+        data-lucide="plus"
+        aria-hidden="true"
+      ></i>
+
+      Agregar relación
+
+    </button>
+
   `;
 
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "requisitosRapidosForm",
+
+      title:
+        "Requisitos rápidos",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      errorId:
+        "requisitosRapidosError",
+
+      cancelButtonId:
+        "cancelarRequisitosRapidos",
+
+      cancelText:
+        "Cancelar",
+
+      submitButtonId:
+        "guardarRequisitosRapidos",
+
+      submitText:
+        "Guardar relaciones",
+
+      submitButtonType:
+        "button",
+
+      submitIcon:
+        "save",
+
+      layout:
+        "custom",
+
+      formClass:
+        "requisitos-rapidos"
+
+    });
+
+
   renderizarFilasRequisitosRapidos();
+
+
   renderizarIconos();
 
-  const cerrar = () => document.getElementById("asignaturaDialog")?.close();
+
+  mostrarDialogHerramienta();
+
+
+  const cerrar =
+    () =>
+      document
+        .getElementById(
+          "asignaturaDialog"
+        )
+        ?.close();
+
 
   document
-    .getElementById("cerrarRequisitosRapidos")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "cancelarRequisitosRapidos"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
+
+
   document
-    .getElementById("cancelarRequisitosRapidos")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "agregarFilaRequisitoRapido"
+    )
+    ?.addEventListener(
+      "click",
+      agregarFilaRequisitoRapido
+    );
+
+
   document
-    .getElementById("agregarFilaRequisitoRapido")
-    ?.addEventListener("click", agregarFilaRequisitoRapido);
-  document
-    .getElementById("guardarRequisitosRapidos")
-    ?.addEventListener("click", guardarRequisitosRapidos);
+    .getElementById(
+      "guardarRequisitosRapidos"
+    )
+    ?.addEventListener(
+      "click",
+      guardarRequisitosRapidos
+    );
+
 }
 
 function renderizarFilasRequisitosRapidos() {
@@ -4110,338 +5509,730 @@ function formatearTipoSalida(tipo) {
 }
 
 function abrirAdministradorSalidas() {
-  const dialog = document.getElementById("asignaturaDialog");
-  const content = document.getElementById("asignaturaDialogContent");
 
-  if (!dialog || !content || !planSeleccionado) {
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
+
+
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !dialog ||
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  const salidasHtml = salidasAcademicas.length
-    ? salidasAcademicas
-        .slice()
-        .sort((a, b) => Number(a.orden) - Number(b.orden))
-        .map((salida) => {
-          const asignaturas = Array.isArray(salida.asignaturas)
-            ? salida.asignaturas
-            : [];
-          const cantidad = asignaturas.length;
-          const creditos = asignaturas
-            .filter((item) => item.activo)
-            .reduce((total, item) => total + Number(item.creditos || 0), 0);
-          const porcentaje = salida.creditosRequeridos
-            ? Math.min(100, (creditos / salida.creditosRequeridos) * 100)
-            : 0;
 
-          return `
-            <article
-              class="salida-academica-card ${
-                salida.activo ? "" : "salida-academica-inactive"
-              }"
-            >
-              <div class="salida-academica-main">
-                <div class="salida-academica-title">
-                  <strong>${escapeHtml(salida.nombre)}</strong>
-                  <span>${escapeHtml(salida.codigo)}</span>
-                </div>
+  const salidasHtml =
+    salidasAcademicas.length
 
-                <div class="salida-academica-meta">
-                  ${escapeHtml(formatearTipoSalida(salida.tipo))}
-                  · ${salida.creditosRequeridos} créditos requeridos
-                  · ${cantidad} asignaturas
-                </div>
+      ? salidasAcademicas
+          .slice()
+          .sort(
+            (a, b) =>
+              Number(a.orden) -
+              Number(b.orden)
+          )
+          .map(
+            (salida) => {
 
-                <div class="salida-academica-progress">
-                  <div class="salida-academica-progress-bar">
-                    <span style="width: ${porcentaje}%;"></span>
+              const asignaturas =
+                Array.isArray(
+                  salida.asignaturas
+                )
+                  ? salida.asignaturas
+                  : [];
+
+
+              const cantidad =
+                asignaturas.length;
+
+
+              const creditos =
+                asignaturas
+                  .filter(
+                    (item) =>
+                      item.activo
+                  )
+                  .reduce(
+                    (total, item) =>
+                      total +
+                      Number(
+                        item.creditos || 0
+                      ),
+                    0
+                  );
+
+
+              const porcentaje =
+                salida.creditosRequeridos
+
+                  ? Math.min(
+                      100,
+                      (
+                        creditos /
+                        salida.creditosRequeridos
+                      ) * 100
+                    )
+
+                  : 0;
+
+
+              return `
+                <article
+                  class="
+                    salida-academica-card
+                    ${
+                      salida.activo
+                        ? ""
+                        : "salida-academica-inactive"
+                    }
+                  "
+                >
+
+                  <div class="salida-academica-main">
+
+                    <div class="salida-academica-title">
+
+                      <strong>
+                        ${escapeHtml(salida.nombre)}
+                      </strong>
+
+                      <span>
+                        ${escapeHtml(salida.codigo)}
+                      </span>
+
+                    </div>
+
+
+                    <div class="salida-academica-meta">
+
+                      ${escapeHtml(
+                        formatearTipoSalida(
+                          salida.tipo
+                        )
+                      )}
+
+                      ·
+                      ${salida.creditosRequeridos}
+                      créditos requeridos
+
+                      ·
+                      ${cantidad}
+                      asignatura${
+                        cantidad === 1
+                          ? ""
+                          : "s"
+                      }
+
+                    </div>
+
+
+                    <div class="salida-academica-progress">
+
+                      <div class="salida-academica-progress-bar">
+
+                        <span
+                          style="
+                            width:
+                            ${porcentaje}%;
+                          "
+                        ></span>
+
+                      </div>
+
+
+                      <small>
+
+                        ${creditos}
+                        /
+                        ${salida.creditosRequeridos}
+                        créditos asociados
+
+                      </small>
+
+                    </div>
+
                   </div>
-                  <small>
-                    ${creditos} / ${salida.creditosRequeridos} créditos asociados
-                  </small>
-                </div>
-              </div>
 
-              <div class="salida-academica-actions">
-                <button
-                  class="planes-secondary-button"
-                  type="button"
-                  data-salida-asignaturas="${salida.id}"
-                >
-                  <i data-lucide="list-checks" aria-hidden="true"></i>
-                  Materias
-                </button>
-                <button
-                  class="planes-icon-button"
-                  type="button"
-                  title="Editar"
-                  aria-label="Editar"
-                  data-salida-editar="${salida.id}"
-                >
-                  <i data-lucide="pencil" aria-hidden="true"></i>
-                </button>
-                <button
-                  class="planes-icon-button"
-                  type="button"
-                  title="${salida.activo ? "Desactivar" : "Activar"}"
-                  aria-label="${salida.activo ? "Desactivar" : "Activar"}"
-                  data-salida-estado="${salida.id}"
-                >
-                  <i
-                    data-lucide="${
-                      salida.activo ? "circle-pause" : "circle-check"
-                    }"
-                    aria-hidden="true"
-                  ></i>
-                </button>
-              </div>
-            </article>
-          `;
-        })
-        .join("")
-    : `
-        <div class="plan-requirements-empty">
-          Este plan todavía no tiene salidas académicas configuradas.
-        </div>
-      `;
 
-  content.innerHTML = `
-    <div class="plan-form salidas-academicas-dialog">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>Salidas académicas</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
-        </div>
-        <button
-          id="cerrarSalidasButton"
-          class="planes-icon-button"
-          type="button"
-          aria-label="Cerrar"
-        >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
+                  <div class="salida-academica-actions">
 
-      <div class="salidas-academicas-content">
-        <div class="salidas-academicas-toolbar">
-          <div>
-            <strong>Títulos y salidas del plan</strong>
-            <small>Una misma asignatura puede pertenecer a más de una salida.</small>
+                    <button
+                      class="sgpa-form-secondary"
+                      type="button"
+                      data-salida-asignaturas="${salida.id}"
+                    >
+
+                      <i
+                        data-lucide="list-checks"
+                        aria-hidden="true"
+                      ></i>
+
+                      Materias
+
+                    </button>
+
+
+                    <button
+                      class="planes-icon-button"
+                      type="button"
+                      title="Editar"
+                      aria-label="Editar"
+                      data-salida-editar="${salida.id}"
+                    >
+
+                      <i
+                        data-lucide="pencil"
+                        aria-hidden="true"
+                      ></i>
+
+                    </button>
+
+
+                    <button
+                      class="planes-icon-button"
+                      type="button"
+                      title="${
+                        salida.activo
+                          ? "Desactivar"
+                          : "Activar"
+                      }"
+                      aria-label="${
+                        salida.activo
+                          ? "Desactivar"
+                          : "Activar"
+                      }"
+                      data-salida-estado="${salida.id}"
+                    >
+
+                      <i
+                        data-lucide="${
+                          salida.activo
+                            ? "circle-pause"
+                            : "circle-check"
+                        }"
+                        aria-hidden="true"
+                      ></i>
+
+                    </button>
+
+                  </div>
+
+                </article>
+              `;
+
+            }
+          )
+          .join("")
+
+      : `
+          <div class="plan-requirements-empty">
+
+            Este plan todavía no tiene
+            salidas académicas configuradas.
+
           </div>
-          <button
-            id="nuevaSalidaButton"
-            class="planes-primary-button"
-            type="button"
-          >
-            <i data-lucide="plus" aria-hidden="true"></i>
-            Nueva salida
-          </button>
+        `;
+
+
+  const body = `
+
+    <div class="salidas-academicas-content">
+
+      <div class="sgpa-form-tool-toolbar">
+
+        <div>
+
+          <strong>
+            Salidas del plan
+          </strong>
+
+          <small>
+            Administre títulos,
+            certificaciones y salidas académicas.
+          </small>
+
         </div>
-        <div class="salidas-academicas-list">${salidasHtml}</div>
+
+
+        <button
+          id="nuevaSalidaButton"
+          class="sgpa-form-primary"
+          type="button"
+        >
+
+          <i
+            data-lucide="plus"
+            aria-hidden="true"
+          ></i>
+
+          <span>
+            Nueva salida
+          </span>
+
+        </button>
+
       </div>
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="cerrarSalidasFooter"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Cerrar
-        </button>
-      </footer>
+
+      <div class="salidas-academicas-list">
+
+        ${salidasHtml}
+
+      </div>
+
     </div>
+
   `;
+
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "salidasAdminForm",
+
+      title:
+        "Salidas académicas",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      cancelButtonId:
+        "cerrarSalidasFooter",
+
+      cancelText:
+        "Cerrar",
+
+      layout:
+        "custom",
+
+      formClass:
+        "salidas-academicas-dialog"
+
+    });
+
 
   renderizarIconos();
 
-  if (!dialog.open) {
-    dialog.showModal();
-  }
 
-  const cerrar = () => dialog.close();
+  mostrarDialogHerramienta();
+
+
+  const cerrar =
+    () => dialog.close();
+
+
   document
-    .getElementById("cerrarSalidasButton")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "cerrarSalidasFooter"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
+
+
   document
-    .getElementById("cerrarSalidasFooter")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "nuevaSalidaButton"
+    )
+    ?.addEventListener(
+      "click",
+      () =>
+        abrirFormularioSalida()
+    );
+
+
   document
-    .getElementById("nuevaSalidaButton")
-    ?.addEventListener("click", () => abrirFormularioSalida());
+    .querySelectorAll(
+      "[data-salida-editar]"
+    )
+    .forEach(
+      (button) => {
 
-  document.querySelectorAll("[data-salida-editar]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const salida = salidasAcademicas.find(
-        (item) => Number(item.id) === Number(button.dataset.salidaEditar),
-      );
+        button.addEventListener(
+          "click",
+          () => {
 
-      if (salida) {
-        abrirFormularioSalida(salida);
+            const salida =
+              salidasAcademicas.find(
+                (item) =>
+                  Number(item.id) ===
+                  Number(
+                    button.dataset
+                      .salidaEditar
+                  )
+              );
+
+
+            if (salida) {
+
+              abrirFormularioSalida(
+                salida
+              );
+
+            }
+
+          }
+        );
+
       }
-    });
-  });
+    );
 
-  document.querySelectorAll("[data-salida-asignaturas]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const salida = salidasAcademicas.find(
-        (item) => Number(item.id) === Number(button.dataset.salidaAsignaturas),
-      );
 
-      if (salida) {
-        abrirAsignaturasSalida(salida);
+  document
+    .querySelectorAll(
+      "[data-salida-asignaturas]"
+    )
+    .forEach(
+      (button) => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            const salida =
+              salidasAcademicas.find(
+                (item) =>
+                  Number(item.id) ===
+                  Number(
+                    button.dataset
+                      .salidaAsignaturas
+                  )
+              );
+
+
+            if (salida) {
+
+              abrirAsignaturasSalida(
+                salida
+              );
+
+            }
+
+          }
+        );
+
       }
-    });
-  });
+    );
 
-  document.querySelectorAll("[data-salida-estado]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const salida = salidasAcademicas.find(
-        (item) => Number(item.id) === Number(button.dataset.salidaEstado),
-      );
 
-      if (salida) {
-        await alternarEstadoSalida(salida);
+  document
+    .querySelectorAll(
+      "[data-salida-estado]"
+    )
+    .forEach(
+      (button) => {
+
+        button.addEventListener(
+          "click",
+          async () => {
+
+            const salida =
+              salidasAcademicas.find(
+                (item) =>
+                  Number(item.id) ===
+                  Number(
+                    button.dataset
+                      .salidaEstado
+                  )
+              );
+
+
+            if (salida) {
+
+              await alternarEstadoSalida(
+                salida
+              );
+
+            }
+
+          }
+        );
+
       }
-    });
-  });
+    );
+
 }
 
-function abrirFormularioSalida(salida = null) {
-  const content = document.getElementById("asignaturaDialogContent");
+function abrirFormularioSalida(
+  salida = null
+) {
 
-  if (!content || !planSeleccionado) {
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  const editando = Boolean(salida);
+
+  const editando =
+    Boolean(salida);
+
+
   const opcionesTipo = [
-    ["DIPLOMADO", "Diplomado"],
-    ["BACHILLERATO", "Bachillerato"],
-    ["LICENCIATURA", "Licenciatura"],
-    ["CERTIFICADO", "Certificado"],
-    ["OTRO", "Otro"],
+
+    [
+      "DIPLOMADO",
+      "Diplomado"
+    ],
+
+    [
+      "BACHILLERATO",
+      "Bachillerato"
+    ],
+
+    [
+      "LICENCIATURA",
+      "Licenciatura"
+    ],
+
+    [
+      "CERTIFICADO",
+      "Certificado"
+    ],
+
+    [
+      "OTRO",
+      "Otro"
+    ]
+
   ];
 
-  content.innerHTML = `
-    <form id="salidaAcademicaForm" class="plan-form">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>${
-            editando ? "Editar salida académica" : "Nueva salida académica"
-          }</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
-        </div>
-      </header>
 
-      <div
-        id="salidaAcademicaError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
+  const body = `
 
-      <div class="plan-form-grid">
-        <label>
-          <span>Código</span>
-          <input
-            id="salidaCodigo"
-            maxlength="30"
-            required
-            value="${escapeHtml(salida?.codigo || "")}"
-            placeholder="Ej. DIP"
-          >
-        </label>
-        <label>
-          <span>Orden</span>
-          <input
-            id="salidaOrden"
-            type="number"
-            min="1"
-            max="999"
-            required
-            value="${salida?.orden || salidasAcademicas.length + 1}"
-          >
-        </label>
-        <label class="plan-form-wide">
-          <span>Nombre</span>
-          <input
-            id="salidaNombre"
-            maxlength="160"
-            required
-            value="${escapeHtml(salida?.nombre || "")}"
-            placeholder="Ej. Diplomado"
-          >
-        </label>
-        <label>
-          <span>Tipo</span>
-          <select id="salidaTipo" required>
-            ${opcionesTipo
-              .map(
-                ([valor, texto]) => `
-                  <option
-                    value="${valor}"
-                    ${
-                      (salida?.tipo || "BACHILLERATO") === valor
-                        ? "selected"
-                        : ""
-                    }
-                  >
-                    ${texto}
-                  </option>
-                `,
-              )
-              .join("")}
-          </select>
-        </label>
-        <label>
-          <span>Créditos requeridos</span>
-          <input
-            id="salidaCreditos"
-            type="number"
-            min="1"
-            max="999"
-            required
-            value="${salida?.creditosRequeridos ?? ""}"
-            placeholder="Ej. 88"
-          >
-        </label>
-        <label class="plan-form-wide">
-          <span>Descripción</span>
-          <textarea
-            id="salidaDescripcion"
-            maxlength="500"
-            rows="3"
-            placeholder="Descripción opcional"
-          >${escapeHtml(salida?.descripcion || "")}</textarea>
-        </label>
-      </div>
+    <label>
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="volverSalidasButton"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Volver
-        </button>
-        <button
-          id="guardarSalidaButton"
-          class="planes-primary-button"
-          type="submit"
-        >
-          Guardar
-        </button>
-      </footer>
-    </form>
+      <span>
+        Código
+      </span>
+
+      <input
+        id="salidaCodigo"
+        maxlength="30"
+        required
+        value="${escapeHtml(
+          salida?.codigo || ""
+        )}"
+        placeholder="Ej. DIP"
+      >
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Orden
+      </span>
+
+      <input
+        id="salidaOrden"
+        type="number"
+        min="1"
+        max="999"
+        required
+        value="${
+          salida?.orden ||
+          salidasAcademicas.length + 1
+        }"
+      >
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Nombre
+      </span>
+
+      <input
+        id="salidaNombre"
+        maxlength="160"
+        required
+        value="${escapeHtml(
+          salida?.nombre || ""
+        )}"
+        placeholder="Ej. Diplomado"
+      >
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Tipo
+      </span>
+
+      <select
+        id="salidaTipo"
+        required
+      >
+
+        ${
+          opcionesTipo
+            .map(
+              ([valor, texto]) => `
+                <option
+                  value="${valor}"
+                  ${
+                    (
+                      salida?.tipo ||
+                      "BACHILLERATO"
+                    ) === valor
+                      ? "selected"
+                      : ""
+                  }
+                >
+                  ${texto}
+                </option>
+              `
+            )
+            .join("")
+        }
+
+      </select>
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Créditos requeridos
+      </span>
+
+      <input
+        id="salidaCreditos"
+        type="number"
+        min="1"
+        max="999"
+        required
+        value="${
+          salida?.creditosRequeridos ??
+          ""
+        }"
+        placeholder="Ej. 88"
+      >
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Descripción
+      </span>
+
+      <textarea
+        id="salidaDescripcion"
+        maxlength="500"
+        rows="3"
+        placeholder="Descripción opcional"
+      >${escapeHtml(
+        salida?.descripcion || ""
+      )}</textarea>
+
+    </label>
+
   `;
 
-  document
-    .getElementById("volverSalidasButton")
-    ?.addEventListener("click", abrirAdministradorSalidas);
-  document
-    .getElementById("salidaAcademicaForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await guardarSalidaAcademicaFrontend(salida);
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "salidaAcademicaForm",
+
+      title:
+        editando
+          ? "Editar salida académica"
+          : "Nueva salida académica",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      errorId:
+        "salidaAcademicaError",
+
+      cancelButtonId:
+        "volverSalidasButton",
+
+      cancelText:
+        "Volver",
+
+      submitButtonId:
+        "guardarSalidaButton",
+
+      submitText:
+        editando
+          ? "Guardar cambios"
+          : "Crear salida",
+
+      submitIcon:
+        "save"
+
     });
+
+
+  renderizarIconos();
+
+
+  mostrarDialogHerramienta();
+
+
+  document
+    .getElementById(
+      "volverSalidasButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirAdministradorSalidas
+    );
+
+
+  document
+    .getElementById(
+      "salidaAcademicaForm"
+    )
+    ?.addEventListener(
+      "submit",
+      async (event) => {
+
+        event.preventDefault();
+
+
+        await guardarSalidaAcademicaFrontend(
+          salida
+        );
+
+      }
+    );
+
 }
 
 async function guardarSalidaAcademicaFrontend(salida) {
@@ -4530,121 +6321,291 @@ async function recargarSalidasAcademicas() {
   renderizarDetallePlan();
 }
 
-function abrirAsignaturasSalida(salida) {
-  const content = document.getElementById("asignaturaDialogContent");
+function abrirAsignaturasSalida(
+  salida
+) {
+
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
 
   if (!content) {
     return;
   }
 
-  const idsSeleccionados = new Set(
-    (salida.asignaturas || []).map((item) => Number(item.id)),
-  );
-  const asignaturas = asignaturasPlan
-    .filter((item) => item.activo)
-    .slice()
-    .sort(
-      (a, b) =>
-        Number(a.nivel) - Number(b.nivel) ||
-        Number(a.ciclo) - Number(b.ciclo) ||
-        Number(a.orden) - Number(b.orden),
+
+  const idsSeleccionados =
+    new Set(
+      (
+        salida.asignaturas ||
+        []
+      )
+        .map(
+          (item) =>
+            Number(item.id)
+        )
     );
 
-  content.innerHTML = `
-    <div class="plan-form">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>Materias de ${escapeHtml(salida.nombre)}</h3>
-          <p>Seleccione las asignaturas que forman parte de esta salida.</p>
-        </div>
-      </header>
 
-      <div
-        id="salidaAsignaturasError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
-      <div class="salida-asignaturas-summary">
-        <strong id="salidaAsignaturasCantidad"></strong>
-        <span id="salidaAsignaturasCreditos"></span>
-      </div>
-      <div class="salida-asignaturas-list">
-        ${asignaturas
-          .map((asignatura) => {
-            const datos = obtenerDatosAsignatura(asignatura);
+  const asignaturas =
+    asignaturasPlan
+      .filter(
+        (item) =>
+          item.activo
+      )
+      .slice()
+      .sort(
+        (a, b) =>
+          Number(a.nivel) -
+            Number(b.nivel) ||
+          Number(a.ciclo) -
+            Number(b.ciclo) ||
+          Number(a.orden) -
+            Number(b.orden)
+      );
 
-            return `
-              <label class="salida-asignatura-option">
-                <input
-                  type="checkbox"
-                  value="${asignatura.id}"
-                  data-salida-asignatura
-                  data-creditos="${asignatura.creditos}"
-                  ${idsSeleccionados.has(Number(asignatura.id)) ? "checked" : ""}
-                >
-                <div>
-                  <strong>
-                    ${escapeHtml(datos.codigo || "SIN CÓDIGO")}
-                    · ${escapeHtml(datos.nombre)}
-                  </strong>
-                  <small>
-                    Nivel ${asignatura.nivel} · Ciclo ${asignatura.ciclo} ·
-                    ${asignatura.creditos} créditos
-                  </small>
-                </div>
-              </label>
-            `;
-          })
-          .join("")}
-      </div>
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="volverAsignaturasSalida"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Volver
-        </button>
-        <button
-          id="guardarAsignaturasSalida"
-          class="planes-primary-button"
-          type="button"
-        >
-          Guardar selección
-        </button>
-      </footer>
+  const body = `
+
+    <div class="salida-asignaturas-summary">
+
+      <strong
+        id="salidaAsignaturasCantidad"
+      ></strong>
+
+      <span
+        id="salidaAsignaturasCreditos"
+      ></span>
+
     </div>
+
+
+    <div class="salida-asignaturas-list">
+
+      ${
+        asignaturas
+          .map(
+            (asignatura) => {
+
+              const datos =
+                obtenerDatosAsignatura(
+                  asignatura
+                );
+
+
+              return `
+                <label class="salida-asignatura-option">
+
+                  <input
+                    type="checkbox"
+                    value="${asignatura.id}"
+                    data-salida-asignatura
+                    data-creditos="${asignatura.creditos}"
+                    ${
+                      idsSeleccionados.has(
+                        Number(
+                          asignatura.id
+                        )
+                      )
+                        ? "checked"
+                        : ""
+                    }
+                  >
+
+
+                  <div>
+
+                    <strong>
+
+                      ${escapeHtml(
+                        datos.codigo ||
+                        "SIN CÓDIGO"
+                      )}
+
+                      ·
+
+                      ${escapeHtml(
+                        datos.nombre
+                      )}
+
+                    </strong>
+
+
+                    <small>
+
+                      Nivel
+                      ${asignatura.nivel}
+
+                      · Ciclo
+                      ${asignatura.ciclo}
+
+                      ·
+                      ${asignatura.creditos}
+                      créditos
+
+                    </small>
+
+                  </div>
+
+                </label>
+              `;
+
+            }
+          )
+          .join("")
+      }
+
+    </div>
+
   `;
 
-  const actualizarResumen = () => {
-    const seleccionadas = Array.from(
-      document.querySelectorAll("[data-salida-asignatura]:checked"),
-    );
-    const creditos = seleccionadas.reduce(
-      (total, input) => total + Number(input.dataset.creditos || 0),
-      0,
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "salidaAsignaturasForm",
+
+      title:
+        `Materias de ${salida.nombre}`,
+
+      description:
+        "Seleccione las asignaturas que forman parte de esta salida académica.",
+
+      body,
+
+      errorId:
+        "salidaAsignaturasError",
+
+      cancelButtonId:
+        "volverAsignaturasSalida",
+
+      cancelText:
+        "Volver",
+
+      submitButtonId:
+        "guardarAsignaturasSalida",
+
+      submitText:
+        "Guardar selección",
+
+      submitButtonType:
+        "button",
+
+      submitIcon:
+        "save",
+
+      layout:
+        "custom"
+
+    });
+
+
+  renderizarIconos();
+
+
+  mostrarDialogHerramienta();
+
+
+  const actualizarResumen =
+    () => {
+
+      const seleccionadas =
+        Array.from(
+          document.querySelectorAll(
+            "[data-salida-asignatura]:checked"
+          )
+        );
+
+
+      const creditos =
+        seleccionadas.reduce(
+          (total, input) =>
+            total +
+            Number(
+              input.dataset.creditos ||
+              0
+            ),
+          0
+        );
+
+
+      const cantidad =
+        document.getElementById(
+          "salidaAsignaturasCantidad"
+        );
+
+
+      const creditosText =
+        document.getElementById(
+          "salidaAsignaturasCreditos"
+        );
+
+
+      if (cantidad) {
+
+        cantidad.textContent =
+          `${seleccionadas.length} asignaturas`;
+
+      }
+
+
+      if (creditosText) {
+
+        creditosText.textContent =
+          `${creditos} / ${salida.creditosRequeridos} créditos`;
+
+      }
+
+    };
+
+
+  document
+    .querySelectorAll(
+      "[data-salida-asignatura]"
+    )
+    .forEach(
+      (input) => {
+
+        input.addEventListener(
+          "change",
+          actualizarResumen
+        );
+
+      }
     );
 
-    document.getElementById("salidaAsignaturasCantidad").textContent =
-      `${seleccionadas.length} asignaturas`;
-    document.getElementById("salidaAsignaturasCreditos").textContent =
-      `${creditos} / ${salida.creditosRequeridos} créditos`;
-  };
 
-  document.querySelectorAll("[data-salida-asignatura]").forEach((input) => {
-    input.addEventListener("change", actualizarResumen);
-  });
   actualizarResumen();
 
+
   document
-    .getElementById("volverAsignaturasSalida")
-    ?.addEventListener("click", abrirAdministradorSalidas);
+    .getElementById(
+      "volverAsignaturasSalida"
+    )
+    ?.addEventListener(
+      "click",
+      abrirAdministradorSalidas
+    );
+
+
   document
-    .getElementById("guardarAsignaturasSalida")
-    ?.addEventListener("click", async () => {
-      await guardarAsignaturasSalidaFrontend(salida);
-    });
+    .getElementById(
+      "guardarAsignaturasSalida"
+    )
+    ?.addEventListener(
+      "click",
+      async () => {
+
+        await guardarAsignaturasSalidaFrontend(
+          salida
+        );
+
+      }
+    );
+
 }
 
 async function guardarAsignaturasSalidaFrontend(salida) {
@@ -4740,35 +6701,77 @@ function formatearTipoBloque(tipo) {
 }
 
 function abrirAdministradorBloques() {
-  const dialog = document.getElementById("asignaturaDialog");
-  const content = document.getElementById("asignaturaDialogContent");
 
-  if (!dialog || !content || !planSeleccionado) {
+  const dialog =
+    document.getElementById(
+      "asignaturaDialog"
+    );
+
+
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !dialog ||
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
+
   const bloquesHtml =
     bloquesPlan.length > 0
+
       ? bloquesPlan
           .map(
             (bloque) => `
               <article
-                class="bloque-plan-row ${
-                  bloque.activo ? "" : "bloque-plan-inactive"
-                }"
+                class="
+                  bloque-plan-row
+                  ${
+                    bloque.activo
+                      ? ""
+                      : "bloque-plan-inactive"
+                  }
+                "
               >
+
                 <div class="bloque-plan-info">
+
                   <div>
-                    <strong>${escapeHtml(bloque.nombre)}</strong>
-                    <span>${escapeHtml(bloque.codigo)}</span>
+
+                    <strong>
+                      ${escapeHtml(bloque.nombre)}
+                    </strong>
+
+                    <span>
+                      ${escapeHtml(bloque.codigo)}
+                    </span>
+
                   </div>
+
+
                   <small>
-                    ${escapeHtml(formatearTipoBloque(bloque.tipo))}
+
+                    ${escapeHtml(
+                      formatearTipoBloque(
+                        bloque.tipo
+                      )
+                    )}
+
                     · Orden ${bloque.orden}
+
                   </small>
+
                 </div>
 
+
                 <div class="bloque-plan-actions">
+
                   <button
                     class="planes-icon-button"
                     data-bloque-editar="${bloque.id}"
@@ -4776,250 +6779,495 @@ function abrirAdministradorBloques() {
                     title="Editar bloque"
                     aria-label="Editar ${escapeHtml(bloque.nombre)}"
                   >
-                    <i data-lucide="pencil" aria-hidden="true"></i>
+
+                    <i
+                      data-lucide="pencil"
+                      aria-hidden="true"
+                    ></i>
+
                   </button>
+
+
                   <button
                     class="planes-icon-button"
                     data-bloque-estado="${bloque.id}"
                     type="button"
-                    title="${bloque.activo ? "Desactivar" : "Activar"}"
+                    title="${
+                      bloque.activo
+                        ? "Desactivar"
+                        : "Activar"
+                    }"
                     aria-label="${
-                      bloque.activo ? "Desactivar" : "Activar"
+                      bloque.activo
+                        ? "Desactivar"
+                        : "Activar"
                     } ${escapeHtml(bloque.nombre)}"
                   >
+
                     <i
                       data-lucide="${
-                        bloque.activo ? "circle-pause" : "circle-check"
+                        bloque.activo
+                          ? "circle-pause"
+                          : "circle-check"
                       }"
                       aria-hidden="true"
                     ></i>
+
                   </button>
+
                 </div>
+
               </article>
-            `,
+            `
           )
           .join("")
+
       : `
           <div class="plan-requirements-empty">
-            Este plan todavía no tiene bloques.
+
+            Este plan todavía
+            no tiene bloques.
+
           </div>
         `;
 
-  content.innerHTML = `
-    <div class="plan-form">
-      <header class="plan-dialog-header">
+
+  const body = `
+
+    <div class="bloques-plan-content">
+
+      <div class="sgpa-form-tool-toolbar">
+
         <div>
-          <h3>Bloques del plan</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
+
+          <strong>
+            Estructura curricular
+          </strong>
+
+          <small>
+            Organice las asignaturas
+            por bloques académicos.
+          </small>
+
         </div>
+
+
         <button
-          id="cerrarBloquesDialog"
-          class="planes-icon-button"
+          id="nuevoBloqueButton"
+          class="sgpa-form-primary"
           type="button"
-          aria-label="Cerrar"
         >
-          <i data-lucide="x" aria-hidden="true"></i>
-        </button>
-      </header>
 
-      <div
-        id="bloquesPlanError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
+          <i
+            data-lucide="plus"
+            aria-hidden="true"
+          ></i>
 
-      <div class="bloques-plan-content">
-        <div class="bloques-plan-toolbar">
-          <div>
-            <strong>Estructura curricular</strong>
-            <small>Organice las asignaturas por bloques académicos.</small>
-          </div>
-          <button
-            id="nuevoBloqueButton"
-            class="planes-primary-button"
-            type="button"
-          >
-            <i data-lucide="plus" aria-hidden="true"></i>
+          <span>
             Nuevo bloque
-          </button>
-        </div>
+          </span>
 
-        <div class="bloques-plan-list">${bloquesHtml}</div>
+        </button>
+
       </div>
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="cerrarBloquesFooter"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Cerrar
-        </button>
-      </footer>
+
+      <div class="bloques-plan-list">
+
+        ${bloquesHtml}
+
+      </div>
+
     </div>
   `;
 
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "bloquesAdminForm",
+
+      title:
+        "Bloques del plan",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      errorId:
+        "bloquesPlanError",
+
+      cancelButtonId:
+        "cerrarBloquesFooter",
+
+      cancelText:
+        "Cerrar",
+
+      layout:
+        "custom"
+
+    });
+
+
   renderizarIconos();
 
-  if (!dialog.open) {
-    dialog.showModal();
-  }
 
-  const cerrar = () => dialog.close();
-  document
-    .getElementById("cerrarBloquesDialog")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("cerrarBloquesFooter")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("nuevoBloqueButton")
-    ?.addEventListener("click", () => abrirFormularioBloque());
-  document.querySelectorAll("[data-bloque-editar]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const id = Number(button.dataset.bloqueEditar);
-      const bloque = bloquesPlan.find((item) => Number(item.id) === id);
+  mostrarDialogHerramienta();
 
-      if (bloque) {
-        abrirFormularioBloque(bloque);
+
+  const cerrar =
+    () => dialog.close();
+
+
+  document
+    .getElementById(
+      "cerrarBloquesFooter"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
+
+
+  document
+    .getElementById(
+      "nuevoBloqueButton"
+    )
+    ?.addEventListener(
+      "click",
+      () =>
+        abrirFormularioBloque()
+    );
+
+
+  document
+    .querySelectorAll(
+      "[data-bloque-editar]"
+    )
+    .forEach(
+      (button) => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            const id =
+              Number(
+                button.dataset
+                  .bloqueEditar
+              );
+
+
+            const bloque =
+              bloquesPlan.find(
+                (item) =>
+                  Number(item.id) ===
+                  id
+              );
+
+
+            if (bloque) {
+
+              abrirFormularioBloque(
+                bloque
+              );
+
+            }
+
+          }
+        );
+
       }
-    });
-  });
-  document.querySelectorAll("[data-bloque-estado]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const id = Number(button.dataset.bloqueEstado);
-      const bloque = bloquesPlan.find((item) => Number(item.id) === id);
+    );
 
-      if (bloque) {
-        await alternarEstadoBloque(bloque);
+
+  document
+    .querySelectorAll(
+      "[data-bloque-estado]"
+    )
+    .forEach(
+      (button) => {
+
+        button.addEventListener(
+          "click",
+          async () => {
+
+            const id =
+              Number(
+                button.dataset
+                  .bloqueEstado
+              );
+
+
+            const bloque =
+              bloquesPlan.find(
+                (item) =>
+                  Number(item.id) ===
+                  id
+              );
+
+
+            if (bloque) {
+
+              await alternarEstadoBloque(
+                bloque
+              );
+
+            }
+
+          }
+        );
+
       }
-    });
-  });
+    );
+
 }
 
-function abrirFormularioBloque(bloque = null) {
-  const content = document.getElementById("asignaturaDialogContent");
+function abrirFormularioBloque(
+  bloque = null
+) {
 
-  if (!content || !planSeleccionado) {
+  const content =
+    document.getElementById(
+      "asignaturaDialogContent"
+    );
+
+
+  if (
+    !content ||
+    !planSeleccionado
+  ) {
     return;
   }
 
-  const editando = Boolean(bloque);
+
+  const editando =
+    Boolean(bloque);
+
+
   const tipos = [
-    ["TRONCO_COMUN", "Tronco común"],
-    ["ENFASIS", "Énfasis"],
-    ["SALIDA_LATERAL", "Salida lateral"],
-    ["GRADO", "Grado"],
-    ["OTRO", "Otro"],
+
+    [
+      "TRONCO_COMUN",
+      "Tronco común"
+    ],
+
+    [
+      "ENFASIS",
+      "Énfasis"
+    ],
+
+    [
+      "SALIDA_LATERAL",
+      "Salida lateral"
+    ],
+
+    [
+      "GRADO",
+      "Grado"
+    ],
+
+    [
+      "OTRO",
+      "Otro"
+    ]
+
   ];
 
-  content.innerHTML = `
-    <form id="bloquePlanForm" class="plan-form">
-      <header class="plan-dialog-header">
-        <div>
-          <h3>${editando ? "Editar bloque" : "Nuevo bloque"}</h3>
-          <p>${escapeHtml(planSeleccionado.nombre)}</p>
-        </div>
-      </header>
 
-      <div
-        id="bloqueFormError"
-        class="plan-form-error hidden"
-        role="alert"
-      ></div>
+  const body = `
 
-      <div class="plan-form-grid">
-        <label>
-          <span>Código</span>
-          <input
-            id="bloqueCodigo"
-            maxlength="30"
-            value="${escapeHtml(bloque?.codigo || "")}"
-            placeholder="Ej. TC"
-            required
-          >
-        </label>
-        <label>
-          <span>Orden</span>
-          <input
-            id="bloqueOrden"
-            type="number"
-            min="1"
-            max="999"
-            value="${bloque?.orden || bloquesPlan.length + 1}"
-            required
-          >
-        </label>
-        <label class="plan-form-wide">
-          <span>Nombre</span>
-          <input
-            id="bloqueNombre"
-            maxlength="150"
-            value="${escapeHtml(bloque?.nombre || "")}"
-            placeholder="Ej. Tronco común"
-            required
-          >
-        </label>
-        <label class="plan-form-wide">
-          <span>Tipo</span>
-          <select id="bloqueTipo" required>
-            ${tipos
-              .map(
-                ([valor, texto]) => `
-                  <option
-                    value="${valor}"
-                    ${
-                      (bloque?.tipo || "TRONCO_COMUN") === valor
-                        ? "selected"
-                        : ""
-                    }
-                  >
-                    ${texto}
-                  </option>
-                `,
-              )
-              .join("")}
-          </select>
-        </label>
-        <label class="plan-form-wide">
-          <span>Descripción</span>
-          <textarea
-            id="bloqueDescripcion"
-            maxlength="500"
-            rows="3"
-            placeholder="Descripción opcional"
-          >${escapeHtml(bloque?.descripcion || "")}</textarea>
-        </label>
-      </div>
+    <label>
 
-      <footer class="plan-dialog-footer">
-        <button
-          id="volverBloquesButton"
-          class="planes-secondary-button"
-          type="button"
-        >
-          Volver
-        </button>
-        <button
-          id="guardarBloqueButton"
-          class="planes-primary-button"
-          type="submit"
-        >
-          Guardar
-        </button>
-      </footer>
-    </form>
+      <span>
+        Código
+      </span>
+
+      <input
+        id="bloqueCodigo"
+        maxlength="30"
+        value="${escapeHtml(
+          bloque?.codigo || ""
+        )}"
+        placeholder="Ej. TC"
+        required
+      >
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Orden
+      </span>
+
+      <input
+        id="bloqueOrden"
+        type="number"
+        min="1"
+        max="999"
+        value="${
+          bloque?.orden ||
+          bloquesPlan.length + 1
+        }"
+        required
+      >
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Nombre
+      </span>
+
+      <input
+        id="bloqueNombre"
+        maxlength="150"
+        value="${escapeHtml(
+          bloque?.nombre || ""
+        )}"
+        placeholder="Ej. Tronco común"
+        required
+      >
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Tipo
+      </span>
+
+      <select
+        id="bloqueTipo"
+        required
+      >
+
+        ${
+          tipos
+            .map(
+              ([valor, texto]) => `
+                <option
+                  value="${valor}"
+                  ${
+                    (
+                      bloque?.tipo ||
+                      "TRONCO_COMUN"
+                    ) === valor
+                      ? "selected"
+                      : ""
+                  }
+                >
+                  ${texto}
+                </option>
+              `
+            )
+            .join("")
+        }
+
+      </select>
+
+    </label>
+
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Descripción
+      </span>
+
+      <textarea
+        id="bloqueDescripcion"
+        maxlength="500"
+        rows="3"
+        placeholder="Descripción opcional"
+      >${escapeHtml(
+        bloque?.descripcion || ""
+      )}</textarea>
+
+    </label>
+
   `;
 
-  document
-    .getElementById("volverBloquesButton")
-    ?.addEventListener("click", abrirAdministradorBloques);
-  document
-    .getElementById("bloquePlanForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await guardarBloque(bloque);
+
+  content.innerHTML =
+    FormDialog({
+
+      formId:
+        "bloquePlanForm",
+
+      title:
+        editando
+          ? "Editar bloque"
+          : "Nuevo bloque",
+
+      description:
+        planSeleccionado.nombre,
+
+      body,
+
+      errorId:
+        "bloqueFormError",
+
+      cancelButtonId:
+        "volverBloquesButton",
+
+      cancelText:
+        "Volver",
+
+      submitButtonId:
+        "guardarBloqueButton",
+
+      submitText:
+        editando
+          ? "Guardar cambios"
+          : "Crear bloque",
+
+      submitIcon:
+        "save"
+
     });
+
+
+  renderizarIconos();
+
+
+  mostrarDialogHerramienta();
+
+
+  document
+    .getElementById(
+      "volverBloquesButton"
+    )
+    ?.addEventListener(
+      "click",
+      abrirAdministradorBloques
+    );
+
+
+  document
+    .getElementById(
+      "bloquePlanForm"
+    )
+    ?.addEventListener(
+      "submit",
+      async (event) => {
+
+        event.preventDefault();
+
+        await guardarBloque(
+          bloque
+        );
+
+      }
+    );
+
 }
 
 async function guardarBloque(bloque) {

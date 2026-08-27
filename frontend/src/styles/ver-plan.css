@@ -1,0 +1,1593 @@
+/* =========================================================
+   VER PLAN
+   =========================================================
+   Vista detallada del plan de estudio.
+
+   Diseño:
+   - SGPA / Universidad Nacional
+   - Rojo como acento
+   - Herramientas compactas
+   - Tipografía uniforme
+   - KPI académicos
+   - Responsive
+   ========================================================= */
+
+
+/* =========================================================
+   PÁGINA
+   ========================================================= */
+
+.ver-plan-page {
+  width:
+    100%;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    18px;
+}
+
+
+/* =========================================================
+   HERO
+   ========================================================= */
+
+.ver-plan-hero {
+  position:
+    relative;
+
+  overflow:
+    hidden;
+
+  padding:
+    20px 24px
+    22px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    14px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 2px 8px
+    rgba(16, 24, 40, 0.035);
+}
+
+
+/* Línea institucional */
+
+.ver-plan-hero::before {
+  content:
+    "";
+
+  position:
+    absolute;
+
+  top:
+    0;
+
+  bottom:
+    0;
+
+  left:
+    0;
+
+  width:
+    3px;
+
+  background:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+/* =========================================================
+   FILA SUPERIOR
+   ========================================================= */
+
+.ver-plan-hero-top {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    20px;
+
+  margin-bottom:
+    14px;
+}
+
+
+/* =========================================================
+   VOLVER
+   ========================================================= */
+
+.ver-plan-back {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  gap:
+    6px;
+
+  padding:
+    0;
+
+  border:
+    0;
+
+  background:
+    transparent;
+
+  color:
+    #667085;
+
+  font-family:
+    inherit;
+
+  font-size:
+    11px;
+
+  font-weight:
+    550;
+
+  cursor:
+    pointer;
+
+  transition:
+    color 0.15s ease;
+}
+
+
+.ver-plan-back:hover {
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.ver-plan-back-arrow {
+  font-size:
+    13px;
+
+  line-height:
+    1;
+}
+
+
+/* =========================================================
+   AGREGAR ASIGNATURA
+   =========================================================
+   El diseño real lo hereda de:
+   .planes-primary-button
+   ========================================================= */
+
+.ver-plan-add-button {
+  flex:
+    0 0 auto;
+
+  margin:
+    0;
+}
+
+
+/* =========================================================
+   TÍTULO
+   ========================================================= */
+
+.ver-plan-title {
+  min-width:
+    0;
+}
+
+
+.ver-plan-eyebrow {
+  display:
+    block;
+
+  margin-bottom:
+    4px;
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  font-size:
+    9px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.075em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.ver-plan-title h2 {
+  margin:
+    0;
+
+  color:
+    #1d2939;
+
+  font-size:
+    24px;
+
+  font-weight:
+    700;
+
+  line-height:
+    1.25;
+
+  letter-spacing:
+    -0.35px;
+}
+
+
+/* =========================================================
+   METADATOS
+   ========================================================= */
+
+.ver-plan-meta {
+  display:
+    flex;
+
+  flex-wrap:
+    wrap;
+
+  align-items:
+    center;
+
+  gap:
+    7px;
+
+  margin-top:
+    11px;
+}
+
+
+.ver-plan-meta > span {
+  min-height:
+    25px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  padding:
+    0 9px;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    999px;
+
+  background:
+    #f8f9fb;
+
+  color:
+    #667085;
+
+  font-size:
+    10px;
+
+  font-weight:
+    550;
+}
+
+
+.ver-plan-meta
+.ver-plan-meta-code {
+  color:
+    #344054;
+
+  font-weight:
+    700;
+}
+
+
+/* =========================================================
+   ESTADO
+   ========================================================= */
+
+.ver-plan-status.is-active {
+  border-color:
+    #d4f0df;
+
+  background:
+    #ecfdf3;
+
+  color:
+    #067647;
+}
+
+
+.ver-plan-status.is-inactive {
+  border-color:
+    #e4e7ec;
+
+  background:
+    #f2f4f7;
+
+  color:
+    #667085;
+}
+
+
+/* =========================================================
+   HERRAMIENTAS
+   ========================================================= */
+
+.ver-plan-tools {
+  padding:
+    13px 16px
+    15px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    12px;
+
+  background:
+    #ffffff;
+}
+
+
+/* =========================================================
+   ETIQUETA HERRAMIENTAS
+   =========================================================
+   Inspirada en los chips de código/carrera del hero.
+   ========================================================= */
+
+.ver-plan-tools-title {
+  margin-bottom:
+    9px;
+}
+
+
+.ver-plan-tools-title span {
+  min-height:
+    24px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  padding:
+    0 9px;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    999px;
+
+  background:
+    #f8f9fb;
+
+  color:
+    #667085;
+
+  font-size:
+    9.5px;
+
+  font-weight:
+    600;
+
+  line-height:
+    1;
+}
+
+
+/* =========================================================
+   GRID DE HERRAMIENTAS
+   ========================================================= */
+
+.ver-plan-tools-grid {
+  width:
+    100%;
+
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(
+      7,
+      minmax(0, 1fr)
+    );
+
+  gap:
+    7px;
+}
+
+
+/* =========================================================
+   BOTÓN HERRAMIENTA
+   ========================================================= */
+
+.ver-plan-tool {
+  min-width:
+    0;
+
+  min-height:
+    48px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    flex-start;
+
+  gap:
+    8px;
+
+  padding:
+    6px 8px;
+
+  border:
+    1px solid transparent;
+
+  border-radius:
+    9px;
+
+  background:
+    transparent;
+
+  color:
+    #475467;
+
+  font-family:
+    inherit;
+
+  font-size:
+    10.5px;
+
+  font-weight:
+    600;
+
+  cursor:
+    pointer;
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+/* =========================================================
+   HOVER HERRAMIENTA
+   ========================================================= */
+
+.ver-plan-tool:hover {
+  border-color:
+    rgba(207, 32, 41, 0.13);
+
+  background:
+    rgba(207, 32, 41, 0.04);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  transform:
+    translateY(-1px);
+}
+
+
+.ver-plan-tool:active {
+  transform:
+    translateY(0);
+}
+
+
+/* =========================================================
+   HERRAMIENTA DESHABILITADA
+   ========================================================= */
+
+.ver-plan-tool:disabled {
+  opacity:
+    0.65;
+
+  cursor:
+    wait;
+
+  transform:
+    none;
+}
+
+
+/* =========================================================
+   ICONO HERRAMIENTA
+   ========================================================= */
+
+.ver-plan-tool-icon {
+  flex:
+    0 0 32px;
+
+  width:
+    32px;
+
+  height:
+    32px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    8px;
+
+  background:
+    #f2f4f7;
+
+  color:
+    #667085;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+
+/*
+ * Todos los iconos cambian de color.
+ * Incluido Revisar.
+ */
+
+.ver-plan-tool:hover
+.ver-plan-tool-icon {
+  background:
+    rgba(207, 32, 41, 0.08);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  transform:
+    scale(1.04);
+}
+
+
+.ver-plan-tool-icon svg {
+  width:
+    16px !important;
+
+  height:
+    16px !important;
+
+  stroke-width:
+    1.8 !important;
+}
+
+
+/* =========================================================
+   TEXTO HERRAMIENTA
+   ========================================================= */
+
+.ver-plan-tool-label {
+  min-width:
+    0;
+
+  overflow:
+    hidden;
+
+  color:
+    inherit;
+
+  font-size:
+    10.5px;
+
+  font-weight:
+    600;
+
+  line-height:
+    1.2;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/* =========================================================
+   LOADER
+   ========================================================= */
+
+.ver-plan-tool.is-loading
+.ver-plan-tool-icon svg {
+  animation:
+    ver-plan-spin
+    0.85s
+    linear
+    infinite;
+}
+
+
+@keyframes ver-plan-spin {
+
+  from {
+    transform:
+      rotate(0deg);
+  }
+
+
+  to {
+    transform:
+      rotate(360deg);
+  }
+
+}
+
+
+/* =========================================================
+   RESUMEN
+   ========================================================= */
+
+.ver-plan-summary {
+  padding:
+    18px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    12px;
+
+  background:
+    #ffffff;
+}
+
+
+/* =========================================================
+   ENCABEZADOS DE SECCIÓN
+   ========================================================= */
+
+.ver-plan-section-header {
+  display:
+    flex;
+
+  align-items:
+    flex-end;
+
+  justify-content:
+    space-between;
+
+  gap:
+    16px;
+
+  margin-bottom:
+    14px;
+}
+
+
+.ver-plan-section-eyebrow {
+  display:
+    block;
+
+  margin-bottom:
+    3px;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.075em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.ver-plan-section-header h3,
+.ver-plan-content-header h3 {
+  margin:
+    0;
+
+  color:
+    #344054;
+
+  font-size:
+    14px;
+
+  font-weight:
+    650;
+}
+
+
+/* =========================================================
+   VER DETALLE
+   ========================================================= */
+
+.ver-plan-text-action {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  gap:
+    6px;
+
+  padding:
+    6px 8px;
+
+  border:
+    0;
+
+  border-radius:
+    7px;
+
+  background:
+    transparent;
+
+  color:
+    #667085;
+
+  font-family:
+    inherit;
+
+  font-size:
+    9.5px;
+
+  font-weight:
+    600;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.ver-plan-text-action:hover {
+  background:
+    rgba(207, 32, 41, 0.05);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.ver-plan-text-action svg {
+  width:
+    14px;
+
+  height:
+    14px;
+}
+
+
+/* =========================================================
+   KPI
+   ========================================================= */
+
+.ver-plan-stats {
+  display:
+    grid;
+
+  grid-template-columns:
+    repeat(
+      5,
+      minmax(0, 1fr)
+    );
+
+  gap:
+    9px;
+}
+
+
+.ver-plan-stat {
+  min-width:
+    0;
+
+  min-height:
+    78px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    11px;
+
+  padding:
+    12px;
+
+  border:
+    1px solid #edf0f4;
+
+  border-radius:
+    10px;
+
+  background:
+    #fbfcfd;
+
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+
+.ver-plan-stat:hover {
+  border-color:
+    rgba(207, 32, 41, 0.13);
+
+  background:
+    #ffffff;
+}
+
+
+/* =========================================================
+   ICONO KPI
+   ========================================================= */
+
+.ver-plan-stat-icon {
+  flex:
+    0 0 36px;
+
+  width:
+    36px;
+
+  height:
+    36px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(207, 32, 41, 0.055);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.ver-plan-stat-icon svg {
+  width:
+    17px !important;
+
+  height:
+    17px !important;
+
+  stroke-width:
+    1.8 !important;
+}
+
+
+/* =========================================================
+   TEXTO KPI
+   ========================================================= */
+
+.ver-plan-stat-content {
+  min-width:
+    0;
+}
+
+
+.ver-plan-stat-value {
+  color:
+    #1d2939;
+
+  font-size:
+    17px;
+
+  font-weight:
+    720;
+
+  line-height:
+    1.1;
+}
+
+
+.ver-plan-stat-title {
+  margin-top:
+    2px;
+
+  color:
+    #344054;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+}
+
+
+.ver-plan-stat small {
+  display:
+    block;
+
+  margin-top:
+    2px;
+
+  overflow:
+    hidden;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    8.5px;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/* =========================================================
+   ADVERTENCIA
+   ========================================================= */
+
+.ver-plan-warning {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    7px;
+
+  margin-top:
+    11px;
+
+  padding:
+    8px 10px;
+
+  border:
+    1px solid #fedf89;
+
+  border-radius:
+    8px;
+
+  background:
+    #fffaeb;
+
+  color:
+    #b54708;
+
+  font-size:
+    9.5px;
+}
+
+
+.ver-plan-warning svg {
+  flex:
+    0 0 auto;
+
+  width:
+    15px;
+
+  height:
+    15px;
+}
+
+
+/* =========================================================
+   ESTRUCTURA CURRICULAR
+   ========================================================= */
+
+.ver-plan-content {
+  overflow:
+    hidden;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    12px;
+
+  background:
+    #ffffff;
+}
+
+
+.ver-plan-content-header {
+  padding:
+    16px 18px
+    0;
+}
+
+
+/* =========================================================
+   CONTROLES
+   ========================================================= */
+
+.ver-plan-controls {
+  display:
+    flex;
+
+  align-items:
+    flex-end;
+
+  justify-content:
+    space-between;
+
+  gap:
+    20px;
+
+  padding:
+    13px 18px;
+
+  border-bottom:
+    1px solid #edf0f4;
+}
+
+
+/* =========================================================
+   LISTA / MALLA
+   ========================================================= */
+
+.ver-plan-tabs {
+  display:
+    inline-flex;
+
+  gap:
+    3px;
+
+  padding:
+    3px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    9px;
+
+  background:
+    #f8f9fb;
+}
+
+
+.ver-plan-tab {
+  min-height:
+    33px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    6px;
+
+  padding:
+    0 11px;
+
+  border:
+    0;
+
+  border-radius:
+    6px;
+
+  background:
+    transparent;
+
+  color:
+    #667085;
+
+  font-family:
+    inherit;
+
+  font-size:
+    10px;
+
+  font-weight:
+    600;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+
+.ver-plan-tab:hover {
+  color:
+    #344054;
+}
+
+
+.ver-plan-tab.active {
+  background:
+    #ffffff;
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  box-shadow:
+    0 1px 4px
+    rgba(16, 24, 40, 0.08);
+}
+
+
+.ver-plan-tab svg {
+  width:
+    14px;
+
+  height:
+    14px;
+}
+
+
+/* =========================================================
+   FILTRO
+   ========================================================= */
+
+.ver-plan-filter {
+  min-width:
+    220px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    4px;
+}
+
+
+.ver-plan-filter > span {
+  color:
+    #667085;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    700;
+
+  letter-spacing:
+    0.04em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.ver-plan-filter select {
+  width:
+    100%;
+
+  min-height:
+    36px;
+
+  padding:
+    0 11px;
+
+  border:
+    1px solid #d9dee7;
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #344054;
+
+  font-family:
+    inherit;
+
+  font-size:
+    10.5px;
+
+  outline:
+    none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+
+.ver-plan-filter select:focus {
+  border-color:
+    rgba(207, 32, 41, 0.55);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(207, 32, 41, 0.07);
+}
+
+
+/* =========================================================
+   LISTA / MALLA
+   ========================================================= */
+
+.ver-plan-stage {
+  min-height:
+    180px;
+
+  padding:
+    18px;
+}
+
+
+/* =========================================================
+   ESTADO VACÍO
+   ========================================================= */
+
+.ver-plan-empty {
+  min-height:
+    210px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    28px;
+
+  text-align:
+    center;
+}
+
+
+.ver-plan-empty-icon {
+  width:
+    48px;
+
+  height:
+    48px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  margin-bottom:
+    10px;
+
+  border-radius:
+    12px;
+
+  background:
+    rgba(207, 32, 41, 0.06);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+}
+
+
+.ver-plan-empty-icon svg {
+  width:
+    21px;
+
+  height:
+    21px;
+
+  stroke-width:
+    1.8;
+}
+
+
+.ver-plan-empty strong {
+  color:
+    #344054;
+
+  font-size:
+    13px;
+
+  font-weight:
+    650;
+}
+
+
+.ver-plan-empty p {
+  max-width:
+    360px;
+
+  margin:
+    5px 0
+    14px;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    10.5px;
+
+  line-height:
+    1.5;
+}
+
+
+.ver-plan-empty-action {
+  min-height:
+    35px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  gap:
+    6px;
+
+  padding:
+    0 12px;
+
+  border:
+    1px solid
+    rgba(207, 32, 41, 0.22);
+
+  border-radius:
+    8px;
+
+  background:
+    rgba(207, 32, 41, 0.045);
+
+  color:
+    var(
+      --una-red,
+      #cf2029
+    );
+
+  font-family:
+    inherit;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+
+  cursor:
+    pointer;
+
+  transition:
+    background-color 0.15s ease;
+}
+
+
+.ver-plan-empty-action:hover {
+  background:
+    rgba(207, 32, 41, 0.085);
+}
+
+
+.ver-plan-empty-action svg {
+  width:
+    14px;
+
+  height:
+    14px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1200px) {
+
+  .ver-plan-tools-grid {
+    grid-template-columns:
+      repeat(
+        4,
+        minmax(0, 1fr)
+      );
+  }
+
+
+  .ver-plan-stats {
+    grid-template-columns:
+      repeat(
+        3,
+        minmax(0, 1fr)
+      );
+  }
+
+}
+
+
+@media (max-width: 800px) {
+
+  .ver-plan-hero-top {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+  }
+
+
+  .ver-plan-add-button {
+    align-self:
+      flex-start;
+  }
+
+
+  .ver-plan-tools-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+
+  .ver-plan-stats {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+
+  .ver-plan-controls {
+    align-items:
+      stretch;
+
+    flex-direction:
+      column;
+  }
+
+
+  .ver-plan-filter {
+    width:
+      100%;
+
+    min-width:
+      0;
+  }
+
+}
+
+
+@media (max-width: 520px) {
+
+  .ver-plan-hero {
+    padding:
+      18px;
+  }
+
+
+  .ver-plan-title h2 {
+    font-size:
+      21px;
+  }
+
+
+  .ver-plan-add-button {
+    width:
+      100%;
+  }
+
+
+  .ver-plan-tools-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .ver-plan-stats {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .ver-plan-tabs {
+    width:
+      100%;
+  }
+
+
+  .ver-plan-tab {
+    flex:
+      1;
+  }
+
+
+  .ver-plan-stage {
+    padding:
+      13px;
+  }
+
+}

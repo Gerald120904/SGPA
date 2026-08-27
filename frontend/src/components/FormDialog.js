@@ -4,10 +4,7 @@ import {
 
 
 /* =========================================================
-   MANEJO DEL CIERRE EXTERIOR
-   =========================================================
-   Guarda el listener asociado a cada dialog para evitar
-   registrar múltiples eventos cada vez que se abre.
+   LISTENERS DE CIERRE EXTERIOR
    ========================================================= */
 
 const dialogOutsideHandlers =
@@ -15,7 +12,7 @@ const dialogOutsideHandlers =
 
 
 /* =========================================================
-   HABILITAR CIERRE AL HACER CLICK FUERA
+   CERRAR AL HACER CLICK FUERA
    ========================================================= */
 
 export function habilitarCierreExterior(
@@ -27,52 +24,56 @@ export function habilitarCierreExterior(
   }
 
 
-  /*
-   * Si el dialog ya tenía un listener anterior,
-   * se elimina antes de registrar uno nuevo.
-   */
-
-  const handlerAnterior =
-    dialogOutsideHandlers.get(
+  if (
+    dialogOutsideHandlers.has(
       dialog
-    );
-
-
-  if (handlerAnterior) {
-
-    dialog.removeEventListener(
-      'click',
-      handlerAnterior
-    );
-
+    )
+  ) {
+    return;
   }
 
 
   const handler =
     (event) => {
 
-      /*
-       * Obtiene las dimensiones reales
-       * del cuadro de diálogo.
-       */
-
-      const rect =
-        dialog.getBoundingClientRect();
+      if (!dialog.open) {
+        return;
+      }
 
 
       /*
-       * Comprobamos si las coordenadas
-       * del click están fuera del formulario.
+       * Solo cerramos automáticamente cuando
+       * el contenido actual utiliza FormDialog.
+       *
+       * Esto permite que Importar Excel siga
+       * funcionando con su estructura antigua.
        */
 
-      const clickFuera =
-        event.clientX < rect.left ||
-        event.clientX > rect.right ||
-        event.clientY < rect.top ||
-        event.clientY > rect.bottom;
+      const formulario =
+        dialog.querySelector(
+          '.sgpa-form'
+        );
 
 
-      if (!clickFuera) {
+      if (!formulario) {
+        return;
+      }
+
+
+      const path =
+        typeof event.composedPath ===
+        'function'
+          ? event.composedPath()
+          : [];
+
+
+      const clickDentro =
+        path.includes(
+          formulario
+        );
+
+
+      if (clickDentro) {
         return;
       }
 
@@ -110,28 +111,158 @@ export function FormDialog({
 
   body = '',
 
-  errorId,
+  errorId = '',
 
-  cancelButtonId,
+  cancelButtonId = '',
 
-  submitButtonId,
+  submitButtonId = '',
 
   cancelText = 'Cancelar',
 
   submitText = 'Guardar',
 
-  submitIcon = 'save'
+  submitIcon = 'save',
+
+  submitButtonType = 'submit',
+
+  layout = 'grid',
+
+  bodyClass = '',
+
+  formClass = '',
+
+  footerHtml = '',
+
+  showFooter = true
 
 }) {
+
+  /* =======================================================
+     CONTENEDOR DEL BODY
+     ======================================================= */
+
+  const bodyContainerClass =
+    layout === 'custom'
+      ? `
+          sgpa-form-body
+          ${bodyClass}
+        `
+      : `
+          sgpa-form-grid
+          ${bodyClass}
+        `;
+
+
+  /* =======================================================
+     ERROR
+     ======================================================= */
+
+  const errorHtml =
+    errorId
+      ? `
+          <div
+            id="${escapeHtml(errorId)}"
+            class="sgpa-form-error hidden"
+            role="alert"
+            aria-live="polite"
+          ></div>
+        `
+      : '';
+
+
+  /* =======================================================
+     BOTÓN CANCELAR
+     ======================================================= */
+
+  const cancelButton =
+    cancelButtonId
+      ? `
+          <button
+            id="${escapeHtml(cancelButtonId)}"
+            class="sgpa-form-secondary"
+            type="button"
+          >
+            ${escapeHtml(cancelText)}
+          </button>
+        `
+      : '';
+
+
+  /* =======================================================
+     BOTÓN PRINCIPAL
+     ======================================================= */
+
+  const submitButton =
+    submitButtonId
+      ? `
+          <button
+            id="${escapeHtml(submitButtonId)}"
+            class="sgpa-form-primary"
+            type="${escapeHtml(submitButtonType)}"
+          >
+
+            ${
+              submitIcon
+                ? `
+                    <i
+                      data-lucide="${escapeHtml(submitIcon)}"
+                      aria-hidden="true"
+                    ></i>
+                  `
+                : ''
+            }
+
+            <span>
+              ${escapeHtml(submitText)}
+            </span>
+
+          </button>
+        `
+      : '';
+
+
+  /* =======================================================
+     FOOTER
+     ======================================================= */
+
+  let footer = '';
+
+
+  if (showFooter) {
+
+    footer = `
+      <footer class="sgpa-form-footer">
+
+        ${
+          footerHtml
+            ? footerHtml
+            : `
+                ${cancelButton}
+                ${submitButton}
+              `
+        }
+
+      </footer>
+    `;
+
+  }
+
+
+  /* =======================================================
+     RENDER
+     ======================================================= */
 
   return `
     <form
       id="${escapeHtml(formId)}"
-      class="sgpa-form"
+      class="
+        sgpa-form
+        ${escapeHtml(formClass)}
+      "
     >
 
       <!-- =============================================== -->
-      <!-- ACENTO INSTITUCIONAL -->
+      <!-- ACENTO UNA -->
       <!-- =============================================== -->
 
       <div
@@ -151,13 +282,13 @@ export function FormDialog({
           alt="Universidad Nacional de Costa Rica"
           class="sgpa-form-logo"
           draggable="false"
-        />
+        >
 
       </div>
 
 
       <!-- =============================================== -->
-      <!-- ENCABEZADO -->
+      <!-- HEADER -->
       <!-- =============================================== -->
 
       <header class="sgpa-form-header">
@@ -190,28 +321,17 @@ export function FormDialog({
 
 
       <!-- =============================================== -->
-      <!-- ÁREA CON SCROLL -->
+      <!-- CONTENIDO -->
       <!-- =============================================== -->
 
       <div class="sgpa-form-scroll">
 
-        <!-- ============================================= -->
-        <!-- ERROR -->
-        <!-- ============================================= -->
+        ${errorHtml}
+
 
         <div
-          id="${escapeHtml(errorId)}"
-          class="sgpa-form-error hidden"
-          role="alert"
-          aria-live="polite"
-        ></div>
-
-
-        <!-- ============================================= -->
-        <!-- CAMPOS -->
-        <!-- ============================================= -->
-
-        <div class="sgpa-form-grid">
+          class="${bodyContainerClass}"
+        >
 
           ${body}
 
@@ -224,38 +344,7 @@ export function FormDialog({
       <!-- FOOTER -->
       <!-- =============================================== -->
 
-      <footer class="sgpa-form-footer">
-
-        <button
-          id="${escapeHtml(cancelButtonId)}"
-          class="sgpa-form-secondary"
-          type="button"
-        >
-
-          ${escapeHtml(cancelText)}
-
-        </button>
-
-
-        <button
-          id="${escapeHtml(submitButtonId)}"
-          class="sgpa-form-primary"
-          type="submit"
-        >
-
-          <i
-            data-lucide="${escapeHtml(submitIcon)}"
-            aria-hidden="true"
-          ></i>
-
-
-          <span>
-            ${escapeHtml(submitText)}
-          </span>
-
-        </button>
-
-      </footer>
+      ${footer}
 
     </form>
   `;
