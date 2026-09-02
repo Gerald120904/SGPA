@@ -153,8 +153,7 @@ ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
       ok: true,
       message:
         message ||
-        "Se generó un código de recuperación válido durante 15 minutos.",
-      codigoDesarrollo: data.codigoDesarrollo,
+        "Si el correo está registrado, recibirás un código de recuperación.",
     };
   } catch (error) {
     console.error("Error al solicitar recuperación de contraseña:", error);
