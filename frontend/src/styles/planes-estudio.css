@@ -1139,90 +1139,456 @@
   gap: 18px;
 }
 
+/* =========================================================
+   CARDS DE MALLA - ESTILO PANEL DE GESTIÓN
+   ========================================================= */
+
 .malla-card {
-  position: relative;
-  z-index: 3;
-  min-height: 92px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 13px;
-  border: 1px solid #d0d5dd;
-  border-radius: 9px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
-  cursor: pointer;
+  position:
+    relative;
+
+  z-index:
+    3;
+
+  min-height:
+    128px;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    10px;
+
+  padding:
+    14px;
+
+  overflow:
+    hidden;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    13px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 2px 6px
+    rgba(
+      16,
+      24,
+      40,
+      0.035
+    );
+
+  cursor:
+    pointer;
+
   transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    transform 120ms ease;
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
-.malla-card:hover {
-  border-color: #98a2b3;
-  box-shadow: 0 3px 7px rgba(16, 24, 40, 0.09);
-  transform: translateY(-1px);
+
+/* =========================================================
+   DECORACIÓN
+   ========================================================= */
+
+.malla-card-decoration {
+  position:
+    absolute;
+
+  right:
+    -29px;
+
+  bottom:
+    -37px;
+
+  z-index:
+    0;
+
+  width:
+    92px;
+
+  height:
+    92px;
+
+  border-radius:
+    50%;
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.065
+    );
+
+  opacity:
+    1;
+
+  transform:
+    scale(0.94);
+
+  transition:
+    background-color 220ms ease,
+    transform 220ms ease;
 }
 
-.malla-card:focus-visible {
-  outline: 2px solid #b5121b;
-  outline-offset: 2px;
-}
 
-.malla-card-inactive {
-  opacity: 0.48;
-}
+/* =========================================================
+   TOP
+   ========================================================= */
 
 .malla-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+  justify-content:
+    space-between;
+
+  gap:
+    10px;
 }
+
 
 .malla-card-top strong {
-  color: #b5121b;
-  font-size: 12px;
-  font-weight: 700;
+  overflow:
+    hidden;
+
+  color:
+    #cf2029;
+
+  font-size:
+    11px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.02em;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
 }
 
-.malla-card-top > span {
-  flex-shrink: 0;
-  padding: 3px 6px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #475467;
-  font-size: 10px;
-  font-weight: 600;
+
+.malla-card-credits {
+  flex:
+    0 0 auto;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  padding:
+    3px 7px;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    999px;
+
+  background:
+    #f9fafb;
+
+  color:
+    #667085;
+
+  font-size:
+    9px;
+
+  font-weight:
+    650;
 }
+
+
+/* =========================================================
+   NOMBRE
+   ========================================================= */
 
 .malla-card-name {
-  color: #344054;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  color:
+    #182235;
+
+  font-size:
+    12px;
+
+  font-weight:
+    650;
+
+  line-height:
+    1.4;
+
+  letter-spacing:
+    -0.05px;
 }
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.malla-card-footer {
+  position:
+    relative;
+
+  z-index:
+    2;
+
+  display:
+    flex;
+
+  align-items:
+    flex-end;
+
+  justify-content:
+    flex-start;
+
+  gap:
+    10px;
+
+  margin-top:
+    auto;
+
+  padding-top:
+    5px;
+}
+
+
+/* =========================================================
+   RELACIONES
+   ========================================================= */
 
 .malla-card-relations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: auto;
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  flex-wrap:
+    wrap;
+
+  align-items:
+    center;
+
+  gap:
+    5px;
 }
 
-.malla-card-relations span {
-  padding: 3px 6px;
-  border-radius: 999px;
-  background: #eff8ff;
-  color: #175cd3;
-  font-size: 9px;
-  font-weight: 700;
+
+.malla-card-relations
+.malla-requirement-badge,
+.malla-card-relations
+.malla-coreq-badge {
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  padding:
+    3px 6px;
+
+  border-radius:
+    999px;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    700;
 }
 
-.malla-card-relations .malla-coreq-badge {
-  background: #f4f3ff;
-  color: #5925dc;
+
+.malla-card-relations
+.malla-requirement-badge {
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.075
+    );
+
+  color:
+    #b71922;
 }
+
+
+.malla-card-relations
+.malla-coreq-badge {
+  background:
+    #f4f3ff;
+
+  color:
+    #6941c6;
+}
+
+
+.malla-card-no-relations {
+  color:
+    #98a2b3;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    600;
+}
+
+
+/* =========================================================
+   FLECHA
+   ========================================================= */
+
+
+
+
+
+
+
+/* =========================================================
+   LÍNEA INFERIOR
+   ========================================================= */
+
+.malla-card-hover-line {
+  position:
+    absolute;
+
+  bottom:
+    0;
+
+  left:
+    0;
+
+  z-index:
+    4;
+
+  width:
+    0;
+
+  height:
+    2px;
+
+  background:
+    #cf2029;
+
+  transition:
+    width 260ms ease;
+}
+
+
+/* =========================================================
+   HOVER
+   ========================================================= */
+
+.malla-card:hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.31
+    );
+
+  box-shadow:
+    0 8px 18px
+    rgba(
+      16,
+      24,
+      40,
+      0.07
+    );
+
+  transform:
+    translateY(-1px);
+}
+
+
+.malla-card:hover
+.malla-card-decoration {
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.12
+    );
+
+  transform:
+    scale(1.08);
+}
+
+
+.malla-card:hover
+.malla-card-hover-line {
+  width:
+    74%;
+}
+
+
+/* =========================================================
+   FOCUS
+   ========================================================= */
+
+.malla-card:focus-visible {
+  outline:
+    none;
+
+  border-color:
+    #cf2029;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      207,
+      32,
+      41,
+      0.10
+    );
+}
+
+
+/* =========================================================
+   INACTIVO
+   ========================================================= */
+
+.malla-card-inactive {
+  opacity:
+    0.48;
+}
+
 
 .malla-connections {
   position: absolute;
@@ -1270,21 +1636,191 @@
    REQUISITOS
    ========================================================= */
 
+/* =========================================================
+   BOTÓN REQUISITOS
+   ========================================================= */
+
 .plan-requirements-button {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 9px;
-  border: 1px solid #d0d5dd;
-  border-radius: 7px;
-  background: #ffffff;
-  color: #475467;
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
+  min-height:
+    34px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    7px;
+
+  padding:
+    0 11px;
+
+  border:
+    1px solid #d0d5dd;
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #344054;
+
+  cursor:
+    pointer;
+
+  font:
+    inherit;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+
+  white-space:
+    nowrap;
+
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+
+/* =========================================================
+   CONTADOR
+   ========================================================= */
+
+.plan-requirements-button > span {
+  min-width:
+    19px;
+
+  height:
+    19px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  padding:
+    0 5px;
+
+  border-radius:
+    999px;
+
+  background:
+    #f2f4f7;
+
+  color:
+    #667085;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    750;
+
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+
+/* =========================================================
+   HOVER
+   ========================================================= */
+
+.plan-requirements-button:hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.32
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.06
+    );
+
+  color:
+    #cf2029;
+
+  box-shadow:
+    0 3px 8px
+    rgba(
+      207,
+      32,
+      41,
+      0.07
+    );
+
+  transform:
+    translateY(-1px);
+}
+
+
+.plan-requirements-button:hover
+> span {
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.11
+    );
+
+  color:
+    #cf2029;
+}
+
+
+/* =========================================================
+   FOCUS
+   ========================================================= */
+
+.plan-requirements-button:focus-visible {
+  outline:
+    none;
+
+  border-color:
+    #cf2029;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      207,
+      32,
+      41,
+      0.09
+    );
+}
+
+
+/* =========================================================
+   ACTIVE
+   ========================================================= */
+
+.plan-requirements-button:active {
+  transform:
+    translateY(0);
 }
 
 .plan-requirements-button:hover {

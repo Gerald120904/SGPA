@@ -1591,3 +1591,2021 @@
   }
 
 }
+
+
+/* =========================================================
+   ESTRUCTURA ACADÉMICA POR NIVEL Y CICLO
+   ========================================================= */
+
+
+/* =========================================================
+   CONTENEDOR GENERAL
+   ========================================================= */
+
+.plan-levels {
+  display:
+    grid;
+
+  gap:
+    22px;
+}
+
+
+/* =========================================================
+   NIVEL / AÑO
+   ========================================================= */
+
+.plan-level {
+  overflow:
+    hidden;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    14px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 1px 2px
+    rgba(16, 24, 40, 0.025);
+}
+
+
+/* =========================================================
+   HEADER DEL NIVEL
+   ========================================================= */
+
+.plan-level-header {
+  min-height:
+    82px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    20px;
+
+  padding:
+    18px 20px;
+
+  border-bottom:
+    1px solid #eaecf0;
+
+  background:
+    linear-gradient(
+      180deg,
+      #ffffff 0%,
+      #fcfcfd 100%
+    );
+}
+
+
+.plan-level-eyebrow {
+  display:
+    block;
+
+  margin-bottom:
+    5px;
+
+  color:
+    #cf2029;
+
+  font-size:
+    10px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.045em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.plan-level-title-row {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+}
+
+
+.plan-level-title-row h3 {
+  margin:
+    0;
+
+  color:
+    #1d2939;
+
+  font-size:
+    18px;
+
+  font-weight:
+    700;
+
+  line-height:
+    1.25;
+}
+
+
+/* =========================================================
+   RESUMEN DEL NIVEL
+   ========================================================= */
+
+.plan-level-summary {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    10px;
+
+  flex-shrink:
+    0;
+
+  padding:
+    8px 11px;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    9px;
+
+  background:
+    #ffffff;
+
+  color:
+    #667085;
+
+  font-size:
+    11px;
+}
+
+
+.plan-level-summary strong {
+  color:
+    #344054;
+
+  font-size:
+    11px;
+
+  font-weight:
+    700;
+}
+
+
+.plan-level-summary-divider {
+  width:
+    1px;
+
+  height:
+    14px;
+
+  background:
+    #e4e7ec;
+}
+
+
+/* =========================================================
+   CICLOS
+   ========================================================= */
+
+.plan-level-cycles {
+  display:
+    grid;
+
+  gap:
+    14px;
+
+  padding:
+    16px;
+}
+
+
+/* =========================================================
+   CICLO
+   ========================================================= */
+
+.plan-cycle {
+  overflow:
+    hidden;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    11px;
+
+  background:
+    #ffffff;
+}
+
+
+/* =========================================================
+   HEADER DEL CICLO
+   ========================================================= */
+
+.plan-cycle-header {
+  min-height:
+    59px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    16px;
+
+  padding:
+    12px 16px;
+
+  border-bottom:
+    1px solid #eaecf0;
+
+  background:
+    #f9fafb;
+}
+
+
+.plan-cycle-heading {
+  min-width:
+    0;
+}
+
+
+.plan-cycle-label {
+  display:
+    block;
+
+  margin-bottom:
+    2px;
+
+  color:
+    #cf2029;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.07em;
+}
+
+
+.plan-cycle-heading h4 {
+  margin:
+    0;
+
+  color:
+    #344054;
+
+  font-size:
+    14px;
+
+  font-weight:
+    650;
+}
+
+
+/* =========================================================
+   RESUMEN DEL CICLO
+   ========================================================= */
+
+.plan-cycle-summary {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    7px;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    10px;
+}
+
+
+.plan-cycle-summary strong {
+  color:
+    #667085;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+}
+
+
+.plan-cycle-summary-separator {
+  color:
+    #d0d5dd;
+}
+
+
+/* =========================================================
+   BODY DEL CICLO
+   ========================================================= */
+
+.plan-cycle-body {
+  min-width:
+    0;
+}
+
+
+/*
+ * Reutilizamos las filas actuales
+ * de asignaturas.
+ */
+
+.plan-cycle-body
+.plan-subject-card {
+  border-radius:
+    0;
+}
+
+
+/* =========================================================
+   CRÉDITOS
+   ========================================================= */
+
+.plan-subject-credits {
+  color:
+    #667085;
+
+  font-size:
+    11px;
+
+  white-space:
+    nowrap;
+}
+
+
+/* =========================================================
+   CICLO VACÍO
+   ========================================================= */
+
+.plan-cycle-empty {
+  min-height:
+    92px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    space-between;
+
+  gap:
+    20px;
+
+  padding:
+    16px;
+
+  background:
+    #ffffff;
+}
+
+
+.plan-cycle-empty-content {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    12px;
+}
+
+
+.plan-cycle-empty-icon {
+  width:
+    36px;
+
+  height:
+    36px;
+
+  flex:
+    0 0 auto;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.07
+    );
+
+  color:
+    #cf2029;
+}
+
+
+.plan-cycle-empty-icon svg {
+  width:
+    17px;
+
+  height:
+    17px;
+}
+
+
+.plan-cycle-empty-content strong {
+  display:
+    block;
+
+  margin-bottom:
+    2px;
+
+  color:
+    #344054;
+
+  font-size:
+    11px;
+
+  font-weight:
+    650;
+}
+
+
+.plan-cycle-empty-content p {
+  margin:
+    0;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    10px;
+
+  line-height:
+    1.45;
+}
+
+
+/* =========================================================
+   BOTÓN AGREGAR EN CICLO
+   ========================================================= */
+
+.plan-cycle-add-button {
+  min-height:
+    34px;
+
+  flex:
+    0 0 auto;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  justify-content:
+    center;
+
+  gap:
+    6px;
+
+  padding:
+    0 11px;
+
+  border:
+    1px solid
+    rgba(
+      207,
+      32,
+      41,
+      0.22
+    );
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #b71922;
+
+  cursor:
+    pointer;
+
+  font:
+    inherit;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+
+.plan-cycle-add-button svg {
+  width:
+    14px;
+
+  height:
+    14px;
+}
+
+
+.plan-cycle-add-button:hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.35
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.055
+    );
+
+  transform:
+    translateY(-1px);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 800px) {
+
+  .plan-level-header {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+  }
+
+
+  .plan-level-summary {
+    align-self:
+      stretch;
+
+    justify-content:
+      flex-start;
+  }
+
+
+  .plan-cycle-header {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+
+    gap:
+      7px;
+  }
+
+
+  .plan-cycle-empty {
+    align-items:
+      flex-start;
+
+    flex-direction:
+      column;
+  }
+
+
+  .plan-cycle-add-button {
+    align-self:
+      flex-start;
+  }
+
+}
+
+
+@media (max-width: 600px) {
+
+  .plan-level-cycles {
+    padding:
+      10px;
+  }
+
+
+  .plan-level-header {
+    padding:
+      15px;
+  }
+
+
+  .plan-level-title-row h3 {
+    font-size:
+      16px;
+  }
+
+}
+
+
+/* =========================================================
+   PAGINACIÓN POR AÑO ACADÉMICO
+   ========================================================= */
+
+.plan-level-list-page {
+  min-width: 0;
+}
+
+
+/* =========================================================
+   CONTENEDOR
+   ========================================================= */
+
+.plan-level-pagination {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  margin-top: 16px;
+
+  padding:
+    12px 14px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    11px;
+
+  background:
+    #ffffff;
+
+  box-shadow:
+    0 1px 2px
+    rgba(16, 24, 40, 0.025);
+}
+
+
+/* =========================================================
+   INFORMACIÓN
+   ========================================================= */
+
+.plan-level-pagination-info {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+
+.plan-level-pagination-info span {
+  color:
+    #98a2b3;
+
+  font-size:
+    9px;
+
+  font-weight:
+    700;
+
+  letter-spacing:
+    0.05em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.plan-level-pagination-info strong {
+  color:
+    #344054;
+
+  font-size:
+    12px;
+
+  font-weight:
+    650;
+}
+
+
+/* =========================================================
+   CONTROLES
+   ========================================================= */
+
+.plan-level-pagination-controls {
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+}
+
+
+/* =========================================================
+   ANTERIOR / SIGUIENTE
+   ========================================================= */
+
+.plan-level-nav-button {
+  min-height:
+    34px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+  justify-content:
+    center;
+
+  gap:
+    5px;
+
+  padding:
+    0 10px;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #475467;
+
+  cursor:
+    pointer;
+
+  font:
+    inherit;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+
+.plan-level-nav-button svg {
+  width:
+    14px;
+
+  height:
+    14px;
+}
+
+
+.plan-level-nav-button:not(:disabled):hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.28
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.055
+    );
+
+  color:
+    #cf2029;
+
+  transform:
+    translateY(-1px);
+}
+
+
+.plan-level-nav-button:disabled {
+  opacity:
+    0.38;
+
+  cursor:
+    not-allowed;
+}
+
+
+/* =========================================================
+   NÚMEROS
+   ========================================================= */
+
+.plan-level-pagination-pages {
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    5px;
+}
+
+
+.plan-level-page-button {
+  width:
+    34px;
+
+  height:
+    34px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+  justify-content:
+    center;
+
+  padding:
+    0;
+
+  border:
+    1px solid #e4e7ec;
+
+  border-radius:
+    8px;
+
+  background:
+    #ffffff;
+
+  color:
+    #667085;
+
+  cursor:
+    pointer;
+
+  font:
+    inherit;
+
+  font-size:
+    10.5px;
+
+  font-weight:
+    700;
+
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+
+.plan-level-page-button:hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.25
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.05
+    );
+
+  color:
+    #cf2029;
+
+  transform:
+    translateY(-1px);
+}
+
+
+.plan-level-page-button.is-active {
+  border-color:
+    #cf2029;
+
+  background:
+    #cf2029;
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0 3px 7px
+    rgba(
+      207,
+      32,
+      41,
+      0.15
+    );
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+  .plan-level-pagination {
+    align-items:
+      stretch;
+
+    flex-direction:
+      column;
+  }
+
+
+  .plan-level-pagination-controls {
+    justify-content:
+      space-between;
+  }
+
+}
+
+
+@media (max-width: 540px) {
+
+  .plan-level-nav-button span {
+    display:
+      none;
+  }
+
+}
+
+
+/* =========================================================
+   REQUISITOS ACADÉMICOS - FORMDIALOG
+   ========================================================= */
+
+.plan-requirements-dialog {
+  min-width:
+    0;
+}
+
+
+/* =========================================================
+   CONTENIDO
+   ========================================================= */
+
+.plan-requirements-modern {
+  display:
+    grid;
+
+  gap:
+    18px;
+}
+
+
+/* =========================================================
+   SECCIONES
+   ========================================================= */
+
+.plan-current-requirements,
+.plan-add-requirement {
+  min-width:
+    0;
+
+  padding:
+    15px;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    11px;
+
+  background:
+    #ffffff;
+}
+
+
+/* =========================================================
+   ENCABEZADOS
+   ========================================================= */
+
+.plan-requirements-section-heading {
+  display:
+    flex;
+
+  align-items:
+    center;
+  justify-content:
+    space-between;
+
+  gap:
+    15px;
+
+  margin-bottom:
+    12px;
+}
+
+
+.plan-requirements-section-heading > div {
+  display:
+    flex;
+  flex-direction:
+    column;
+
+  gap:
+    2px;
+}
+
+
+.plan-requirements-section-heading
+> div
+> span {
+  color:
+    #cf2029;
+
+  font-size:
+    9px;
+
+  font-weight:
+    750;
+
+  letter-spacing:
+    0.05em;
+
+  text-transform:
+    uppercase;
+}
+
+
+.plan-requirements-section-heading
+> div
+> strong {
+  color:
+    #344054;
+
+  font-size:
+    12px;
+
+  font-weight:
+    650;
+}
+
+
+.plan-requirements-count {
+  min-width:
+    26px;
+
+  height:
+    26px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+  justify-content:
+    center;
+
+  padding:
+    0 7px;
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.07
+    );
+
+  color:
+    #cf2029;
+
+  font-size:
+    10px;
+
+  font-weight:
+    750;
+}
+
+
+/* =========================================================
+   LISTA
+   ========================================================= */
+
+.plan-requirements-list {
+  display:
+    grid;
+
+  gap:
+    7px;
+}
+
+
+.plan-requirement-row {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+  justify-content:
+    space-between;
+
+  gap:
+    14px;
+
+  padding:
+    10px 11px;
+
+  border:
+    1px solid #eaecf0;
+
+  border-radius:
+    9px;
+
+  background:
+    #fcfcfd;
+}
+
+
+.plan-requirement-row-info {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    9px;
+}
+
+
+.plan-requirement-row-info strong {
+  overflow:
+    hidden;
+
+  color:
+    #344054;
+
+  font-size:
+    11px;
+
+  font-weight:
+    600;
+
+  text-overflow:
+    ellipsis;
+
+  white-space:
+    nowrap;
+}
+
+
+/* =========================================================
+   BADGES
+   ========================================================= */
+
+.plan-requirement-type {
+  flex:
+    0 0 auto;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+
+  padding:
+    4px 7px;
+
+  border-radius:
+    999px;
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.075
+    );
+
+  color:
+    #b71922;
+
+  font-size:
+    8.5px;
+
+  font-weight:
+    750;
+
+  text-transform:
+    uppercase;
+}
+
+
+.plan-requirement-type.plan-requirement-coreq {
+  background:
+    #f4f3ff;
+
+  color:
+    #6941c6;
+}
+
+
+/* =========================================================
+   QUITAR
+   ========================================================= */
+
+.plan-requirement-delete {
+  min-height:
+    30px;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+  justify-content:
+    center;
+
+  gap:
+    5px;
+
+  padding:
+    0 8px;
+
+  border:
+    1px solid transparent;
+
+  border-radius:
+    7px;
+
+  background:
+    transparent;
+
+  color:
+    #98a2b3;
+
+  cursor:
+    pointer;
+
+  font:
+    inherit;
+
+  font-size:
+    9px;
+
+  font-weight:
+    650;
+
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+
+.plan-requirement-delete svg {
+  width:
+    13px;
+
+  height:
+    13px;
+}
+
+
+.plan-requirement-delete:hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.14
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.055
+    );
+
+  color:
+    #cf2029;
+}
+
+
+/* =========================================================
+   FORMULARIO DE NUEVA RELACIÓN
+   ========================================================= */
+
+.plan-requirement-form {
+  display:
+    grid;
+
+  grid-template-columns:
+    180px minmax(0, 1fr) auto;
+
+  align-items:
+    end;
+
+  gap:
+    10px;
+}
+
+
+.plan-requirement-form label {
+  min-width:
+    0;
+
+  display:
+    flex;
+
+  flex-direction:
+    column;
+
+  gap:
+    6px;
+}
+
+
+.plan-requirement-form label > span {
+  color:
+    #475467;
+
+  font-size:
+    10px;
+
+  font-weight:
+    650;
+}
+
+
+.plan-requirement-form select {
+  width:
+    100%;
+
+  min-height:
+    40px;
+
+  padding:
+    0 10px;
+
+  border:
+    1px solid #d0d5dd;
+
+  border-radius:
+    8px;
+
+  outline:
+    none;
+
+  background:
+    #ffffff;
+
+  color:
+    #344054;
+
+  font:
+    inherit;
+
+  font-size:
+    11px;
+
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+
+.plan-requirement-form select:focus {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.65
+    );
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      207,
+      32,
+      41,
+      0.08
+    );
+}
+
+
+.plan-requirement-add-button {
+  min-height:
+    40px;
+
+  padding:
+    0 14px;
+}
+
+
+/* =========================================================
+   VACÍO
+   ========================================================= */
+
+.plan-requirements-empty-modern {
+  min-height:
+    70px;
+
+  display:
+    flex;
+
+  align-items:
+    center;
+
+  gap:
+    11px;
+
+  padding:
+    13px;
+
+  border:
+    1px dashed #d0d5dd;
+
+  border-radius:
+    9px;
+
+  background:
+    #fcfcfd;
+
+  color:
+    #98a2b3;
+}
+
+
+.plan-requirements-empty-icon {
+  width:
+    34px;
+
+  height:
+    34px;
+
+  flex:
+    0 0 auto;
+
+  display:
+    inline-flex;
+
+  align-items:
+    center;
+  justify-content:
+    center;
+
+  border-radius:
+    9px;
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.065
+    );
+
+  color:
+    #cf2029;
+}
+
+
+.plan-requirements-empty-icon svg {
+  width:
+    15px;
+
+  height:
+    15px;
+}
+
+
+.plan-requirements-empty-modern strong {
+  display:
+    block;
+
+  margin-bottom:
+    2px;
+
+  color:
+    #475467;
+
+  font-size:
+    11px;
+}
+
+
+.plan-requirements-empty-modern p {
+  margin:
+    0;
+
+  color:
+    #98a2b3;
+
+  font-size:
+    10px;
+
+  line-height:
+    1.45;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 760px) {
+
+  .plan-requirement-form {
+    grid-template-columns:
+      1fr;
+  }
+
+
+  .plan-requirement-add-button {
+    justify-self:
+      flex-start;
+  }
+
+}
+
+
+/* =========================================================
+   SALIDAS ACADÉMICAS - HITOS DEL PLAN
+   Agregar al final de frontend/src/styles/ver-plan.css
+   ========================================================= */
+
+/* Punto de corte dentro del administrador */
+.salida-academica-cut {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.salida-academica-cut svg {
+  width: 13px;
+  height: 13px;
+  color: #cf2029;
+}
+
+/* Intro del formulario de salida */
+.salida-form-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(207, 32, 41, 0.12);
+  border-radius: 10px;
+  background: rgba(207, 32, 41, 0.035);
+}
+
+.salida-form-intro-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
+}
+
+.salida-form-intro-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.salida-form-intro strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #344054;
+  font-size: 11px;
+}
+
+.salida-form-intro p {
+  margin: 0;
+  color: #667085;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* Selector rápido del punto de corte */
+.salida-cut-helper {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #eaecf0;
+  border-radius: 11px;
+  background: #fcfcfd;
+}
+
+.salida-cut-helper-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.salida-cut-helper-copy > span {
+  color: #cf2029;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.salida-cut-helper-copy > strong {
+  color: #344054;
+  font-size: 11px;
+}
+
+.salida-cut-helper-copy > small {
+  color: #667085;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.salida-cut-helper-controls {
+  display: grid;
+  grid-template-columns: 130px 130px auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.salida-cut-helper-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.salida-cut-helper-controls label > span {
+  color: #475467;
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.salida-cut-helper-controls select {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 10.5px;
+}
+
+/* Resumen de selección */
+.salida-asignaturas-summary-modern {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.salida-asignaturas-summary-modern > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.salida-cut-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #667085;
+  font-size: 9.5px;
+}
+
+.salida-cut-preview svg {
+  width: 13px;
+  height: 13px;
+  color: #cf2029;
+}
+
+/* Hito dentro de la vista Lista */
+.plan-cycle-outcomes {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid #eaecf0;
+  background: linear-gradient(
+    180deg,
+    rgba(207, 32, 41, 0.018) 0%,
+    rgba(207, 32, 41, 0.045) 100%
+  );
+}
+
+.plan-outcome-milestone {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(207, 32, 41, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.035);
+}
+
+.plan-outcome-milestone::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: #cf2029;
+}
+
+.plan-outcome-milestone-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
+}
+
+.plan-outcome-milestone-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.plan-outcome-milestone-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-outcome-milestone-kicker {
+  color: #cf2029;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.plan-outcome-milestone-content strong {
+  color: #1d2939;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.plan-outcome-milestone-content small {
+  color: #667085;
+  font-size: 9.5px;
+}
+
+.plan-outcome-milestone-credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 1px solid #eaecf0;
+}
+
+.plan-outcome-milestone-credits strong {
+  color: #cf2029;
+  font-size: 12px;
+}
+
+.plan-outcome-milestone-credits span {
+  color: #98a2b3;
+  font-size: 8.5px;
+}
+
+/* Salidas visibles sobre la Malla */
+.malla-outcomes {
+  margin-bottom: 14px;
+  padding: 13px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.malla-outcomes-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.malla-outcomes-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.malla-outcomes-header span {
+  color: #cf2029;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+}
+
+.malla-outcomes-header strong {
+  color: #344054;
+  font-size: 11.5px;
+}
+
+.malla-outcomes-header small {
+  color: #98a2b3;
+  font-size: 9px;
+}
+
+.malla-outcomes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 9px;
+}
+
+.malla-outcome-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 10px 11px;
+  border: 1px solid rgba(207, 32, 41, 0.15);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff 0%, rgba(207, 32, 41, 0.035) 100%);
+}
+
+.malla-outcome-card-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
+}
+
+.malla-outcome-card-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.malla-outcome-card-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.malla-outcome-card-content > span {
+  color: #cf2029;
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.malla-outcome-card-content > strong {
+  overflow: hidden;
+  color: #1d2939;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.malla-outcome-card-content > small {
+  color: #667085;
+  font-size: 8.5px;
+}
+
+.malla-outcome-card-credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-left: 10px;
+  border-left: 1px solid #eaecf0;
+}
+
+.malla-outcome-card-credits strong {
+  color: #cf2029;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.malla-outcome-card-credits span {
+  margin-top: 2px;
+  color: #98a2b3;
+  font-size: 8px;
+}
+
+@media (max-width: 760px) {
+  .salida-cut-helper-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .salida-cut-helper-controls button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .salida-asignaturas-summary-modern,
+  .malla-outcomes-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .plan-outcome-milestone,
+  .malla-outcome-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .plan-outcome-milestone-credits,
+  .malla-outcome-card-credits {
+    grid-column: 2;
+    align-items: flex-start;
+    padding-left: 0;
+    border-left: 0;
+  }
+}
