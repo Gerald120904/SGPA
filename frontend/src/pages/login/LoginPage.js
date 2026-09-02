@@ -30,8 +30,8 @@ export function LoginPage() {
           <div class="brand-area">
 
             <img
-              src="/AVI_horizontal.png"
-              alt="AVI Universidad Nacional"
+              src="/Logo-UNA-Rojo_FondoTransparente.png"
+              alt="Universidad Nacional"
               class="brand-logo"
               draggable="false"
             />
