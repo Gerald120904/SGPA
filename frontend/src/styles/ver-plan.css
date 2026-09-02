@@ -3201,3 +3201,411 @@
   }
 
 }
+
+
+/* =========================================================
+   SALIDAS ACADÉMICAS - HITOS DEL PLAN
+   Agregar al final de frontend/src/styles/ver-plan.css
+   ========================================================= */
+
+/* Punto de corte dentro del administrador */
+.salida-academica-cut {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.salida-academica-cut svg {
+  width: 13px;
+  height: 13px;
+  color: #cf2029;
+}
+
+/* Intro del formulario de salida */
+.salida-form-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(207, 32, 41, 0.12);
+  border-radius: 10px;
+  background: rgba(207, 32, 41, 0.035);
+}
+
+.salida-form-intro-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
+}
+
+.salida-form-intro-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.salida-form-intro strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #344054;
+  font-size: 11px;
+}
+
+.salida-form-intro p {
+  margin: 0;
+  color: #667085;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* Selector rápido del punto de corte */
+.salida-cut-helper {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #eaecf0;
+  border-radius: 11px;
+  background: #fcfcfd;
+}
+
+.salida-cut-helper-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.salida-cut-helper-copy > span {
+  color: #cf2029;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+}
+
+.salida-cut-helper-copy > strong {
+  color: #344054;
+  font-size: 11px;
+}
+
+.salida-cut-helper-copy > small {
+  color: #667085;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.salida-cut-helper-controls {
+  display: grid;
+  grid-template-columns: 130px 130px auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.salida-cut-helper-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.salida-cut-helper-controls label > span {
+  color: #475467;
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.salida-cut-helper-controls select {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 10.5px;
+}
+
+/* Resumen de selección */
+.salida-asignaturas-summary-modern {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.salida-asignaturas-summary-modern > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.salida-cut-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #667085;
+  font-size: 9.5px;
+}
+
+.salida-cut-preview svg {
+  width: 13px;
+  height: 13px;
+  color: #cf2029;
+}
+
+/* Hito dentro de la vista Lista */
+.plan-cycle-outcomes {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+  border-top: 1px solid #eaecf0;
+  background: linear-gradient(
+    180deg,
+    rgba(207, 32, 41, 0.018) 0%,
+    rgba(207, 32, 41, 0.045) 100%
+  );
+}
+
+.plan-outcome-milestone {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(207, 32, 41, 0.18);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.035);
+}
+
+.plan-outcome-milestone::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: #cf2029;
+}
+
+.plan-outcome-milestone-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
+}
+
+.plan-outcome-milestone-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.plan-outcome-milestone-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-outcome-milestone-kicker {
+  color: #cf2029;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.plan-outcome-milestone-content strong {
+  color: #1d2939;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.plan-outcome-milestone-content small {
+  color: #667085;
+  font-size: 9.5px;
+}
+
+.plan-outcome-milestone-credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 1px solid #eaecf0;
+}
+
+.plan-outcome-milestone-credits strong {
+  color: #cf2029;
+  font-size: 12px;
+}
+
+.plan-outcome-milestone-credits span {
+  color: #98a2b3;
+  font-size: 8.5px;
+}
+
+/* Salidas visibles sobre la Malla */
+.malla-outcomes {
+  margin-bottom: 14px;
+  padding: 13px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.malla-outcomes-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.malla-outcomes-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.malla-outcomes-header span {
+  color: #cf2029;
+  font-size: 8.5px;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+}
+
+.malla-outcomes-header strong {
+  color: #344054;
+  font-size: 11.5px;
+}
+
+.malla-outcomes-header small {
+  color: #98a2b3;
+  font-size: 9px;
+}
+
+.malla-outcomes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 9px;
+}
+
+.malla-outcome-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 10px 11px;
+  border: 1px solid rgba(207, 32, 41, 0.15);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff 0%, rgba(207, 32, 41, 0.035) 100%);
+}
+
+.malla-outcome-card-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
+}
+
+.malla-outcome-card-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.malla-outcome-card-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.malla-outcome-card-content > span {
+  color: #cf2029;
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.malla-outcome-card-content > strong {
+  overflow: hidden;
+  color: #1d2939;
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.malla-outcome-card-content > small {
+  color: #667085;
+  font-size: 8.5px;
+}
+
+.malla-outcome-card-credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-left: 10px;
+  border-left: 1px solid #eaecf0;
+}
+
+.malla-outcome-card-credits strong {
+  color: #cf2029;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.malla-outcome-card-credits span {
+  margin-top: 2px;
+  color: #98a2b3;
+  font-size: 8px;
+}
+
+@media (max-width: 760px) {
+  .salida-cut-helper-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .salida-cut-helper-controls button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .salida-asignaturas-summary-modern,
+  .malla-outcomes-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .plan-outcome-milestone,
+  .malla-outcome-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .plan-outcome-milestone-credits,
+  .malla-outcome-card-credits {
+    grid-column: 2;
+    align-items: flex-start;
+    padding-left: 0;
+    border-left: 0;
+  }
+}
