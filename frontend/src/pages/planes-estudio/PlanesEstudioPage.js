@@ -1012,6 +1012,195 @@ function renderizarAsignaturaLista(asignatura) {
   `;
 }
 
+
+/* =========================================================
+   SALIDAS ACADÉMICAS COMO HITOS DEL PLAN
+   ========================================================= */
+
+function obtenerAsignaturasSalida(salida) {
+  if (!salida || !Array.isArray(salida.asignaturas)) {
+    return [];
+  }
+
+  return salida.asignaturas
+    .map((asignatura) => {
+      const id = Number(asignatura?.id);
+      if (!Number.isFinite(id)) {
+        return asignatura;
+      }
+
+      return (
+        asignaturasPlan.find((item) => Number(item.id) === id) || asignatura
+      );
+    })
+    .filter(Boolean);
+}
+
+function obtenerCreditosAsociadosSalida(salida) {
+  return obtenerAsignaturasSalida(salida)
+    .filter((asignatura) => asignatura.activo !== false)
+    .reduce(
+      (total, asignatura) => total + Number(asignatura.creditos || 0),
+      0,
+    );
+}
+
+function obtenerPuntoCorteSalida(salida) {
+  const asignaturas = obtenerAsignaturasSalida(salida)
+    .filter(
+      (asignatura) =>
+        Number.isFinite(Number(asignatura.nivel)) &&
+        Number.isFinite(Number(asignatura.ciclo)),
+    )
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(a.nivel) - Number(b.nivel) ||
+        Number(a.ciclo) - Number(b.ciclo) ||
+        Number(a.orden || 0) - Number(b.orden || 0),
+    );
+
+  const ultima = asignaturas.at(-1);
+
+  if (!ultima) {
+    return null;
+  }
+
+  return {
+    nivel: Number(ultima.nivel),
+    ciclo: Number(ultima.ciclo),
+  };
+}
+
+function obtenerSalidasEnPuntoCorte(nivel, ciclo) {
+  return salidasAcademicas
+    .filter((salida) => salida.activo !== false)
+    .filter((salida) => {
+      const corte = obtenerPuntoCorteSalida(salida);
+      return (
+        corte &&
+        corte.nivel === Number(nivel) &&
+        corte.ciclo === Number(ciclo)
+      );
+    })
+    .sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
+}
+
+function renderizarEstadoCreditosSalida(salida) {
+  const asociados = obtenerCreditosAsociadosSalida(salida);
+  const requeridos = Number(salida.creditosRequeridos || 0);
+  const completa = requeridos > 0 && asociados >= requeridos;
+
+  return {
+    asociados,
+    requeridos,
+    completa,
+    porcentaje:
+      requeridos > 0 ? Math.min(100, (asociados / requeridos) * 100) : 0,
+  };
+}
+
+function renderizarHitosSalidaLista(nivel, ciclo) {
+  const salidas = obtenerSalidasEnPuntoCorte(nivel, ciclo);
+
+  if (!salidas.length) {
+    return "";
+  }
+
+  return `
+    <div class="plan-cycle-outcomes">
+      ${salidas
+        .map((salida) => {
+          const estado = renderizarEstadoCreditosSalida(salida);
+          return `
+            <article class="plan-outcome-milestone">
+              <div class="plan-outcome-milestone-icon" aria-hidden="true">
+                <i data-lucide="graduation-cap"></i>
+              </div>
+
+              <div class="plan-outcome-milestone-content">
+                <span class="plan-outcome-milestone-kicker">
+                  Salida académica · ${escapeHtml(formatearTipoSalida(salida.tipo))}
+                </span>
+                <strong>${escapeHtml(salida.nombre)}</strong>
+                <small>
+                  Se alcanza al completar el Nivel ${nivel}, ${obtenerNombreCiclo(ciclo)}.
+                </small>
+              </div>
+
+              <div class="plan-outcome-milestone-credits">
+                <strong>${estado.requeridos} créditos</strong>
+                <span>
+                  ${estado.asociados} asociados
+                </span>
+              </div>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderizarSalidasMalla() {
+  const salidas = salidasAcademicas
+    .filter((salida) => salida.activo !== false)
+    .slice()
+    .sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0));
+
+  if (!salidas.length) {
+    return "";
+  }
+
+  return `
+    <section class="malla-outcomes">
+      <header class="malla-outcomes-header">
+        <div>
+          <span>SALIDAS ACADÉMICAS</span>
+          <strong>Hitos del plan de estudios</strong>
+        </div>
+        <small>
+          El punto de corte se obtiene de las asignaturas asociadas a cada salida.
+        </small>
+      </header>
+
+      <div class="malla-outcomes-grid">
+        ${salidas
+          .map((salida) => {
+            const corte = obtenerPuntoCorteSalida(salida);
+            const estado = renderizarEstadoCreditosSalida(salida);
+
+            return `
+              <article class="malla-outcome-card">
+                <div class="malla-outcome-card-icon" aria-hidden="true">
+                  <i data-lucide="graduation-cap"></i>
+                </div>
+
+                <div class="malla-outcome-card-content">
+                  <span>${escapeHtml(formatearTipoSalida(salida.tipo))}</span>
+                  <strong>${escapeHtml(salida.nombre)}</strong>
+                  <small>
+                    ${
+                      corte
+                        ? `Nivel ${corte.nivel} · ${obtenerNombreCiclo(corte.ciclo)}`
+                        : "Asigne las materias para definir el punto de corte"
+                    }
+                  </small>
+                </div>
+
+                <div class="malla-outcome-card-credits">
+                  <strong>${estado.requeridos}</strong>
+                  <span>créditos</span>
+                </div>
+              </article>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
   const asignaturasOrdenadas = asignaturas
     .slice()
@@ -1070,6 +1259,8 @@ function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
               `
         }
       </div>
+
+      ${renderizarHitosSalidaLista(nivel, ciclo)}
     </section>
   `;
 }
@@ -1330,6 +1521,8 @@ function renderizarMallaCurricular() {
     .join("");
 
   return `
+    ${renderizarSalidasMalla()}
+
     <div class="malla-legend" aria-label="Tipos de conexión">
       <span>
         <i class="malla-legend-line" aria-hidden="true"></i>
@@ -3938,16 +4131,10 @@ function abrirAdministradorSalidas() {
         .slice()
         .sort((a, b) => Number(a.orden) - Number(b.orden))
         .map((salida) => {
-          const asignaturas = Array.isArray(salida.asignaturas)
-            ? salida.asignaturas
-            : [];
+          const asignaturas = obtenerAsignaturasSalida(salida);
           const cantidad = asignaturas.length;
-          const creditos = asignaturas
-            .filter((item) => item.activo)
-            .reduce((total, item) => total + Number(item.creditos || 0), 0);
-          const porcentaje = salida.creditosRequeridos
-            ? Math.min(100, (creditos / salida.creditosRequeridos) * 100)
-            : 0;
+          const estado = renderizarEstadoCreditosSalida(salida);
+          const corte = obtenerPuntoCorteSalida(salida);
 
           return `
             <article class="salida-academica-card ${
@@ -3965,12 +4152,25 @@ function abrirAdministradorSalidas() {
                   · ${cantidad} asignatura${cantidad === 1 ? "" : "s"}
                 </div>
 
+                <div class="salida-academica-cut">
+                  <i data-lucide="map-pin" aria-hidden="true"></i>
+                  <span>
+                    ${
+                      corte
+                        ? `Punto de corte: Nivel ${corte.nivel} · ${obtenerNombreCiclo(
+                            corte.ciclo,
+                          )}`
+                        : "Sin punto de corte: seleccione las materias de la salida"
+                    }
+                  </span>
+                </div>
+
                 <div class="salida-academica-progress">
                   <div class="salida-academica-progress-bar">
-                    <span style="width: ${porcentaje}%;"></span>
+                    <span style="width: ${estado.porcentaje}%;"></span>
                   </div>
                   <small>
-                    ${creditos} / ${salida.creditosRequeridos} créditos asociados
+                    ${estado.asociados} / ${estado.requeridos} créditos asociados
                   </small>
                 </div>
               </div>
@@ -4025,7 +4225,10 @@ function abrirAdministradorSalidas() {
       <div class="sgpa-form-tool-toolbar">
         <div>
           <strong>Salidas del plan</strong>
-          <small>Administre títulos, certificaciones y salidas académicas.</small>
+          <small>
+            Configure títulos intermedios y finales. El punto de corte se calcula
+            con las materias asociadas.
+          </small>
         </div>
 
         <button id="nuevaSalidaButton" class="sgpa-form-primary" type="button">
@@ -4055,12 +4258,23 @@ function abrirAdministradorSalidas() {
   document
     .getElementById("cerrarSalidasFooter")
     ?.addEventListener("click", () => dialog.close());
+
   document
     .getElementById("nuevaSalidaButton")
-    ?.addEventListener("click", () => abrirFormularioSalida());
+    ?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      window.requestAnimationFrame(() => {
+        abrirFormularioSalida();
+      });
+    });
 
   document.querySelectorAll("[data-salida-editar]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
       const salida = salidasAcademicas.find(
         (item) => Number(item.id) === Number(button.dataset.salidaEditar),
       );
@@ -4071,7 +4285,10 @@ function abrirAdministradorSalidas() {
   });
 
   document.querySelectorAll("[data-salida-asignaturas]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
       const salida = salidasAcademicas.find(
         (item) => Number(item.id) === Number(button.dataset.salidaAsignaturas),
       );
@@ -4082,7 +4299,10 @@ function abrirAdministradorSalidas() {
   });
 
   document.querySelectorAll("[data-salida-estado]").forEach((button) => {
-    button.addEventListener("click", async () => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
       const salida = salidasAcademicas.find(
         (item) => Number(item.id) === Number(button.dataset.salidaEstado),
       );
@@ -4110,6 +4330,20 @@ function abrirFormularioSalida(salida = null) {
   ];
 
   const body = `
+    <div class="salida-form-intro sgpa-form-wide">
+      <div class="salida-form-intro-icon" aria-hidden="true">
+        <i data-lucide="graduation-cap"></i>
+      </div>
+      <div>
+        <strong>Hito académico del plan</strong>
+        <p>
+          Primero registre la salida. Después seleccione las materias que la
+          componen; con ellas SGPA determina automáticamente el nivel y ciclo
+          donde se alcanza.
+        </p>
+      </div>
+    </div>
+
     <label>
       <span>Código</span>
       <input
@@ -4140,7 +4374,7 @@ function abrirFormularioSalida(salida = null) {
         maxlength="160"
         required
         value="${escapeHtml(salida?.nombre || "")}"
-        placeholder="Ej. Diplomado"
+        placeholder="Ej. Diplomado en Programación de Aplicaciones Informáticas"
       >
     </label>
 
@@ -4152,7 +4386,7 @@ function abrirFormularioSalida(salida = null) {
             ([valor, texto]) => `
               <option
                 value="${valor}"
-                ${(salida?.tipo || "BACHILLERATO") === valor ? "selected" : ""}
+                ${(salida?.tipo || "DIPLOMADO") === valor ? "selected" : ""}
               >
                 ${texto}
               </option>
@@ -4195,7 +4429,7 @@ function abrirFormularioSalida(salida = null) {
     cancelButtonId: "volverSalidasButton",
     cancelText: "Volver",
     submitButtonId: "guardarSalidaButton",
-    submitText: editando ? "Guardar cambios" : "Crear salida",
+    submitText: editando ? "Guardar cambios" : "Crear y seleccionar materias",
     submitIcon: "save",
   });
 
@@ -4204,11 +4438,17 @@ function abrirFormularioSalida(salida = null) {
 
   document
     .getElementById("volverSalidasButton")
-    ?.addEventListener("click", abrirAdministradorSalidas);
+    ?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      abrirAdministradorSalidas();
+    });
+
   document
     .getElementById("salidaAcademicaForm")
     ?.addEventListener("submit", async (event) => {
       event.preventDefault();
+      event.stopPropagation();
       await guardarSalidaAcademicaFrontend(salida);
     });
 }
@@ -4270,7 +4510,41 @@ async function guardarSalidaAcademicaFrontend(salida) {
       );
     }
 
-    await recargarSalidasAcademicas();
+    await recargarSalidasAcademicas({ renderizar: false });
+
+    const salidaGuardada =
+      salidasAcademicas.find(
+        (item) =>
+          Number(item.id) ===
+          Number(resultado?.salida?.id || resultado?.id || salida?.id),
+      ) ||
+      salidasAcademicas.find(
+        (item) =>
+          String(item.codigo || "").toUpperCase() === datos.codigo.toUpperCase(),
+      );
+
+    if (salida) {
+      renderizarDetallePlan();
+      mostrarExito({
+        titulo: "Salida actualizada",
+        mensaje: `"${datos.nombre}" se actualizó correctamente.`,
+      });
+      abrirAdministradorSalidas();
+      return;
+    }
+
+    mostrarExito({
+      titulo: "Salida creada",
+      mensaje:
+        "Ahora seleccione las materias que forman parte de esta salida académica.",
+    });
+
+    if (salidaGuardada) {
+      abrirAsignaturasSalida(salidaGuardada);
+      return;
+    }
+
+    renderizarDetallePlan();
     abrirAdministradorSalidas();
   } catch (error) {
     errorBox.textContent =
@@ -4281,7 +4555,7 @@ async function guardarSalidaAcademicaFrontend(salida) {
   }
 }
 
-async function recargarSalidasAcademicas() {
+async function recargarSalidasAcademicas({ renderizar = true } = {}) {
   if (!planSeleccionado) {
     return;
   }
@@ -4296,19 +4570,23 @@ async function recargarSalidasAcademicas() {
 
   salidasAcademicas = Array.isArray(resultado.salidas) ? resultado.salidas : [];
   await recargarResumenPlan();
-  renderizarDetallePlan();
+
+  if (renderizar) {
+    renderizarDetallePlan();
+  }
 }
 
 function abrirAsignaturasSalida(salida) {
   const content = document.getElementById("asignaturaDialogContent");
 
-  if (!content) {
+  if (!content || !planSeleccionado) {
     return;
   }
 
   const idsSeleccionados = new Set(
-    (salida.asignaturas || []).map((item) => Number(item.id)),
+    obtenerAsignaturasSalida(salida).map((item) => Number(item.id)),
   );
+
   const asignaturas = asignaturasPlan
     .filter((item) => item.activo)
     .slice()
@@ -4320,9 +4598,52 @@ function abrirAsignaturasSalida(salida) {
     );
 
   const body = `
-    <div class="salida-asignaturas-summary">
-      <strong id="salidaAsignaturasCantidad"></strong>
-      <span id="salidaAsignaturasCreditos"></span>
+    <div class="salida-cut-helper sgpa-form-wide">
+      <div class="salida-cut-helper-copy">
+        <span>SELECCIÓN RÁPIDA</span>
+        <strong>Seleccionar materias hasta un punto del plan</strong>
+        <small>
+          SGPA marcará todas las asignaturas desde el inicio del plan hasta el
+          nivel y ciclo seleccionados. Puede ajustar la selección manualmente después.
+        </small>
+      </div>
+
+      <div class="salida-cut-helper-controls">
+        <label>
+          <span>Nivel</span>
+          <select id="salidaCorteNivel">
+            <option value="1">Nivel 1</option>
+            <option value="2">Nivel 2</option>
+            <option value="3">Nivel 3</option>
+            <option value="4">Nivel 4</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Ciclo</span>
+          <select id="salidaCorteCiclo">
+            <option value="1">Ciclo I</option>
+            <option value="2">Ciclo II</option>
+          </select>
+        </label>
+
+        <button
+          id="seleccionarHastaCorteSalida"
+          class="sgpa-form-secondary"
+          type="button"
+        >
+          <i data-lucide="list-checks" aria-hidden="true"></i>
+          Seleccionar hasta aquí
+        </button>
+      </div>
+    </div>
+
+    <div class="salida-asignaturas-summary salida-asignaturas-summary-modern">
+      <div>
+        <strong id="salidaAsignaturasCantidad"></strong>
+        <span id="salidaAsignaturasCreditos"></span>
+      </div>
+      <div id="salidaPuntoCortePreview" class="salida-cut-preview"></div>
     </div>
 
     <div class="salida-asignaturas-list">
@@ -4336,6 +4657,9 @@ function abrirAsignaturasSalida(salida) {
                 value="${asignatura.id}"
                 data-salida-asignatura
                 data-creditos="${asignatura.creditos}"
+                data-nivel="${asignatura.nivel}"
+                data-ciclo="${asignatura.ciclo}"
+                data-orden="${asignatura.orden || 0}"
                 ${
                   idsSeleccionados.has(Number(asignatura.id)) ? "checked" : ""
                 }
@@ -4361,8 +4685,9 @@ function abrirAsignaturasSalida(salida) {
   content.innerHTML = FormDialog({
     formId: "salidaAsignaturasForm",
     title: `Materias de ${salida.nombre}`,
-    description:
-      "Seleccione las asignaturas que forman parte de esta salida académica.",
+    description: `${formatearTipoSalida(salida.tipo)} · ${
+      salida.creditosRequeridos
+    } créditos requeridos`,
     body,
     errorId: "salidaAsignaturasError",
     cancelButtonId: "volverAsignaturasSalida",
@@ -4372,6 +4697,7 @@ function abrirAsignaturasSalida(salida) {
     submitButtonType: "button",
     submitIcon: "save",
     layout: "custom",
+    formClass: "salida-asignaturas-dialog",
   });
 
   renderizarIconos();
@@ -4381,33 +4707,101 @@ function abrirAsignaturasSalida(salida) {
     const seleccionadas = Array.from(
       document.querySelectorAll("[data-salida-asignatura]:checked"),
     );
+
     const creditos = seleccionadas.reduce(
       (total, input) => total + Number(input.dataset.creditos || 0),
       0,
     );
 
+    const ordenadas = seleccionadas.slice().sort(
+      (a, b) =>
+        Number(a.dataset.nivel) - Number(b.dataset.nivel) ||
+        Number(a.dataset.ciclo) - Number(b.dataset.ciclo) ||
+        Number(a.dataset.orden || 0) - Number(b.dataset.orden || 0),
+    );
+
+    const ultima = ordenadas.at(-1) || null;
     const cantidad = document.getElementById("salidaAsignaturasCantidad");
     const creditosText = document.getElementById("salidaAsignaturasCreditos");
+    const cortePreview = document.getElementById("salidaPuntoCortePreview");
 
     if (cantidad) {
-      cantidad.textContent = `${seleccionadas.length} asignaturas`;
+      cantidad.textContent = `${seleccionadas.length} asignatura${
+        seleccionadas.length === 1 ? "" : "s"
+      }`;
     }
+
     if (creditosText) {
       creditosText.textContent = `${creditos} / ${salida.creditosRequeridos} créditos`;
     }
+
+    if (cortePreview) {
+      cortePreview.innerHTML = ultima
+        ? `
+            <i data-lucide="map-pin" aria-hidden="true"></i>
+            <span>
+              Punto de corte: <strong>Nivel ${ultima.dataset.nivel} · ${obtenerNombreCiclo(
+                ultima.dataset.ciclo,
+              )}</strong>
+            </span>
+          `
+        : `
+            <i data-lucide="map-pin" aria-hidden="true"></i>
+            <span>Sin punto de corte definido</span>
+          `;
+
+      renderizarIconos();
+    }
   };
+
+  const corteActual = obtenerPuntoCorteSalida(salida);
+  if (corteActual) {
+    const nivelSelect = document.getElementById("salidaCorteNivel");
+    const cicloSelect = document.getElementById("salidaCorteCiclo");
+    if (nivelSelect) nivelSelect.value = String(corteActual.nivel);
+    if (cicloSelect) cicloSelect.value = String(corteActual.ciclo);
+  }
+
+  document
+    .getElementById("seleccionarHastaCorteSalida")
+    ?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const nivel = Number(document.getElementById("salidaCorteNivel")?.value);
+      const ciclo = Number(document.getElementById("salidaCorteCiclo")?.value);
+
+      document.querySelectorAll("[data-salida-asignatura]").forEach((input) => {
+        const nivelAsignatura = Number(input.dataset.nivel);
+        const cicloAsignatura = Number(input.dataset.ciclo);
+
+        input.checked =
+          nivelAsignatura < nivel ||
+          (nivelAsignatura === nivel && cicloAsignatura <= ciclo);
+      });
+
+      actualizarResumen();
+    });
 
   document.querySelectorAll("[data-salida-asignatura]").forEach((input) => {
     input.addEventListener("change", actualizarResumen);
   });
+
   actualizarResumen();
 
   document
     .getElementById("volverAsignaturasSalida")
-    ?.addEventListener("click", abrirAdministradorSalidas);
+    ?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      abrirAdministradorSalidas();
+    });
+
   document
     .getElementById("guardarAsignaturasSalida")
-    ?.addEventListener("click", async () => {
+    ?.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       await guardarAsignaturasSalidaFrontend(salida);
     });
 }
@@ -4420,9 +4814,27 @@ async function guardarAsignaturasSalidaFrontend(salida) {
     return;
   }
 
-  const asignaturaIds = Array.from(
+  const seleccionadas = Array.from(
     document.querySelectorAll("[data-salida-asignatura]:checked"),
-  ).map((input) => Number(input.value));
+  );
+  const asignaturaIds = seleccionadas.map((input) => Number(input.value));
+
+  if (!asignaturaIds.length) {
+    errorBox.textContent =
+      "Debe seleccionar al menos una asignatura para ubicar la salida académica.";
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  const ultima = seleccionadas
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(a.dataset.nivel) - Number(b.dataset.nivel) ||
+        Number(a.dataset.ciclo) - Number(b.dataset.ciclo) ||
+        Number(a.dataset.orden || 0) - Number(b.dataset.orden || 0),
+    )
+    .at(-1);
 
   button.disabled = true;
   errorBox.textContent = "";
@@ -4442,8 +4854,21 @@ async function guardarAsignaturasSalidaFrontend(salida) {
       );
     }
 
-    await recargarSalidasAcademicas();
-    abrirAdministradorSalidas();
+    if (ultima) {
+      nivelPaginaPlan = normalizarNivelPaginaPlan(ultima.dataset.nivel);
+    }
+
+    await recargarSalidasAcademicas({ renderizar: false });
+    renderizarDetallePlan();
+
+    mostrarExito({
+      titulo: "Salida académica configurada",
+      mensaje: `"${salida.nombre}" quedó ubicada en Nivel ${
+        ultima?.dataset.nivel || "—"
+      }, ${
+        ultima ? obtenerNombreCiclo(ultima.dataset.ciclo) : "sin ciclo"
+      } con ${salida.creditosRequeridos} créditos requeridos.`,
+    });
   } catch (error) {
     errorBox.textContent =
       error?.message || "No fue posible guardar la selección.";
