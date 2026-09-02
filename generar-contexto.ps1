@@ -6,6 +6,7 @@
 
 $Root = Get-Location
 $Output = Join-Path $Root "SGPA_CONTEXT_ACTUAL.txt"
+$ContextLines = [System.Collections.Generic.List[string]]::new()
 
 # Carpetas que NO queremos incluir
 $ExcludedFolders = @(
@@ -54,20 +55,12 @@ $AllowedNames = @(
     "Dockerfile"
 )
 
-# Limpiar archivo anterior
-if (Test-Path $Output) {
-    Remove-Item $Output -Force
-}
-
 function Add-Line {
     param(
         [string]$Text = ""
     )
 
-    Add-Content `
-        -Path $Output `
-        -Value $Text `
-        -Encoding UTF8
+    [void]$script:ContextLines.Add($Text)
 }
 
 function Is-ExcludedPath {
@@ -358,6 +351,17 @@ Add-Line ""
 Add-Line "============================================================"
 Add-Line "FIN DEL CONTEXTO SGPA"
 Add-Line "============================================================"
+
+try {
+    [System.IO.File]::WriteAllLines(
+        $Output,
+        $ContextLines,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+catch [System.IO.IOException] {
+    throw "No se pudo escribir el archivo de contexto porque otro proceso lo mantiene bloqueado: $Output"
+}
 
 Write-Host ""
 Write-Host "==============================================" -ForegroundColor Green
