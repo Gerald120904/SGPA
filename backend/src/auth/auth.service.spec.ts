@@ -61,7 +61,9 @@ describe('AuthService', () => {
 
     const result = await service.login({ correo: 'admin@una.ac.cr', password });
 
-    expect(usuariosService.buscarPorCorreo).toHaveBeenCalledWith('admin@una.ac.cr');
+    expect(usuariosService.buscarPorCorreo).toHaveBeenCalledWith(
+      'admin@una.ac.cr',
+    );
     expect(jwtService.signAsync).toHaveBeenCalledWith({
       sub: 1,
       correo: 'admin@una.ac.cr',
@@ -201,12 +203,8 @@ describe('AuthService', () => {
     const expectedHash = createHash('sha256')
       .update(codigoEnviado)
       .digest('hex');
-    const [, storedHash, expiresAt] =
-      usuariosService.guardarRecuperacionPassword.mock.calls[0] as [
-        number,
-        string,
-        Date,
-      ];
+    const [, storedHash, expiresAt] = usuariosService
+      .guardarRecuperacionPassword.mock.calls[0] as [number, string, Date];
 
     expect(storedHash).toBe(expectedHash);
     expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 15 * 60 * 1000);
@@ -224,9 +222,7 @@ describe('AuthService', () => {
       message:
         'Si el correo está registrado, recibirás un código de recuperación.',
     });
-    expect(
-      usuariosService.guardarRecuperacionPassword,
-    ).not.toHaveBeenCalled();
+    expect(usuariosService.guardarRecuperacionPassword).not.toHaveBeenCalled();
     expect(mailService.enviarCodigoRecuperacion).not.toHaveBeenCalled();
   });
 
@@ -235,9 +231,7 @@ describe('AuthService', () => {
     usuariosService.buscarPorCorreo.mockResolvedValue({
       id: 1,
       activo: true,
-      passwordResetTokenHash: createHash('sha256')
-        .update(codigo)
-        .digest('hex'),
+      passwordResetTokenHash: createHash('sha256').update(codigo).digest('hex'),
       passwordResetExpiresAt: new Date(Date.now() + 60_000),
     });
 
@@ -251,8 +245,11 @@ describe('AuthService', () => {
       1,
       expect.any(String),
     );
-    const passwordHash = usuariosService.actualizarPassword.mock.calls[0][1] as string;
-    await expect(bcrypt.compare('NuevaClave123', passwordHash)).resolves.toBe(true);
+    const passwordHash = usuariosService.actualizarPassword.mock
+      .calls[0][1] as string;
+    await expect(bcrypt.compare('NuevaClave123', passwordHash)).resolves.toBe(
+      true,
+    );
     expect(result).toEqual({
       message: 'La contraseña se actualizó correctamente.',
     });

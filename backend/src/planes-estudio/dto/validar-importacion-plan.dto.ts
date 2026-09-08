@@ -2,10 +2,6 @@ import { ArrayMaxSize, IsArray } from 'class-validator';
 
 export class ValidarImportacionPlanDto {
   @IsArray()
-  @ArrayMaxSize(100)
-  bloques!: Record<string, unknown>[];
-
-  @IsArray()
   @ArrayMaxSize(500)
   asignaturas!: Record<string, unknown>[];
 

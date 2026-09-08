@@ -6,6 +6,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { PlanesEstudioController } from './planes-estudio.controller';
 import { PlanesEstudioService } from './planes-estudio.service';
 
@@ -91,6 +92,7 @@ describe('PlanesEstudioController', () => {
   it('crea un plan válido', async () => {
     const dto = {
       carreraId: 1,
+      grado: GradoAcademico.BACHILLERATO,
       codigo: 'BA-INFORM 2012-10',
       nombre: 'Plan de Bachillerato 2012-10',
     };

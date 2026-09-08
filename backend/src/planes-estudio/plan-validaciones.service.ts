@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
@@ -12,7 +12,6 @@ type Resultado = {
   nivel: 'ADVERTENCIA' | 'ERROR';
   mensaje: string;
   asignaturaId?: number;
-  bloqueId?: number;
   salidaId?: number;
 };
 
@@ -23,18 +22,14 @@ export class PlanValidacionesService {
     private readonly planes: Repository<PlanEstudio>,
     @InjectRepository(PlanAsignatura)
     private readonly asignaturas: Repository<PlanAsignatura>,
-    @InjectRepository(BloquePlan)
-    private readonly bloques: Repository<BloquePlan>,
     @InjectRepository(PlanRequisito)
     private readonly requisitos: Repository<PlanRequisito>,
     @InjectRepository(SalidaAcademica)
     private readonly salidas: Repository<SalidaAcademica>,
   ) {}
   private nombre(a: PlanAsignatura) {
-    const codigo =
-      a.codigoReferencia?.trim() || a.curso?.codigo?.trim() || '';
-    const nombre =
-      a.nombreReferencia?.trim() || a.curso?.nombre?.trim() || '';
+    const codigo = a.codigoReferencia?.trim() || a.curso?.codigo?.trim() || '';
+    const nombre = a.nombreReferencia?.trim() || a.curso?.nombre?.trim() || '';
 
     if (codigo && nombre) {
       return `${codigo} - ${nombre}`;
@@ -47,6 +42,11 @@ export class PlanValidacionesService {
       a.codigoReferencia?.trim().toUpperCase() ||
       a.curso?.codigo?.trim().toUpperCase() ||
       ''
+    );
+  }
+  private requiereCodigoUnico(asignatura: PlanAsignatura): boolean {
+    return ![TipoPlanAsignatura.OPTATIVA, TipoPlanAsignatura.GENERAL].includes(
+      asignatura.tipo,
     );
   }
   private despues(r: PlanAsignatura, a: PlanAsignatura) {
@@ -82,12 +82,11 @@ export class PlanValidacionesService {
   async validar(planId: number) {
     const plan = await this.planes.findOne({ where: { id: planId } });
     if (!plan) throw new NotFoundException('El plan de estudio no existe.');
-    const [asignaturas, bloques, requisitos, salidas] = await Promise.all([
+    const [asignaturas, requisitos, salidas] = await Promise.all([
       this.asignaturas.find({
         where: { planEstudioId: planId },
-        relations: { curso: true, bloque: true },
+        relations: { curso: true },
       }),
-      this.bloques.find({ where: { planEstudioId: planId } }),
       this.requisitos.find({
         where: { asignatura: { planEstudioId: planId } },
         relations: { asignatura: true, requisitoAsignatura: true },
@@ -112,13 +111,6 @@ export class PlanValidacionesService {
           mensaje: `${this.nombre(a)} no tiene nombre curricular.`,
         });
 
-      if (a.bloqueId == null)
-        advertencias.push({
-          codigo: 'ASIGNATURA_SIN_BLOQUE',
-          nivel: 'ADVERTENCIA',
-          asignaturaId: a.id,
-          mensaje: `${this.nombre(a)} no tiene un bloque asignado.`,
-        });
       const c = [
         a.horasTeoria,
         a.horasPractica,
@@ -138,14 +130,6 @@ export class PlanValidacionesService {
           });
       }
     }
-    for (const b of bloques.filter((b) => b.activo))
-      if (!activas.some((a) => Number(a.bloqueId) === Number(b.id)))
-        advertencias.push({
-          codigo: 'BLOQUE_VACIO',
-          nivel: 'ADVERTENCIA',
-          bloqueId: b.id,
-          mensaje: `El bloque "${b.nombre}" no contiene asignaturas activas.`,
-        });
     const codigosUsados = new Set<string>();
     for (const a of activas) {
       const codigo = this.codigo(a);
@@ -160,7 +144,7 @@ export class PlanValidacionesService {
         continue;
       }
 
-      if (codigosUsados.has(codigo)) {
+      if (this.requiereCodigoUnico(a) && codigosUsados.has(codigo)) {
         errores.push({
           codigo: 'CODIGO_ASIGNATURA_DUPLICADO',
           nivel: 'ERROR',
@@ -170,7 +154,9 @@ export class PlanValidacionesService {
         continue;
       }
 
-      codigosUsados.add(codigo);
+      if (this.requiereCodigoUnico(a)) {
+        codigosUsados.add(codigo);
+      }
     }
     for (const r of requisitos.filter(
       (r) => r.tipo === TipoRequisito.REQUISITO,

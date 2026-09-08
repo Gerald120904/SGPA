@@ -34,17 +34,16 @@ describe('SalidasAcademicasService', () => {
       planEstudioId: 1,
       activo,
       curso: null,
-      bloque: null,
     }) as PlanAsignatura;
 
   const salida = (cambios: Partial<SalidaAcademica> = {}) =>
     ({
       id: 1,
       planEstudioId: 1,
-      codigo: 'DIP',
-      nombre: 'Diplomado',
-      tipo: TipoSalidaAcademica.DIPLOMADO,
-      creditosRequeridos: 88,
+      codigo: 'ENF-SEG',
+      nombre: 'Énfasis en Ciberseguridad',
+      tipo: TipoSalidaAcademica.ENFASIS,
+      creditosRequeridos: 12,
       orden: 1,
       descripcion: null,
       activo: true,
@@ -87,7 +86,6 @@ describe('SalidasAcademicasService', () => {
       relations: {
         asignaturas: {
           curso: true,
-          bloque: true,
         },
       },
       order: {
@@ -105,7 +103,7 @@ describe('SalidasAcademicasService', () => {
   });
 
   it('crea una salida normalizando código, nombre y descripción', async () => {
-    const guardada = salida({ descripcion: 'Título intermedio' });
+    const guardada = salida({ descripcion: 'Ruta específica' });
     planRepository.findOne.mockResolvedValue(plan);
     salidaRepository.findOne
       .mockResolvedValueOnce(null)
@@ -113,22 +111,22 @@ describe('SalidasAcademicasService', () => {
     salidaRepository.save.mockResolvedValue({ id: 1 });
 
     const resultado = await service.crear(1, {
-      codigo: ' dip ',
-      nombre: ' Diplomado ',
-      tipo: TipoSalidaAcademica.DIPLOMADO,
-      creditosRequeridos: 88,
+      codigo: ' enf-seg ',
+      nombre: ' Énfasis en Ciberseguridad ',
+      tipo: TipoSalidaAcademica.ENFASIS,
+      creditosRequeridos: 12,
       orden: 1,
-      descripcion: ' Título intermedio ',
+      descripcion: ' Ruta específica ',
     });
 
     expect(salidaRepository.create).toHaveBeenCalledWith({
       planEstudioId: 1,
-      codigo: 'DIP',
-      nombre: 'Diplomado',
-      tipo: TipoSalidaAcademica.DIPLOMADO,
-      creditosRequeridos: 88,
+      codigo: 'ENF-SEG',
+      nombre: 'Énfasis en Ciberseguridad',
+      tipo: TipoSalidaAcademica.ENFASIS,
+      creditosRequeridos: 12,
       orden: 1,
-      descripcion: 'Título intermedio',
+      descripcion: 'Ruta específica',
       activo: true,
       asignaturas: [],
     });
@@ -141,10 +139,10 @@ describe('SalidasAcademicasService', () => {
 
     await expect(
       service.crear(1, {
-        codigo: 'DIP',
-        nombre: 'Otro diplomado',
-        tipo: TipoSalidaAcademica.DIPLOMADO,
-        creditosRequeridos: 80,
+        codigo: 'ENF-SEG',
+        nombre: 'Otro énfasis',
+        tipo: TipoSalidaAcademica.ENFASIS,
+        creditosRequeridos: 12,
         orden: 2,
       }),
     ).rejects.toThrow(ConflictException);
@@ -156,10 +154,10 @@ describe('SalidasAcademicasService', () => {
 
     await expect(
       service.crear(1, {
-        codigo: 'DIP',
-        nombre: 'Diplomado',
-        tipo: TipoSalidaAcademica.DIPLOMADO,
-        creditosRequeridos: 88,
+        codigo: 'ENF-SEG',
+        nombre: 'Énfasis en Ciberseguridad',
+        tipo: TipoSalidaAcademica.ENFASIS,
+        creditosRequeridos: 12,
         orden: 1,
       }),
     ).rejects.toThrow(BadRequestException);

@@ -9,11 +9,15 @@ import { AuthModule } from './auth/auth.module';
 import { EstudiantesModule } from './estudiantes/estudiantes.module';
 import { CarrerasModule } from './carreras/carreras.module';
 import { CursosModule } from './cursos/cursos.module';
+import { OptativasModule } from './optativas/optativas.module';
+import { PerfilesAcademicosModule } from './perfiles-academicos/perfiles-academicos.module';
 import { ProfesoresModule } from './profesores/profesores.module';
 import { AulasModule } from './aulas/aulas.module';
 import { PeriodosAcademicosModule } from './periodos-academicos/periodos-academicos.module';
 import { ProyeccionModule } from './proyeccion/proyeccion.module';
 import { OfertaAcademicaModule } from './oferta-academica/oferta-academica.module';
+import { PermisosModule } from './permisos/permisos.module';
+import { EstructuraAcademicaModule } from './estructura-academica/estructura-academica.module';
 import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
 
 @Module({
@@ -37,9 +41,13 @@ import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
     UsuariosModule,
     RolesModule,
     AuthModule,
+    PermisosModule,
+    EstructuraAcademicaModule,
     EstudiantesModule,
     CarrerasModule,
     CursosModule,
+    OptativasModule,
+    PerfilesAcademicosModule,
     PlanesEstudioModule,
     ProfesoresModule,
     AulasModule,

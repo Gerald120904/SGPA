@@ -91,10 +91,10 @@ describe('SalidasAcademicasController', () => {
 
   it('crea una salida válida', async () => {
     const dto = {
-      codigo: 'DIP',
-      nombre: 'Diplomado',
-      tipo: TipoSalidaAcademica.DIPLOMADO,
-      creditosRequeridos: 88,
+      codigo: 'ENF-SEG',
+      nombre: 'Énfasis en Ciberseguridad',
+      tipo: TipoSalidaAcademica.ENFASIS,
+      creditosRequeridos: 12,
       orden: 1,
     };
 
@@ -112,10 +112,10 @@ describe('SalidasAcademicasController', () => {
       .post('/planes-estudio/1/salidas-academicas')
       .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
       .send({
-        codigo: 'DIP',
-        nombre: 'Diplomado',
+        codigo: 'ENF-SEG',
+        nombre: 'Énfasis en Ciberseguridad',
         tipo: 'INVENTADO',
-        creditosRequeridos: 88,
+        creditosRequeridos: 12,
         orden: 1,
       })
       .expect(400);
@@ -128,9 +128,9 @@ describe('SalidasAcademicasController', () => {
       .post('/planes-estudio/1/salidas-academicas')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
       .send({
-        codigo: 'DIP',
-        nombre: 'Diplomado',
-        tipo: TipoSalidaAcademica.DIPLOMADO,
+        codigo: 'ENF-SEG',
+        nombre: 'Énfasis en Ciberseguridad',
+        tipo: TipoSalidaAcademica.ENFASIS,
         creditosRequeridos: 0,
         orden: 1,
       })
@@ -140,16 +140,16 @@ describe('SalidasAcademicasController', () => {
   });
 
   it.each([
-    { codigo: '', nombre: 'Diplomado' },
-    { codigo: 'DIP', nombre: '' },
+    { codigo: '', nombre: 'Énfasis en Ciberseguridad' },
+    { codigo: 'ENF-SEG', nombre: '' },
   ])('rechaza código o nombre vacío: %o', async (campos) => {
     await request(app.getHttpServer())
       .post('/planes-estudio/1/salidas-academicas')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
       .send({
         ...campos,
-        tipo: TipoSalidaAcademica.DIPLOMADO,
-        creditosRequeridos: 88,
+        tipo: TipoSalidaAcademica.ENFASIS,
+        creditosRequeridos: 12,
         orden: 1,
       })
       .expect(400);
@@ -196,10 +196,10 @@ describe('SalidasAcademicasController', () => {
       .post('/planes-estudio/1/salidas-academicas')
       .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
       .send({
-        codigo: 'DIP',
-        nombre: 'Diplomado',
-        tipo: TipoSalidaAcademica.DIPLOMADO,
-        creditosRequeridos: 88,
+        codigo: 'ENF-SEG',
+        nombre: 'Énfasis en Ciberseguridad',
+        tipo: TipoSalidaAcademica.ENFASIS,
+        creditosRequeridos: 12,
         orden: 1,
       })
       .expect(403);

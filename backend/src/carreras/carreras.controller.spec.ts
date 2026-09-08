@@ -6,7 +6,6 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { GradoAcademico } from './constants/grado-academico.constant';
 import { CarrerasController } from './carreras.controller';
 import { CarrerasService } from './carreras.service';
 
@@ -142,7 +141,6 @@ describe('CarrerasController', () => {
     const dto = {
       codigo: 'EIF',
       nombre: 'Ingeniería en Sistemas de Información',
-      grado: GradoAcademico.BACHILLERATO,
       descripcion: 'Carrera de informática',
     };
 
@@ -155,22 +153,6 @@ describe('CarrerasController', () => {
       });
 
     expect(carrerasService.crear).toHaveBeenCalledWith(dto);
-  });
-
-  it('rechaza un grado académico inválido', async () => {
-    const token = await crearToken('COORDINADOR');
-
-    await request(app.getHttpServer())
-      .post('/carreras')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        codigo: 'EIF',
-        nombre: 'Ingeniería en Sistemas',
-        grado: 'DOCTORADO_INVENTADO',
-      })
-      .expect(400);
-
-    expect(carrerasService.crear).not.toHaveBeenCalled();
   });
 
   it('consulta una carrera por id', async () => {

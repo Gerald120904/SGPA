@@ -77,24 +77,23 @@ describe('UsuariosController', () => {
     expect(usuariosService.listar).not.toHaveBeenCalled();
   });
 
-  it.each([
-    'COORDINADOR',
-    'PROFESOR',
-    'ESTUDIANTE',
-  ])('responde 403 para %s', async (rol) => {
-    const token = await jwtService.signAsync({
-      sub: 2,
-      correo: 'usuario@sgpa.local',
-      roles: [rol],
-    });
+  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
+    'responde 403 para %s',
+    async (rol) => {
+      const token = await jwtService.signAsync({
+        sub: 2,
+        correo: 'usuario@sgpa.local',
+        roles: [rol],
+      });
 
-    await request(app.getHttpServer())
-      .get('/usuarios')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(403);
+      await request(app.getHttpServer())
+        .get('/usuarios')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
 
-    expect(usuariosService.listar).not.toHaveBeenCalled();
-  });
+      expect(usuariosService.listar).not.toHaveBeenCalled();
+    },
+  );
 
   it('responde 200 para ADMIN_GLOBAL', async () => {
     const token = await jwtService.signAsync({

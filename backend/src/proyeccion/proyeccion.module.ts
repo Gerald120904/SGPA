@@ -4,6 +4,6 @@ import { ProyeccionService } from './proyeccion.service';
 
 @Module({
   controllers: [ProyeccionController],
-  providers: [ProyeccionService]
+  providers: [ProyeccionService],
 })
 export class ProyeccionModule {}

@@ -2,25 +2,25 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
 import { Carrera } from '../carreras/entities/carrera.entity';
-import { BloquesPlanController } from './bloques-plan.controller';
-import { BloquesPlanService } from './bloques-plan.service';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
+import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
 import { PlanAsignaturasController } from './plan-asignaturas.controller';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
-import { PlanRequisitosController } from './plan-requisitos.controller';
-import { PlanRequisitosService } from './plan-requisitos.service';
-import { PlanesEstudioController } from './planes-estudio.controller';
-import { PlanesEstudioService } from './planes-estudio.service';
-import { PlanResumenController } from './plan-resumen.controller';
-import { PlanResumenService } from './plan-resumen.service';
 import { PlanImportacionController } from './plan-importacion.controller';
 import { PlanImportacionService } from './plan-importacion.service';
+import { PlanReglasOptativasController } from './plan-reglas-optativas.controller';
+import { PlanReglasOptativasService } from './plan-reglas-optativas.service';
+import { PlanRequisitosController } from './plan-requisitos.controller';
+import { PlanRequisitosService } from './plan-requisitos.service';
+import { PlanResumenController } from './plan-resumen.controller';
+import { PlanResumenService } from './plan-resumen.service';
 import { PlanValidacionesController } from './plan-validaciones.controller';
 import { PlanValidacionesService } from './plan-validaciones.service';
+import { PlanesEstudioController } from './planes-estudio.controller';
+import { PlanesEstudioService } from './planes-estudio.service';
 import { SalidasAcademicasController } from './salidas-academicas.controller';
 import { SalidasAcademicasService } from './salidas-academicas.service';
 
@@ -31,7 +31,7 @@ import { SalidasAcademicasService } from './salidas-academicas.service';
       PlanAsignatura,
       PlanRequisito,
       SalidaAcademica,
-      BloquePlan,
+      ReglaOptativaPlan,
       Carrera,
     ]),
     SecurityModule,
@@ -40,31 +40,31 @@ import { SalidasAcademicasService } from './salidas-academicas.service';
     PlanesEstudioController,
     PlanAsignaturasController,
     PlanRequisitosController,
-    BloquesPlanController,
     SalidasAcademicasController,
     PlanResumenController,
     PlanValidacionesController,
     PlanImportacionController,
+    PlanReglasOptativasController,
   ],
   providers: [
     PlanesEstudioService,
     PlanAsignaturasService,
     PlanRequisitosService,
-    BloquesPlanService,
     SalidasAcademicasService,
     PlanResumenService,
     PlanValidacionesService,
     PlanImportacionService,
+    PlanReglasOptativasService,
   ],
   exports: [
     PlanesEstudioService,
     PlanAsignaturasService,
     PlanRequisitosService,
-    BloquesPlanService,
     SalidasAcademicasService,
     PlanResumenService,
     PlanValidacionesService,
     PlanImportacionService,
+    PlanReglasOptativasService,
   ],
 })
 export class PlanesEstudioModule {}

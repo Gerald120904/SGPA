@@ -93,6 +93,22 @@ export class PeriodosAcademicosService {
     }
   }
 
+  private async validarUnicoPeriodoEnPreparacion(
+    excluirId?: number,
+  ): Promise<void> {
+    const existente = await this.periodoRepository.findOne({
+      where: {
+        estado: EstadoPeriodoAcademico.EN_PREPARACION,
+      },
+    });
+
+    if (existente && existente.id !== excluirId) {
+      throw new ConflictException(
+        `Ya existe un periodo académico en preparación: ${existente.codigo}.`,
+      );
+    }
+  }
+
   private validarPeriodoEditable(periodo: PeriodoAcademico): void {
     if (periodo.estado === EstadoPeriodoAcademico.EN_CURSO) {
       throw new BadRequestException(
@@ -256,6 +272,13 @@ export class PeriodosAcademicosService {
     const periodo = await this.obtenerEntidadPorId(id);
 
     this.validarTransicionEstado(periodo.estado, nuevoEstado);
+
+    if (
+      periodo.estado !== nuevoEstado &&
+      nuevoEstado === EstadoPeriodoAcademico.EN_PREPARACION
+    ) {
+      await this.validarUnicoPeriodoEnPreparacion(periodo.id);
+    }
 
     periodo.estado = nuevoEstado;
 

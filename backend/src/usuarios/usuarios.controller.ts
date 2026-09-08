@@ -90,10 +90,6 @@ export class UsuariosController {
     @Req()
     request: Request,
   ) {
-    return this.usuariosService.revocarRol(
-      id,
-      rolId,
-      request.user!.sub,
-    );
+    return this.usuariosService.revocarRol(id, rolId, request.user!.sub);
   }
 }

@@ -5,8 +5,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { GradoAcademico } from '../constants/grado-academico.constant';
-
 @Entity({ name: 'carreras' })
 export class Carrera {
   @PrimaryGeneratedColumn({
@@ -28,12 +26,6 @@ export class Carrera {
     unique: true,
   })
   nombre!: string;
-
-  @Column({
-    type: 'varchar',
-    length: 30,
-  })
-  grado!: GradoAcademico;
 
   @Column({
     type: 'varchar',

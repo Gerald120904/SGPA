@@ -14,11 +14,6 @@ export class ActualizarPlanAsignaturaDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  bloqueId?: number | null;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
   @Max(20)
   nivel?: number;
 

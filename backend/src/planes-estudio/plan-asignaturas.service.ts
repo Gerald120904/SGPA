@@ -6,10 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { ActualizarPlanAsignaturaDto } from './dto/actualizar-plan-asignatura.dto';
 import { CargaMasivaPlanAsignaturasDto } from './dto/carga-masiva-plan-asignaturas.dto';
 import { CrearPlanAsignaturaDto } from './dto/crear-plan-asignatura.dto';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 
@@ -20,8 +20,6 @@ export class PlanAsignaturasService {
     private readonly asignaturaRepository: Repository<PlanAsignatura>,
     @InjectRepository(PlanEstudio)
     private readonly planRepository: Repository<PlanEstudio>,
-    @InjectRepository(BloquePlan)
-    private readonly bloqueRepository: Repository<BloquePlan>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -57,7 +55,6 @@ export class PlanAsignaturasService {
       },
       relations: {
         curso: true,
-        bloque: true,
       },
     });
 
@@ -68,35 +65,19 @@ export class PlanAsignaturasService {
     return asignatura;
   }
 
-  private async obtenerBloqueValido(
-    planId: number,
-    bloqueId: number,
-  ): Promise<BloquePlan> {
-    const bloque = await this.bloqueRepository.findOne({
-      where: {
-        id: bloqueId,
-        planEstudioId: planId,
-      },
-    });
-
-    if (!bloque) {
-      throw new BadRequestException(
-        'El bloque seleccionado no pertenece a este plan de estudio.',
-      );
-    }
-
-    if (!bloque.activo) {
-      throw new BadRequestException('No se puede utilizar un bloque inactivo.');
-    }
-
-    return bloque;
-  }
-
   private async validarCodigoDuplicado(
     planId: number,
     codigo: string,
+    tipo: TipoPlanAsignatura,
     excluirId?: number,
   ): Promise<void> {
+    if (
+      tipo === TipoPlanAsignatura.OPTATIVA ||
+      tipo === TipoPlanAsignatura.GENERAL
+    ) {
+      return;
+    }
+
     const existente = await this.asignaturaRepository.findOne({
       where: {
         planEstudioId: planId,
@@ -115,12 +96,6 @@ export class PlanAsignaturasService {
     plan: PlanEstudio,
     dto: CrearPlanAsignaturaDto,
   ): Promise<PlanAsignatura> {
-    let bloque: BloquePlan | null = null;
-
-    if (dto.bloqueId !== undefined) {
-      bloque = await this.obtenerBloqueValido(plan.id, dto.bloqueId);
-    }
-
     const codigoReferencia = dto.codigoReferencia.trim().toUpperCase();
     const nombreReferencia = dto.nombreReferencia.trim();
 
@@ -136,12 +111,10 @@ export class PlanAsignaturasService {
       );
     }
 
-    await this.validarCodigoDuplicado(plan.id, codigoReferencia);
+    await this.validarCodigoDuplicado(plan.id, codigoReferencia, dto.tipo);
 
     return this.asignaturaRepository.create({
       planEstudioId: plan.id,
-      bloqueId: bloque?.id ?? null,
-      bloque,
       cursoId: null,
       curso: null,
       nivel: dto.nivel,
@@ -172,7 +145,6 @@ export class PlanAsignaturasService {
       },
       relations: {
         curso: true,
-        bloque: true,
       },
       order: {
         nivel: 'ASC',
@@ -230,7 +202,6 @@ export class PlanAsignaturasService {
       })),
       relations: {
         curso: true,
-        bloque: true,
       },
       order: {
         nivel: 'ASC',
@@ -245,6 +216,42 @@ export class PlanAsignaturasService {
     };
   }
 
+  private validarIdentidadAsignaturaVinculada(
+    asignatura: PlanAsignatura,
+    dto: ActualizarPlanAsignaturaDto,
+  ): void {
+    if (asignatura.cursoId === null) {
+      return;
+    }
+
+    const codigoActual =
+      asignatura.codigoReferencia?.trim().toUpperCase() ?? '';
+
+    const nombreActual = asignatura.nombreReferencia?.trim() ?? '';
+
+    const nuevoCodigo =
+      dto.codigoReferencia !== undefined
+        ? (dto.codigoReferencia?.trim().toUpperCase() ?? '')
+        : codigoActual;
+
+    const nuevoNombre =
+      dto.nombreReferencia !== undefined
+        ? (dto.nombreReferencia?.trim() ?? '')
+        : nombreActual;
+
+    const cambiaCodigo =
+      dto.codigoReferencia !== undefined && nuevoCodigo !== codigoActual;
+
+    const cambiaNombre =
+      dto.nombreReferencia !== undefined && nuevoNombre !== nombreActual;
+
+    if (cambiaCodigo || cambiaNombre) {
+      throw new ConflictException(
+        'No se puede modificar el código o nombre de una asignatura que ya está vinculada al catálogo de cursos.',
+      );
+    }
+  }
+
   async actualizar(
     planId: number,
     id: number,
@@ -253,15 +260,25 @@ export class PlanAsignaturasService {
     await this.obtenerPlan(planId, true);
     const asignatura = await this.obtenerAsignatura(planId, id);
 
-    if (dto.bloqueId !== undefined) {
-      if (dto.bloqueId === null) {
-        asignatura.bloqueId = null;
-        asignatura.bloque = null;
-      } else {
-        const bloque = await this.obtenerBloqueValido(planId, dto.bloqueId);
-        asignatura.bloqueId = bloque.id;
-        asignatura.bloque = bloque;
+    this.validarIdentidadAsignaturaVinculada(asignatura, dto);
+
+    const tipoResultante = dto.tipo ?? asignatura.tipo;
+    const codigoResultante =
+      dto.codigoReferencia !== undefined
+        ? (dto.codigoReferencia?.trim().toUpperCase() ?? '')
+        : (asignatura.codigoReferencia?.trim().toUpperCase() ?? '');
+
+    if (dto.codigoReferencia !== undefined || dto.tipo !== undefined) {
+      if (!codigoResultante) {
+        throw new BadRequestException('La asignatura debe tener un código.');
       }
+
+      await this.validarCodigoDuplicado(
+        planId,
+        codigoResultante,
+        tipoResultante,
+        id,
+      );
     }
 
     if (dto.nivel !== undefined) asignatura.nivel = dto.nivel;
@@ -292,20 +309,13 @@ export class PlanAsignaturasService {
     if (dto.observacionHoras !== undefined) {
       asignatura.observacionHoras = dto.observacionHoras?.trim() || null;
     }
-    if (dto.tipo !== undefined) asignatura.tipo = dto.tipo;
+
+    if (dto.tipo !== undefined) {
+      asignatura.tipo = dto.tipo;
+    }
 
     if (dto.codigoReferencia !== undefined) {
-      const codigoReferencia =
-        dto.codigoReferencia?.trim().toUpperCase() ?? '';
-
-      if (!codigoReferencia) {
-        throw new BadRequestException(
-          'El código de la asignatura no puede estar vacío.',
-        );
-      }
-
-      await this.validarCodigoDuplicado(planId, codigoReferencia, id);
-      asignatura.codigoReferencia = codigoReferencia;
+      asignatura.codigoReferencia = codigoResultante;
     }
 
     if (dto.nombreReferencia !== undefined) {
@@ -321,15 +331,11 @@ export class PlanAsignaturasService {
     }
 
     if (!asignatura.codigoReferencia) {
-      throw new BadRequestException(
-        'La asignatura debe tener un código.',
-      );
+      throw new BadRequestException('La asignatura debe tener un código.');
     }
 
     if (!asignatura.nombreReferencia) {
-      throw new BadRequestException(
-        'La asignatura debe tener un nombre.',
-      );
+      throw new BadRequestException('La asignatura debe tener un nombre.');
     }
 
     await this.asignaturaRepository.save(asignatura);

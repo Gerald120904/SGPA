@@ -34,34 +34,25 @@ describe('RolesGuard', () => {
   });
 
   it('permite un usuario con un rol autorizado', () => {
-    reflector.getAllAndOverride.mockReturnValue([
-      RolSistema.ADMIN_GLOBAL,
-    ]);
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.ADMIN_GLOBAL]);
 
-    expect(
-      guard.canActivate(crearContexto([RolSistema.ADMIN_GLOBAL])),
-    ).toBe(true);
+    expect(guard.canActivate(crearContexto([RolSistema.ADMIN_GLOBAL]))).toBe(
+      true,
+    );
   });
 
   it('permite cuando cualquiera de los roles del usuario está autorizado', () => {
-    reflector.getAllAndOverride.mockReturnValue([
-      RolSistema.COORDINADOR,
-    ]);
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.COORDINADOR]);
 
     expect(
       guard.canActivate(
-        crearContexto([
-          RolSistema.PROFESOR,
-          RolSistema.COORDINADOR,
-        ]),
+        crearContexto([RolSistema.PROFESOR, RolSistema.COORDINADOR]),
       ),
     ).toBe(true);
   });
 
   it('deniega un usuario con un rol no autorizado', () => {
-    reflector.getAllAndOverride.mockReturnValue([
-      RolSistema.ADMIN_GLOBAL,
-    ]);
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.ADMIN_GLOBAL]);
 
     expect(() =>
       guard.canActivate(crearContexto([RolSistema.COORDINADOR])),
@@ -69,9 +60,7 @@ describe('RolesGuard', () => {
   });
 
   it('deniega una solicitud sin usuario autenticado', () => {
-    reflector.getAllAndOverride.mockReturnValue([
-      RolSistema.ADMIN_GLOBAL,
-    ]);
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.ADMIN_GLOBAL]);
 
     expect(() => guard.canActivate(crearContexto())).toThrow(
       ForbiddenException,

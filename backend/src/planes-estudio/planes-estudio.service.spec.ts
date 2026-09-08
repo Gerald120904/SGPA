@@ -26,7 +26,6 @@ describe('PlanesEstudioService', () => {
     id: 1,
     codigo: 'EIF',
     nombre: 'Ingeniería en Sistemas',
-    grado: GradoAcademico.BACHILLERATO,
     descripcion: null,
     activo: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -36,6 +35,7 @@ describe('PlanesEstudioService', () => {
   const crearPlan = (cambios: Partial<PlanEstudio> = {}): PlanEstudio => ({
     id: 1,
     carreraId: 1,
+    grado: GradoAcademico.BACHILLERATO,
     codigo: 'BA-INFORM 2012-10',
     nombre: 'Plan de Bachillerato 2012-10',
     descripcion: 'Plan de estudios',
@@ -107,6 +107,7 @@ describe('PlanesEstudioService', () => {
 
     const resultado = await service.crear({
       carreraId: 1,
+      grado: GradoAcademico.BACHILLERATO,
       codigo: ' ba-inform 2012-10 ',
       nombre: ' Plan de Bachillerato 2012-10 ',
       descripcion: ' Plan de estudios ',
@@ -114,6 +115,7 @@ describe('PlanesEstudioService', () => {
 
     expect(planRepository.create).toHaveBeenCalledWith({
       carreraId: 1,
+      grado: GradoAcademico.BACHILLERATO,
       codigo: 'BA-INFORM 2012-10',
       nombre: 'Plan de Bachillerato 2012-10',
       descripcion: 'Plan de estudios',
@@ -128,6 +130,7 @@ describe('PlanesEstudioService', () => {
     await expect(
       service.crear({
         carreraId: 999,
+        grado: GradoAcademico.BACHILLERATO,
         codigo: 'PLAN-1',
         nombre: 'Plan uno',
       }),
@@ -144,6 +147,7 @@ describe('PlanesEstudioService', () => {
     await expect(
       service.crear({
         carreraId: 1,
+        grado: GradoAcademico.BACHILLERATO,
         codigo: 'PLAN-1',
         nombre: 'Plan uno',
       }),
@@ -157,6 +161,7 @@ describe('PlanesEstudioService', () => {
     await expect(
       service.crear({
         carreraId: 1,
+        grado: GradoAcademico.BACHILLERATO,
         codigo: 'BA-INFORM 2012-10',
         nombre: 'Otro plan',
       }),
@@ -168,6 +173,7 @@ describe('PlanesEstudioService', () => {
     const actualizado = crearPlan({
       codigo: 'BA-INFORM 2026',
       nombre: 'Plan actualizado',
+      grado: GradoAcademico.LICENCIATURA,
     });
     planRepository.findOne
       .mockResolvedValueOnce(existente)
@@ -177,11 +183,13 @@ describe('PlanesEstudioService', () => {
     const resultado = await service.actualizar(1, {
       codigo: ' ba-inform 2026 ',
       nombre: ' Plan actualizado ',
+      grado: GradoAcademico.LICENCIATURA,
     });
 
     expect(planRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
         carreraId: 1,
+        grado: GradoAcademico.LICENCIATURA,
         codigo: 'BA-INFORM 2026',
         nombre: 'Plan actualizado',
       }),
@@ -228,6 +236,7 @@ describe('PlanesEstudioService', () => {
     await expect(
       service.crear({
         carreraId: 1,
+        grado: GradoAcademico.BACHILLERATO,
         codigo: 'BA-INFORM 2012-10',
         nombre: 'Plan de Bachillerato',
       }),

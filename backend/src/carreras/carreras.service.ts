@@ -106,7 +106,6 @@ export class CarrerasService {
     const carrera = this.carreraRepository.create({
       codigo,
       nombre,
-      grado: dto.grado,
       descripcion,
       activo: true,
     });
@@ -148,10 +147,6 @@ export class CarrerasService {
 
     if (nombre !== undefined) {
       cambios.nombre = nombre;
-    }
-
-    if (dto.grado !== undefined) {
-      cambios.grado = dto.grado;
     }
 
     if (dto.descripcion !== undefined) {

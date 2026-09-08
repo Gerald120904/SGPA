@@ -11,10 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { MailService } from '../mail/mail.service';
-import {
-  RolSistema,
-  ROLES_SISTEMA,
-} from './constants/roles.constants';
+import { RolSistema, ROLES_SISTEMA } from './constants/roles.constants';
 
 @Injectable()
 export class AuthService {
@@ -37,9 +34,7 @@ export class AuthService {
         (usuarioRol) =>
           usuarioRol.rol &&
           usuarioRol.rol.activo &&
-          ROLES_SISTEMA.includes(
-            usuarioRol.rol.nombre as RolSistema,
-          ),
+          ROLES_SISTEMA.includes(usuarioRol.rol.nombre as RolSistema),
       )
       .map((usuarioRol) => usuarioRol.rol.nombre as RolSistema);
 
@@ -157,7 +152,8 @@ export class AuthService {
     const esperado = Buffer.from(usuario.passwordResetTokenHash, 'hex');
     const recibido = Buffer.from(hashRecibido, 'hex');
     const codigoValido =
-      esperado.length === recibido.length && timingSafeEqual(esperado, recibido);
+      esperado.length === recibido.length &&
+      timingSafeEqual(esperado, recibido);
 
     if (!codigoValido) {
       throw errorCodigo;

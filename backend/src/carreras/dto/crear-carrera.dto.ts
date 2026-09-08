@@ -1,11 +1,4 @@
-import {
-  IsEnum,
-  IsOptional,
-  IsString,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
-import { GradoAcademico } from '../constants/grado-academico.constant';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CrearCarreraDto {
   @IsString()
@@ -17,9 +10,6 @@ export class CrearCarreraDto {
   @MinLength(1)
   @MaxLength(150)
   nombre!: string;
-
-  @IsEnum(GradoAcademico)
-  grado!: GradoAcademico;
 
   @IsOptional()
   @IsString()

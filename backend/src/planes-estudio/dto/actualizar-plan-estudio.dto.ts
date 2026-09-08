@@ -1,6 +1,17 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { GradoAcademico } from '../../carreras/constants/grado-academico.constant';
 
 export class ActualizarPlanEstudioDto {
+  @IsOptional()
+  @IsEnum(GradoAcademico)
+  grado?: GradoAcademico;
+
   @IsOptional()
   @IsString()
   @MinLength(1)
