@@ -7,14 +7,6 @@ describe('PlanImportacionController', () => {
   let service: { validar: jest.Mock; importar: jest.Mock };
 
   const dto: ValidarImportacionPlanDto = {
-    bloques: [
-      {
-        CODIGO: 'TC',
-        NOMBRE: 'Tronco común',
-        TIPO: 'TRONCO_COMUN',
-        ORDEN: '1',
-      },
-    ],
     asignaturas: [],
     requisitos: [],
     salidas: [],
@@ -39,7 +31,6 @@ describe('PlanImportacionController', () => {
       totalErrores: 0,
       totalAdvertencias: 0,
       resumen: {
-        bloques: 1,
         asignaturas: 0,
         requisitos: 0,
         salidas: 0,
@@ -62,7 +53,6 @@ describe('PlanImportacionController', () => {
       ok: true,
       message: 'El plan de estudio fue importado correctamente.',
       resumen: {
-        bloques: 1,
         asignaturas: 0,
         requisitos: 0,
         salidas: 0,

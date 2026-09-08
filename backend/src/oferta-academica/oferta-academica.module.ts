@@ -4,6 +4,6 @@ import { OfertaAcademicaService } from './oferta-academica.service';
 
 @Module({
   controllers: [OfertaAcademicaController],
-  providers: [OfertaAcademicaService]
+  providers: [OfertaAcademicaService],
 })
 export class OfertaAcademicaModule {}

@@ -11,7 +11,6 @@ import {
 } from 'typeorm';
 import { Curso } from '../../cursos/entities/curso.entity';
 import { TipoPlanAsignatura } from '../constants/tipo-plan-asignatura.constant';
-import { BloquePlan } from './bloque-plan.entity';
 import { PlanEstudio } from './plan-estudio.entity';
 
 const decimalNumberTransformer: ValueTransformer = {
@@ -47,14 +46,6 @@ export class PlanAsignatura {
     nullable: true,
   })
   cursoId!: number | null;
-
-  @Column({
-    name: 'bloque_id',
-    type: 'int',
-    unsigned: true,
-    nullable: true,
-  })
-  bloqueId!: number | null;
 
   @Column({
     type: 'smallint',
@@ -193,14 +184,6 @@ export class PlanAsignatura {
   })
   @JoinColumn({ name: 'plan_estudio_id' })
   planEstudio!: PlanEstudio;
-
-  @ManyToOne(() => BloquePlan, {
-    nullable: true,
-    onDelete: 'RESTRICT',
-    onUpdate: 'CASCADE',
-  })
-  @JoinColumn({ name: 'bloque_id' })
-  bloque!: BloquePlan | null;
 
   @ManyToOne(() => Curso, {
     nullable: true,

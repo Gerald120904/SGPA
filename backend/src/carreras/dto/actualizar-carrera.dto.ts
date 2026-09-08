@@ -1,11 +1,4 @@
-import {
-  IsEnum,
-  IsOptional,
-  IsString,
-  MaxLength,
-  MinLength,
-} from 'class-validator';
-import { GradoAcademico } from '../constants/grado-academico.constant';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class ActualizarCarreraDto {
   @IsOptional()
@@ -19,10 +12,6 @@ export class ActualizarCarreraDto {
   @MinLength(1)
   @MaxLength(150)
   nombre?: string;
-
-  @IsOptional()
-  @IsEnum(GradoAcademico)
-  grado?: GradoAcademico;
 
   @IsOptional()
   @IsString()

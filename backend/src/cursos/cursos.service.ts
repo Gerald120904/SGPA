@@ -5,11 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
+import { CursoOptativo } from '../optativas/entities/curso-optativo.entity';
+import { TipoPlanAsignatura } from '../planes-estudio/constants/tipo-plan-asignatura.constant';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { ActualizarCursoDto } from './dto/actualizar-curso.dto';
 import { CrearCursoDto } from './dto/crear-curso.dto';
 import { ListarAsignaturasDisponiblesDto } from './dto/listar-asignaturas-disponibles.dto';
+import { CursoRequisito } from './entities/curso-requisito.entity';
 import { Curso } from './entities/curso.entity';
 
 @Injectable()
@@ -17,8 +20,13 @@ export class CursosService {
   constructor(
     @InjectRepository(Curso)
     private readonly cursoRepository: Repository<Curso>,
+    @InjectRepository(CursoRequisito)
+    private readonly cursoRequisitoRepository: Repository<CursoRequisito>,
+    @InjectRepository(CursoOptativo)
+    private readonly optativaRepository: Repository<CursoOptativo>,
     @InjectRepository(PlanAsignatura)
     private readonly planAsignaturaRepository: Repository<PlanAsignatura>,
+    private readonly dataSource: DataSource,
   ) {}
 
   private async obtenerAsignaturaFuente(
@@ -60,6 +68,15 @@ export class CursosService {
       );
     }
 
+    if (
+      asignatura.tipo === TipoPlanAsignatura.OPTATIVA ||
+      asignatura.tipo === TipoPlanAsignatura.GENERAL
+    ) {
+      throw new BadRequestException(
+        'Las asignaturas optativas y generales del plan representan espacios curriculares y no pueden convertirse directamente en cursos.',
+      );
+    }
+
     if (asignatura.cursoId !== null) {
       throw new ConflictException(
         'Esta asignatura del plan ya está vinculada a un curso.',
@@ -94,6 +111,56 @@ export class CursosService {
     }
 
     return curso;
+  }
+
+  private async validarPuedeDesactivarse(cursoId: number): Promise<void> {
+    const [
+      asignaturasActivas,
+      optativaActiva,
+      usadoComoCurso,
+      usadoComoRequisito,
+    ] = await Promise.all([
+      this.planAsignaturaRepository.count({
+        where: {
+          cursoId,
+          activo: true,
+        },
+      }),
+      this.optativaRepository.count({
+        where: {
+          cursoId,
+          activo: true,
+        },
+      }),
+      this.cursoRequisitoRepository.count({
+        where: {
+          cursoId,
+        },
+      }),
+      this.cursoRequisitoRepository.count({
+        where: {
+          requisitoCursoId: cursoId,
+        },
+      }),
+    ]);
+
+    if (asignaturasActivas > 0) {
+      throw new BadRequestException(
+        'No se puede desactivar el curso porque está vinculado a asignaturas activas de uno o más planes de estudio.',
+      );
+    }
+
+    if (optativaActiva > 0) {
+      throw new BadRequestException(
+        'No se puede desactivar el curso mientras esté activo en el catálogo de optativas.',
+      );
+    }
+
+    if (usadoComoCurso > 0 || usadoComoRequisito > 0) {
+      throw new BadRequestException(
+        'No se puede desactivar el curso porque participa en relaciones de requisitos o correquisitos.',
+      );
+    }
   }
 
   private relanzarErrorPersistencia(error: unknown): never {
@@ -131,6 +198,9 @@ export class CursosService {
       where: {
         activo: true,
         cursoId: IsNull(),
+        tipo: Not(
+          In([TipoPlanAsignatura.OPTATIVA, TipoPlanAsignatura.GENERAL]),
+        ),
         ...(filtros.planId !== undefined
           ? {
               planEstudioId: filtros.planId,
@@ -159,7 +229,6 @@ export class CursosService {
         planEstudio: {
           carrera: true,
         },
-        bloque: true,
       },
       order: {
         nivel: 'ASC',
@@ -174,67 +243,85 @@ export class CursosService {
   }
 
   async crear(dto: CrearCursoDto): Promise<Curso> {
-    const asignatura = await this.obtenerAsignaturaFuente(
+    const asignaturaFuente = await this.obtenerAsignaturaFuente(
       dto.planAsignaturaId,
     );
 
-    const codigo = asignatura.codigoReferencia!.trim().toUpperCase();
-    const nombre = asignatura.nombreReferencia!.trim();
+    const codigo = asignaturaFuente.codigoReferencia!.trim().toUpperCase();
+    const nombre = asignaturaFuente.nombreReferencia!.trim();
     const descripcion = dto.descripcion?.trim() || null;
-    const carrera = asignatura.planEstudio.carrera;
+    const carrera = asignaturaFuente.planEstudio.carrera;
 
-    let curso = await this.cursoRepository.findOne({
-      where: {
-        codigo,
-      },
-      relations: {
-        carreras: true,
-      },
-    });
+    return this.dataSource.transaction(async (manager) => {
+      const cursoRepo = manager.getRepository(Curso);
+      const asignaturaRepo = manager.getRepository(PlanAsignatura);
 
-    if (curso) {
-      if (curso.nombre.trim().toLowerCase() !== nombre.toLowerCase()) {
-        throw new ConflictException(
-          `Ya existe el curso ${codigo}, pero tiene un nombre diferente.`,
-        );
-      }
-
-      if (!curso.activo) {
-        throw new BadRequestException(
-          'El curso correspondiente ya existe, pero se encuentra inactivo.',
-        );
-      }
-
-      const yaPerteneceCarrera = (curso.carreras ?? []).some(
-        (item) => item.id === carrera.id,
-      );
-
-      if (!yaPerteneceCarrera) {
-        curso.carreras = [...(curso.carreras ?? []), carrera];
-        curso = await this.cursoRepository.save(curso);
-      }
-    } else {
-      const nuevoCurso = this.cursoRepository.create({
-        codigo,
-        nombre,
-        descripcion,
-        activo: true,
-        carreras: [carrera],
+      let curso = await cursoRepo.findOne({
+        where: {
+          codigo,
+        },
+        relations: {
+          carreras: true,
+        },
       });
 
-      try {
-        curso = await this.cursoRepository.save(nuevoCurso);
-      } catch (error) {
-        this.relanzarErrorPersistencia(error);
+      if (curso) {
+        if (curso.nombre.trim().toLowerCase() !== nombre.toLowerCase()) {
+          throw new ConflictException(
+            `Ya existe el curso ${codigo}, pero tiene un nombre diferente.`,
+          );
+        }
+
+        if (!curso.activo) {
+          throw new BadRequestException(
+            'El curso correspondiente ya existe, pero se encuentra inactivo.',
+          );
+        }
+
+        const yaPerteneceCarrera = (curso.carreras ?? []).some(
+          (item) => item.id === carrera.id,
+        );
+
+        if (!yaPerteneceCarrera) {
+          curso.carreras = [...(curso.carreras ?? []), carrera];
+          curso = await cursoRepo.save(curso);
+        }
+      } else {
+        const nuevoCurso = cursoRepo.create({
+          codigo,
+          nombre,
+          descripcion,
+          activo: true,
+          carreras: [carrera],
+        });
+
+        try {
+          curso = await cursoRepo.save(nuevoCurso);
+        } catch (error) {
+          this.relanzarErrorPersistencia(error);
+        }
       }
-    }
 
-    asignatura.cursoId = curso.id;
-    asignatura.curso = curso;
+      const asignatura = await asignaturaRepo.findOne({
+        where: { id: dto.planAsignaturaId },
+      });
 
-    await this.planAsignaturaRepository.save(asignatura);
+      if (!asignatura) {
+        throw new NotFoundException(
+          'La asignatura seleccionada no existe en el plan de estudio.',
+        );
+      }
 
-    return this.obtenerEntidadPorId(curso.id);
+      asignatura.cursoId = curso.id;
+      asignatura.curso = curso;
+
+      await asignaturaRepo.save(asignatura);
+
+      return cursoRepo.findOneOrFail({
+        where: { id: curso.id },
+        relations: { carreras: true },
+      });
+    });
   }
 
   async actualizar(id: number, dto: ActualizarCursoDto): Promise<Curso> {
@@ -251,6 +338,10 @@ export class CursosService {
 
   async cambiarEstado(id: number, activo: boolean): Promise<Curso> {
     await this.obtenerEntidadPorId(id);
+
+    if (!activo) {
+      await this.validarPuedeDesactivarse(id);
+    }
 
     await this.cursoRepository.update(id, { activo });
 

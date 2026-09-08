@@ -42,7 +42,6 @@ describe('PlanRequisitosService', () => {
   ): PlanAsignatura => ({
     id,
     planEstudioId: 1,
-    bloqueId: null,
     cursoId: null,
     nivel: 1,
     ciclo: 1,
@@ -53,7 +52,6 @@ describe('PlanRequisitosService', () => {
     nombreReferencia: `Asignatura ${id}`,
     activo: true,
     planEstudio: plan,
-    bloque: null,
     curso: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),

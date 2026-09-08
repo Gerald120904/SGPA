@@ -126,6 +126,7 @@ export class PlanesEstudioService {
 
     const plan = this.planRepository.create({
       carreraId: dto.carreraId,
+      grado: dto.grado,
       codigo,
       nombre,
       descripcion,
@@ -145,6 +146,10 @@ export class PlanesEstudioService {
     dto: ActualizarPlanEstudioDto,
   ): Promise<PlanEstudio> {
     const plan = await this.obtenerEntidadPorId(id);
+
+    if (dto.grado !== undefined) {
+      plan.grado = dto.grado;
+    }
 
     if (dto.codigo !== undefined) {
       const codigo = dto.codigo.trim().toUpperCase();

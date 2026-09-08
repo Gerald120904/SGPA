@@ -88,15 +88,15 @@ export class UsuariosService {
   }
 
   private relanzarErrorPersistencia(error: unknown): never {
-    const codigo = (
-      error as {
-        code?: string;
-        driverError?: {
+    const codigo =
+      (
+        error as {
           code?: string;
-        };
-      }
-    )?.driverError?.code ??
-      (error as { code?: string })?.code;
+          driverError?: {
+            code?: string;
+          };
+        }
+      )?.driverError?.code ?? (error as { code?: string })?.code;
 
     if (codigo === 'ER_DUP_ENTRY') {
       throw new ConflictException(
@@ -241,17 +241,11 @@ export class UsuariosService {
     return this.obtenerPorId(id);
   }
 
-  async cambiarEstado(
-    id: number,
-    activo: boolean,
-    usuarioActualId: number,
-  ) {
+  async cambiarEstado(id: number, activo: boolean, usuarioActualId: number) {
     await this.obtenerEntidadPorId(id);
 
     if (id === usuarioActualId && !activo) {
-      throw new BadRequestException(
-        'No puede desactivar su propia cuenta.',
-      );
+      throw new BadRequestException('No puede desactivar su propia cuenta.');
     }
 
     await this.usuarioRepository.update(id, { activo });
@@ -297,11 +291,7 @@ export class UsuariosService {
     return this.obtenerPorId(id);
   }
 
-  async revocarRol(
-    id: number,
-    rolId: number,
-    usuarioActualId: number,
-  ) {
+  async revocarRol(id: number, rolId: number, usuarioActualId: number) {
     await this.obtenerEntidadPorId(id);
 
     const relacion = await this.usuarioRolRepository.findOne({

@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
-import { GradoAcademico } from './constants/grado-academico.constant';
 import { CarrerasService } from './carreras.service';
 import { Carrera } from './entities/carrera.entity';
 
@@ -23,7 +22,6 @@ describe('CarrerasService', () => {
     id: 1,
     codigo: 'EIF',
     nombre: 'Ingeniería en Sistemas de Información',
-    grado: GradoAcademico.BACHILLERATO,
     descripcion: 'Carrera de informática',
     activo: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -104,14 +102,12 @@ describe('CarrerasService', () => {
     const resultado = await service.crear({
       codigo: ' eif ',
       nombre: ' Ingeniería en Sistemas de Información ',
-      grado: GradoAcademico.BACHILLERATO,
       descripcion: ' Carrera de informática ',
     });
 
     expect(carreraRepository.create).toHaveBeenCalledWith({
       codigo: 'EIF',
       nombre: 'Ingeniería en Sistemas de Información',
-      grado: GradoAcademico.BACHILLERATO,
       descripcion: 'Carrera de informática',
       activo: true,
     });
@@ -126,7 +122,6 @@ describe('CarrerasService', () => {
       service.crear({
         codigo: 'EIF',
         nombre: 'Otra carrera',
-        grado: GradoAcademico.BACHILLERATO,
       }),
     ).rejects.toThrow(ConflictException);
 
@@ -142,7 +137,6 @@ describe('CarrerasService', () => {
       service.crear({
         codigo: 'OTR',
         nombre: 'Ingeniería en Sistemas de Información',
-        grado: GradoAcademico.BACHILLERATO,
       }),
     ).rejects.toThrow(ConflictException);
 
@@ -154,7 +148,6 @@ describe('CarrerasService', () => {
       service.crear({
         codigo: '   ',
         nombre: 'Carrera prueba',
-        grado: GradoAcademico.BACHILLERATO,
       }),
     ).rejects.toThrow(BadRequestException);
   });
@@ -174,13 +167,11 @@ describe('CarrerasService', () => {
     const resultado = await service.actualizar(1, {
       codigo: ' info ',
       nombre: ' Informática ',
-      grado: GradoAcademico.LICENCIATURA,
     });
 
     expect(carreraRepository.update).toHaveBeenCalledWith(1, {
       codigo: 'INFO',
       nombre: 'Informática',
-      grado: GradoAcademico.LICENCIATURA,
     });
 
     expect(resultado.codigo).toBe('INFO');

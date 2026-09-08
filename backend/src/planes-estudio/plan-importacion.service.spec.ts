@@ -3,9 +3,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
-import { TipoBloquePlan } from './constants/tipo-bloque-plan.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
@@ -14,7 +12,6 @@ import { PlanImportacionService } from './plan-importacion.service';
 describe('PlanImportacionService', () => {
   let service: PlanImportacionService;
   let planRepository: { findOne: jest.Mock };
-  let bloqueRepository: { count: jest.Mock };
   let asignaturaRepository: { count: jest.Mock };
   let salidaRepository: { count: jest.Mock };
   let dataSource: { transaction: jest.Mock };
@@ -27,27 +24,21 @@ describe('PlanImportacionService', () => {
     activo: true,
   } as PlanEstudio;
 
-  const bloque = {
-    CODIGO: 'TC',
-    NOMBRE: 'Tronco común',
-    TIPO: TipoBloquePlan.TRONCO_COMUN,
-    ORDEN: '1',
-  };
   const asignatura = (clave: string, orden = '1', cambios = {}) => ({
     CLAVE: clave,
     CODIGO: clave,
     NOMBRE: `Asignatura ${clave}`,
-    BLOQUE: 'TC',
     NIVEL: '1',
     CICLO: '1',
     ORDEN: orden,
     CREDITOS: '3',
-    TIPO: TipoPlanAsignatura.OPTATIVA,
+    TIPO: TipoPlanAsignatura.OBLIGATORIA,
     ...cambios,
   });
   const dto = (cambios = {}) => ({
-    bloques: [bloque],
-    asignaturas: [asignatura('OPT-01')],
+    asignaturas: [
+      asignatura('OPT-01', '1', { TIPO: TipoPlanAsignatura.OPTATIVA }),
+    ],
     requisitos: [],
     salidas: [],
     salidaAsignaturas: [],
@@ -56,13 +47,11 @@ describe('PlanImportacionService', () => {
 
   beforeEach(() => {
     planRepository = { findOne: jest.fn().mockResolvedValue(plan) };
-    bloqueRepository = { count: jest.fn().mockResolvedValue(0) };
     asignaturaRepository = { count: jest.fn().mockResolvedValue(0) };
     salidaRepository = { count: jest.fn().mockResolvedValue(0) };
     dataSource = { transaction: jest.fn() };
     service = new PlanImportacionService(
       planRepository as unknown as Repository<PlanEstudio>,
-      bloqueRepository as unknown as Repository<BloquePlan>,
       asignaturaRepository as unknown as Repository<PlanAsignatura>,
       salidaRepository as unknown as Repository<SalidaAcademica>,
       dataSource as unknown as DataSource,
@@ -94,7 +83,6 @@ describe('PlanImportacionService', () => {
       puedeImportar: true,
       totalErrores: 0,
       resumen: {
-        bloques: 1,
         asignaturas: 1,
         requisitos: 0,
         salidas: 0,
@@ -146,13 +134,19 @@ describe('PlanImportacionService', () => {
     );
   });
 
-  it('detecta códigos curriculares duplicados aunque las claves sean distintas', async () => {
+  it('detecta códigos curriculares duplicados para obligatorias aunque las claves sean distintas', async () => {
     const resultado = await service.validar(
       1,
       dto({
         asignaturas: [
-          asignatura('A01', '1', { CODIGO: 'EIF200' }),
-          asignatura('A02', '2', { CODIGO: 'eif200' }),
+          asignatura('A01', '1', {
+            CODIGO: 'EIF200',
+            TIPO: TipoPlanAsignatura.OBLIGATORIA,
+          }),
+          asignatura('A02', '2', {
+            CODIGO: 'eif200',
+            TIPO: TipoPlanAsignatura.OBLIGATORIA,
+          }),
         ],
       }),
     );
@@ -163,19 +157,50 @@ describe('PlanImportacionService', () => {
     );
   });
 
-  it('detecta bloques inexistentes y claves duplicadas', async () => {
+  it('permite códigos repetidos para asignaturas OPTATIVAS y GENERALES con distinta CLAVE', async () => {
     const resultado = await service.validar(
       1,
       dto({
         asignaturas: [
-          asignatura('OPT-01', '1', { BLOQUE: 'NO-EXISTE', __fila: 7 }),
-          asignatura('OPT-01', '2'),
+          asignatura('OPT-01', '1', {
+            CODIGO: 'OPT',
+            NOMBRE: 'Optativo I',
+            TIPO: TipoPlanAsignatura.OPTATIVA,
+          }),
+          asignatura('OPT-02', '2', {
+            CODIGO: 'OPT',
+            NOMBRE: 'Optativo II',
+            TIPO: TipoPlanAsignatura.OPTATIVA,
+          }),
+          asignatura('GEN-01', '3', {
+            CODIGO: 'EST GEN',
+            NOMBRE: 'Estudios Generales I',
+            TIPO: TipoPlanAsignatura.GENERAL,
+          }),
+          asignatura('GEN-02', '4', {
+            CODIGO: 'EST GEN',
+            NOMBRE: 'Estudios Generales II',
+            TIPO: TipoPlanAsignatura.GENERAL,
+          }),
+        ],
+      }),
+    );
+    expect(resultado.valido).toBe(true);
+    expect(resultado.errores).toEqual([]);
+  });
+
+  it('detecta claves de asignaturas duplicadas', async () => {
+    const resultado = await service.validar(
+      1,
+      dto({
+        asignaturas: [
+          asignatura('OPT-01', '1'),
+          asignatura('OPT-01', '2', { CODIGO: 'OPT-02' }),
         ],
       }),
     );
     expect(resultado.errores).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ codigo: 'BLOQUE_NO_EXISTE', fila: 7 }),
         expect.objectContaining({ codigo: 'CLAVE_ASIGNATURA_DUPLICADA' }),
       ]),
     );
@@ -205,7 +230,7 @@ describe('PlanImportacionService', () => {
   });
 
   it('rechaza importación completa sobre un plan que ya contiene información', async () => {
-    bloqueRepository.count.mockResolvedValue(1);
+    asignaturaRepository.count.mockResolvedValue(1);
     const resultado = await service.validar(1, dto());
     expect(resultado.puedeImportar).toBe(false);
     expect(resultado.errores).toEqual(
@@ -216,30 +241,27 @@ describe('PlanImportacionService', () => {
   });
 
   it('no inicia la transacción si la validación tiene errores', async () => {
-    jest
-      .spyOn(service, 'validar')
-      .mockResolvedValue({
-        valido: false,
-        puedeImportar: false,
-        totalErrores: 1,
-        totalAdvertencias: 0,
-        resumen: {
-          bloques: 0,
-          asignaturas: 0,
-          requisitos: 0,
-          salidas: 0,
-          asignacionesSalidas: 0,
+    jest.spyOn(service, 'validar').mockResolvedValue({
+      valido: false,
+      puedeImportar: false,
+      totalErrores: 1,
+      totalAdvertencias: 0,
+      resumen: {
+        asignaturas: 0,
+        requisitos: 0,
+        salidas: 0,
+        asignacionesSalidas: 0,
+      },
+      errores: [
+        {
+          nivel: 'ERROR',
+          codigo: 'PRUEBA',
+          hoja: 'PLAN',
+          mensaje: 'Error de prueba.',
         },
-        errores: [
-          {
-            nivel: 'ERROR',
-            codigo: 'PRUEBA',
-            hoja: 'PLAN',
-            mensaje: 'Error de prueba.',
-          },
-        ],
-        advertencias: [],
-      });
+      ],
+      advertencias: [],
+    });
     await expect(service.importar(1, dto())).rejects.toThrow(
       BadRequestException,
     );
@@ -253,7 +275,6 @@ describe('PlanImportacionService', () => {
       totalErrores: 0,
       totalAdvertencias: 0,
       resumen: {
-        bloques: 1,
         asignaturas: 2,
         requisitos: 1,
         salidas: 0,
@@ -265,16 +286,6 @@ describe('PlanImportacionService', () => {
 
     const planRepo = {
       findOne: jest.fn().mockResolvedValue(plan),
-    };
-    const bloqueRepo = {
-      count: jest.fn().mockResolvedValue(0),
-      create: jest.fn((datos) => datos),
-      save: jest.fn(async (datos) =>
-        datos.map((item: object, indice: number) => ({
-          id: indice + 10,
-          ...item,
-        })),
-      ),
     };
     const asignaturaRepo = {
       count: jest.fn().mockResolvedValue(0),
@@ -299,7 +310,6 @@ describe('PlanImportacionService', () => {
       getRepository: jest
         .fn()
         .mockReturnValueOnce(planRepo)
-        .mockReturnValueOnce(bloqueRepo)
         .mockReturnValueOnce(asignaturaRepo)
         .mockReturnValueOnce(requisitoRepo)
         .mockReturnValueOnce(salidaRepo),
@@ -366,28 +376,25 @@ describe('PlanImportacionService', () => {
     ]);
     expect(resultado).toMatchObject({
       ok: true,
-      resumen: { bloques: 1, asignaturas: 2, requisitos: 1 },
+      resumen: { asignaturas: 2, requisitos: 1 },
     });
   });
 
   it('maneja un fallo inesperado dentro de la transacción', async () => {
-    jest
-      .spyOn(service, 'validar')
-      .mockResolvedValue({
-        valido: true,
-        puedeImportar: true,
-        totalErrores: 0,
-        totalAdvertencias: 0,
-        resumen: {
-          bloques: 0,
-          asignaturas: 0,
-          requisitos: 0,
-          salidas: 0,
-          asignacionesSalidas: 0,
-        },
-        errores: [],
-        advertencias: [],
-      });
+    jest.spyOn(service, 'validar').mockResolvedValue({
+      valido: true,
+      puedeImportar: true,
+      totalErrores: 0,
+      totalAdvertencias: 0,
+      resumen: {
+        asignaturas: 0,
+        requisitos: 0,
+        salidas: 0,
+        asignacionesSalidas: 0,
+      },
+      errores: [],
+      advertencias: [],
+    });
     dataSource.transaction.mockRejectedValue(
       new Error('Fallo de base de datos'),
     );

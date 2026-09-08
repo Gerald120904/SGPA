@@ -14,12 +14,13 @@ import { PlanAsignatura } from './plan-asignatura.entity';
 import { PlanEstudio } from './plan-estudio.entity';
 
 export enum TipoSalidaAcademica {
-  DIPLOMADO = 'DIPLOMADO',
-  BACHILLERATO = 'BACHILLERATO',
-  LICENCIATURA = 'LICENCIATURA',
+  ENFASIS = 'ENFASIS',
+  SALIDA_LATERAL = 'SALIDA_LATERAL',
   CERTIFICADO = 'CERTIFICADO',
   OTRO = 'OTRO',
 }
+
+export const TIPOS_SALIDA_ACADEMICA = Object.values(TipoSalidaAcademica);
 
 @Entity({ name: 'salidas_academicas' })
 @Index('UQ_salidas_academicas_plan_codigo', ['planEstudioId', 'codigo'], {

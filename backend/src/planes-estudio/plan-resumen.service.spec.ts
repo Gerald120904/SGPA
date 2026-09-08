@@ -1,7 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
@@ -12,7 +11,6 @@ describe('PlanResumenService', () => {
   let service: PlanResumenService;
   const planRepository = { findOne: jest.fn() };
   const asignaturaRepository = { find: jest.fn() };
-  const bloqueRepository = { find: jest.fn() };
   const requisitoRepository = { find: jest.fn() };
   const salidaRepository = { find: jest.fn() };
 
@@ -21,7 +19,6 @@ describe('PlanResumenService', () => {
     service = new PlanResumenService(
       planRepository as unknown as Repository<PlanEstudio>,
       asignaturaRepository as unknown as Repository<PlanAsignatura>,
-      bloqueRepository as unknown as Repository<BloquePlan>,
       requisitoRepository as unknown as Repository<PlanRequisito>,
       salidaRepository as unknown as Repository<SalidaAcademica>,
     );
@@ -36,7 +33,6 @@ describe('PlanResumenService', () => {
     const activa1 = {
       id: 10,
       planEstudioId: 1,
-      bloqueId: 1,
       nivel: 1,
       ciclo: 1,
       orden: 1,
@@ -53,7 +49,6 @@ describe('PlanResumenService', () => {
     const activa2 = {
       id: 11,
       planEstudioId: 1,
-      bloqueId: 1,
       nivel: 1,
       ciclo: 1,
       orden: 2,
@@ -70,7 +65,6 @@ describe('PlanResumenService', () => {
     const inactiva = {
       id: 12,
       planEstudioId: 1,
-      bloqueId: null,
       nivel: 1,
       ciclo: 2,
       orden: 1,
@@ -85,16 +79,6 @@ describe('PlanResumenService', () => {
       carrera: { id: 1, codigo: 'INF', nombre: 'Informática' },
     });
     asignaturaRepository.find.mockResolvedValue([activa1, activa2, inactiva]);
-    bloqueRepository.find.mockResolvedValue([
-      {
-        id: 1,
-        codigo: 'TC',
-        nombre: 'Tronco común',
-        tipo: 'TRONCO_COMUN',
-        orden: 1,
-        activo: true,
-      },
-    ]);
     requisitoRepository.find.mockResolvedValue([
       { tipo: TipoRequisito.REQUISITO },
       { tipo: TipoRequisito.CORREQUISITO },
@@ -102,9 +86,9 @@ describe('PlanResumenService', () => {
     salidaRepository.find.mockResolvedValue([
       {
         id: 1,
-        codigo: 'DIP',
-        nombre: 'Diplomado',
-        tipo: 'DIPLOMADO',
+        codigo: 'ENF-SEG',
+        nombre: 'Énfasis en Ciberseguridad',
+        tipo: 'ENFASIS',
         activo: true,
         creditosRequeridos: 7,
         orden: 1,
@@ -118,7 +102,6 @@ describe('PlanResumenService', () => {
       total: 3,
       activas: 2,
       inactivas: 1,
-      sinBloque: 0,
     });
     expect(resultado.creditos.total).toBe(7);
     expect(resultado.horas).toEqual({

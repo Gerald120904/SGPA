@@ -6,6 +6,4 @@ export enum EstadoPeriodoAcademico {
   CANCELADO = 'CANCELADO',
 }
 
-export const ESTADOS_PERIODO_ACADEMICO = Object.values(
-  EstadoPeriodoAcademico,
-);
+export const ESTADOS_PERIODO_ACADEMICO = Object.values(EstadoPeriodoAcademico);

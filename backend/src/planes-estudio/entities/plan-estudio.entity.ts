@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Carrera } from '../../carreras/entities/carrera.entity';
+import { GradoAcademico } from '../../carreras/constants/grado-academico.constant';
 
 @Entity({ name: 'planes_estudio' })
 @Index('UQ_planes_estudio_carrera_codigo', ['carreraId', 'codigo'], {
@@ -27,6 +28,12 @@ export class PlanEstudio {
     unsigned: true,
   })
   carreraId!: number;
+
+  @Column({
+    type: 'varchar',
+    length: 30,
+  })
+  grado!: GradoAcademico;
 
   @Column({
     type: 'varchar',

@@ -12,11 +12,6 @@ import {
 import { TipoPlanAsignatura } from '../constants/tipo-plan-asignatura.constant';
 
 export class CrearPlanAsignaturaDto {
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  bloqueId?: number;
-
   @IsInt()
   @Min(1)
   @Max(20)

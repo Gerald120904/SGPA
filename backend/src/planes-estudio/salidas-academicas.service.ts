@@ -57,7 +57,6 @@ export class SalidasAcademicasService {
       relations: {
         asignaturas: {
           curso: true,
-          bloque: true,
         },
       },
     });
@@ -105,7 +104,6 @@ export class SalidasAcademicasService {
       },
       relations: {
         curso: true,
-        bloque: true,
       },
     });
 
@@ -150,7 +148,6 @@ export class SalidasAcademicasService {
       relations: {
         asignaturas: {
           curso: true,
-          bloque: true,
         },
       },
       order: {

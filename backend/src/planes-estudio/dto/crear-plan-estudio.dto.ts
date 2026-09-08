@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -6,11 +7,15 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { GradoAcademico } from '../../carreras/constants/grado-academico.constant';
 
 export class CrearPlanEstudioDto {
   @IsInt()
   @Min(1)
   carreraId!: number;
+
+  @IsEnum(GradoAcademico)
+  grado!: GradoAcademico;
 
   @IsString()
   @MinLength(1)

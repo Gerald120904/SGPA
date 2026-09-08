@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
@@ -15,8 +14,6 @@ export class PlanResumenService {
     private readonly planRepository: Repository<PlanEstudio>,
     @InjectRepository(PlanAsignatura)
     private readonly asignaturaRepository: Repository<PlanAsignatura>,
-    @InjectRepository(BloquePlan)
-    private readonly bloqueRepository: Repository<BloquePlan>,
     @InjectRepository(PlanRequisito)
     private readonly requisitoRepository: Repository<PlanRequisito>,
     @InjectRepository(SalidaAcademica)
@@ -40,13 +37,12 @@ export class PlanResumenService {
       throw new NotFoundException('El plan de estudio no existe.');
     }
 
-    const [asignaturas, bloques, requisitos, salidas] = await Promise.all([
+    const [asignaturas, requisitos, salidas] = await Promise.all([
       this.asignaturaRepository.find({
         where: { planEstudioId: planId },
-        relations: { curso: true, bloque: true },
+        relations: { curso: true },
         order: { nivel: 'ASC', ciclo: 'ASC', orden: 'ASC' },
       }),
-      this.bloqueRepository.find({ where: { planEstudioId: planId } }),
       this.requisitoRepository.find({
         where: { asignatura: { planEstudioId: planId } },
         relations: { asignatura: true },
@@ -91,7 +87,6 @@ export class PlanResumenService {
         total: asignaturas.length,
         activas: activas.length,
         inactivas: asignaturas.length - activas.length,
-        sinBloque: activas.filter((item) => item.bloqueId == null).length,
       },
       creditos: { total: this.sumar(activas, 'creditos') },
       horas: {
@@ -102,27 +97,6 @@ export class PlanResumenService {
         estudioIndependiente: this.sumar(activas, 'horasEstudioIndependiente'),
         totales: this.sumar(activas, 'horasTotales'),
         docente: this.sumar(activas, 'horasDocente'),
-      },
-      bloques: {
-        total: bloques.length,
-        activos: bloques.filter((item) => item.activo).length,
-        detalle: bloques
-          .slice()
-          .sort((a, b) => Number(a.orden) - Number(b.orden))
-          .map((bloque) => {
-            const materias = activas.filter(
-              (asignatura) => Number(asignatura.bloqueId) === Number(bloque.id),
-            );
-            return {
-              id: bloque.id,
-              codigo: bloque.codigo,
-              nombre: bloque.nombre,
-              tipo: bloque.tipo,
-              activo: bloque.activo,
-              cantidadAsignaturas: materias.length,
-              creditos: this.sumar(materias, 'creditos'),
-            };
-          }),
       },
       relaciones: {
         requisitos: requisitos.filter(

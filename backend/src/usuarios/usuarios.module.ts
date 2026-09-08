@@ -9,11 +9,7 @@ import { Rol } from '../roles/entities/rol.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Usuario,
-      UsuarioRol,
-      Rol,
-    ]),
+    TypeOrmModule.forFeature([Usuario, UsuarioRol, Rol]),
     SecurityModule,
   ],
   controllers: [UsuariosController],

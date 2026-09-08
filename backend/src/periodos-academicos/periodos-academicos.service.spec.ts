@@ -482,4 +482,72 @@ describe('PeriodosAcademicosService', () => {
       }),
     ).rejects.toThrow(ConflictException);
   });
+
+  it('rechaza abrir un segundo periodo EN_PREPARACION', async () => {
+    const periodoNuevo = crearPeriodo({
+      id: 2,
+      codigo: '2027-C2',
+      nombre: 'II Ciclo 2027',
+      ciclo: 2,
+      estado: EstadoPeriodoAcademico.BORRADOR,
+    });
+
+    const periodoYaAbierto = crearPeriodo({
+      id: 1,
+      codigo: '2027-C1',
+      nombre: 'I Ciclo 2027',
+      ciclo: 1,
+      estado: EstadoPeriodoAcademico.EN_PREPARACION,
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodoNuevo)
+      .mockResolvedValueOnce(periodoYaAbierto);
+
+    await expect(
+      service.cambiarEstado(2, EstadoPeriodoAcademico.EN_PREPARACION),
+    ).rejects.toThrow(ConflictException);
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('permite cambiar a EN_PREPARACION si no existe otro periodo abierto', async () => {
+    const periodo = crearPeriodo({
+      estado: EstadoPeriodoAcademico.BORRADOR,
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodo)
+      .mockResolvedValueOnce(null);
+
+    periodoRepository.save.mockImplementation(async (entidad) => entidad);
+
+    const resultado = await service.cambiarEstado(
+      1,
+      EstadoPeriodoAcademico.EN_PREPARACION,
+    );
+
+    expect(resultado.estado).toBe(EstadoPeriodoAcademico.EN_PREPARACION);
+
+    expect(periodoRepository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantiene EN_PREPARACION del mismo periodo sin buscar otro periodo', async () => {
+    const periodo = crearPeriodo({
+      estado: EstadoPeriodoAcademico.EN_PREPARACION,
+    });
+
+    periodoRepository.findOne.mockResolvedValue(periodo);
+
+    periodoRepository.save.mockImplementation(async (entidad) => entidad);
+
+    const resultado = await service.cambiarEstado(
+      1,
+      EstadoPeriodoAcademico.EN_PREPARACION,
+    );
+
+    expect(resultado.estado).toBe(EstadoPeriodoAcademico.EN_PREPARACION);
+
+    expect(periodoRepository.findOne).toHaveBeenCalledTimes(1);
+  });
 });

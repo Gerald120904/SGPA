@@ -7,8 +7,6 @@ import { DataSource, Repository } from 'typeorm';
 import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
-import { TipoBloquePlan } from './constants/tipo-bloque-plan.constant';
-import { BloquePlan } from './entities/bloque-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
@@ -23,7 +21,6 @@ describe('PlanAsignaturasService', () => {
     update: jest.Mock;
   };
   let planRepository: { findOne: jest.Mock };
-  let bloqueRepository: { findOne: jest.Mock };
   let transactionRepository: { save: jest.Mock };
   let dataSource: { transaction: jest.Mock };
 
@@ -31,7 +28,6 @@ describe('PlanAsignaturasService', () => {
     id: 1,
     codigo: 'EIF',
     nombre: 'Ingeniería en Sistemas',
-    grado: GradoAcademico.BACHILLERATO,
     descripcion: null,
     activo: true,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -41,6 +37,7 @@ describe('PlanAsignaturasService', () => {
   const plan = {
     id: 1,
     carreraId: 1,
+    grado: GradoAcademico.BACHILLERATO,
     codigo: 'BA-INFORM 2012-10',
     nombre: 'Plan de Bachillerato',
     descripcion: null,
@@ -55,7 +52,6 @@ describe('PlanAsignaturasService', () => {
   ): PlanAsignatura => ({
     id: 10,
     planEstudioId: 1,
-    bloqueId: null,
     cursoId: null,
     nivel: 1,
     ciclo: 1,
@@ -74,7 +70,6 @@ describe('PlanAsignaturasService', () => {
     nombreReferencia: 'Programación I',
     activo: true,
     planEstudio: plan,
-    bloque: null,
     curso: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -90,7 +85,6 @@ describe('PlanAsignaturasService', () => {
       update: jest.fn(),
     };
     planRepository = { findOne: jest.fn() };
-    bloqueRepository = { findOne: jest.fn() };
     transactionRepository = { save: jest.fn() };
     dataSource = {
       transaction: jest.fn(async (callback) =>
@@ -103,7 +97,6 @@ describe('PlanAsignaturasService', () => {
     service = new PlanAsignaturasService(
       asignaturaRepository as unknown as Repository<PlanAsignatura>,
       planRepository as unknown as Repository<PlanEstudio>,
-      bloqueRepository as unknown as Repository<BloquePlan>,
       dataSource as unknown as DataSource,
     );
   });
@@ -116,7 +109,7 @@ describe('PlanAsignaturasService', () => {
 
     expect(asignaturaRepository.find).toHaveBeenCalledWith({
       where: { planEstudioId: 1 },
-      relations: { curso: true, bloque: true },
+      relations: { curso: true },
       order: { nivel: 'ASC', ciclo: 'ASC', orden: 'ASC' },
     });
   });
@@ -164,8 +157,6 @@ describe('PlanAsignaturasService', () => {
     expect(asignaturaRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         planEstudioId: 1,
-        bloqueId: null,
-        bloque: null,
         cursoId: null,
         curso: null,
         codigoReferencia: 'EIF201',
@@ -175,9 +166,15 @@ describe('PlanAsignaturasService', () => {
     expect(resultado).toEqual(guardada);
   });
 
-  it('rechaza un código duplicado dentro del mismo plan', async () => {
+  it('rechaza un código duplicado para asignaturas OBLIGATORIAS dentro del mismo plan', async () => {
     planRepository.findOne.mockResolvedValue(plan);
-    asignaturaRepository.findOne.mockResolvedValue(crearAsignatura());
+    asignaturaRepository.findOne.mockResolvedValue(
+      crearAsignatura({
+        codigoReferencia: 'EIF200',
+        nombreReferencia: 'Fundamentos',
+        tipo: TipoPlanAsignatura.OBLIGATORIA,
+      }),
+    );
 
     await expect(
       service.crear(1, {
@@ -186,18 +183,116 @@ describe('PlanAsignaturasService', () => {
         orden: 2,
         creditos: 3,
         tipo: TipoPlanAsignatura.OBLIGATORIA,
-        codigoReferencia: ' eif201 ',
-        nombreReferencia: 'Programación avanzada',
+        codigoReferencia: ' EIF200 ',
+        nombreReferencia: 'Otro nombre',
       }),
     ).rejects.toThrow(ConflictException);
 
     expect(asignaturaRepository.findOne).toHaveBeenCalledWith({
       where: {
         planEstudioId: 1,
-        codigoReferencia: 'EIF201',
+        codigoReferencia: 'EIF200',
       },
     });
     expect(asignaturaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('permite crear múltiples asignaturas OPTATIVAS con el mismo código dentro del plan', async () => {
+    const opt1 = crearAsignatura({
+      id: 11,
+      codigoReferencia: 'OPT',
+      nombreReferencia: 'Optativo I',
+      tipo: TipoPlanAsignatura.OPTATIVA,
+    });
+    const opt2 = crearAsignatura({
+      id: 12,
+      codigoReferencia: 'OPT',
+      nombreReferencia: 'Optativo II',
+      tipo: TipoPlanAsignatura.OPTATIVA,
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne
+      .mockResolvedValueOnce(opt1)
+      .mockResolvedValueOnce(opt2);
+    asignaturaRepository.save
+      .mockResolvedValueOnce(opt1)
+      .mockResolvedValueOnce(opt2);
+
+    const res1 = await service.crear(1, {
+      nivel: 3,
+      ciclo: 1,
+      orden: 1,
+      creditos: 3,
+      tipo: TipoPlanAsignatura.OPTATIVA,
+      codigoReferencia: 'OPT',
+      nombreReferencia: 'Optativo I',
+    });
+
+    const res2 = await service.crear(1, {
+      nivel: 3,
+      ciclo: 2,
+      orden: 2,
+      creditos: 3,
+      tipo: TipoPlanAsignatura.OPTATIVA,
+      codigoReferencia: 'OPT',
+      nombreReferencia: 'Optativo II',
+    });
+
+    expect(res1.codigoReferencia).toBe('OPT');
+    expect(res2.codigoReferencia).toBe('OPT');
+    // findOne no debe haberse llamado para validar unicidad de OPTATIVA
+    expect(asignaturaRepository.findOne).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ codigoReferencia: 'OPT' }),
+      }),
+    );
+  });
+
+  it('permite crear múltiples asignaturas GENERALES con el mismo código dentro del plan', async () => {
+    const gen1 = crearAsignatura({
+      id: 21,
+      codigoReferencia: 'EST GEN',
+      nombreReferencia: 'Estudios Generales I',
+      tipo: TipoPlanAsignatura.GENERAL,
+    });
+    const gen2 = crearAsignatura({
+      id: 22,
+      codigoReferencia: 'EST GEN',
+      nombreReferencia: 'Estudios Generales II',
+      tipo: TipoPlanAsignatura.GENERAL,
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne
+      .mockResolvedValueOnce(gen1)
+      .mockResolvedValueOnce(gen2);
+    asignaturaRepository.save
+      .mockResolvedValueOnce(gen1)
+      .mockResolvedValueOnce(gen2);
+
+    const res1 = await service.crear(1, {
+      nivel: 1,
+      ciclo: 1,
+      orden: 1,
+      creditos: 3,
+      tipo: TipoPlanAsignatura.GENERAL,
+      codigoReferencia: 'EST GEN',
+      nombreReferencia: 'Estudios Generales I',
+    });
+
+    const res2 = await service.crear(1, {
+      nivel: 1,
+      ciclo: 2,
+      orden: 2,
+      creditos: 3,
+      tipo: TipoPlanAsignatura.GENERAL,
+      codigoReferencia: 'EST GEN',
+      nombreReferencia: 'Estudios Generales II',
+    });
+
+    expect(res1.codigoReferencia).toBe('EST GEN');
+    expect(res2.codigoReferencia).toBe('EST GEN');
   });
 
   it('guarda las horas académicas de la asignatura dentro del plan', async () => {
@@ -261,11 +356,12 @@ describe('PlanAsignaturasService', () => {
     ];
     planRepository.findOne.mockResolvedValue(plan);
     asignaturaRepository.findOne.mockResolvedValue(null);
-    transactionRepository.save.mockImplementation(async (asignaturas) =>
-      asignaturas.map((asignatura, index) => ({
-        ...asignatura,
-        id: 100 + index,
-      })),
+    transactionRepository.save.mockImplementation(
+      async (asignaturas: PlanAsignatura[]) =>
+        asignaturas.map((asignatura: PlanAsignatura, index: number) => ({
+          ...asignatura,
+          id: 100 + index,
+        })),
     );
     asignaturaRepository.find.mockResolvedValue(guardadas);
 
@@ -310,7 +406,7 @@ describe('PlanAsignaturasService', () => {
         { id: 100, planEstudioId: 1 },
         { id: 101, planEstudioId: 1 },
       ],
-      relations: { curso: true, bloque: true },
+      relations: { curso: true },
       order: { nivel: 'ASC', ciclo: 'ASC', orden: 'ASC' },
     });
     expect(resultado).toEqual({
@@ -385,78 +481,6 @@ describe('PlanAsignaturasService', () => {
     expect(transactionRepository.save).not.toHaveBeenCalled();
   });
 
-  it('crea una asignatura dentro de un bloque del mismo plan', async () => {
-    const bloque = {
-      id: 5,
-      planEstudioId: 1,
-      codigo: 'TC',
-      nombre: 'Tronco común',
-      tipo: TipoBloquePlan.TRONCO_COMUN,
-      orden: 1,
-      descripcion: null,
-      activo: true,
-      planEstudio: plan,
-      createdAt: new Date('2026-01-01T00:00:00.000Z'),
-      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
-    } as BloquePlan;
-    const guardada = crearAsignatura({
-      bloqueId: 5,
-      bloque,
-    });
-    planRepository.findOne.mockResolvedValue(plan);
-    bloqueRepository.findOne.mockResolvedValue(bloque);
-    asignaturaRepository.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(guardada);
-    asignaturaRepository.save.mockResolvedValue({ id: 10 });
-
-    const resultado = await service.crear(1, {
-      bloqueId: 5,
-      nivel: 1,
-      ciclo: 1,
-      orden: 1,
-      creditos: 3,
-      tipo: TipoPlanAsignatura.OBLIGATORIA,
-      codigoReferencia: 'EIF201',
-      nombreReferencia: 'Programación I',
-    });
-
-    expect(bloqueRepository.findOne).toHaveBeenCalledWith({
-      where: {
-        id: 5,
-        planEstudioId: 1,
-      },
-    });
-    expect(asignaturaRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        planEstudioId: 1,
-        bloqueId: 5,
-        bloque,
-      }),
-    );
-    expect(resultado.bloqueId).toBe(5);
-  });
-
-  it('rechaza un bloque que no pertenece al plan', async () => {
-    planRepository.findOne.mockResolvedValue(plan);
-    bloqueRepository.findOne.mockResolvedValue(null);
-
-    await expect(
-      service.crear(1, {
-        bloqueId: 999,
-        nivel: 1,
-        ciclo: 1,
-        orden: 1,
-        creditos: 3,
-        tipo: TipoPlanAsignatura.OBLIGATORIA,
-        codigoReferencia: 'EIF201',
-        nombreReferencia: 'Programación I',
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(asignaturaRepository.save).not.toHaveBeenCalled();
-  });
-
   it('crea un espacio curricular sin curso', async () => {
     const optativa = crearAsignatura({
       cursoId: null,
@@ -466,10 +490,8 @@ describe('PlanAsignaturasService', () => {
       nombreReferencia: 'Optativa',
     });
     planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne.mockResolvedValueOnce(optativa);
     asignaturaRepository.save.mockResolvedValue(optativa);
-    asignaturaRepository.findOne
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(optativa);
 
     const resultado = await service.crear(1, {
       nivel: 4,
@@ -564,7 +586,7 @@ describe('PlanAsignaturasService', () => {
 
     await expect(
       service.actualizar(1, 10, { codigoReferencia: '   ' }),
-    ).rejects.toThrow('El código de la asignatura no puede estar vacío.');
+    ).rejects.toThrow('La asignatura debe tener un código.');
   });
 
   it('exige nombre al actualizar una asignatura', async () => {
@@ -574,6 +596,166 @@ describe('PlanAsignaturasService', () => {
     await expect(
       service.actualizar(1, 10, { nombreReferencia: '   ' }),
     ).rejects.toThrow('El nombre de la asignatura no puede estar vacío.');
+  });
+
+  it('permite cambiar código y nombre a una materia SIN curso', async () => {
+    const asignaturaSinCurso = crearAsignatura({
+      cursoId: null,
+      codigoReferencia: 'EIF201',
+      nombreReferencia: 'Programación I',
+    });
+    const asignaturaActualizada = crearAsignatura({
+      cursoId: null,
+      codigoReferencia: 'EIF201-REV',
+      nombreReferencia: 'Programación I Revisada',
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne
+      .mockResolvedValueOnce(asignaturaSinCurso)
+      .mockResolvedValueOnce(null) // validarCodigoDuplicado
+      .mockResolvedValueOnce(asignaturaActualizada);
+    asignaturaRepository.save.mockResolvedValue(asignaturaActualizada);
+
+    const resultado = await service.actualizar(1, 10, {
+      codigoReferencia: 'EIF201-REV',
+      nombreReferencia: 'Programación I Revisada',
+    });
+
+    expect(asignaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codigoReferencia: 'EIF201-REV',
+        nombreReferencia: 'Programación I Revisada',
+      }),
+    );
+    expect(resultado.codigoReferencia).toBe('EIF201-REV');
+    expect(resultado.nombreReferencia).toBe('Programación I Revisada');
+  });
+
+  it('rechaza cambiar el código a una materia CON curso vinculado', async () => {
+    const asignaturaConCurso = crearAsignatura({
+      cursoId: 8,
+      codigoReferencia: 'EIF203',
+      nombreReferencia: 'Estructuras Discretas',
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne.mockResolvedValue(asignaturaConCurso);
+
+    await expect(
+      service.actualizar(1, 10, {
+        codigoReferencia: 'EIF999',
+      }),
+    ).rejects.toThrow(
+      new ConflictException(
+        'No se puede modificar el código o nombre de una asignatura que ya está vinculada al catálogo de cursos.',
+      ),
+    );
+
+    expect(asignaturaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza cambiar el nombre a una materia CON curso vinculado', async () => {
+    const asignaturaConCurso = crearAsignatura({
+      cursoId: 8,
+      codigoReferencia: 'EIF203',
+      nombreReferencia: 'Estructuras Discretas',
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne.mockResolvedValue(asignaturaConCurso);
+
+    await expect(
+      service.actualizar(1, 10, {
+        nombreReferencia: 'Matemática X',
+      }),
+    ).rejects.toThrow(
+      new ConflictException(
+        'No se puede modificar el código o nombre de una asignatura que ya está vinculada al catálogo de cursos.',
+      ),
+    );
+
+    expect(asignaturaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('permite cambiar ciclo, créditos y horas a una materia CON curso vinculado', async () => {
+    const asignaturaConCurso = crearAsignatura({
+      cursoId: 8,
+      codigoReferencia: 'EIF203',
+      nombreReferencia: 'Estructuras Discretas',
+      ciclo: 1,
+      creditos: 3,
+      horasTeoria: 2,
+      horasPractica: 2,
+    });
+    const asignaturaActualizada = crearAsignatura({
+      cursoId: 8,
+      codigoReferencia: 'EIF203',
+      nombreReferencia: 'Estructuras Discretas',
+      ciclo: 2,
+      creditos: 4,
+      horasTeoria: 3,
+      horasPractica: 2,
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne
+      .mockResolvedValueOnce(asignaturaConCurso)
+      .mockResolvedValueOnce(asignaturaActualizada);
+    asignaturaRepository.save.mockResolvedValue(asignaturaActualizada);
+
+    const resultado = await service.actualizar(1, 10, {
+      ciclo: 2,
+      creditos: 4,
+      horasTeoria: 3,
+      horasPractica: 2,
+    });
+
+    expect(asignaturaRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cursoId: 8,
+        ciclo: 2,
+        creditos: 4,
+        horasTeoria: 3,
+        horasPractica: 2,
+        codigoReferencia: 'EIF203',
+        nombreReferencia: 'Estructuras Discretas',
+      }),
+    );
+    expect(resultado.ciclo).toBe(2);
+    expect(resultado.creditos).toBe(4);
+  });
+
+  it('permite crear una asignatura GENERAL', async () => {
+    const general = crearAsignatura({
+      cursoId: null,
+      curso: null,
+      tipo: TipoPlanAsignatura.GENERAL,
+      codigoReferencia: 'HUM101',
+      nombreReferencia: 'Arte y Humanidades',
+    });
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne.mockResolvedValueOnce(general);
+    asignaturaRepository.save.mockResolvedValue(general);
+
+    const resultado = await service.crear(1, {
+      nivel: 1,
+      ciclo: 1,
+      orden: 1,
+      creditos: 2,
+      tipo: TipoPlanAsignatura.GENERAL,
+      codigoReferencia: 'HUM101',
+      nombreReferencia: 'Arte y Humanidades',
+    });
+
+    expect(asignaturaRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tipo: TipoPlanAsignatura.GENERAL,
+        codigoReferencia: 'HUM101',
+        nombreReferencia: 'Arte y Humanidades',
+      }),
+    );
+    expect(resultado.tipo).toBe(TipoPlanAsignatura.GENERAL);
   });
 
   it('cambia el estado de una asignatura dentro de un plan activo', async () => {

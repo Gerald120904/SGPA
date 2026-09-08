@@ -1,5 +1,6 @@
 export enum TipoPlanAsignatura {
   OBLIGATORIA = 'OBLIGATORIA',
+  GENERAL = 'GENERAL',
   OPTATIVA = 'OPTATIVA',
   OTRA = 'OTRA',
 }
