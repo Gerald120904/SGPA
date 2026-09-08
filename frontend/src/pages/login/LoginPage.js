@@ -321,12 +321,6 @@ export function LoginPage() {
                 class="recovery-reset-section hidden"
               >
 
-                <div
-                  id="developmentCode"
-                  class="development-code hidden"
-                ></div>
-
-
                 <form
                   id="resetPasswordForm"
                   class="recovery-form"
@@ -568,11 +562,6 @@ export function iniciarLoginPage({
       'recoverySuccess'
     );
 
-  const developmentCode =
-    document.getElementById(
-      'developmentCode'
-    );
-
   const resetPasswordForm =
     document.getElementById(
       'resetPasswordForm'
@@ -724,10 +713,6 @@ export function iniciarLoginPage({
       'hidden'
     );
 
-    developmentCode.classList.add(
-      'hidden'
-    );
-
     ocultarErrorRecuperacion(
       recoveryRequestError
     );
@@ -781,10 +766,6 @@ export function iniciarLoginPage({
     );
 
     recoverySuccess.classList.add(
-      'hidden'
-    );
-
-    developmentCode.classList.add(
       'hidden'
     );
 
@@ -994,10 +975,6 @@ export function iniciarLoginPage({
         'hidden'
       );
 
-      developmentCode.classList.add(
-        'hidden'
-      );
-
       const correo =
         recoveryEmail.value.trim();
 
@@ -1047,24 +1024,11 @@ export function iniciarLoginPage({
 
         recoveryMessage.textContent =
           resultado.message ||
-          'Si el correo está registrado, se generó un código de recuperación.';
+          'Si el correo está registrado, recibirás un código de recuperación.';
 
         recoveryMessage.classList.remove(
           'hidden'
         );
-
-        if (
-          resultado.codigoDesarrollo
-        ) {
-
-          developmentCode.textContent =
-            `Código temporal de desarrollo: ${resultado.codigoDesarrollo}`;
-
-          developmentCode.classList.remove(
-            'hidden'
-          );
-
-        }
 
         recoveryCode.focus();
 
@@ -1197,10 +1161,6 @@ export function iniciarLoginPage({
         );
 
         recoveryMessage.classList.add(
-          'hidden'
-        );
-
-        developmentCode.classList.add(
           'hidden'
         );
 

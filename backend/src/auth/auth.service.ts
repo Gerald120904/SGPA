@@ -10,6 +10,7 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
 import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
+import { MailService } from '../mail/mail.service';
 import {
   RolSistema,
   ROLES_SISTEMA,
@@ -20,6 +21,7 @@ export class AuthService {
   constructor(
     private readonly usuariosService: UsuariosService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   private obtenerRolesValidos(
@@ -104,9 +106,13 @@ export class AuthService {
   async solicitarRecuperacion(dto: SolicitarRecuperacionDto) {
     const correo = dto.correo.trim().toLowerCase();
     const usuario = await this.usuariosService.buscarPorCorreo(correo);
+    const mensaje = {
+      message:
+        'Si el correo está registrado, recibirás un código de recuperación.',
+    };
 
     if (!usuario || !usuario.activo) {
-      throw new BadRequestException('No existe un usuario activo con ese correo');
+      return mensaje;
     }
 
     const codigo = randomInt(100000, 1000000).toString();
@@ -119,12 +125,13 @@ export class AuthService {
       expiresAt,
     );
 
-    return {
-      message: 'Se generó un código de recuperación válido durante 15 minutos.',
-      ...(process.env.NODE_ENV !== 'production'
-        ? { codigoDesarrollo: codigo }
-        : {}),
-    };
+    await this.mailService.enviarCodigoRecuperacion(
+      usuario.correo,
+      usuario.nombres,
+      codigo,
+    );
+
+    return mensaje;
   }
 
   async restablecerPassword(dto: RestablecerPasswordDto) {

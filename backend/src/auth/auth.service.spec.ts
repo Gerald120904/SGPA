@@ -5,6 +5,7 @@ import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { AuthService } from './auth.service';
 import { UsuariosService } from '../usuarios/usuarios.service';
+import { MailService } from '../mail/mail.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -22,12 +23,17 @@ describe('AuthService', () => {
     signAsync: jest.fn(),
   };
 
+  const mailService = {
+    enviarCodigoRecuperacion: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: UsuariosService, useValue: usuariosService },
         { provide: JwtService, useValue: jwtService },
+        { provide: MailService, useValue: mailService },
       ],
     }).compile();
 
@@ -163,6 +169,8 @@ describe('AuthService', () => {
   it('should generate and store a six-digit recovery code hash', async () => {
     usuariosService.buscarPorCorreo.mockResolvedValue({
       id: 1,
+      correo: 'admin@una.ac.cr',
+      nombres: 'Administrador',
       activo: true,
     });
 
@@ -175,10 +183,23 @@ describe('AuthService', () => {
     expect(usuariosService.buscarPorCorreo).toHaveBeenCalledWith(
       'admin@una.ac.cr',
     );
-    expect(result.codigoDesarrollo).toMatch(/^\d{6}$/);
+    expect(result).toEqual({
+      message:
+        'Si el correo está registrado, recibirás un código de recuperación.',
+    });
+
+    const codigoEnviado = mailService.enviarCodigoRecuperacion.mock
+      .calls[0][2] as string;
+
+    expect(codigoEnviado).toMatch(/^\d{6}$/);
+    expect(mailService.enviarCodigoRecuperacion).toHaveBeenCalledWith(
+      'admin@una.ac.cr',
+      'Administrador',
+      codigoEnviado,
+    );
 
     const expectedHash = createHash('sha256')
-      .update(result.codigoDesarrollo)
+      .update(codigoEnviado)
       .digest('hex');
     const [, storedHash, expiresAt] =
       usuariosService.guardarRecuperacionPassword.mock.calls[0] as [
@@ -192,23 +213,21 @@ describe('AuthService', () => {
     expect(expiresAt.getTime()).toBeLessThanOrEqual(after + 15 * 60 * 1000);
   });
 
-  it('should not expose the recovery code in production', async () => {
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
-    usuariosService.buscarPorCorreo.mockResolvedValue({
-      id: 1,
-      activo: true,
+  it('should return the generic response without revealing an unknown email', async () => {
+    usuariosService.buscarPorCorreo.mockResolvedValue(null);
+
+    const result = await service.solicitarRecuperacion({
+      correo: 'desconocido@una.ac.cr',
     });
 
-    try {
-      const result = await service.solicitarRecuperacion({
-        correo: 'admin@una.ac.cr',
-      });
-
-      expect(result).not.toHaveProperty('codigoDesarrollo');
-    } finally {
-      process.env.NODE_ENV = previousNodeEnv;
-    }
+    expect(result).toEqual({
+      message:
+        'Si el correo está registrado, recibirás un código de recuperación.',
+    });
+    expect(
+      usuariosService.guardarRecuperacionPassword,
+    ).not.toHaveBeenCalled();
+    expect(mailService.enviarCodigoRecuperacion).not.toHaveBeenCalled();
   });
 
   it('should hash the new password and invalidate the recovery code', async () => {
