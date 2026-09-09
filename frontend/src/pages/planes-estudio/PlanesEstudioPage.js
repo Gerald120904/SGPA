@@ -1,3 +1,4 @@
+
 import {
   actualizarPlanEstudio,
   cambiarEstadoPlanEstudio,
@@ -18,12 +19,6 @@ import {
   listarPlanRequisitos,
 } from "../../services/plan-requisitos.service.js";
 import {
-  actualizarBloquePlan,
-  cambiarEstadoBloquePlan,
-  crearBloquePlan,
-  listarBloquesPlan,
-} from "../../services/bloques-plan.service.js";
-import {
   actualizarSalidaAcademica,
   cambiarEstadoSalidaAcademica,
   crearSalidaAcademica,
@@ -33,6 +28,11 @@ import {
 import { listarCarreras } from "../../services/carreras.service.js";
 import { obtenerResumenPlan } from "../../services/plan-resumen.service.js";
 import { validarPlanEstudio } from "../../services/plan-validaciones.service.js";
+import {
+  eliminarReglaOptativasPlan,
+  guardarReglaOptativasPlan,
+  obtenerReglaOptativasPlan,
+} from "../../services/plan-reglas-optativas.service.js";
 import {
   ejecutarImportacionPlanCompleta,
   guardarPlantillaExcelPlan,
@@ -55,13 +55,15 @@ let carrerasDisponibles = [];
 let asignaturasPlan = [];
 let filasRequisitosRapidos = [];
 let requisitosPlan = [];
-let bloquesPlan = [];
 let salidasAcademicas = [];
 let resumenPlan = null;
+let reglaOptativasPlan = {
+  regla: null,
+  cantidadEspaciosOptativos: 0,
+};
 let planSeleccionado = null;
 let instanciaActual = 0;
 let vistaDetallePlan = "LISTA";
-let filtroBloquePlan = "";
 let observerMalla = null;
 let nivelPaginaPlan = 1;
 let detalleEventosController = null;
@@ -382,184 +384,466 @@ async function cargarDatos(instancia) {
 }
 
 function abrirFormulario(plan = null) {
-  const dialog = document.getElementById("planDialog");
-  const content = document.getElementById("planDialogContent");
+  const dialog =
+    document.getElementById(
+      "planDialog"
+    );
+
+  const content =
+    document.getElementById(
+      "planDialogContent"
+    );
 
   if (!dialog || !content) {
     return;
   }
 
-  const editando = Boolean(plan);
+  const editando =
+    Boolean(plan);
 
-  const opcionesCarreras = carrerasDisponibles
-    .filter((carrera) => carrera.activo === true)
-    .map(
-      (carrera) => `
-        <option value="${carrera.id}">
-          ${escapeHtml(carrera.codigo)} - ${escapeHtml(carrera.nombre)}
-        </option>
-      `,
-    )
-    .join("");
-
-  const carreraField = editando
-    ? `
-        <label class="sgpa-form-wide">
-          <span>Carrera</span>
-          <input
-            type="text"
-            value="${escapeHtml(
-              `${plan.carrera?.codigo || ""} - ${plan.carrera?.nombre || ""}`,
-            )}"
-            disabled
+  const opcionesCarreras =
+    carrerasDisponibles
+      .filter(
+        (carrera) =>
+          carrera.activo === true
+      )
+      .map(
+        (carrera) => `
+          <option
+            value="${carrera.id}"
           >
-          <small class="sgpa-field-help">
-            La carrera de un plan no se puede cambiar después de crearlo.
-          </small>
-        </label>
-      `
-    : `
-        <label class="sgpa-form-wide">
-          <span>Carrera</span>
-          <select id="planCarrera" name="carreraId" required>
-            <option value="" selected disabled>
-              Seleccione una carrera...
-            </option>
-            ${opcionesCarreras}
-          </select>
-        </label>
-      `;
+            ${escapeHtml(carrera.codigo)}
+            -
+            ${escapeHtml(carrera.nombre)}
+          </option>
+        `
+      )
+      .join("");
+
+  const carreraField =
+    editando
+      ? `
+          <label class="sgpa-form-wide">
+
+            <span>
+              Carrera
+            </span>
+
+            <input
+              type="text"
+              value="${escapeHtml(
+                `${
+                  plan.carrera?.codigo || ""
+                } - ${
+                  plan.carrera?.nombre || ""
+                }`
+              )}"
+              disabled
+            >
+
+            <small class="sgpa-field-help">
+              La carrera de un plan no se puede
+              cambiar después de crearlo.
+            </small>
+
+          </label>
+        `
+      : `
+          <label class="sgpa-form-wide">
+
+            <span>
+              Carrera
+            </span>
+
+            <select
+              id="planCarrera"
+              name="carreraId"
+              required
+            >
+
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione una carrera...
+              </option>
+
+              ${opcionesCarreras}
+
+            </select>
+
+          </label>
+        `;
+
+  const grados = [
+    {
+      valor: "DIPLOMADO",
+      texto: "Diplomado"
+    },
+    {
+      valor: "BACHILLERATO",
+      texto: "Bachillerato"
+    },
+    {
+      valor: "LICENCIATURA",
+      texto: "Licenciatura"
+    },
+    {
+      valor: "MAESTRIA",
+      texto: "Maestría"
+    },
+    {
+      valor: "OTRO",
+      texto: "Otro"
+    }
+  ];
+
+  const opcionesGrados =
+    grados
+      .map(
+        (grado) => `
+          <option
+            value="${grado.valor}"
+            ${
+              plan?.grado === grado.valor
+                ? "selected"
+                : ""
+            }
+          >
+            ${grado.texto}
+          </option>
+        `
+      )
+      .join("");
 
   const body = `
     ${carreraField}
 
     <label>
-      <span>Código</span>
+
+      <span>
+        Grado académico
+      </span>
+
+      <select
+        id="planGrado"
+        name="grado"
+        required
+      >
+
+        <option
+          value=""
+          ${
+            !plan?.grado
+              ? "selected"
+              : ""
+          }
+          disabled
+        >
+          Seleccione un grado...
+        </option>
+
+        ${opcionesGrados}
+
+      </select>
+
+    </label>
+
+
+    <label>
+
+      <span>
+        Código
+      </span>
+
       <input
         id="planCodigo"
         name="codigo"
         type="text"
         maxlength="40"
-        value="${plan ? escapeHtml(plan.codigo) : ""}"
-        placeholder="Ej. BA-INFORM 2012-10"
+        value="${
+          plan
+            ? escapeHtml(plan.codigo)
+            : ""
+        }"
+        placeholder="Ej. BA-INFORM 2026"
         required
       >
+
     </label>
 
-    <label>
-      <span>Nombre</span>
+
+    <label class="sgpa-form-wide">
+
+      <span>
+        Nombre
+      </span>
+
       <input
         id="planNombre"
         name="nombre"
         type="text"
         maxlength="180"
-        value="${plan ? escapeHtml(plan.nombre) : ""}"
-        placeholder="Ej. Plan de Bachillerato 2012-10"
+        value="${
+          plan
+            ? escapeHtml(plan.nombre)
+            : ""
+        }"
+        placeholder="Ej. Plan de Bachillerato 2026"
         required
       >
+
     </label>
 
+
     <label class="sgpa-form-wide">
-      <span>Descripción</span>
+
+      <span>
+        Descripción
+      </span>
+
       <textarea
         id="planDescripcion"
         name="descripcion"
         maxlength="500"
         rows="4"
         placeholder="Descripción opcional del plan"
-      >${plan?.descripcion ? escapeHtml(plan.descripcion) : ""}</textarea>
+      >${
+        plan?.descripcion
+          ? escapeHtml(plan.descripcion)
+          : ""
+      }</textarea>
+
     </label>
   `;
 
-  content.innerHTML = FormDialog({
-    formId: "planForm",
-    title: editando ? "Editar plan de estudio" : "Nuevo plan de estudio",
-    description: editando
-      ? "Actualice la información general del plan de estudio."
-      : "Registre un nuevo plan asociado a una carrera existente.",
-    body,
-    errorId: "planFormError",
-    cancelButtonId: "cancelarPlanButton",
-    submitButtonId: "guardarPlanButton",
-    submitText: editando ? "Guardar cambios" : "Crear plan",
-  });
+  content.innerHTML =
+    FormDialog({
+      formId:
+        "planForm",
+
+      title:
+        editando
+          ? "Editar plan de estudio"
+          : "Nuevo plan de estudio",
+
+      description:
+        editando
+          ? "Actualice la información general del plan de estudio."
+          : "Registre un nuevo plan asociado a una carrera existente.",
+
+      body,
+
+      errorId:
+        "planFormError",
+
+      cancelButtonId:
+        "cancelarPlanButton",
+
+      submitButtonId:
+        "guardarPlanButton",
+
+      submitText:
+        editando
+          ? "Guardar cambios"
+          : "Crear plan"
+    });
 
   renderizarIconos();
+
   dialog.showModal();
-  habilitarCierreExterior(dialog);
 
-  const cerrar = () => dialog.close();
+  habilitarCierreExterior(
+    dialog
+  );
+
+  const cerrar = () => {
+    dialog.close();
+  };
 
   document
-    .getElementById("cancelarPlanButton")
-    ?.addEventListener("click", cerrar);
+    .getElementById(
+      "cancelarPlanButton"
+    )
+    ?.addEventListener(
+      "click",
+      cerrar
+    );
 
   document
-    .getElementById("planForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
+    .getElementById(
+      "planForm"
+    )
+    ?.addEventListener(
+      "submit",
+      async (event) => {
 
-      const errorBox = document.getElementById("planFormError");
-      const guardarButton = document.getElementById("guardarPlanButton");
-      const codigoInput = document.getElementById("planCodigo");
-      const nombreInput = document.getElementById("planNombre");
-      const descripcionInput = document.getElementById("planDescripcion");
+        event.preventDefault();
 
-      if (!guardarButton || !codigoInput || !nombreInput || !descripcionInput) {
-        return;
-      }
+        const errorBox =
+          document.getElementById(
+            "planFormError"
+          );
 
-      const datos = {
-        codigo: codigoInput.value.trim(),
-        nombre: nombreInput.value.trim(),
-        descripcion: descripcionInput.value.trim(),
-      };
+        const guardarButton =
+          document.getElementById(
+            "guardarPlanButton"
+          );
 
-      if (!editando) {
-        const carreraInput = document.getElementById("planCarrera");
+        const gradoInput =
+          document.getElementById(
+            "planGrado"
+          );
 
-        if (!carreraInput?.value) {
-          if (errorBox) {
-            errorBox.textContent = "Debe seleccionar una carrera.";
-            errorBox.classList.remove("hidden");
-          }
+        const codigoInput =
+          document.getElementById(
+            "planCodigo"
+          );
+
+        const nombreInput =
+          document.getElementById(
+            "planNombre"
+          );
+
+        const descripcionInput =
+          document.getElementById(
+            "planDescripcion"
+          );
+
+        if (
+          !guardarButton ||
+          !gradoInput ||
+          !codigoInput ||
+          !nombreInput ||
+          !descripcionInput
+        ) {
           return;
         }
 
-        datos.carreraId = Number(carreraInput.value);
-      }
+        if (!gradoInput.value) {
 
-      errorBox?.classList.add("hidden");
-      guardarButton.disabled = true;
+          if (errorBox) {
 
-      try {
-        const resultado = editando
-          ? await actualizarPlanEstudio(plan.id, datos)
-          : await crearPlanEstudio(datos);
+            errorBox.textContent =
+              "Debe seleccionar el grado académico del plan.";
 
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || "No fue posible guardar el plan de estudio.",
-          );
+            errorBox.classList.remove(
+              "hidden"
+            );
+
+          }
+
+          return;
         }
 
-        cerrar();
-        mostrarFeedback(
-          editando
-            ? "Plan actualizado correctamente."
-            : "Plan creado correctamente.",
+        const datos = {
+
+          grado:
+            gradoInput.value,
+
+          codigo:
+            codigoInput.value.trim(),
+
+          nombre:
+            nombreInput.value.trim(),
+
+          descripcion:
+            descripcionInput.value.trim()
+
+        };
+
+        if (!editando) {
+
+          const carreraInput =
+            document.getElementById(
+              "planCarrera"
+            );
+
+          if (!carreraInput?.value) {
+
+            if (errorBox) {
+
+              errorBox.textContent =
+                "Debe seleccionar una carrera.";
+
+              errorBox.classList.remove(
+                "hidden"
+              );
+
+            }
+
+            return;
+          }
+
+          datos.carreraId =
+            Number(
+              carreraInput.value
+            );
+        }
+
+        errorBox?.classList.add(
+          "hidden"
         );
-        await cargarDatos(instanciaActual);
-      } catch (error) {
-        if (errorBox) {
-          errorBox.textContent =
-            error?.message || "No fue posible guardar el plan de estudio.";
-          errorBox.classList.remove("hidden");
+
+        guardarButton.disabled =
+          true;
+
+        try {
+
+          const resultado =
+            editando
+              ? await actualizarPlanEstudio(
+                  plan.id,
+                  datos
+                )
+              : await crearPlanEstudio(
+                  datos
+                );
+
+          if (!resultado?.ok) {
+
+            throw new Error(
+              resultado?.message ||
+                "No fue posible guardar el plan de estudio."
+            );
+
+          }
+
+          cerrar();
+
+          mostrarFeedback(
+            editando
+              ? "Plan actualizado correctamente."
+              : "Plan creado correctamente."
+          );
+
+          await cargarDatos(
+            instanciaActual
+          );
+
+        } catch (error) {
+
+          if (errorBox) {
+
+            errorBox.textContent =
+              error?.message ||
+              "No fue posible guardar el plan de estudio.";
+
+            errorBox.classList.remove(
+              "hidden"
+            );
+
+          }
+
+        } finally {
+
+          guardarButton.disabled =
+            false;
+
         }
-      } finally {
-        guardarButton.disabled = false;
       }
-    });
+    );
 }
 
 async function alternarEstado(plan) {
@@ -603,7 +887,6 @@ async function alternarEstado(plan) {
 
 async function abrirDetallePlan(plan) {
   vistaDetallePlan = "LISTA";
-  filtroBloquePlan = "";
   nivelPaginaPlan = 1;
   planSeleccionado = plan;
 
@@ -623,15 +906,15 @@ async function abrirDetallePlan(plan) {
     const [
       resultadoAsignaturas,
       resultadoRequisitos,
-      resultadoBloques,
       resultadoSalidas,
       resultadoResumen,
+      resultadoReglaOptativas,
     ] = await Promise.all([
       listarPlanAsignaturas(plan.id),
       listarPlanRequisitos(plan.id),
-      listarBloquesPlan(plan.id),
       listarSalidasAcademicas(plan.id),
       obtenerResumenPlan(plan.id),
+      obtenerReglaOptativasPlan(plan.id),
     ]);
 
     if (!resultadoAsignaturas?.ok) {
@@ -648,12 +931,6 @@ async function abrirDetallePlan(plan) {
       );
     }
 
-    if (!resultadoBloques?.ok) {
-      throw new Error(
-        resultadoBloques?.message ||
-          "No fue posible consultar los bloques del plan.",
-      );
-    }
 
     if (!resultadoSalidas?.ok) {
       throw new Error(
@@ -669,19 +946,29 @@ async function abrirDetallePlan(plan) {
       );
     }
 
+    if (!resultadoReglaOptativas?.ok) {
+      throw new Error(
+        resultadoReglaOptativas?.message ||
+          "No fue posible consultar la regla de optativas del plan.",
+      );
+    }
+
     asignaturasPlan = Array.isArray(resultadoAsignaturas.asignaturas)
       ? resultadoAsignaturas.asignaturas
       : [];
     requisitosPlan = Array.isArray(resultadoRequisitos.requisitos)
       ? resultadoRequisitos.requisitos
       : [];
-    bloquesPlan = Array.isArray(resultadoBloques.bloques)
-      ? resultadoBloques.bloques
-      : [];
     salidasAcademicas = Array.isArray(resultadoSalidas.salidas)
       ? resultadoSalidas.salidas
       : [];
     resumenPlan = resultadoResumen.resumen || null;
+    reglaOptativasPlan = {
+      regla: resultadoReglaOptativas.regla || null,
+      cantidadEspaciosOptativos: Number(
+        resultadoReglaOptativas.cantidadEspaciosOptativos || 0,
+      ),
+    };
 
     renderizarDetallePlan();
   } catch (error) {
@@ -711,15 +998,17 @@ function volverListadoPlanes() {
   observerMalla?.disconnect();
   observerMalla = null;
   vistaDetallePlan = "LISTA";
-  filtroBloquePlan = "";
   nivelPaginaPlan = 1;
   planSeleccionado = null;
   asignaturasPlan = [];
   filasRequisitosRapidos = [];
   requisitosPlan = [];
-  bloquesPlan = [];
   salidasAcademicas = [];
   resumenPlan = null;
+  reglaOptativasPlan = {
+    regla: null,
+    cantidadEspaciosOptativos: 0,
+  };
 
   const contentArea = document.getElementById("contentArea");
 
@@ -746,6 +1035,54 @@ function obtenerEtiquetaAsignatura(asignatura) {
   const nombre = datos.nombre || asignatura.nombreReferencia || "Sin nombre";
 
   return `${codigo} - ${nombre}`;
+}
+
+function obtenerPresentacionTipoAsignatura(asignatura) {
+  const tipo = String(asignatura?.tipo || "OBLIGATORIA").toUpperCase();
+
+  const presentaciones = {
+    OBLIGATORIA: {
+      etiqueta: "Obligatoria",
+      detalle: "Materia concreta del plan",
+      clase: "obligatoria",
+    },
+    GENERAL: {
+      etiqueta: "Estudios generales",
+      detalle: "Espacio de Estudios Generales",
+      clase: "general",
+    },
+    OPTATIVA: {
+      etiqueta: "Espacio optativo",
+      detalle: "Se cubre con una optativa válida",
+      clase: "optativa",
+    },
+    OTRA: {
+      etiqueta: "Otra",
+      detalle: "Espacio curricular especial",
+      clase: "otra",
+    },
+  };
+
+  return presentaciones[tipo] || {
+    etiqueta: tipo,
+    detalle: "Tipo curricular",
+    clase: "otra",
+  };
+}
+
+function obtenerAyudaTipoAsignatura(tipo) {
+  const ayudas = {
+    OBLIGATORIA:
+      "Materia concreta del plan. Después puede incorporarse o vincularse al catálogo institucional de Cursos.",
+    GENERAL:
+      "Espacio curricular de Estudios Generales. No se convierte directamente en un Curso institucional desde el flujo normal de Cursos.",
+    OPTATIVA:
+      "Espacio optativo del plan. La regla de optativas define cómo debe cubrirse; los cursos optativos reales se administran en su catálogo independiente.",
+    OTRA:
+      "Utilice este tipo para un espacio curricular especial que no corresponda a obligatoria, general u optativa.",
+  };
+
+  return ayudas[String(tipo || "OBLIGATORIA").toUpperCase()] || ayudas.OTRA;
 }
 
 function obtenerAsignaturasParaRequisitos() {
@@ -803,17 +1140,7 @@ function obtenerRequisitosDeAsignatura(asignaturaId) {
 }
 
 function obtenerAsignaturasVisibles() {
-  return asignaturasPlan.filter((asignatura) => {
-    if (!filtroBloquePlan) {
-      return true;
-    }
-
-    if (filtroBloquePlan === "SIN_BLOQUE") {
-      return asignatura.bloqueId === null || asignatura.bloqueId === undefined;
-    }
-
-    return Number(asignatura.bloqueId) === Number(filtroBloquePlan);
-  });
+  return asignaturasPlan;
 }
 
 function agruparAsignaturas(asignaturas = obtenerAsignaturasVisibles()) {
@@ -839,56 +1166,6 @@ function agruparAsignaturas(asignaturas = obtenerAsignaturasVisibles()) {
       asignaturas: grupo.asignaturas.sort((a, b) => a.orden - b.orden),
     }))
     .sort((a, b) => a.nivel - b.nivel || a.ciclo - b.ciclo);
-}
-
-function obtenerBloqueAsignatura(asignatura) {
-  if (asignatura.bloque) {
-    return asignatura.bloque;
-  }
-
-  if (asignatura.bloqueId === null || asignatura.bloqueId === undefined) {
-    return null;
-  }
-
-  return (
-    bloquesPlan.find(
-      (bloque) => Number(bloque.id) === Number(asignatura.bloqueId),
-    ) || null
-  );
-}
-
-function agruparAsignaturasPorBloque() {
-  const gruposBloque = new Map();
-
-  for (const asignatura of obtenerAsignaturasVisibles()) {
-    const bloque = obtenerBloqueAsignatura(asignatura);
-    const clave = bloque ? `BLOQUE-${bloque.id}` : "SIN_BLOQUE";
-
-    if (!gruposBloque.has(clave)) {
-      gruposBloque.set(clave, {
-        bloque,
-        asignaturas: [],
-      });
-    }
-
-    gruposBloque.get(clave).asignaturas.push(asignatura);
-  }
-
-  return Array.from(gruposBloque.values()).sort((a, b) => {
-    if (!a.bloque && b.bloque) {
-      return 1;
-    }
-
-    if (a.bloque && !b.bloque) {
-      return -1;
-    }
-
-    if (!a.bloque && !b.bloque) {
-      return 0;
-    }
-
-    return Number(a.bloque.orden || 0) - Number(b.bloque.orden || 0);
-  });
 }
 
 function obtenerNombreAnioNivel(nivel) {
@@ -922,12 +1199,12 @@ function renderizarAsignaturaLista(asignatura) {
   const datos = obtenerDatosAsignatura(asignatura);
   const creditos = Number(asignatura.creditos || 0);
   const requisitos = obtenerRequisitosDeAsignatura(asignatura.id);
-  const bloque = obtenerBloqueAsignatura(asignatura);
   const resumenHoras = obtenerResumenHoras(asignatura);
+  const presentacionTipo = obtenerPresentacionTipoAsignatura(asignatura);
 
   return `
     <article
-      class="plan-subject-card ${
+      class="plan-subject-card plan-subject-type-${presentacionTipo.clase} ${
         asignatura.activo ? "" : "plan-subject-inactive"
       }"
     >
@@ -939,19 +1216,12 @@ function renderizarAsignaturaLista(asignatura) {
         <div class="plan-subject-description">
           <strong>${escapeHtml(datos.nombre)}</strong>
 
-          ${
-            bloque
-              ? `
-                  <small class="plan-subject-block">
-                    ${escapeHtml(bloque.nombre)}
-                  </small>
-                `
-              : `
-                  <small class="plan-subject-block plan-subject-no-block">
-                    Sin bloque
-                  </small>
-                `
-          }
+          <span
+            class="plan-subject-type-badge is-${presentacionTipo.clase}"
+            title="${escapeHtml(presentacionTipo.detalle)}"
+          >
+            ${escapeHtml(presentacionTipo.etiqueta)}
+          </span>
 
           ${
             resumenHoras
@@ -1208,11 +1478,6 @@ function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
   const cantidad = asignaturasOrdenadas.length;
   const creditos = calcularCreditosAsignaturas(asignaturasOrdenadas);
 
-  let bloqueInicial = "";
-  if (filtroBloquePlan && filtroBloquePlan !== "SIN_BLOQUE") {
-    bloqueInicial = String(filtroBloquePlan);
-  }
-
   return `
     <section class="plan-cycle" data-nivel="${nivel}" data-ciclo="${ciclo}">
       <header class="plan-cycle-header">
@@ -1249,7 +1514,6 @@ function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
                     data-agregar-ciclo
                     data-nivel="${nivel}"
                     data-ciclo="${ciclo}"
-                    data-bloque="${bloqueInicial}"
                     type="button"
                   >
                     <i data-lucide="plus" aria-hidden="true"></i>
@@ -1394,10 +1658,13 @@ function renderizarTarjetaMalla(asignatura) {
     (item) => item.tipo === "CORREQUISITO",
   ).length;
   const creditos = Number(asignatura.creditos || 0);
+  const presentacionTipo = obtenerPresentacionTipoAsignatura(asignatura);
 
   return `
     <article
-      class="malla-card ${asignatura.activo ? "" : "malla-card-inactive"}"
+      class="malla-card malla-card-type-${presentacionTipo.clase} ${
+        asignatura.activo ? "" : "malla-card-inactive"
+      }"
       data-malla-asignatura="${asignatura.id}"
       tabindex="0"
       role="button"
@@ -1412,6 +1679,13 @@ function renderizarTarjetaMalla(asignatura) {
       </div>
 
       <div class="malla-card-name">${escapeHtml(datos.nombre)}</div>
+
+      <span
+        class="malla-card-type-badge is-${presentacionTipo.clase}"
+        title="${escapeHtml(presentacionTipo.detalle)}"
+      >
+        ${escapeHtml(presentacionTipo.etiqueta)}
+      </span>
 
       <div class="malla-card-footer">
         <div class="malla-card-relations">
@@ -1457,68 +1731,15 @@ function renderizarColumnasMalla(asignaturas) {
 }
 
 function renderizarMallaCurricular() {
-  const gruposBloque = agruparAsignaturasPorBloque();
+  const asignaturas = obtenerAsignaturasVisibles();
 
-  if (gruposBloque.length === 0) {
+  if (asignaturas.length === 0) {
     return `
       <div class="planes-message">
         No hay asignaturas para mostrar en esta malla.
       </div>
     `;
   }
-
-  const secciones = gruposBloque
-    .map(({ bloque, asignaturas }) => {
-      const nombre = bloque ? bloque.nombre : "Asignaturas sin bloque";
-      const tipo = bloque ? formatearTipoBloque(bloque.tipo) : "Sin clasificar";
-      const creditos = asignaturas
-        .filter((item) => item.activo)
-        .reduce((total, item) => total + Number(item.creditos || 0), 0);
-
-      return `
-        <section
-          class="malla-block-section ${bloque ? "" : "malla-block-unassigned"}"
-        >
-          <header class="malla-block-header">
-            <div>
-              <div class="malla-block-title-row">
-                <h3>${escapeHtml(nombre)}</h3>
-                ${
-                  bloque?.codigo
-                    ? `
-                        <span class="malla-block-code">
-                          ${escapeHtml(bloque.codigo)}
-                        </span>
-                      `
-                    : ""
-                }
-              </div>
-
-              <p>
-                ${escapeHtml(tipo)} · ${asignaturas.length}
-                asignatura${asignaturas.length === 1 ? "" : "s"} ·
-                ${creditos} créditos
-              </p>
-            </div>
-
-            ${
-              bloque && !bloque.activo
-                ? `
-                    <span class="malla-block-inactive">
-                      Bloque inactivo
-                    </span>
-                  `
-                : ""
-            }
-          </header>
-
-          <div class="malla-block-grid">
-            ${renderizarColumnasMalla(asignaturas)}
-          </div>
-        </section>
-      `;
-    })
-    .join("");
 
   return `
     ${renderizarSalidasMalla()}
@@ -1544,7 +1765,9 @@ function renderizarMallaCurricular() {
           class="malla-connections"
           aria-hidden="true"
         ></svg>
-        ${secciones}
+        <div class="malla-plan-grid">
+          ${renderizarColumnasMalla(asignaturas)}
+        </div>
       </div>
     </div>
   `;
@@ -1744,14 +1967,14 @@ function renderizarVistaPreviaAsignaturasExcel(asignaturas) {
   return `
     <section class="plan-import-preview-section">
       <header><strong>Vista previa de asignaturas</strong><small>Mostrando ${primeras.length} de ${asignaturas.length}</small></header>
-      <div class="plan-import-table-wrapper"><table class="plan-import-table"><thead><tr><th>Clave</th><th>Curso</th><th>Bloque</th><th>Nivel</th><th>Ciclo</th><th>Cr.</th></tr></thead><tbody>
+      <div class="plan-import-table-wrapper"><table class="plan-import-table"><thead><tr><th>Clave</th><th>Código</th><th>Asignatura</th><th>Nivel</th><th>Ciclo</th><th>Cr.</th></tr></thead><tbody>
         ${primeras
           .map(
             (fila) => `
               <tr>
                 <td>${escapeHtml(fila.CLAVE || "")}</td>
-                <td>${escapeHtml(fila.CODIGO_CURSO || fila.NOMBRE_REFERENCIA || "—")}</td>
-                <td>${escapeHtml(fila.BLOQUE || "—")}</td>
+                <td>${escapeHtml(fila.CODIGO || "—")}</td>
+                <td>${escapeHtml(fila.NOMBRE || "—")}</td>
                 <td>${escapeHtml(fila.NIVEL || "")}</td>
                 <td>${escapeHtml(fila.CICLO || "")}</td>
                 <td>${escapeHtml(fila.CREDITOS || "")}</td>
@@ -1814,7 +2037,7 @@ async function ejecutarImportacionPlan(datos) {
   const confirmado = await confirmarAccion({
     titulo: "Importar plan de estudio",
     mensaje:
-      "Se crearán los bloques, asignaturas, requisitos y salidas académicas del archivo. La operación se guardará completa o se revertirá por completo.",
+      "Se crearán las asignaturas, requisitos y salidas académicas del archivo. La operación se guardará completa o se revertirá por completo.",
     textoConfirmar: "Importar plan",
     peligro: false,
   });
@@ -1859,7 +2082,6 @@ function mostrarImportacionCompletada(resultado) {
       <div class="plan-import-content">
         <div class="plan-review-status plan-review-status-ok"><i data-lucide="circle-check-big"></i><div><strong>Plan importado correctamente</strong><p>Todos los datos fueron guardados dentro de una única transacción.</p></div></div>
         <div class="plan-import-counters">
-          ${renderizarContadorImportacion("layers", resumen.bloques ?? 0, "Bloques")}
           ${renderizarContadorImportacion("book-open", resumen.asignaturas ?? 0, "Asignaturas")}
           ${renderizarContadorImportacion("git-branch", resumen.requisitos ?? 0, "Requisitos")}
           ${renderizarContadorImportacion("graduation-cap", resumen.salidas ?? 0, "Salidas")}
@@ -1941,7 +2163,6 @@ function mostrarPrevisualizacionExcel(archivo, datos) {
   const content = document.getElementById("asignaturaDialogContent");
   if (!dialog || !content) return;
 
-  const bloques = Array.isArray(datos?.bloques) ? datos.bloques : [];
   const asignaturas = Array.isArray(datos?.asignaturas)
     ? datos.asignaturas
     : [];
@@ -1957,7 +2178,6 @@ function mostrarPrevisualizacionExcel(archivo, datos) {
       <div class="plan-import-content">
         <div class="plan-import-notice"><i data-lucide="info"></i><div><strong>Previsualización</strong><p>Todavía no se ha guardado ningún dato en el plan.</p></div></div>
         <div class="plan-import-counters">
-          ${renderizarContadorImportacion("layers", bloques.length, "Bloques")}
           ${renderizarContadorImportacion("book-open", asignaturas.length, "Asignaturas")}
           ${renderizarContadorImportacion("git-branch", requisitos.length, "Requisitos")}
           ${renderizarContadorImportacion("graduation-cap", salidas.length, "Salidas")}
@@ -2044,8 +2264,6 @@ function renderizarEstadoGeneralRevision(validacion) {
 
 function formatearCodigoValidacion(codigo) {
   const nombres = {
-    ASIGNATURA_SIN_BLOQUE: "Asignatura sin bloque",
-    BLOQUE_VACIO: "Bloque vacío",
     HORAS_NO_COINCIDEN: "Horas inconsistentes",
     CURSO_DUPLICADO: "Curso duplicado",
     REQUISITO_POSTERIOR: "Requisito posterior",
@@ -2242,10 +2460,9 @@ function renderizarDetallePlan() {
   contenedor.innerHTML = VerPlanPage({
     plan: planSeleccionado,
     resumenPlan,
+    reglaOptativasPlan,
     creditosTotales,
     vista: vistaDetallePlan,
-    filtroBloque: filtroBloquePlan,
-    bloques: bloquesPlan,
     contenidoVista,
   });
 
@@ -2340,6 +2557,7 @@ function crearFilaCargaRapidaAsignatura(indice) {
         <span>Tipo</span>
         <select class="carga-asignatura-tipo" required>
           <option value="OBLIGATORIA">Obligatoria</option>
+          <option value="GENERAL">General</option>
           <option value="OPTATIVA">Optativa</option>
           <option value="OTRA">Otra</option>
         </select>
@@ -2372,10 +2590,6 @@ function renderizarCargaRapida() {
     return;
   }
 
-  const bloques = bloquesPlan
-    .filter((bloque) => bloque.activo)
-    .sort((a, b) => a.orden - b.orden);
-
   const body = `
     <div class="sgpa-form-grid carga-rapida-config">
       <label>
@@ -2402,21 +2616,6 @@ function renderizarCargaRapida() {
         >
       </label>
 
-      <label class="sgpa-form-wide">
-        <span>Bloque</span>
-        <select id="cargaAsignaturaBloque">
-          <option value="">Sin bloque</option>
-          ${bloques
-            .map(
-              (bloque) => `
-                <option value="${bloque.id}">
-                  ${escapeHtml(bloque.codigo)} - ${escapeHtml(bloque.nombre)}
-                </option>
-              `,
-            )
-            .join("")}
-        </select>
-      </label>
     </div>
 
     <div class="plan-bulk-header">
@@ -2520,9 +2719,6 @@ function renderizarCargaRapida() {
 function construirCargaRapida() {
   const nivel = Number(document.getElementById("cargaAsignaturaNivel")?.value);
   const ciclo = Number(document.getElementById("cargaAsignaturaCiclo")?.value);
-  const bloqueValue =
-    document.getElementById("cargaAsignaturaBloque")?.value || "";
-  const bloqueId = bloqueValue ? Number(bloqueValue) : undefined;
   const filas = [
     ...document.querySelectorAll("[data-asignatura-carga]"),
   ];
@@ -2568,7 +2764,7 @@ function construirCargaRapida() {
 
     if (codigosUtilizados.has(codigoReferencia)) {
       throw new Error(
-        `Fila ${index + 1}: el código ${codigoReferencia} está repetido.`,
+        `Fila ${index + 1}: el código ${codigoReferencia} está repetido dentro de esta carga.`,
       );
     }
 
@@ -2584,7 +2780,7 @@ function construirCargaRapida() {
       throw new Error(`Fila ${index + 1}: el orden debe estar entre 1 y 999.`);
     }
 
-    const datos = {
+    return {
       codigoReferencia,
       nombreReferencia,
       nivel,
@@ -2593,12 +2789,6 @@ function construirCargaRapida() {
       creditos,
       tipo,
     };
-
-    if (bloqueId) {
-      datos.bloqueId = bloqueId;
-    }
-
-    return datos;
   });
 }
 
@@ -2657,10 +2847,6 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
   const cicloInicial = editando
     ? Number(asignatura.ciclo || 1)
     : Number(valoresIniciales.ciclo || 1);
-  const bloqueInicialId = editando
-    ? asignatura.bloqueId
-    : valoresIniciales.bloqueId;
-
   const asignaturasMismoCiclo = asignaturasPlan.filter(
     (item) =>
       Number(item.nivel) === nivelInicial &&
@@ -2676,62 +2862,8 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
     ? Number(asignatura.orden || 1)
     : ordenSugerido;
 
-  const opcionesBloques = bloquesPlan
-    .filter(
-      (bloque) =>
-        bloque.activo === true ||
-        Number(bloque.id) === Number(bloqueInicialId),
-    )
-    .sort((a, b) => Number(a.orden) - Number(b.orden))
-    .map(
-      (bloque) => `
-        <option
-          value="${bloque.id}"
-          ${
-            Number(bloqueInicialId) === Number(bloque.id)
-              ? "selected"
-              : ""
-          }
-        >
-          ${escapeHtml(bloque.nombre)} · ${escapeHtml(
-            formatearTipoBloque(bloque.tipo),
-          )}${bloque.activo ? "" : " (Inactivo)"}
-        </option>
-      `,
-    )
-    .join("");
-
   const body = `
     <div class="sgpa-form-grid">
-      <label class="sgpa-form-wide">
-        <span>Bloque del plan</span>
-        <select id="asignaturaBloque">
-          <option
-            value=""
-            ${
-              bloqueInicialId === null ||
-              bloqueInicialId === undefined ||
-              bloqueInicialId === ""
-                ? "selected"
-                : ""
-            }
-          >
-            Sin bloque
-          </option>
-          ${opcionesBloques}
-        </select>
-        ${
-          bloquesPlan.length === 0
-            ? `
-                <small class="sgpa-field-help">
-                  Este plan todavía no tiene bloques. Puede dejar la asignatura
-                  sin bloque y organizarla después.
-                </small>
-              `
-            : ""
-        }
-      </label>
-
       <div class="plan-reference-fields sgpa-form-wide">
         <label>
           <span>Código de la asignatura</span>
@@ -2812,7 +2944,11 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
 
       <label class="sgpa-form-wide">
         <span>Tipo</span>
-        <select id="asignaturaTipo" required>
+        <select
+          id="asignaturaTipo"
+          ${vinculadaACurso ? "disabled" : ""}
+          required
+        >
           <option
             value="OBLIGATORIA"
             ${
@@ -2822,6 +2958,12 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
             }
           >
             Obligatoria
+          </option>
+          <option
+            value="GENERAL"
+            ${asignatura?.tipo === "GENERAL" ? "selected" : ""}
+          >
+            General
           </option>
           <option
             value="OPTATIVA"
@@ -2836,6 +2978,20 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
             Otra
           </option>
         </select>
+        <small
+          id="asignaturaTipoHelp"
+          class="sgpa-field-help plan-type-help"
+        ></small>
+        ${
+          vinculadaACurso
+            ? `
+                <small class="sgpa-field-help plan-type-locked">
+                  El tipo no puede modificarse desde esta pantalla porque la
+                  asignatura ya está vinculada al catálogo de Cursos.
+                </small>
+              `
+            : ""
+        }
       </label>
 
       <details
@@ -2991,6 +3147,35 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
   renderizarIconos();
   mostrarDialogHerramienta();
 
+  const tipoSelect = document.getElementById("asignaturaTipo");
+  const tipoHelp = document.getElementById("asignaturaTipoHelp");
+  const codigoInput = document.getElementById("asignaturaCodigoReferencia");
+  const nombreInput = document.getElementById("asignaturaNombreReferencia");
+
+  const actualizarAyudaTipo = () => {
+    const tipo = tipoSelect?.value || asignatura?.tipo || "OBLIGATORIA";
+
+    if (tipoHelp) {
+      tipoHelp.textContent = obtenerAyudaTipoAsignatura(tipo);
+    }
+
+    if (!vinculadaACurso && codigoInput && nombreInput) {
+      const ejemplos = {
+        OBLIGATORIA: { codigo: "Ej. EIF201", nombre: "Ej. Programación I" },
+        GENERAL: { codigo: "Ej. GEN-01", nombre: "Ej. Estudios Generales I" },
+        OPTATIVA: { codigo: "Ej. OPT-01", nombre: "Ej. Optativa I" },
+        OTRA: { codigo: "Ej. ESP-01", nombre: "Ej. Espacio curricular" },
+      };
+
+      const ejemplo = ejemplos[tipo] || ejemplos.OTRA;
+      codigoInput.placeholder = ejemplo.codigo;
+      nombreInput.placeholder = ejemplo.nombre;
+    }
+  };
+
+  tipoSelect?.addEventListener("change", actualizarAyudaTipo);
+  actualizarAyudaTipo();
+
   const camposHoras = [
     "asignaturaHorasTeoria",
     "asignaturaHorasPractica",
@@ -3107,12 +3292,6 @@ async function guardarAsignatura(asignatura, cerrar) {
     datos.observacionHoras = observacionHoras || null;
   }
 
-  const bloqueValue = document.getElementById("asignaturaBloque")?.value || "";
-  if (bloqueValue) {
-    datos.bloqueId = Number(bloqueValue);
-  } else if (asignatura) {
-    datos.bloqueId = null;
-  }
 
   button.disabled = true;
   errorBox.classList.add("hidden");
@@ -3172,7 +3351,12 @@ async function recargarAsignaturasPlan() {
   asignaturasPlan = Array.isArray(resultado.asignaturas)
     ? resultado.asignaturas
     : [];
-  await recargarResumenPlan();
+
+  await Promise.all([
+    recargarResumenPlan(),
+    recargarReglaOptativasPlan(),
+  ]);
+
   renderizarDetallePlan();
 }
 
@@ -3293,9 +3477,7 @@ function conectarEventosDetallePlan(contenedor) {
         event.preventDefault();
         const nivel = Number(agregarCiclo.dataset.nivel);
         const ciclo = Number(agregarCiclo.dataset.ciclo);
-        const bloqueValue = agregarCiclo.dataset.bloque || "";
-        const bloqueId = bloqueValue ? Number(bloqueValue) : undefined;
-        abrirFormularioAsignatura(null, { nivel, ciclo, bloqueId });
+        abrirFormularioAsignatura(null, { nivel, ciclo });
         return;
       }
 
@@ -3350,11 +3532,11 @@ function conectarEventosDetallePlan(contenedor) {
         case "verDetalleResumenButton":
           abrirDetalleResumenPlan();
           break;
-        case "administrarBloquesButton":
-          abrirAdministradorBloques();
-          break;
         case "salidasAcademicasButton":
           abrirAdministradorSalidas();
+          break;
+        case "reglaOptativasButton":
+          abrirReglaOptativasPlan();
           break;
         case "cargaRapidaButton":
           abrirCargaRapida();
@@ -3382,21 +3564,6 @@ function conectarEventosDetallePlan(contenedor) {
     { signal },
   );
 
-  contenedor.addEventListener(
-    "change",
-    (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLSelectElement)) {
-        return;
-      }
-
-      if (target.id === "filtroBloquePlan") {
-        filtroBloquePlan = target.value;
-        renderizarDetallePlan();
-      }
-    },
-    { signal },
-  );
 
   contenedor.addEventListener(
     "keydown",
@@ -3421,6 +3588,432 @@ function conectarEventosDetallePlan(contenedor) {
     },
     { signal },
   );
+}
+
+async function recargarReglaOptativasPlan() {
+  if (!planSeleccionado) {
+    return;
+  }
+
+  const resultado = await obtenerReglaOptativasPlan(planSeleccionado.id);
+
+  if (!resultado?.ok) {
+    throw new Error(
+      resultado?.message ||
+        "No fue posible actualizar la regla de optativas del plan.",
+    );
+  }
+
+  reglaOptativasPlan = {
+    regla: resultado.regla || null,
+    cantidadEspaciosOptativos: Number(
+      resultado.cantidadEspaciosOptativos || 0,
+    ),
+  };
+}
+
+function abrirReglaOptativasPlan() {
+  if (!planSeleccionado) {
+    return;
+  }
+
+  renderizarReglaOptativasPlan();
+}
+
+function renderizarReglaOptativasPlan() {
+  const dialog = document.getElementById("asignaturaDialog");
+  const content = document.getElementById("asignaturaDialogContent");
+
+  if (!dialog || !content || !planSeleccionado) {
+    return;
+  }
+
+  const cantidadEspacios = Number(
+    reglaOptativasPlan?.cantidadEspaciosOptativos || 0,
+  );
+  const regla = reglaOptativasPlan?.regla || null;
+  const minimoDisciplinarias = Number(
+    regla?.minimoDisciplinariasPropias || 0,
+  );
+  const maximoOtrasAreas =
+    regla?.maximoOtrasAreas === null ||
+    regla?.maximoOtrasAreas === undefined
+      ? ""
+      : Number(regla.maximoOtrasAreas);
+  const puedeConfigurar = cantidadEspacios > 0 && planSeleccionado.activo;
+
+  const body = `
+    <div class="plan-optative-rule">
+      <section class="plan-optative-overview">
+        <div class="plan-optative-count">
+          <span>Espacios optativos activos</span>
+          <strong>${cantidadEspacios}</strong>
+          <small>
+            Son las asignaturas del plan registradas con tipo OPTATIVA.
+          </small>
+        </div>
+
+        <div class="plan-optative-rule-state ${regla ? "is-configured" : ""}">
+          <i
+            data-lucide="${regla ? "circle-check-big" : "circle-dashed"}"
+            aria-hidden="true"
+          ></i>
+          <div>
+            <strong>
+              ${regla ? "Regla configurada" : "Sin regla específica"}
+            </strong>
+            <small>
+              ${
+                regla
+                  ? "El plan ya tiene condiciones registradas para sus espacios optativos."
+                  : "Puede definir las condiciones cuando el plan tenga espacios tipo OPTATIVA."
+              }
+            </small>
+          </div>
+        </div>
+      </section>
+
+      <section class="plan-optative-catalog-info">
+        <header>
+          <span>Catálogo de optativas</span>
+          <strong>Tipos reconocidos por el SGPA</strong>
+          <p>
+            Estos tipos describen los cursos optativos reales del catálogo.
+            No son tipos adicionales de PlanAsignatura: dentro de la malla el
+            espacio continúa siendo OPTATIVA.
+          </p>
+        </header>
+
+        <div class="plan-optative-kind-grid">
+          <article class="plan-optative-kind is-disciplinary">
+            <span class="plan-optative-kind-icon">
+              <i data-lucide="graduation-cap" aria-hidden="true"></i>
+            </span>
+            <div>
+              <strong>De carrera / disciplinaria</strong>
+              <p>
+                Curso optativo propio de una carrera. En el catálogo se
+                registra como DISCIPLINARIA y requiere una carrera de origen.
+              </p>
+            </div>
+          </article>
+
+          <article class="plan-optative-kind is-open">
+            <span class="plan-optative-kind-icon">
+              <i data-lucide="landmark" aria-hidden="true"></i>
+            </span>
+            <div>
+              <strong>Abierta</strong>
+              <p>
+                Curso optativo de tipo ABIERTA. Puede utilizarse como una
+                alternativa fuera de las disciplinarias propias según las
+                reglas académicas aplicables.
+              </p>
+            </div>
+          </article>
+
+          <article class="plan-optative-kind is-campus">
+            <span class="plan-optative-kind-icon">
+              <i data-lucide="map-pin" aria-hidden="true"></i>
+            </span>
+            <div>
+              <strong>De sede</strong>
+              <p>
+                Curso optativo de tipo SEDE. Forma parte del catálogo de
+                opciones administradas a nivel de sede.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="plan-optative-rule-form">
+        <header>
+          <span>Regla del plan</span>
+          <strong>Condiciones para cubrir los espacios optativos</strong>
+          <p>
+            El backend actual del SGPA permite definir un mínimo de optativas
+            disciplinarias propias y, opcionalmente, un máximo de optativas de
+            otras áreas. ABIERTA y SEDE se distinguen en el catálogo, pero la
+            regla actual no guarda límites separados para cada una.
+          </p>
+        </header>
+
+        ${
+          cantidadEspacios === 0
+            ? `
+                <div class="plan-optative-empty-rule">
+                  <i data-lucide="circle-alert" aria-hidden="true"></i>
+                  <div>
+                    <strong>No hay espacios optativos activos</strong>
+                    <p>
+                      Agregue primero al menos una asignatura del plan con tipo
+                      OPTATIVA. Luego podrá configurar esta regla.
+                    </p>
+                  </div>
+                </div>
+              `
+            : `
+                <div class="sgpa-form-grid plan-optative-fields">
+                  <label>
+                    <span>Mínimo de disciplinarias propias</span>
+                    <input
+                      id="optativasMinimoDisciplinarias"
+                      type="number"
+                      min="0"
+                      max="${cantidadEspacios}"
+                      value="${minimoDisciplinarias}"
+                      ${puedeConfigurar ? "" : "disabled"}
+                      required
+                    >
+                    <small class="sgpa-field-help">
+                      Cantidad mínima de espacios que deben cubrirse con
+                      optativas DISCIPLINARIAS propias de la carrera.
+                    </small>
+                  </label>
+
+                  <label>
+                    <span>Máximo de otras áreas</span>
+                    <input
+                      id="optativasMaximoOtrasAreas"
+                      type="number"
+                      min="0"
+                      max="${cantidadEspacios}"
+                      value="${maximoOtrasAreas}"
+                      placeholder="Sin máximo específico"
+                      ${puedeConfigurar ? "" : "disabled"}
+                    >
+                    <small class="sgpa-field-help">
+                      Campo opcional. Déjelo vacío cuando el plan no defina un
+                      máximo específico para optativas de otras áreas.
+                    </small>
+                  </label>
+                </div>
+              `
+        }
+
+        ${
+          !planSeleccionado.activo
+            ? `
+                <div class="plan-optative-empty-rule is-warning">
+                  <i data-lucide="lock" aria-hidden="true"></i>
+                  <div>
+                    <strong>Plan inactivo</strong>
+                    <p>
+                      La regla puede consultarse, pero el backend solo permite
+                      modificarla cuando el plan está activo.
+                    </p>
+                  </div>
+                </div>
+              `
+            : ""
+        }
+      </section>
+    </div>
+  `;
+
+  const footerHtml = `
+    ${
+      regla
+        ? `
+            <button
+              id="eliminarReglaOptativasButton"
+              class="sgpa-form-secondary sgpa-form-footer-left plan-optative-delete"
+              type="button"
+              ${planSeleccionado.activo ? "" : "disabled"}
+            >
+              <i data-lucide="trash-2" aria-hidden="true"></i>
+              Eliminar regla
+            </button>
+          `
+        : '<span class="sgpa-form-footer-left"></span>'
+    }
+
+    <button
+      id="cancelarReglaOptativasButton"
+      class="sgpa-form-secondary"
+      type="button"
+    >
+      Cerrar
+    </button>
+
+    <button
+      id="guardarReglaOptativasButton"
+      class="sgpa-form-primary"
+      type="button"
+      ${puedeConfigurar ? "" : "disabled"}
+    >
+      <i data-lucide="save" aria-hidden="true"></i>
+      <span>Guardar regla</span>
+    </button>
+  `;
+
+  content.innerHTML = FormDialog({
+    formId: "reglaOptativasForm",
+    title: "Optativas del plan",
+    description: `${planSeleccionado.nombre} · ${
+      planSeleccionado.carrera?.nombre || "Carrera"
+    }`,
+    body,
+    errorId: "reglaOptativasError",
+    footerHtml,
+    layout: "custom",
+    formClass: "regla-optativas-plan-form",
+  });
+
+  renderizarIconos();
+  mostrarDialogHerramienta();
+
+  const cerrar = () => dialog.close();
+
+  document
+    .getElementById("cancelarReglaOptativasButton")
+    ?.addEventListener("click", cerrar);
+
+  document
+    .getElementById("guardarReglaOptativasButton")
+    ?.addEventListener("click", guardarReglaOptativasFrontend);
+
+  document
+    .getElementById("eliminarReglaOptativasButton")
+    ?.addEventListener("click", eliminarReglaOptativasFrontend);
+}
+
+async function guardarReglaOptativasFrontend() {
+  const errorBox = document.getElementById("reglaOptativasError");
+  const button = document.getElementById("guardarReglaOptativasButton");
+
+  if (!errorBox || !button || !planSeleccionado) {
+    return;
+  }
+
+  const cantidadEspacios = Number(
+    reglaOptativasPlan?.cantidadEspaciosOptativos || 0,
+  );
+  const minimoInput = document.getElementById(
+    "optativasMinimoDisciplinarias",
+  );
+  const maximoInput = document.getElementById("optativasMaximoOtrasAreas");
+
+  const minimoDisciplinariasPropias = Number(minimoInput?.value);
+  const maximoTexto = maximoInput?.value?.trim() || "";
+  const maximoOtrasAreas = maximoTexto === "" ? null : Number(maximoTexto);
+
+  errorBox.textContent = "";
+  errorBox.classList.add("hidden");
+
+  if (
+    !Number.isInteger(minimoDisciplinariasPropias) ||
+    minimoDisciplinariasPropias < 0 ||
+    minimoDisciplinariasPropias > cantidadEspacios
+  ) {
+    errorBox.textContent = `El mínimo de disciplinarias propias debe ser un entero entre 0 y ${cantidadEspacios}.`;
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  if (
+    maximoOtrasAreas !== null &&
+    (!Number.isInteger(maximoOtrasAreas) ||
+      maximoOtrasAreas < 0 ||
+      maximoOtrasAreas > cantidadEspacios)
+  ) {
+    errorBox.textContent = `El máximo de otras áreas debe estar vacío o ser un entero entre 0 y ${cantidadEspacios}.`;
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    const resultado = await guardarReglaOptativasPlan(planSeleccionado.id, {
+      minimoDisciplinariasPropias,
+      maximoOtrasAreas,
+    });
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message || "No fue posible guardar la regla de optativas.",
+      );
+    }
+
+    await recargarReglaOptativasPlan();
+    document.getElementById("asignaturaDialog")?.close();
+    renderizarDetallePlan();
+
+    mostrarExito({
+      titulo: "Regla de optativas guardada",
+      mensaje:
+        "Las condiciones de optativas del plan se actualizaron correctamente.",
+    });
+  } catch (error) {
+    errorBox.textContent =
+      error?.message || "No fue posible guardar la regla de optativas.";
+    errorBox.classList.remove("hidden");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function eliminarReglaOptativasFrontend() {
+  if (!planSeleccionado || !reglaOptativasPlan?.regla) {
+    return;
+  }
+
+  const confirmado = await confirmarAccion({
+    titulo: "Eliminar regla de optativas",
+    mensaje:
+      "¿Desea eliminar la regla específica de optativas de este plan? Los espacios OPTATIVA de la malla no se eliminarán.",
+    textoConfirmar: "Eliminar regla",
+    peligro: true,
+  });
+
+  if (!confirmado) {
+    return;
+  }
+
+  const errorBox = document.getElementById("reglaOptativasError");
+  const button = document.getElementById("eliminarReglaOptativasButton");
+
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const resultado = await eliminarReglaOptativasPlan(planSeleccionado.id);
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message || "No fue posible eliminar la regla de optativas.",
+      );
+    }
+
+    await recargarReglaOptativasPlan();
+    document.getElementById("asignaturaDialog")?.close();
+    renderizarDetallePlan();
+
+    mostrarExito({
+      titulo: "Regla eliminada",
+      mensaje:
+        "El plan conserva sus espacios optativos, pero ya no tiene una regla específica configurada.",
+    });
+  } catch (error) {
+    if (errorBox) {
+      errorBox.textContent =
+        error?.message || "No fue posible eliminar la regla de optativas.";
+      errorBox.classList.remove("hidden");
+    } else {
+      mostrarError({
+        titulo: "No se pudo eliminar la regla",
+        mensaje:
+          error?.message || "No fue posible eliminar la regla de optativas.",
+      });
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
 }
 
 function crearFilaRequisitoRapido() {
@@ -4078,9 +4671,6 @@ function abrirDetalleResumenPlan() {
   if (!dialog || !content) return;
   const horas = resumenPlan.horas || {};
   const ciclos = Array.isArray(resumenPlan.ciclos) ? resumenPlan.ciclos : [];
-  const bloques = Array.isArray(resumenPlan.bloques?.detalle)
-    ? resumenPlan.bloques.detalle
-    : [];
   const lista = (items, render, vacio) =>
     items.length
       ? items.map(render).join("")
@@ -4091,7 +4681,6 @@ function abrirDetalleResumenPlan() {
       <div class="plan-summary-detail-content">
         <section class="plan-summary-detail-section"><h4>Horas académicas</h4><div class="plan-summary-hours">${renderizarDatoResumen("Teoría", horas.teoria)}${renderizarDatoResumen("Práctica", horas.practica)}${renderizarDatoResumen("Laboratorio", horas.laboratorio)}${renderizarDatoResumen("Gira", horas.gira)}${renderizarDatoResumen("Estudio independiente", horas.estudioIndependiente)}${renderizarDatoResumen("Horas totales", horas.totales)}${renderizarDatoResumen("Horas docente", horas.docente)}</div></section>
         <section class="plan-summary-detail-section"><h4>Créditos por ciclo</h4><div class="plan-summary-cycle-list">${lista(ciclos, (grupo) => `<div class="plan-summary-cycle"><div><strong>Nivel ${grupo.nivel} · Ciclo ${grupo.ciclo}</strong><small>${grupo.cantidadAsignaturas} asignaturas</small></div><span>${grupo.creditos} cr.</span></div>`, "No hay ciclos registrados.")}</div></section>
-        <section class="plan-summary-detail-section"><h4>Bloques</h4><div class="plan-summary-cycle-list">${lista(bloques, (bloque) => `<div class="plan-summary-cycle"><div><strong>${escapeHtml(bloque.nombre)}</strong><small>${bloque.cantidadAsignaturas} asignaturas</small></div><span>${bloque.creditos} cr.</span></div>`, "No hay bloques registrados.")}</div></section>
       </div>
       <footer class="plan-dialog-footer"><button id="cerrarResumenPlanFooter" class="planes-secondary-button" type="button">Cerrar</button></footer>
     </div>`;
@@ -4914,379 +5503,6 @@ async function alternarEstadoSalida(salida) {
     mostrarFeedbackDetalle(
       error?.message || "No fue posible cambiar el estado de la salida.",
     );
-  }
-}
-
-function formatearTipoBloque(tipo) {
-  const nombres = {
-    TRONCO_COMUN: "Tronco común",
-    ENFASIS: "Énfasis",
-    SALIDA_LATERAL: "Salida lateral",
-    GRADO: "Grado",
-    OTRO: "Otro",
-  };
-
-  return nombres[tipo] || tipo;
-}
-
-function abrirAdministradorBloques() {
-  const dialog = document.getElementById("asignaturaDialog");
-  const content = document.getElementById("asignaturaDialogContent");
-
-  if (!dialog || !content || !planSeleccionado) {
-    return;
-  }
-
-  const bloquesHtml = bloquesPlan.length
-    ? bloquesPlan
-        .map(
-          (bloque) => `
-            <article class="bloque-plan-row ${
-              bloque.activo ? "" : "bloque-plan-inactive"
-            }">
-              <div class="bloque-plan-info">
-                <div>
-                  <strong>${escapeHtml(bloque.nombre)}</strong>
-                  <span>${escapeHtml(bloque.codigo)}</span>
-                </div>
-                <small>
-                  ${escapeHtml(formatearTipoBloque(bloque.tipo))} · Orden ${
-                    bloque.orden
-                  }
-                </small>
-              </div>
-
-              <div class="bloque-plan-actions">
-                <button
-                  class="planes-icon-button"
-                  data-bloque-editar="${bloque.id}"
-                  type="button"
-                  title="Editar bloque"
-                  aria-label="Editar ${escapeHtml(bloque.nombre)}"
-                >
-                  <i data-lucide="pencil" aria-hidden="true"></i>
-                </button>
-
-                <button
-                  class="planes-icon-button"
-                  data-bloque-estado="${bloque.id}"
-                  type="button"
-                  title="${bloque.activo ? "Desactivar" : "Activar"}"
-                  aria-label="${bloque.activo ? "Desactivar" : "Activar"} ${escapeHtml(
-                    bloque.nombre,
-                  )}"
-                >
-                  <i
-                    data-lucide="${
-                      bloque.activo ? "circle-pause" : "circle-check"
-                    }"
-                    aria-hidden="true"
-                  ></i>
-                </button>
-              </div>
-            </article>
-          `,
-        )
-        .join("")
-    : `
-        <div class="plan-requirements-empty">
-          Este plan todavía no tiene bloques.
-        </div>
-      `;
-
-  const body = `
-    <div class="bloques-plan-content">
-      <div class="sgpa-form-tool-toolbar">
-        <div>
-          <strong>Estructura curricular</strong>
-          <small>Organice las asignaturas por bloques académicos.</small>
-        </div>
-
-        <button id="nuevoBloqueButton" class="sgpa-form-primary" type="button">
-          <i data-lucide="plus" aria-hidden="true"></i>
-          <span>Nuevo bloque</span>
-        </button>
-      </div>
-
-      <div class="bloques-plan-list">${bloquesHtml}</div>
-    </div>
-  `;
-
-  content.innerHTML = FormDialog({
-    formId: "bloquesAdminForm",
-    title: "Bloques del plan",
-    description: planSeleccionado.nombre,
-    body,
-    errorId: "bloquesPlanError",
-    cancelButtonId: "cerrarBloquesFooter",
-    cancelText: "Cerrar",
-    layout: "custom",
-  });
-
-  renderizarIconos();
-  mostrarDialogHerramienta();
-
-  document
-    .getElementById("cerrarBloquesFooter")
-    ?.addEventListener("click", () => dialog.close());
-  document
-    .getElementById("nuevoBloqueButton")
-    ?.addEventListener("click", () => abrirFormularioBloque());
-
-  document.querySelectorAll("[data-bloque-editar]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const bloque = bloquesPlan.find(
-        (item) => Number(item.id) === Number(button.dataset.bloqueEditar),
-      );
-      if (bloque) {
-        abrirFormularioBloque(bloque);
-      }
-    });
-  });
-
-  document.querySelectorAll("[data-bloque-estado]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const bloque = bloquesPlan.find(
-        (item) => Number(item.id) === Number(button.dataset.bloqueEstado),
-      );
-      if (bloque) {
-        await alternarEstadoBloque(bloque);
-      }
-    });
-  });
-}
-
-function abrirFormularioBloque(bloque = null) {
-  const content = document.getElementById("asignaturaDialogContent");
-
-  if (!content || !planSeleccionado) {
-    return;
-  }
-
-  const editando = Boolean(bloque);
-  const tipos = [
-    ["TRONCO_COMUN", "Tronco común"],
-    ["ENFASIS", "Énfasis"],
-    ["SALIDA_LATERAL", "Salida lateral"],
-    ["GRADO", "Grado"],
-    ["OTRO", "Otro"],
-  ];
-
-  const body = `
-    <label>
-      <span>Código</span>
-      <input
-        id="bloqueCodigo"
-        maxlength="30"
-        value="${escapeHtml(bloque?.codigo || "")}"
-        placeholder="Ej. TC"
-        required
-      >
-    </label>
-
-    <label>
-      <span>Orden</span>
-      <input
-        id="bloqueOrden"
-        type="number"
-        min="1"
-        max="999"
-        value="${bloque?.orden || bloquesPlan.length + 1}"
-        required
-      >
-    </label>
-
-    <label class="sgpa-form-wide">
-      <span>Nombre</span>
-      <input
-        id="bloqueNombre"
-        maxlength="150"
-        value="${escapeHtml(bloque?.nombre || "")}"
-        placeholder="Ej. Tronco común"
-        required
-      >
-    </label>
-
-    <label class="sgpa-form-wide">
-      <span>Tipo</span>
-      <select id="bloqueTipo" required>
-        ${tipos
-          .map(
-            ([valor, texto]) => `
-              <option
-                value="${valor}"
-                ${(bloque?.tipo || "TRONCO_COMUN") === valor ? "selected" : ""}
-              >
-                ${texto}
-              </option>
-            `,
-          )
-          .join("")}
-      </select>
-    </label>
-
-    <label class="sgpa-form-wide">
-      <span>Descripción</span>
-      <textarea
-        id="bloqueDescripcion"
-        maxlength="500"
-        rows="3"
-        placeholder="Descripción opcional"
-      >${escapeHtml(bloque?.descripcion || "")}</textarea>
-    </label>
-  `;
-
-  content.innerHTML = FormDialog({
-    formId: "bloquePlanForm",
-    title: editando ? "Editar bloque" : "Nuevo bloque",
-    description: planSeleccionado.nombre,
-    body,
-    errorId: "bloqueFormError",
-    cancelButtonId: "volverBloquesButton",
-    cancelText: "Volver",
-    submitButtonId: "guardarBloqueButton",
-    submitText: editando ? "Guardar cambios" : "Crear bloque",
-    submitIcon: "save",
-  });
-
-  renderizarIconos();
-  mostrarDialogHerramienta();
-
-  document
-    .getElementById("volverBloquesButton")
-    ?.addEventListener("click", abrirAdministradorBloques);
-  document
-    .getElementById("bloquePlanForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      await guardarBloque(bloque);
-    });
-}
-
-async function guardarBloque(bloque) {
-  const errorBox = document.getElementById("bloqueFormError");
-  const button = document.getElementById("guardarBloqueButton");
-
-  if (!errorBox || !button || !planSeleccionado) {
-    return;
-  }
-
-  const datos = {
-    codigo: document.getElementById("bloqueCodigo")?.value.trim() || "",
-    nombre: document.getElementById("bloqueNombre")?.value.trim() || "",
-    tipo: document.getElementById("bloqueTipo")?.value,
-    orden: Number(document.getElementById("bloqueOrden")?.value),
-    descripcion:
-      document.getElementById("bloqueDescripcion")?.value.trim() || "",
-  };
-
-  if (!datos.codigo || !datos.nombre) {
-    errorBox.textContent = "Código y nombre son obligatorios.";
-    errorBox.classList.remove("hidden");
-    return;
-  }
-
-  button.disabled = true;
-  errorBox.classList.add("hidden");
-
-  try {
-    const resultado = bloque
-      ? await actualizarBloquePlan(planSeleccionado.id, bloque.id, datos)
-      : await crearBloquePlan(planSeleccionado.id, datos);
-
-    if (!resultado?.ok) {
-      throw new Error(
-        resultado?.message || "No fue posible guardar el bloque.",
-      );
-    }
-
-    await recargarBloquesPlan();
-    abrirAdministradorBloques();
-  } catch (error) {
-    errorBox.textContent =
-      error?.message || "No fue posible guardar el bloque.";
-    errorBox.classList.remove("hidden");
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function recargarBloquesPlan() {
-  if (!planSeleccionado) {
-    return;
-  }
-
-  const resultado = await listarBloquesPlan(planSeleccionado.id);
-
-  if (!resultado?.ok) {
-    throw new Error(
-      resultado?.message || "No fue posible actualizar los bloques.",
-    );
-  }
-
-  bloquesPlan = Array.isArray(resultado.bloques) ? resultado.bloques : [];
-
-  if (
-    filtroBloquePlan &&
-    filtroBloquePlan !== "SIN_BLOQUE" &&
-    !bloquesPlan.some(
-      (bloque) =>
-        bloque.activo && String(bloque.id) === String(filtroBloquePlan),
-    )
-  ) {
-    filtroBloquePlan = "";
-  }
-
-  await recargarResumenPlan();
-  renderizarDetallePlan();
-}
-
-async function alternarEstadoBloque(bloque) {
-  if (!planSeleccionado) {
-    return;
-  }
-
-  const nuevoEstado = !bloque.activo;
-  const confirmado = await confirmarAccion({
-    titulo: nuevoEstado ? "Activar bloque" : "Desactivar bloque",
-    mensaje: `¿Desea ${nuevoEstado ? "activar" : "desactivar"} "${
-      bloque.nombre
-    }"?`,
-    textoConfirmar: nuevoEstado ? "Activar" : "Desactivar",
-    peligro: !nuevoEstado,
-  });
-
-  if (!confirmado) {
-    return;
-  }
-
-  try {
-    const resultado = await cambiarEstadoBloquePlan(
-      planSeleccionado.id,
-      bloque.id,
-      nuevoEstado,
-    );
-
-    if (!resultado?.ok) {
-      throw new Error(
-        resultado?.message || "No fue posible cambiar el estado del bloque.",
-      );
-    }
-
-    await recargarBloquesPlan();
-    abrirAdministradorBloques();
-  } catch (error) {
-    const errorBox = document.getElementById("bloquesPlanError");
-
-    if (errorBox) {
-      errorBox.textContent =
-        error?.message || "No fue posible cambiar el estado del bloque.";
-      errorBox.classList.remove("hidden");
-    } else {
-      mostrarFeedbackDetalle(
-        error?.message || "No fue posible cambiar el estado del bloque.",
-      );
-    }
   }
 }
 
