@@ -1,3 +1,4 @@
+
 import { app, BrowserWindow, ipcMain, net } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
@@ -473,6 +474,64 @@ ipcMain.handle("planes-estudio:cambiar-estado", async (_event, id, activo) => {
 });
 
 /* =========================================================
+   REGLA DE OPTATIVAS DEL PLAN
+   ========================================================= */
+
+ipcMain.handle("plan-reglas-optativas:obtener", async (_event, planId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/planes-estudio/${planId}/regla-optativas`,
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return {
+    ok: true,
+    regla: resultado.data?.regla ?? null,
+    cantidadEspaciosOptativos:
+      Number(resultado.data?.cantidadEspaciosOptativos || 0),
+  };
+});
+
+ipcMain.handle(
+  "plan-reglas-optativas:guardar",
+  async (_event, planId, datos) => {
+    const resultado = await ejecutarPeticionAutenticada(
+      `/planes-estudio/${planId}/regla-optativas`,
+      {
+        method: "PUT",
+        body: datos,
+      },
+    );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      regla: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle("plan-reglas-optativas:eliminar", async (_event, planId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/planes-estudio/${planId}/regla-optativas`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return { ok: true };
+});
+
+/* =========================================================
    ASIGNATURAS DE PLAN
    ========================================================= */
 
@@ -704,58 +763,6 @@ ipcMain.handle("plan-validaciones:validar", async (_event, planId) => {
 
   return { ok: true, validacion: resultado.data };
 });
-
-/* =========================================================
-   BLOQUES DEL PLAN
-   ========================================================= */
-
-ipcMain.handle("bloques-plan:listar", async (_event, planId) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/planes-estudio/${planId}/bloques`,
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    bloques: resultado.data,
-  };
-});
-
-ipcMain.handle("bloques-plan:crear", async (_event, planId, datos) => {
-  return ejecutarPeticionAutenticada(`/planes-estudio/${planId}/bloques`, {
-    method: "POST",
-    body: datos,
-  });
-});
-
-ipcMain.handle(
-  "bloques-plan:actualizar",
-  async (_event, planId, bloqueId, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/planes-estudio/${planId}/bloques/${bloqueId}`,
-      {
-        method: "PATCH",
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  "bloques-plan:cambiar-estado",
-  async (_event, planId, bloqueId, activo) => {
-    return ejecutarPeticionAutenticada(
-      `/planes-estudio/${planId}/bloques/${bloqueId}/estado`,
-      {
-        method: "PATCH",
-        body: { activo },
-      },
-    );
-  },
-);
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({

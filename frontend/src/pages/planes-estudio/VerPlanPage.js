@@ -1,3 +1,4 @@
+
 import {
   escapeHtml
 } from "../../utils/html.js";
@@ -112,7 +113,9 @@ function renderizarResumen(
 
   resumenPlan,
 
-  creditosTotales
+  creditosTotales,
+
+  reglaOptativasPlan
 
 ) {
 
@@ -131,9 +134,6 @@ function renderizarResumen(
   const relaciones =
     resumen.relaciones || {};
 
-
-  const bloques =
-    resumen.bloques || {};
 
 
   const salidas =
@@ -155,6 +155,18 @@ function renderizarResumen(
       (salida) =>
         salida.activo
     ).length;
+
+
+  const cantidadEspaciosOptativos =
+    Number(
+      reglaOptativasPlan?.cantidadEspaciosOptativos ||
+      0
+    );
+
+
+  const reglaOptativas =
+    reglaOptativasPlan?.regla ||
+    null;
 
 
   return `
@@ -260,23 +272,6 @@ function renderizarResumen(
         ${renderizarResumenCard({
 
           icono:
-            "blocks",
-
-          valor:
-            bloques.activos ?? 0,
-
-          titulo:
-            "Bloques",
-
-          detalle:
-            `${bloques.total ?? 0} registrados`
-
-        })}
-
-
-        ${renderizarResumenCard({
-
-          icono:
             "square-arrow-right-exit",
 
           valor:
@@ -290,48 +285,27 @@ function renderizarResumen(
 
         })}
 
+
+        ${renderizarResumenCard({
+
+          icono:
+            "shuffle",
+
+          valor:
+            cantidadEspaciosOptativos,
+
+          titulo:
+            "Optativas",
+
+          detalle:
+            reglaOptativas
+              ? "Regla configurada"
+              : "Sin regla específica"
+
+        })}
+
       </div>
 
-
-      <!-- =============================================== -->
-      <!-- ADVERTENCIA -->
-      <!-- =============================================== -->
-
-      ${
-        Number(
-          asignaturas.sinBloque || 0
-        ) > 0
-
-          ? `
-              <div class="ver-plan-warning">
-
-                <i
-                  data-lucide="triangle-alert"
-                  aria-hidden="true"
-                ></i>
-
-
-                <span>
-
-                  ${asignaturas.sinBloque}
-
-                  asignatura${
-                    Number(
-                      asignaturas.sinBloque
-                    ) === 1
-                      ? ""
-                      : "s"
-                  }
-
-                  sin bloque académico.
-
-                </span>
-
-              </div>
-            `
-
-          : ""
-      }
 
     </section>
   `;
@@ -349,13 +323,11 @@ export function VerPlanPage({
 
   resumenPlan,
 
+  reglaOptativasPlan = null,
+
   creditosTotales = 0,
 
   vista = "LISTA",
-
-  filtroBloque = "",
-
-  bloques = [],
 
   contenidoVista = ""
 
@@ -374,19 +346,6 @@ export function VerPlanPage({
 
   }
 
-
-  const bloquesActivos =
-    bloques
-      .filter(
-        (bloque) =>
-          bloque.activo
-      )
-      .slice()
-      .sort(
-        (a, b) =>
-          Number(a.orden) -
-          Number(b.orden)
-      );
 
 
   return `
@@ -550,23 +509,6 @@ export function VerPlanPage({
           ${renderizarHerramienta({
 
             id:
-              "administrarBloquesButton",
-
-            icono:
-              "blocks",
-
-            texto:
-              "Bloques",
-
-            title:
-              "Administrar bloques"
-
-          })}
-
-
-          ${renderizarHerramienta({
-
-            id:
               "salidasAcademicasButton",
 
             icono:
@@ -577,6 +519,23 @@ export function VerPlanPage({
 
             title:
               "Salidas académicas"
+
+          })}
+
+
+          ${renderizarHerramienta({
+
+            id:
+              "reglaOptativasButton",
+
+            icono:
+              "shuffle",
+
+            texto:
+              "Optativas",
+
+            title:
+              "Configurar regla de optativas del plan"
 
           })}
 
@@ -678,7 +637,9 @@ export function VerPlanPage({
 
         resumenPlan,
 
-        creditosTotales
+        creditosTotales,
+
+        reglaOptativasPlan
 
       )}
 
@@ -789,74 +750,6 @@ export function VerPlanPage({
           </div>
 
 
-          <!-- =========================================== -->
-          <!-- FILTRO -->
-          <!-- =========================================== -->
-
-          <label class="ver-plan-filter">
-
-            <span>
-              Bloque
-            </span>
-
-
-            <select
-              id="filtroBloquePlan"
-            >
-
-              <option value="">
-                Todos los bloques
-              </option>
-
-
-              <option
-                value="SIN_BLOQUE"
-                ${
-                  filtroBloque ===
-                  "SIN_BLOQUE"
-                    ? "selected"
-                    : ""
-                }
-              >
-
-                Sin bloque
-
-              </option>
-
-
-              ${
-                bloquesActivos
-                  .map(
-                    (bloque) => `
-                      <option
-                        value="${bloque.id}"
-                        ${
-                          String(
-                            bloque.id
-                          ) ===
-                          String(
-                            filtroBloque
-                          )
-
-                            ? "selected"
-
-                            : ""
-                        }
-                      >
-
-                        ${escapeHtml(
-                          bloque.nombre
-                        )}
-
-                      </option>
-                    `
-                  )
-                  .join("")
-              }
-
-            </select>
-
-          </label>
 
         </div>
 
