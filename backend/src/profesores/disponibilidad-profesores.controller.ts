@@ -34,6 +34,17 @@ export class DisponibilidadProfesoresController {
     return request.user.sub;
   }
 
+  @Get('mi-disponibilidad/periodos')
+  @Roles(RolSistema.PROFESOR)
+  listarPeriodosMiDisponibilidad(
+    @Req() request: Request,
+  ) {
+    return this.disponibilidadService
+      .listarPeriodosMiDisponibilidad(
+        this.obtenerUsuarioId(request),
+      );
+  }
+
   @Get('mi-disponibilidad/:periodoId/historial')
   @Roles(RolSistema.PROFESOR)
   obtenerHistorial(

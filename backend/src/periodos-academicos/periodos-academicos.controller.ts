@@ -26,6 +26,11 @@ export class PeriodosAcademicosController {
   ) {}
 
   @Get()
+  @Roles(
+    RolSistema.ADMIN_GLOBAL,
+    RolSistema.COORDINADOR,
+    RolSistema.PROFESOR,
+  )
   listar() {
     return this.periodosAcademicosService.listar();
   }

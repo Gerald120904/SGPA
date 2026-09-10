@@ -32,6 +32,21 @@ import {
 } from '../pages/cursos/CursosPage.js';
 
 import {
+  PeriodosPage,
+  iniciarPeriodosPage
+} from '../pages/periodos/PeriodosPage.js';
+
+import {
+  ProfesoresPage,
+  iniciarProfesoresPage
+} from '../pages/profesores/ProfesoresPage.js';
+
+import {
+  AulasPage,
+  iniciarAulasPage
+} from '../pages/aulas/AulasPage.js';
+
+import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
 
@@ -98,7 +113,16 @@ const PAGE_RENDERERS = {
     PlanesEstudioPage,
 
   cursos:
-    CursosPage
+    CursosPage,
+
+  periodos:
+    PeriodosPage,
+
+  profesores:
+    ProfesoresPage,
+
+  aulas:
+    AulasPage
 
 };
 
@@ -429,6 +453,33 @@ function renderizarRuta(
   ) {
 
     iniciarCursosPage();
+
+  }
+
+
+  if (
+    module.id === 'periodos'
+  ) {
+
+    iniciarPeriodosPage();
+
+  }
+
+
+  if (
+    module.id === 'profesores'
+  ) {
+
+    iniciarProfesoresPage();
+
+  }
+
+
+  if (
+    module.id === 'aulas'
+  ) {
+
+    iniciarAulasPage();
 
   }
 

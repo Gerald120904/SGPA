@@ -102,19 +102,22 @@ describe('PeriodosAcademicosController', () => {
     expect(periodosAcademicosService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite listar periodos a COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it.each(['COORDINADOR', 'PROFESOR'])(
+    'permite listar periodos a %s',
+    async (rol) => {
+      const token = await crearToken(rol);
 
-    await request(app.getHttpServer())
-      .get('/periodos-academicos')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200, []);
+      await request(app.getHttpServer())
+        .get('/periodos-academicos')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200, []);
 
-    expect(periodosAcademicosService.listar).toHaveBeenCalledTimes(1);
-  });
+      expect(periodosAcademicosService.listar).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])('responde 403 para %s', async (rol) => {
-    const token = await crearToken(rol);
+  it('responde 403 para ESTUDIANTE al listar periodos', async () => {
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/periodos-academicos')

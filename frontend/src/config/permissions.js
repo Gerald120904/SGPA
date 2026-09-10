@@ -37,7 +37,9 @@ export const ROLE_PERMISSIONS = {
 
   [ROLES.PROFESOR]: [
     'home',
-    'dashboard'
+    'dashboard',
+    'profesores',
+    'aulas',
   ],
 
   [ROLES.ESTUDIANTE]: [
