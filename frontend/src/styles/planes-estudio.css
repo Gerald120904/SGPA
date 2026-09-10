@@ -1,3 +1,4 @@
+
 /* =========================================================
    PLANES DE ESTUDIO
    ========================================================= */
@@ -722,119 +723,6 @@
   font-size: 13px;
 }
 
-.plan-subject-block {
-  width: fit-content;
-  display: inline-flex;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #475467;
-  font-size: 9px;
-  font-weight: 600;
-}
-
-.plan-subject-no-block {
-  background: #fffaeb;
-  color: #b54708;
-}
-
-.plan-block-filter {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.plan-block-filter label {
-  min-width: 230px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.plan-block-filter label > span {
-  color: #667085;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.plan-block-filter select {
-  min-height: 38px;
-  padding: 0 10px;
-  border: 1px solid #d0d5dd;
-  border-radius: 7px;
-  background: #ffffff;
-  color: #344054;
-  font: inherit;
-  font-size: 12px;
-}
-
-
-.bloques-plan-list {
-  display: grid;
-  gap: 8px;
-}
-
-.bloque-plan-row {
-  min-height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 12px;
-  border: 1px solid #eaecf0;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.bloque-plan-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.bloque-plan-info > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.bloque-plan-info strong {
-  color: #344054;
-  font-size: 13px;
-}
-
-.bloque-plan-info span {
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #667085;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.bloque-plan-info small {
-  color: #98a2b3;
-  font-size: 11px;
-}
-
-.bloque-plan-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.bloque-plan-inactive {
-  opacity: 0.5;
-}
-
-@media (max-width: 700px) {
-
-  .bloque-plan-row {
-    align-items: flex-start;
-  }
-
-}
-
 /* RESUMEN DEL PLAN */
 .plan-summary-icon svg {
   width: 16px;
@@ -1031,66 +919,12 @@
 }
 
 /* =========================================================
-   BLOQUES EN LA MALLA
+   ESTRUCTURA HORIZONTAL DE LA MALLA
    ========================================================= */
 
-.malla-block-section {
+.malla-plan-grid {
   position: relative;
   z-index: 2;
-  width: max-content;
-  min-width: 100%;
-}
-
-.malla-block-header {
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
-  padding: 0 4px 10px;
-  border-bottom: 2px solid #e4e7ec;
-}
-
-.malla-block-header h3 {
-  margin: 0;
-  color: #1d2939;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.malla-block-header p {
-  margin: 5px 0 0;
-  color: #667085;
-  font-size: 11px;
-}
-
-.malla-block-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.malla-block-code {
-  display: inline-flex;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #475467;
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.malla-block-inactive {
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #f2f4f7;
-  color: #667085;
-  font-size: 10px;
-  font-weight: 600;
-}
-
-.malla-block-grid {
   width: max-content;
   min-width: 100%;
   display: grid;
@@ -1099,14 +933,6 @@
   align-items: start;
   gap: 70px;
   padding-bottom: 10px;
-}
-
-.malla-block-unassigned .malla-block-header {
-  border-bottom-style: dashed;
-}
-
-.malla-block-unassigned .malla-block-header h3 {
-  color: #b54708;
 }
 
 .malla-column {
@@ -1625,7 +1451,7 @@
     padding: 20px 30px 32px;
   }
 
-  .malla-block-grid {
+  .malla-plan-grid {
     grid-auto-columns: 220px;
     gap: 55px;
   }
@@ -2777,3 +2603,300 @@
 
 
 
+
+/* =========================================================
+   TIPOS DE ASIGNATURA DEL PLAN
+   ========================================================= */
+
+.plan-subject-type-badge,
+.malla-card-type-badge {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid #eaecf0;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.plan-subject-type-badge.is-obligatoria,
+.malla-card-type-badge.is-obligatoria {
+  background: #f8f9fb;
+  color: #475467;
+}
+
+.plan-subject-type-badge.is-general,
+.malla-card-type-badge.is-general {
+  border-color: #d9e6ff;
+  background: #f5f8ff;
+  color: #365f91;
+}
+
+.plan-subject-type-badge.is-optativa,
+.malla-card-type-badge.is-optativa {
+  border-color: rgba(207, 32, 41, 0.16);
+  background: rgba(207, 32, 41, 0.055);
+  color: var(--una-red-dark, #b71922);
+}
+
+.plan-subject-type-badge.is-otra,
+.malla-card-type-badge.is-otra {
+  border-color: #e4e7ec;
+  background: #f9fafb;
+  color: #667085;
+}
+
+.plan-subject-type-optativa,
+.malla-card-type-optativa {
+  box-shadow: inset 3px 0 0 rgba(207, 32, 41, 0.3);
+}
+
+.plan-subject-type-general,
+.malla-card-type-general {
+  box-shadow: inset 3px 0 0 rgba(54, 95, 145, 0.24);
+}
+
+.malla-card-type-badge {
+  position: relative;
+  z-index: 2;
+  margin-top: 2px;
+  font-size: 8.5px;
+}
+
+.plan-type-help {
+  margin-top: 5px;
+  line-height: 1.45;
+}
+
+.plan-type-locked {
+  margin-top: 4px;
+  color: #b54708;
+}
+
+
+/* =========================================================
+   REGLA DE OPTATIVAS DEL PLAN
+   ========================================================= */
+
+.plan-optative-rule {
+  display: grid;
+  gap: 18px;
+}
+
+.plan-optative-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 12px;
+}
+
+.plan-optative-count,
+.plan-optative-rule-state {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+
+.plan-optative-count {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-optative-count > span,
+.plan-optative-catalog-info > header > span,
+.plan-optative-rule-form > header > span {
+  color: #98a2b3;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.plan-optative-count > strong {
+  color: var(--una-red, #cf2029);
+  font-size: 26px;
+  font-weight: 750;
+  line-height: 1.05;
+}
+
+.plan-optative-count > small,
+.plan-optative-rule-state small {
+  color: #667085;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.plan-optative-rule-state {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.plan-optative-rule-state > svg {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  color: #98a2b3;
+}
+
+.plan-optative-rule-state.is-configured > svg {
+  color: #067647;
+}
+
+.plan-optative-rule-state > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.plan-optative-rule-state strong {
+  color: #344054;
+  font-size: 11px;
+}
+
+.plan-optative-catalog-info,
+.plan-optative-rule-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.plan-optative-catalog-info > header,
+.plan-optative-rule-form > header {
+  display: grid;
+  gap: 4px;
+}
+
+.plan-optative-catalog-info > header > strong,
+.plan-optative-rule-form > header > strong {
+  color: #344054;
+  font-size: 12px;
+}
+
+.plan-optative-catalog-info > header > p,
+.plan-optative-rule-form > header > p {
+  max-width: 760px;
+  margin: 0;
+  color: #667085;
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+.plan-optative-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.plan-optative-kind {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.plan-optative-kind-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(207, 32, 41, 0.055);
+  color: var(--una-red, #cf2029);
+}
+
+.plan-optative-kind-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.plan-optative-kind > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.plan-optative-kind strong {
+  color: #344054;
+  font-size: 10px;
+}
+
+.plan-optative-kind p {
+  margin: 0;
+  color: #667085;
+  font-size: 8.8px;
+  line-height: 1.5;
+}
+
+.plan-optative-fields {
+  padding: 13px;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+
+.plan-optative-empty-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #fedf89;
+  border-radius: 9px;
+  background: #fffaeb;
+  color: #b54708;
+}
+
+.plan-optative-empty-rule.is-warning {
+  margin-top: 2px;
+}
+
+.plan-optative-empty-rule > svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.plan-optative-empty-rule > div {
+  display: grid;
+  gap: 3px;
+}
+
+.plan-optative-empty-rule strong {
+  font-size: 10px;
+}
+
+.plan-optative-empty-rule p {
+  margin: 0;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.plan-optative-delete {
+  color: #b42318;
+}
+
+.plan-optative-delete:hover:not(:disabled) {
+  border-color: #fecdca;
+  background: #fef3f2;
+  color: #b42318;
+}
+
+@media (max-width: 800px) {
+  .plan-optative-overview,
+  .plan-optative-kind-grid {
+    grid-template-columns: 1fr;
+  }
+}

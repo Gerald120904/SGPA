@@ -1,3 +1,4 @@
+
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("sgpa", {
@@ -80,6 +81,12 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("planes-estudio:actualizar", id, datos),
   cambiarEstadoPlanEstudio: (id, activo) =>
     ipcRenderer.invoke("planes-estudio:cambiar-estado", id, activo),
+  obtenerReglaOptativasPlan: (planId) =>
+    ipcRenderer.invoke("plan-reglas-optativas:obtener", planId),
+  guardarReglaOptativasPlan: (planId, datos) =>
+    ipcRenderer.invoke("plan-reglas-optativas:guardar", planId, datos),
+  eliminarReglaOptativasPlan: (planId) =>
+    ipcRenderer.invoke("plan-reglas-optativas:eliminar", planId),
   listarPlanAsignaturas: (planId) =>
     ipcRenderer.invoke("plan-asignaturas:listar", planId),
   obtenerPlanAsignatura: (planId, id) =>

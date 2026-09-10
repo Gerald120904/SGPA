@@ -1,3 +1,4 @@
+
 import { app, BrowserWindow, ipcMain, net } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
@@ -540,6 +541,64 @@ ipcMain.handle("planes-estudio:cambiar-estado", async (_event, id, activo) => {
     method: "PATCH",
     body: { activo },
   });
+});
+
+/* =========================================================
+   REGLA DE OPTATIVAS DEL PLAN
+   ========================================================= */
+
+ipcMain.handle("plan-reglas-optativas:obtener", async (_event, planId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/planes-estudio/${planId}/regla-optativas`,
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return {
+    ok: true,
+    regla: resultado.data?.regla ?? null,
+    cantidadEspaciosOptativos:
+      Number(resultado.data?.cantidadEspaciosOptativos || 0),
+  };
+});
+
+ipcMain.handle(
+  "plan-reglas-optativas:guardar",
+  async (_event, planId, datos) => {
+    const resultado = await ejecutarPeticionAutenticada(
+      `/planes-estudio/${planId}/regla-optativas`,
+      {
+        method: "PUT",
+        body: datos,
+      },
+    );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      regla: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle("plan-reglas-optativas:eliminar", async (_event, planId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/planes-estudio/${planId}/regla-optativas`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return { ok: true };
 });
 
 /* =========================================================

@@ -1,3 +1,4 @@
+
 import ExcelJS from "exceljs";
 
 function normalizarCabecera(valor) {
@@ -61,17 +62,10 @@ export async function leerArchivoPlanExcel(filePath) {
   await workbook.xlsx.readFile(filePath);
 
   return {
-    bloques: leerHojaExcel(workbook, "BLOQUES", [
-      "CODIGO",
-      "NOMBRE",
-      "TIPO",
-      "ORDEN",
-    ]),
     asignaturas: leerHojaExcel(workbook, "ASIGNATURAS", [
       "CLAVE",
       "CODIGO",
       "NOMBRE",
-      "BLOQUE",
       "NIVEL",
       "CICLO",
       "ORDEN",
@@ -167,33 +161,10 @@ export async function crearPlantillaExcelPlan(destino) {
   workbook.title = "Plantilla de Plan de Estudio";
   workbook.subject = "Importación de mallas curriculares SGPA";
 
-  const bloques = prepararHoja(workbook, "BLOQUES", [
-    { header: "CODIGO", key: "codigo" },
-    { header: "NOMBRE", key: "nombre", width: 36 },
-    { header: "TIPO", key: "tipo", width: 22 },
-    { header: "ORDEN", key: "orden", width: 12 },
-    { header: "DESCRIPCION", key: "descripcion", width: 45 },
-  ]);
-  bloques.addRow({
-    codigo: "TC",
-    nombre: "Tronco común",
-    tipo: "TRONCO_COMUN",
-    orden: 1,
-    descripcion: "Fila de ejemplo. Puede eliminarla.",
-  });
-  aplicarValidacionLista(bloques, "C", 300, [
-    "TRONCO_COMUN",
-    "ENFASIS",
-    "SALIDA_LATERAL",
-    "GRADO",
-    "OTRO",
-  ]);
-
   const asignaturas = prepararHoja(workbook, "ASIGNATURAS", [
     { header: "CLAVE", key: "clave", width: 18 },
     { header: "CODIGO", key: "codigo", width: 20 },
     { header: "NOMBRE", key: "nombre", width: 36 },
-    { header: "BLOQUE", key: "bloque", width: 18 },
     { header: "NIVEL", key: "nivel", width: 10 },
     { header: "CICLO", key: "ciclo", width: 10 },
     { header: "ORDEN", key: "orden", width: 10 },
@@ -213,7 +184,6 @@ export async function crearPlantillaExcelPlan(destino) {
       clave: "EIF101",
       codigo: "EIF101",
       nombre: "Fundamentos de Informática",
-      bloque: "TC",
       nivel: 1,
       ciclo: 1,
       orden: 1,
@@ -231,7 +201,6 @@ export async function crearPlantillaExcelPlan(destino) {
       clave: "EIF102",
       codigo: "EIF102",
       nombre: "Programación I",
-      bloque: "TC",
       nivel: 1,
       ciclo: 1,
       orden: 2,
@@ -239,10 +208,19 @@ export async function crearPlantillaExcelPlan(destino) {
       tipo: "OBLIGATORIA",
     },
     {
+      clave: "GEN-01",
+      codigo: "GEN-01",
+      nombre: "Estudios Generales I",
+      nivel: 1,
+      ciclo: 1,
+      orden: 3,
+      creditos: 3,
+      tipo: "GENERAL",
+    },
+    {
       clave: "OPT-01",
       codigo: "OPT-01",
       nombre: "Optativa",
-      bloque: "TC",
       nivel: 2,
       ciclo: 1,
       orden: 1,
@@ -250,15 +228,16 @@ export async function crearPlantillaExcelPlan(destino) {
       tipo: "OPTATIVA",
     },
   ]);
-  aplicarValidacionLista(asignaturas, "I", 600, [
+  aplicarValidacionLista(asignaturas, "H", 600, [
     "OBLIGATORIA",
+    "GENERAL",
     "OPTATIVA",
     "OTRA",
   ]);
-  for (const columna of ["E", "F", "G"])
+  for (const columna of ["D", "E", "F"])
     aplicarValidacionNumero(asignaturas, columna, 600, 1);
-  aplicarValidacionNumero(asignaturas, "H", 600, 0);
-  for (const columna of ["J", "K", "L", "M", "N", "O", "P"])
+  aplicarValidacionNumero(asignaturas, "G", 600, 0);
+  for (const columna of ["I", "J", "K", "L", "M", "N", "O"])
     aplicarValidacionNumero(asignaturas, columna, 600, 0, true, "decimal");
 
   const requisitos = prepararHoja(workbook, "REQUISITOS", [
@@ -324,12 +303,8 @@ export async function crearPlantillaExcelPlan(destino) {
     ["PLANTILLA SGPA", "Importación completa de un plan de estudio"],
     ["", ""],
     [
-      "BLOQUES",
-      "Define tronco común, énfasis u otras agrupaciones estructurales.",
-    ],
-    [
       "ASIGNATURAS",
-      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan.",
+      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan. TIPO admite OBLIGATORIA, GENERAL, OPTATIVA u OTRA.",
     ],
     [
       "Asignaturas",
