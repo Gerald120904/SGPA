@@ -48,7 +48,8 @@ function renderNavItem(module) {
 
 export function Sidebar({
   usuario,
-  roles
+  roles,
+  permisos,
 }) {
 
   const nombre =
@@ -75,7 +76,8 @@ export function Sidebar({
       (module) =>
         puedeAcceder(
           roles,
-          module.id
+          module.id,
+          permisos,
         )
     );
 

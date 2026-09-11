@@ -318,140 +318,94 @@ function renderizarResumen(
    ========================================================= */
 
 export function VerPlanPage({
-
   plan,
-
   resumenPlan,
-
   reglaOptativasPlan = null,
-
   creditosTotales = 0,
-
   vista = "LISTA",
-
-  contenidoVista = ""
-
+  contenidoVista = "",
+  puedeGestionar = false,
 }) {
-
   if (!plan) {
-
     return `
       <div class="planes-message planes-error">
-
-        No fue posible cargar
-        el plan de estudio.
-
+        No fue posible cargar el plan de estudio.
       </div>
     `;
-
   }
-
-
 
   return `
     <section class="ver-plan-page">
-
-
       <!-- =================================================
            INFORMACIÓN PRINCIPAL
            ================================================= -->
-
       <header class="ver-plan-hero">
-
-
         <!-- ============================================= -->
         <!-- FILA SUPERIOR -->
         <!-- ============================================= -->
-
         <div class="ver-plan-hero-top">
-
           <button
             id="volverPlanesButton"
             class="ver-plan-back"
             type="button"
           >
-
             <span
               class="ver-plan-back-arrow"
               aria-hidden="true"
             >
               ←
             </span>
-
             Planes de estudio
-
           </button>
 
-
-          <!--
-            Se reutiliza el botón principal de Planes
-            para que sea idéntico a Nuevo plan.
-          -->
-
-          <button
-            id="agregarAsignaturaButton"
-            class="
-              planes-primary-button
-              ver-plan-add-button
-            "
-            type="button"
-          >
-
-            <i
-              data-lucide="plus"
-              aria-hidden="true"
-            ></i>
-
-            Agregar asignatura
-
-          </button>
-
+          ${
+            puedeGestionar
+              ? `
+                <button
+                  id="agregarAsignaturaButton"
+                  class="
+                    planes-primary-button
+                    ver-plan-add-button
+                  "
+                  type="button"
+                >
+                  <i
+                    data-lucide="plus"
+                    aria-hidden="true"
+                  ></i>
+                  Agregar asignatura
+                </button>
+              `
+              : ""
+          }
         </div>
-
 
         <!-- ============================================= -->
         <!-- TÍTULO -->
         <!-- ============================================= -->
-
         <div class="ver-plan-title">
-
           <span class="ver-plan-eyebrow">
             Plan académico
           </span>
 
-
           <h2>
-            ${escapeHtml(
-              plan.nombre
-            )}
+            ${escapeHtml(plan.nombre)}
           </h2>
 
-
           <div class="ver-plan-meta">
-
             <span class="ver-plan-meta-code">
-
-              ${escapeHtml(
-                plan.codigo
-              )}
-
+              ${escapeHtml(plan.codigo)}
             </span>
-
 
             ${
               plan.carrera?.nombre
                 ? `
                     <span>
-
-                      ${escapeHtml(
-                        plan.carrera.nombre
-                      )}
-
+                      ${escapeHtml(plan.carrera.nombre)}
                     </span>
                   `
                 : ""
             }
-
 
             <span
               class="
@@ -463,170 +417,90 @@ export function VerPlanPage({
                 }
               "
             >
-
               ${
                 plan.activo
                   ? "Activo"
                   : "Inactivo"
               }
-
             </span>
-
           </div>
-
         </div>
-
       </header>
-
 
       <!-- =================================================
            HERRAMIENTAS
            ================================================= -->
-
       <section class="ver-plan-tools">
-
-
-        <!-- ============================================= -->
-        <!-- ETIQUETA -->
-        <!-- ============================================= -->
-
         <div class="ver-plan-tools-title">
-
           <span>
             Herramientas
           </span>
-
         </div>
-
-
-        <!-- ============================================= -->
-        <!-- OPCIONES -->
-        <!-- ============================================= -->
 
         <div class="ver-plan-tools-grid">
-
-
           ${renderizarHerramienta({
-
-            id:
-              "salidasAcademicasButton",
-
-            icono:
-              "square-arrow-right-exit",
-
-            texto:
-              "Salidas",
-
-            title:
-              "Salidas académicas"
-
+            id: "salidasAcademicasButton",
+            icono: "square-arrow-right-exit",
+            texto: "Salidas",
+            title: "Salidas académicas",
           })}
 
-
           ${renderizarHerramienta({
-
-            id:
-              "reglaOptativasButton",
-
-            icono:
-              "shuffle",
-
-            texto:
-              "Optativas",
-
-            title:
-              "Configurar regla de optativas del plan"
-
+            id: "reglaOptativasButton",
+            icono: "shuffle",
+            texto: "Optativas",
+            title: "Configurar regla de optativas del plan",
           })}
 
+          ${
+            puedeGestionar
+              ? renderizarHerramienta({
+                  id: "cargaRapidaButton",
+                  icono: "zap",
+                  texto: "Carga rápida",
+                  title: "Carga rápida de asignaturas",
+                })
+              : ""
+          }
+
+          ${
+            puedeGestionar
+              ? renderizarHerramienta({
+                  id: "requisitosRapidosButton",
+                  icono: "construction",
+                  texto: "Requisitos",
+                  title: "Requisitos rápidos",
+                })
+              : ""
+          }
 
           ${renderizarHerramienta({
-
-            id:
-              "cargaRapidaButton",
-
-            icono:
-              "zap",
-
-            texto:
-              "Carga rápida",
-
-            title:
-              "Carga rápida de asignaturas"
-
+            id: "revisarPlanButton",
+            icono: "shield-check",
+            texto: "Revisar",
+            title: "Revisar consistencia del plan",
           })}
 
+          ${
+            puedeGestionar
+              ? renderizarHerramienta({
+                  id: "importarExcelPlanButton",
+                  icono: "import",
+                  texto: "Importar",
+                  title: "Importar plan desde Excel",
+                })
+              : ""
+          }
 
           ${renderizarHerramienta({
-
-            id:
-              "requisitosRapidosButton",
-
-            icono:
-              "construction",
-
-            texto:
-              "Requisitos",
-
-            title:
-              "Requisitos rápidos"
-
+            id: "plantillaExcelPlanButton",
+            icono: "book-marked",
+            texto: "Plantilla",
+            title: "Descargar plantilla",
           })}
-
-
-          ${renderizarHerramienta({
-
-            id:
-              "revisarPlanButton",
-
-            icono:
-              "shield-check",
-
-            texto:
-              "Revisar",
-
-            title:
-              "Revisar consistencia del plan"
-
-          })}
-
-
-          ${renderizarHerramienta({
-
-            id:
-              "importarExcelPlanButton",
-
-            icono:
-              "import",
-
-            texto:
-              "Importar",
-
-            title:
-              "Importar plan desde Excel"
-
-          })}
-
-
-          ${renderizarHerramienta({
-
-            id:
-              "plantillaExcelPlanButton",
-
-            icono:
-              "book-marked",
-
-            texto:
-              "Plantilla",
-
-            title:
-              "Descargar plantilla"
-
-          })}
-
         </div>
-
       </section>
+
 
 
       <!-- =================================================

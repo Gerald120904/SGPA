@@ -12,6 +12,7 @@ import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { MailService } from '../mail/mail.service';
 import { RolSistema, ROLES_SISTEMA } from './constants/roles.constants';
+import { PermisosService } from '../permisos/permisos.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +20,7 @@ export class AuthService {
     private readonly usuariosService: UsuariosService,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
+    private readonly permisosService: PermisosService,
   ) {}
 
   private obtenerRolesValidos(
@@ -70,6 +72,11 @@ export class AuthService {
       );
     }
 
+    const permisos = await this.permisosService.obtenerPermisosEfectivos(
+      usuario.id,
+      roles,
+    );
+
     const payload = {
       sub: usuario.id,
       correo: usuario.correo,
@@ -90,6 +97,7 @@ export class AuthService {
         apellido2: usuario.apellido2,
         correo: usuario.correo,
         roles,
+        permisos,
       },
     };
   }
@@ -186,6 +194,11 @@ export class AuthService {
       );
     }
 
+    const permisos = await this.permisosService.obtenerPermisosEfectivos(
+      usuario.id,
+      roles,
+    );
+
     return {
       id: usuario.id,
       cedula: usuario.cedula,
@@ -194,6 +207,7 @@ export class AuthService {
       apellido2: usuario.apellido2,
       correo: usuario.correo,
       roles,
+      permisos,
     };
   }
 }

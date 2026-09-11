@@ -267,6 +267,96 @@ export function formatearRoles(
 
 
 /* =========================================================
+   PERMISOS DEL USUARIO
+   ========================================================= */
+
+export function obtenerPermisosUsuario(
+  usuario = obtenerUsuario(),
+) {
+
+  if (!usuario) {
+    return [];
+  }
+
+
+  const permisos =
+    Array.isArray(
+      usuario.permisos,
+    )
+      ? usuario.permisos
+      : [];
+
+
+  return [
+    ...new Set(
+      permisos
+        .map(
+          (permiso) => {
+
+            if (
+              typeof permiso ===
+              'string'
+            ) {
+              return permiso.trim();
+            }
+
+
+            if (
+              typeof permiso
+                ?.permiso ===
+              'string'
+            ) {
+              return permiso.permiso
+                .trim();
+            }
+
+
+            return null;
+
+          },
+        )
+        .filter(Boolean),
+    ),
+  ];
+
+}
+
+
+export function usuarioTienePermiso(
+  permiso,
+  usuario = obtenerUsuario(),
+) {
+
+  if (!permiso) {
+    return false;
+  }
+
+
+  const roles =
+    obtenerRolesUsuario(
+      usuario,
+    );
+
+
+  if (
+    roles.includes(
+      ROLES.ADMIN_GLOBAL,
+    )
+  ) {
+    return true;
+  }
+
+
+  return obtenerPermisosUsuario(
+    usuario,
+  ).includes(
+    permiso,
+  );
+
+}
+
+
+/* =========================================================
    LIMPIAR SESIÓN
    ========================================================= */
 

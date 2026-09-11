@@ -9,20 +9,20 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { CursoRequisitosService } from './curso-requisitos.service';
 import { CrearCursoRequisitoDto } from './dto/crear-curso-requisito.dto';
 
 @Controller('cursos/:cursoId/requisitos')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class CursoRequisitosController {
   constructor(private readonly service: CursoRequisitosService) {}
 
   @Get()
+  @Permisos(PermisoSistema.CURSOS_VER)
   listar(
     @Param('cursoId', ParseIntPipe)
     cursoId: number,
@@ -31,6 +31,7 @@ export class CursoRequisitosController {
   }
 
   @Post()
+  @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   crear(
     @Param('cursoId', ParseIntPipe)
     cursoId: number,
@@ -42,6 +43,7 @@ export class CursoRequisitosController {
 
   @Delete(':id')
   @HttpCode(204)
+  @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   async eliminar(
     @Param('cursoId', ParseIntPipe)
     cursoId: number,

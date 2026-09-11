@@ -310,6 +310,104 @@ ipcMain.handle("roles:listar", async () => {
 });
 
 /* =========================================================
+   PERMISOS
+   ========================================================= */
+
+ipcMain.handle(
+  "permisos:catalogo",
+  async () => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        "/permisos/catalogo",
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  "permisos:usuario",
+  async (_event, usuarioId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/permisos/usuarios/${usuarioId}`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  "permisos:reemplazar",
+  async (
+    _event,
+    usuarioId,
+    permisos,
+  ) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/permisos/usuarios/${usuarioId}`,
+        {
+          method: "PUT",
+          body: {
+            permisos,
+          },
+        },
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  'permisos:plantillas',
+  async () => {
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/permisos/plantillas-roles',
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      plantillas:
+        resultado.data,
+    };
+
+  },
+);
+
+/* =========================================================
    CARRERAS
    ========================================================= */
 
@@ -430,6 +528,40 @@ ipcMain.handle("cursos:cambiar-estado", async (_event, id, activo) => {
     body: { activo },
   });
 });
+
+ipcMain.handle("cursos:requisitos:listar", async (_event, cursoId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/cursos/${cursoId}/requisitos`,
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return {
+    ok: true,
+    requisitos: resultado.data,
+  };
+});
+
+ipcMain.handle("cursos:requisitos:crear", async (_event, cursoId, datos) => {
+  return ejecutarPeticionAutenticada(`/cursos/${cursoId}/requisitos`, {
+    method: "POST",
+    body: datos,
+  });
+});
+
+ipcMain.handle(
+  "cursos:requisitos:eliminar",
+  async (_event, cursoId, requisitoId) => {
+    return ejecutarPeticionAutenticada(
+      `/cursos/${cursoId}/requisitos/${requisitoId}`,
+      {
+        method: "DELETE",
+      },
+    );
+  },
+);
 
 /* =========================================================
    PERIODOS ACADÉMICOS

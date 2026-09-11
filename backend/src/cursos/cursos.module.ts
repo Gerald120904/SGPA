@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
 import { CursoOptativo } from '../optativas/entities/curso-optativo.entity';
+import { PermisosModule } from '../permisos/permisos.module';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { CursoRequisitosController } from './curso-requisitos.controller';
 import { CursoRequisitosService } from './curso-requisitos.service';
@@ -19,6 +20,7 @@ import { Curso } from './entities/curso.entity';
       PlanAsignatura,
     ]),
     SecurityModule,
+    PermisosModule,
   ],
   controllers: [CursosController, CursoRequisitosController],
   providers: [CursosService, CursoRequisitosService],

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
+import { PermisosModule } from '../permisos/permisos.module';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
@@ -35,6 +36,7 @@ import { SalidasAcademicasService } from './salidas-academicas.service';
       Carrera,
     ]),
     SecurityModule,
+    PermisosModule,
   ],
   controllers: [
     PlanesEstudioController,

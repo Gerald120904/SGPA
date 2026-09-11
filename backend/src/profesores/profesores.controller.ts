@@ -34,7 +34,11 @@ import { SolicitarPerfilProfesorDto } from './dto/solicitar-perfil-profesor.dto'
 import { ProfesoresService } from './profesores.service';
 
 @Controller('profesores')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(
+  AuthGuard,
+  RolesGuard,
+  PermisosGuard,
+)
 export class ProfesoresController {
   constructor(private readonly profesoresService: ProfesoresService) {}
 
@@ -105,8 +109,6 @@ export class ProfesoresController {
   }
 
   @Patch(':profesorId/perfiles/:perfilId/revision')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
-  @UseGuards(PermisosGuard)
   @Permisos(PermisoSistema.PERFILES_DOCENTES_VALIDAR)
   revisarPerfilProfesor(
     @Param('profesorId', ParseIntPipe) profesorId: number,
@@ -123,7 +125,7 @@ export class ProfesoresController {
   }
 
   @Patch(':profesorId/perfiles/:perfilId/inactivar')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.PERFILES_DOCENTES_VALIDAR)
   inactivarPerfilProfesor(
     @Param('profesorId', ParseIntPipe) profesorId: number,
     @Param('perfilId', ParseIntPipe) perfilId: number,
@@ -187,8 +189,6 @@ export class ProfesoresController {
   }
 
   @Patch(':profesorId/atestados/:atestadoId/revision')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
-  @UseGuards(PermisosGuard)
   @Permisos(PermisoSistema.ATESTADOS_VALIDAR)
   revisarAtestadoProfesor(
     @Param('profesorId', ParseIntPipe) profesorId: number,
@@ -273,7 +273,7 @@ export class ProfesoresController {
   }
 
   @Get(':profesorId/historial-perfil')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.PROFESORES_VER)
   obtenerHistorialPerfil(
     @Param('profesorId', ParseIntPipe) profesorId: number,
   ) {
@@ -281,13 +281,13 @@ export class ProfesoresController {
   }
 
   @Get()
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.PROFESORES_VER)
   listar(@Query() filtros: FiltroProfesoresDto) {
     return this.profesoresService.listar(filtros);
   }
 
   @Get(':id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.PROFESORES_VER)
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
     return this.profesoresService.obtenerPorId(id);
   }

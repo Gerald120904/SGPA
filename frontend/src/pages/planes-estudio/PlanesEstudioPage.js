@@ -39,6 +39,8 @@ import {
   seleccionarExcelPlan,
   validarImportacionPlan,
 } from "../../services/plan-importacion.service.js";
+import { usuarioTienePermiso } from "../../app/session.js";
+import { PERMISOS } from "../../config/permissions.js";
 import { confirmarAccion } from "../../utils/confirm.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
@@ -49,6 +51,22 @@ import {
 } from "../../components/FormDialog.js";
 import { mostrarExito, mostrarError } from "../../components/AlertModal.js";
 import { VerPlanPage } from "./VerPlanPage.js";
+
+const GRADOS_PLAN = {
+  DIPLOMADO: "Diplomado",
+  BACHILLERATO: "Bachillerato",
+  LICENCIATURA: "Licenciatura",
+  MAESTRIA: "Maestría",
+  OTRO: "Otro",
+};
+
+function formatearGradoPlan(grado) {
+  return GRADOS_PLAN[grado] || grado || "—";
+}
+
+function puedeGestionarPlanes() {
+  return usuarioTienePermiso(PERMISOS.PLANES_ESTUDIO_GESTIONAR);
+}
 
 let planes = [];
 let carrerasDisponibles = [];
@@ -95,14 +113,20 @@ export function PlanesEstudioPage() {
           <p>Administración de los planes académicos asociados a cada carrera.</p>
         </div>
 
-        <button
-          id="nuevoPlanButton"
-          class="planes-primary-button"
-          type="button"
-        >
-          <i data-lucide="plus" aria-hidden="true"></i>
-          Nuevo plan
-        </button>
+        ${
+          puedeGestionarPlanes()
+            ? `
+              <button
+                id="nuevoPlanButton"
+                class="planes-primary-button"
+                type="button"
+              >
+                <i data-lucide="plus" aria-hidden="true"></i>
+                Nuevo plan
+              </button>
+            `
+            : ""
+        }
       </div>
 
       <div
@@ -245,6 +269,10 @@ function renderizarPlanes() {
           </td>
 
           <td>
+            ${escapeHtml(formatearGradoPlan(plan.grado))}
+          </td>
+
+          <td>
             <span class="plan-status ${
               plan.activo ? "plan-status-active" : "plan-status-inactive"
             }">
@@ -264,32 +292,40 @@ function renderizarPlanes() {
               <i data-lucide="eye" aria-hidden="true"></i>
             </button>
 
-            <button
-              class="planes-icon-button"
-              data-action="editar"
-              data-id="${plan.id}"
-              type="button"
-              title="Editar plan"
-            >
-              <i data-lucide="pencil" aria-hidden="true"></i>
-            </button>
+            ${
+              puedeGestionarPlanes()
+                ? `
+                  <button
+                    class="planes-icon-button"
+                    data-action="editar"
+                    data-id="${plan.id}"
+                    type="button"
+                    title="Editar plan"
+                  >
+                    <i data-lucide="pencil" aria-hidden="true"></i>
+                  </button>
 
-            <button
-              class="planes-icon-button ${
-                plan.activo ? "planes-danger-button" : "planes-success-button"
-              }"
-              data-action="estado"
-              data-id="${plan.id}"
-              type="button"
-              title="${plan.activo ? "Desactivar plan" : "Activar plan"}"
-            >
-              <i
-                data-lucide="${
-                  plan.activo ? "circle-pause" : "circle-check"
-                }"
-                aria-hidden="true"
-              ></i>
-            </button>
+                  <button
+                    class="planes-icon-button ${
+                      plan.activo
+                        ? "planes-danger-button"
+                        : "planes-success-button"
+                    }"
+                    data-action="estado"
+                    data-id="${plan.id}"
+                    type="button"
+                    title="${plan.activo ? "Desactivar plan" : "Activar plan"}"
+                  >
+                    <i
+                      data-lucide="${
+                        plan.activo ? "circle-pause" : "circle-check"
+                      }"
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+                `
+                : ""
+            }
           </td>
         </tr>
       `,
@@ -297,7 +333,7 @@ function renderizarPlanes() {
     .join("");
 
   contenedor.innerHTML = DataTable({
-    columns: ["Código", "Plan de estudio", "Carrera", "Estado", "Acciones"],
+    columns: ["Código", "Plan de estudio", "Carrera", "Grado", "Estado", "Acciones"],
     rows: filas,
     emptyMessage:
       "No se encontraron planes de estudio con los filtros seleccionados.",
@@ -384,6 +420,11 @@ async function cargarDatos(instancia) {
 }
 
 function abrirFormulario(plan = null) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedback("No posee permiso para gestionar planes de estudio.", "error");
+    return;
+  }
+
   const dialog =
     document.getElementById(
       "planDialog"
@@ -476,47 +517,6 @@ function abrirFormulario(plan = null) {
           </label>
         `;
 
-  const grados = [
-    {
-      valor: "DIPLOMADO",
-      texto: "Diplomado"
-    },
-    {
-      valor: "BACHILLERATO",
-      texto: "Bachillerato"
-    },
-    {
-      valor: "LICENCIATURA",
-      texto: "Licenciatura"
-    },
-    {
-      valor: "MAESTRIA",
-      texto: "Maestría"
-    },
-    {
-      valor: "OTRO",
-      texto: "Otro"
-    }
-  ];
-
-  const opcionesGrados =
-    grados
-      .map(
-        (grado) => `
-          <option
-            value="${grado.valor}"
-            ${
-              plan?.grado === grado.valor
-                ? "selected"
-                : ""
-            }
-          >
-            ${grado.texto}
-          </option>
-        `
-      )
-      .join("");
-
   const body = `
     ${carreraField}
 
@@ -531,21 +531,22 @@ function abrirFormulario(plan = null) {
         name="grado"
         required
       >
-
-        <option
-          value=""
-          ${
-            !plan?.grado
-              ? "selected"
-              : ""
-          }
-          disabled
-        >
-          Seleccione un grado...
-        </option>
-
-        ${opcionesGrados}
-
+        ${Object.entries(GRADOS_PLAN)
+          .map(
+            ([valor, nombre]) => `
+              <option
+                value="${valor}"
+                ${
+                  (plan?.grado || "BACHILLERATO") === valor
+                    ? "selected"
+                    : ""
+                }
+              >
+                ${nombre}
+              </option>
+            `,
+          )
+          .join("")}
       </select>
 
     </label>
@@ -847,6 +848,11 @@ function abrirFormulario(plan = null) {
 }
 
 async function alternarEstado(plan) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedback("No posee permiso para gestionar planes de estudio.", "error");
+    return;
+  }
+
   const nuevoEstado = !plan.activo;
   const accion = nuevoEstado ? "activar" : "desactivar";
   const confirmado = await confirmarAccion({
@@ -861,6 +867,7 @@ async function alternarEstado(plan) {
   if (!confirmado) {
     return;
   }
+
 
   try {
     const resultado = await cambiarEstadoPlanEstudio(plan.id, nuevoEstado);
@@ -1251,32 +1258,38 @@ function renderizarAsignaturaLista(asignatura) {
           ${requisitos.length > 0 ? `<span>${requisitos.length}</span>` : ""}
         </button>
 
-        <button
-          class="planes-icon-button"
-          data-asignatura-action="editar"
-          data-id="${asignatura.id}"
-          type="button"
-          title="Editar"
-          aria-label="Editar ${escapeHtml(datos.nombre)}"
-        >
-          <i data-lucide="pencil" aria-hidden="true"></i>
-        </button>
+        ${
+          puedeGestionarPlanes()
+            ? `
+              <button
+                class="planes-icon-button"
+                data-asignatura-action="editar"
+                data-id="${asignatura.id}"
+                type="button"
+                title="Editar"
+                aria-label="Editar ${escapeHtml(datos.nombre)}"
+              >
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
 
-        <button
-          class="planes-icon-button"
-          data-asignatura-action="estado"
-          data-id="${asignatura.id}"
-          type="button"
-          title="${asignatura.activo ? "Desactivar" : "Activar"}"
-          aria-label="${asignatura.activo ? "Desactivar" : "Activar"} ${escapeHtml(
-            datos.nombre,
-          )}"
-        >
-          <i
-            data-lucide="${asignatura.activo ? "circle-pause" : "circle-check"}"
-            aria-hidden="true"
-          ></i>
-        </button>
+              <button
+                class="planes-icon-button"
+                data-asignatura-action="estado"
+                data-id="${asignatura.id}"
+                type="button"
+                title="${asignatura.activo ? "Desactivar" : "Activar"}"
+                aria-label="${asignatura.activo ? "Desactivar" : "Activar"} ${escapeHtml(
+                  datos.nombre,
+                )}"
+              >
+                <i
+                  data-lucide="${asignatura.activo ? "circle-pause" : "circle-check"}"
+                  aria-hidden="true"
+                ></i>
+              </button>
+            `
+            : ""
+        }
       </div>
     </article>
   `;
@@ -1509,16 +1522,22 @@ function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
                     </div>
                   </div>
 
-                  <button
-                    class="plan-cycle-add-button"
-                    data-agregar-ciclo
-                    data-nivel="${nivel}"
-                    data-ciclo="${ciclo}"
-                    type="button"
-                  >
-                    <i data-lucide="plus" aria-hidden="true"></i>
-                    Agregar asignatura
-                  </button>
+                  ${
+                    puedeGestionarPlanes()
+                      ? `
+                        <button
+                          class="plan-cycle-add-button"
+                          data-agregar-ciclo
+                          data-nivel="${nivel}"
+                          data-ciclo="${ciclo}"
+                          type="button"
+                        >
+                          <i data-lucide="plus" aria-hidden="true"></i>
+                          Agregar asignatura
+                        </button>
+                      `
+                      : ""
+                  }
                 </div>
               `
         }
@@ -1528,6 +1547,7 @@ function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
     </section>
   `;
 }
+
 
 function renderizarNivelAcademico(nivel, asignaturas = []) {
   const asignaturasNivel = asignaturas.filter(
@@ -1932,6 +1952,11 @@ async function descargarPlantillaPlan() {
 }
 
 async function seleccionarExcelParaPlan() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const button = document.getElementById("importarExcelPlanButton");
   if (button) button.disabled = true;
 
@@ -2033,6 +2058,11 @@ function renderizarProblemasImportacion(titulo, items, esError) {
 }
 
 async function ejecutarImportacionPlan(datos) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   if (!planSeleccionado) return;
   const confirmado = await confirmarAccion({
     titulo: "Importar plan de estudio",
@@ -2464,7 +2494,9 @@ function renderizarDetallePlan() {
     creditosTotales,
     vista: vistaDetallePlan,
     contenidoVista,
+    puedeGestionar: puedeGestionarPlanes(),
   });
+
 
   /*
    * Conectamos los eventos ANTES de renderizar los iconos.
@@ -2576,6 +2608,11 @@ function crearFilaCargaRapidaAsignatura(indice) {
 }
 
 function abrirCargaRapida() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   if (!planSeleccionado) {
     return;
   }
@@ -2793,6 +2830,11 @@ function construirCargaRapida() {
 }
 
 async function guardarCargaRapida() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("cargaRapidaError");
   const button = document.getElementById("guardarCargaRapida");
 
@@ -2832,6 +2874,11 @@ async function guardarCargaRapida() {
 }
 
 function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const dialog = document.getElementById("asignaturaDialog");
   const content = document.getElementById("asignaturaDialogContent");
 
@@ -3235,12 +3282,18 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
 }
 
 async function guardarAsignatura(asignatura, cerrar) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("asignaturaFormError");
   const button = document.getElementById("guardarAsignaturaButton");
 
   if (!errorBox || !button || !planSeleccionado) {
     return;
   }
+
 
   const editando = Boolean(asignatura);
   const codigoInput = document.getElementById("asignaturaCodigoReferencia");
@@ -3386,6 +3439,11 @@ async function ejecutarAccionAsignatura(accion, id) {
 
   if (accion === "requisitos") {
     abrirFormularioRequisitos(asignatura);
+    return;
+  }
+
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
 
@@ -3628,6 +3686,7 @@ function renderizarReglaOptativasPlan() {
     return;
   }
 
+  const puedeGestionar = puedeGestionarPlanes();
   const cantidadEspacios = Number(
     reglaOptativasPlan?.cantidadEspaciosOptativos || 0,
   );
@@ -3640,7 +3699,8 @@ function renderizarReglaOptativasPlan() {
     regla?.maximoOtrasAreas === undefined
       ? ""
       : Number(regla.maximoOtrasAreas);
-  const puedeConfigurar = cantidadEspacios > 0 && planSeleccionado.activo;
+  const puedeConfigurar =
+    puedeGestionar && cantidadEspacios > 0 && planSeleccionado.activo;
 
   const body = `
     <div class="plan-optative-rule">
@@ -3814,7 +3874,7 @@ function renderizarReglaOptativasPlan() {
 
   const footerHtml = `
     ${
-      regla
+      regla && puedeGestionar
         ? `
             <button
               id="eliminarReglaOptativasButton"
@@ -3837,15 +3897,21 @@ function renderizarReglaOptativasPlan() {
       Cerrar
     </button>
 
-    <button
-      id="guardarReglaOptativasButton"
-      class="sgpa-form-primary"
-      type="button"
-      ${puedeConfigurar ? "" : "disabled"}
-    >
-      <i data-lucide="save" aria-hidden="true"></i>
-      <span>Guardar regla</span>
-    </button>
+    ${
+      puedeGestionar
+        ? `
+          <button
+            id="guardarReglaOptativasButton"
+            class="sgpa-form-primary"
+            type="button"
+            ${puedeConfigurar ? "" : "disabled"}
+          >
+            <i data-lucide="save" aria-hidden="true"></i>
+            <span>Guardar regla</span>
+          </button>
+        `
+        : ""
+    }
   `;
 
   content.innerHTML = FormDialog({
@@ -3870,16 +3936,23 @@ function renderizarReglaOptativasPlan() {
     .getElementById("cancelarReglaOptativasButton")
     ?.addEventListener("click", cerrar);
 
-  document
-    .getElementById("guardarReglaOptativasButton")
-    ?.addEventListener("click", guardarReglaOptativasFrontend);
+  if (puedeGestionar) {
+    document
+      .getElementById("guardarReglaOptativasButton")
+      ?.addEventListener("click", guardarReglaOptativasFrontend);
 
-  document
-    .getElementById("eliminarReglaOptativasButton")
-    ?.addEventListener("click", eliminarReglaOptativasFrontend);
+    document
+      .getElementById("eliminarReglaOptativasButton")
+      ?.addEventListener("click", eliminarReglaOptativasFrontend);
+  }
 }
 
 async function guardarReglaOptativasFrontend() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("reglaOptativasError");
   const button = document.getElementById("guardarReglaOptativasButton");
 
@@ -3956,6 +4029,11 @@ async function guardarReglaOptativasFrontend() {
 }
 
 async function eliminarReglaOptativasFrontend() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   if (!planSeleccionado || !reglaOptativasPlan?.regla) {
     return;
   }
@@ -4026,6 +4104,11 @@ function crearFilaRequisitoRapido() {
 }
 
 function abrirRequisitosRapidos() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   if (!planSeleccionado) {
     return;
   }
@@ -4263,6 +4346,11 @@ function construirRequisitosRapidos() {
 }
 
 async function guardarRequisitosRapidos() {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("requisitosRapidosError");
   const button = document.getElementById("guardarRequisitosRapidos");
   const dialog = document.getElementById("asignaturaDialog");
@@ -4318,6 +4406,7 @@ function abrirFormularioRequisitos(asignatura) {
     return;
   }
 
+  const puedeGestionar = puedeGestionarPlanes();
   const datosAsignatura = obtenerDatosAsignatura(asignatura);
   const relaciones = obtenerRequisitosDeAsignatura(asignatura.id);
 
@@ -4374,15 +4463,21 @@ function abrirFormularioRequisitos(asignatura) {
                 </strong>
               </div>
 
-              <button
-                class="plan-requirement-delete"
-                data-eliminar-requisito="${relacion.id}"
-                type="button"
-                aria-label="Quitar ${escapeHtml(datos.nombre)}"
-              >
-                <i data-lucide="trash-2" aria-hidden="true"></i>
-                <span>Quitar</span>
-              </button>
+              ${
+                puedeGestionar
+                  ? `
+                    <button
+                      class="plan-requirement-delete"
+                      data-eliminar-requisito="${relacion.id}"
+                      type="button"
+                      aria-label="Quitar ${escapeHtml(datos.nombre)}"
+                    >
+                      <i data-lucide="trash-2" aria-hidden="true"></i>
+                      <span>Quitar</span>
+                    </button>
+                  `
+                  : ""
+              }
             </article>
           `;
         })
@@ -4401,22 +4496,8 @@ function abrirFormularioRequisitos(asignatura) {
         </div>
       `;
 
-  const body = `
-    <div class="plan-requirements-modern">
-      <section class="plan-current-requirements">
-        <div class="plan-requirements-section-heading">
-          <div>
-            <span>Relaciones actuales</span>
-            <strong>Requisitos y correquisitos</strong>
-          </div>
-          <span class="plan-requirements-count">${relaciones.length}</span>
-        </div>
-
-        <div class="plan-requirements-list">
-          ${relacionesHtml}
-        </div>
-      </section>
-
+  const seccionNuevaRelacion = puedeGestionar
+    ? `
       <section class="plan-add-requirement">
         <div class="plan-requirements-section-heading">
           <div>
@@ -4464,6 +4545,26 @@ function abrirFormularioRequisitos(asignatura) {
               `
         }
       </section>
+    `
+    : "";
+
+  const body = `
+    <div class="plan-requirements-modern">
+      <section class="plan-current-requirements">
+        <div class="plan-requirements-section-heading">
+          <div>
+            <span>Relaciones actuales</span>
+            <strong>Requisitos y correquisitos</strong>
+          </div>
+          <span class="plan-requirements-count">${relaciones.length}</span>
+        </div>
+
+        <div class="plan-requirements-list">
+          ${relacionesHtml}
+        </div>
+      </section>
+
+      ${seccionNuevaRelacion}
     </div>
   `;
 
@@ -4499,27 +4600,34 @@ function abrirFormularioRequisitos(asignatura) {
     .getElementById("cerrarRequisitosFooter")
     ?.addEventListener("click", () => dialog.close());
 
-  document
-    .getElementById("requisitoForm")
-    ?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!candidatas.length) {
-        return;
-      }
-      await agregarRequisitoFrontend(asignatura);
-    });
+  if (puedeGestionar) {
+    document
+      .getElementById("requisitoForm")
+      ?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!candidatas.length) {
+          return;
+        }
+        await agregarRequisitoFrontend(asignatura);
+      });
 
-  document.querySelectorAll("[data-eliminar-requisito]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      await eliminarRequisitoFrontend(
-        Number(button.dataset.eliminarRequisito),
-        asignatura,
-      );
+    document.querySelectorAll("[data-eliminar-requisito]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        await eliminarRequisitoFrontend(
+          Number(button.dataset.eliminarRequisito),
+          asignatura,
+        );
+      });
     });
-  });
+  }
 }
 
 async function agregarRequisitoFrontend(asignatura) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("requisitosFormError");
   const button = document.getElementById("agregarRequisitoButton");
   const tipo = document.getElementById("requisitoTipo")?.value;
@@ -4571,6 +4679,11 @@ async function agregarRequisitoFrontend(asignatura) {
 }
 
 async function eliminarRequisitoFrontend(relacionId, asignatura) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const relacion = requisitosPlan.find(
     (item) => Number(item.id) === Number(relacionId),
   );
@@ -4697,14 +4810,13 @@ function abrirDetalleResumenPlan() {
 
 function formatearTipoSalida(tipo) {
   const tipos = {
-    DIPLOMADO: "Diplomado",
-    BACHILLERATO: "Bachillerato",
-    LICENCIATURA: "Licenciatura",
+    ENFASIS: "Énfasis",
+    SALIDA_LATERAL: "Salida lateral",
     CERTIFICADO: "Certificado",
     OTRO: "Otro",
   };
 
-  return tipos[tipo] || tipo;
+  return tipos[tipo] || tipo || "—";
 }
 
 function abrirAdministradorSalidas() {
@@ -4714,6 +4826,8 @@ function abrirAdministradorSalidas() {
   if (!dialog || !content || !planSeleccionado) {
     return;
   }
+
+  const puedeGestionar = puedeGestionarPlanes();
 
   const salidasHtml = salidasAcademicas.length
     ? salidasAcademicas
@@ -4764,41 +4878,47 @@ function abrirAdministradorSalidas() {
                 </div>
               </div>
 
-              <div class="salida-academica-actions">
-                <button
-                  class="sgpa-form-secondary"
-                  type="button"
-                  data-salida-asignaturas="${salida.id}"
-                >
-                  <i data-lucide="list-checks" aria-hidden="true"></i>
-                  Materias
-                </button>
+              ${
+                puedeGestionar
+                  ? `
+                    <div class="salida-academica-actions">
+                      <button
+                        class="sgpa-form-secondary"
+                        type="button"
+                        data-salida-asignaturas="${salida.id}"
+                      >
+                        <i data-lucide="list-checks" aria-hidden="true"></i>
+                        Materias
+                      </button>
 
-                <button
-                  class="planes-icon-button"
-                  type="button"
-                  title="Editar"
-                  aria-label="Editar"
-                  data-salida-editar="${salida.id}"
-                >
-                  <i data-lucide="pencil" aria-hidden="true"></i>
-                </button>
+                      <button
+                        class="planes-icon-button"
+                        type="button"
+                        title="Editar"
+                        aria-label="Editar"
+                        data-salida-editar="${salida.id}"
+                      >
+                        <i data-lucide="pencil" aria-hidden="true"></i>
+                      </button>
 
-                <button
-                  class="planes-icon-button"
-                  type="button"
-                  title="${salida.activo ? "Desactivar" : "Activar"}"
-                  aria-label="${salida.activo ? "Desactivar" : "Activar"}"
-                  data-salida-estado="${salida.id}"
-                >
-                  <i
-                    data-lucide="${
-                      salida.activo ? "circle-pause" : "circle-check"
-                    }"
-                    aria-hidden="true"
-                  ></i>
-                </button>
-              </div>
+                      <button
+                        class="planes-icon-button"
+                        type="button"
+                        title="${salida.activo ? "Desactivar" : "Activar"}"
+                        aria-label="${salida.activo ? "Desactivar" : "Activar"}"
+                        data-salida-estado="${salida.id}"
+                      >
+                        <i
+                          data-lucide="${
+                            salida.activo ? "circle-pause" : "circle-check"
+                          }"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+                    </div>
+                  `
+                  : ""
+              }
             </article>
           `;
         })
@@ -4820,10 +4940,16 @@ function abrirAdministradorSalidas() {
           </small>
         </div>
 
-        <button id="nuevaSalidaButton" class="sgpa-form-primary" type="button">
-          <i data-lucide="plus" aria-hidden="true"></i>
-          <span>Nueva salida</span>
-        </button>
+        ${
+          puedeGestionar
+            ? `
+              <button id="nuevaSalidaButton" class="sgpa-form-primary" type="button">
+                <i data-lucide="plus" aria-hidden="true"></i>
+                <span>Nueva salida</span>
+              </button>
+            `
+            : ""
+        }
       </div>
 
       <div class="salidas-academicas-list">${salidasHtml}</div>
@@ -4848,61 +4974,68 @@ function abrirAdministradorSalidas() {
     .getElementById("cerrarSalidasFooter")
     ?.addEventListener("click", () => dialog.close());
 
-  document
-    .getElementById("nuevaSalidaButton")
-    ?.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+  if (puedeGestionar) {
+    document
+      .getElementById("nuevaSalidaButton")
+      ?.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-      window.requestAnimationFrame(() => {
-        abrirFormularioSalida();
+        window.requestAnimationFrame(() => {
+          abrirFormularioSalida();
+        });
+      });
+
+    document.querySelectorAll("[data-salida-editar]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const salida = salidasAcademicas.find(
+          (item) => Number(item.id) === Number(button.dataset.salidaEditar),
+        );
+        if (salida) {
+          abrirFormularioSalida(salida);
+        }
       });
     });
 
-  document.querySelectorAll("[data-salida-editar]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    document.querySelectorAll("[data-salida-asignaturas]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-      const salida = salidasAcademicas.find(
-        (item) => Number(item.id) === Number(button.dataset.salidaEditar),
-      );
-      if (salida) {
-        abrirFormularioSalida(salida);
-      }
+        const salida = salidasAcademicas.find(
+          (item) => Number(item.id) === Number(button.dataset.salidaAsignaturas),
+        );
+        if (salida) {
+          abrirAsignaturasSalida(salida);
+        }
+      });
     });
-  });
 
-  document.querySelectorAll("[data-salida-asignaturas]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    document.querySelectorAll("[data-salida-estado]").forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-      const salida = salidasAcademicas.find(
-        (item) => Number(item.id) === Number(button.dataset.salidaAsignaturas),
-      );
-      if (salida) {
-        abrirAsignaturasSalida(salida);
-      }
+        const salida = salidasAcademicas.find(
+          (item) => Number(item.id) === Number(button.dataset.salidaEstado),
+        );
+        if (salida) {
+          await alternarEstadoSalida(salida);
+        }
+      });
     });
-  });
-
-  document.querySelectorAll("[data-salida-estado]").forEach((button) => {
-    button.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const salida = salidasAcademicas.find(
-        (item) => Number(item.id) === Number(button.dataset.salidaEstado),
-      );
-      if (salida) {
-        await alternarEstadoSalida(salida);
-      }
-    });
-  });
+  }
 }
 
 function abrirFormularioSalida(salida = null) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const content = document.getElementById("asignaturaDialogContent");
 
   if (!content || !planSeleccionado) {
@@ -4911,9 +5044,8 @@ function abrirFormularioSalida(salida = null) {
 
   const editando = Boolean(salida);
   const opcionesTipo = [
-    ["DIPLOMADO", "Diplomado"],
-    ["BACHILLERATO", "Bachillerato"],
-    ["LICENCIATURA", "Licenciatura"],
+    ["ENFASIS", "Énfasis"],
+    ["SALIDA_LATERAL", "Salida lateral"],
     ["CERTIFICADO", "Certificado"],
     ["OTRO", "Otro"],
   ];
@@ -4963,7 +5095,7 @@ function abrirFormularioSalida(salida = null) {
         maxlength="160"
         required
         value="${escapeHtml(salida?.nombre || "")}"
-        placeholder="Ej. Diplomado en Programación de Aplicaciones Informáticas"
+        placeholder="Ej. Énfasis en Ciberseguridad"
       >
     </label>
 
@@ -4975,7 +5107,7 @@ function abrirFormularioSalida(salida = null) {
             ([valor, texto]) => `
               <option
                 value="${valor}"
-                ${(salida?.tipo || "DIPLOMADO") === valor ? "selected" : ""}
+                ${(salida?.tipo || "ENFASIS") === valor ? "selected" : ""}
               >
                 ${texto}
               </option>
@@ -5043,6 +5175,11 @@ function abrirFormularioSalida(salida = null) {
 }
 
 async function guardarSalidaAcademicaFrontend(salida) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("salidaAcademicaError");
   const button = document.getElementById("guardarSalidaButton");
 
@@ -5166,6 +5303,11 @@ async function recargarSalidasAcademicas({ renderizar = true } = {}) {
 }
 
 function abrirAsignaturasSalida(salida) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const content = document.getElementById("asignaturaDialogContent");
 
   if (!content || !planSeleccionado) {
@@ -5396,6 +5538,11 @@ function abrirAsignaturasSalida(salida) {
 }
 
 async function guardarAsignaturasSalidaFrontend(salida) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const errorBox = document.getElementById("salidaAsignaturasError");
   const button = document.getElementById("guardarAsignaturasSalida");
 
@@ -5468,6 +5615,11 @@ async function guardarAsignaturasSalidaFrontend(salida) {
 }
 
 async function alternarEstadoSalida(salida) {
+  if (!puedeGestionarPlanes()) {
+    mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
+    return;
+  }
+
   const nuevoEstado = !salida.activo;
   const confirmado = await confirmarAccion({
     titulo: nuevoEstado

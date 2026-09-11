@@ -6,6 +6,9 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { DiaSemana } from './constants/dia-semana.constant';
 import { DisponibilidadProfesoresController } from './disponibilidad-profesores.controller';
 import { DisponibilidadProfesoresService } from './disponibilidad-profesores.service';
@@ -15,14 +18,20 @@ describe('DisponibilidadProfesoresController', () => {
 
   const disponibilidadService = {
     consultarMiDisponibilidad: jest.fn(),
-
     guardarMiDisponibilidad: jest.fn(),
-
     copiarDisponibilidadAnterior: jest.fn(),
-
     obtenerHistorialMiDisponibilidad: jest.fn(),
-
     obtenerDisponibilidadProfesor: jest.fn(),
+    listarPeriodosMiDisponibilidad: jest.fn(),
+  };
+
+  const permisosAsignados = new Set<string>();
+  const permisosService = {
+    usuarioTienePermisos: jest
+      .fn()
+      .mockImplementation(async (_usuarioId: number, permisos: string[]) =>
+        permisos.every((p) => permisosAsignados.has(p)),
+      ),
   };
 
   let app: INestApplication<App>;
@@ -35,23 +44,23 @@ describe('DisponibilidadProfesoresController', () => {
           secret: jwtSecret,
         }),
       ],
-
       controllers: [DisponibilidadProfesoresController],
-
       providers: [
         AuthGuard,
         RolesGuard,
-
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
           },
         },
-
+        {
+          provide: PermisosService,
+          useValue: permisosService,
+        },
         {
           provide: DisponibilidadProfesoresService,
-
           useValue: disponibilidadService,
         },
       ],
@@ -74,6 +83,9 @@ describe('DisponibilidadProfesoresController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados.clear();
+
+    disponibilidadService.listarPeriodosMiDisponibilidad.mockResolvedValue([]);
 
     disponibilidadService.consultarMiDisponibilidad.mockResolvedValue({
       registrada: true,
@@ -96,9 +108,7 @@ describe('DisponibilidadProfesoresController', () => {
       bloques: [],
     });
 
-    disponibilidadService.obtenerHistorialMiDisponibilidad.mockResolvedValue(
-      [],
-    );
+    disponibilidadService.obtenerHistorialMiDisponibilidad.mockResolvedValue([]);
 
     disponibilidadService.obtenerDisponibilidadProfesor.mockResolvedValue({
       registrada: true,
@@ -143,26 +153,36 @@ describe('DisponibilidadProfesoresController', () => {
     ).toHaveBeenCalledWith(10, 2);
   });
 
+  it('permite al PROFESOR listar periodos de su disponibilidad', async () => {
+    const token = await crearToken(['PROFESOR']);
+
+    await request(app.getHttpServer())
+      .get('/profesores/mi-disponibilidad/periodos')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, []);
+
+    expect(
+      disponibilidadService.listarPeriodosMiDisponibilidad,
+    ).toHaveBeenCalledWith(10);
+  });
+
   it('permite al PROFESOR guardar su propia disponibilidad', async () => {
     const token = await crearToken(['PROFESOR']);
 
     const dto = {
       periodoAcademicoId: 2,
-
       bloques: [
         {
           dia: DiaSemana.LUNES,
           horaInicio: '08:00',
           horaFin: '11:00',
         },
-
         {
           dia: DiaSemana.MIERCOLES,
           horaInicio: '13:00',
           horaFin: '17:00',
         },
       ],
-
       observaciones: 'Disponibilidad del ciclo',
     };
 
@@ -202,13 +222,10 @@ describe('DisponibilidadProfesoresController', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         periodoAcademicoId: 2,
-
         bloques: [
           {
             dia: DiaSemana.LUNES,
-
             horaInicio: '8:00 AM',
-
             horaFin: '11:00',
           },
         ],
@@ -228,7 +245,6 @@ describe('DisponibilidadProfesoresController', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         periodoAcademicoId: 2,
-
         bloques: [
           {
             dia: 'FUNDAY',
@@ -311,8 +327,9 @@ describe('DisponibilidadProfesoresController', () => {
     ).toHaveBeenCalledWith(10, 2);
   });
 
-  it('permite a COORDINADOR consultar disponibilidad de un profesor', async () => {
-    const token = await crearToken(['COORDINADOR']);
+  it('permite a ESTUDIANTE con PROFESORES_VER consultar disponibilidad de un profesor', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/10/disponibilidad/2')
@@ -324,7 +341,7 @@ describe('DisponibilidadProfesoresController', () => {
     ).toHaveBeenCalledWith(10, 2);
   });
 
-  it('permite a ADMIN_GLOBAL consultar disponibilidad de un profesor', async () => {
+  it('permite a ADMIN_GLOBAL consultar disponibilidad sin permisos guardados', async () => {
     const token = await crearToken(['ADMIN_GLOBAL']);
 
     await request(app.getHttpServer())
@@ -337,8 +354,8 @@ describe('DisponibilidadProfesoresController', () => {
     ).toHaveBeenCalledWith(10, 2);
   });
 
-  it('impide a PROFESOR consultar la disponibilidad de otro profesor', async () => {
-    const token = await crearToken(['PROFESOR']);
+  it('impide a ESTUDIANTE sin PROFESORES_VER consultar disponibilidad de un profesor', async () => {
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/99/disponibilidad/2')
@@ -350,8 +367,9 @@ describe('DisponibilidadProfesoresController', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('impide a COORDINADOR modificar disponibilidad si no posee rol PROFESOR', async () => {
-    const token = await crearToken(['COORDINADOR']);
+  it('impide a usuario sin rol PROFESOR modificar disponibilidad', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .put('/profesores/mi-disponibilidad')
@@ -384,15 +402,14 @@ describe('DisponibilidadProfesoresController', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('permite a COORDINADOR + PROFESOR modificar únicamente su propia disponibilidad', async () => {
-    const token = await crearToken(['COORDINADOR', 'PROFESOR'], 25);
+  it('permite a PROFESOR modificar únicamente su propia disponibilidad', async () => {
+    const token = await crearToken(['PROFESOR'], 25);
 
     await request(app.getHttpServer())
       .put('/profesores/mi-disponibilidad')
       .set('Authorization', `Bearer ${token}`)
       .send({
         periodoAcademicoId: 2,
-
         bloques: [
           {
             dia: DiaSemana.VIERNES,
@@ -421,7 +438,8 @@ describe('DisponibilidadProfesoresController', () => {
   });
 
   it('rechaza profesorId inválido para consulta administrativa', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/no-es-id/disponibilidad/2')

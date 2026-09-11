@@ -6,20 +6,20 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ValidarImportacionPlanDto } from './dto/validar-importacion-plan.dto';
 import { PlanImportacionService } from './plan-importacion.service';
 
 @Controller('planes-estudio/:planId/importacion')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class PlanImportacionController {
   constructor(private readonly service: PlanImportacionService) {}
 
   @Post('validar')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   validar(
     @Param('planId', ParseIntPipe) planId: number,
     @Body() dto: ValidarImportacionPlanDto,
@@ -28,6 +28,7 @@ export class PlanImportacionController {
   }
 
   @Post('ejecutar')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   importar(
     @Param('planId', ParseIntPipe) planId: number,
     @Body() dto: ValidarImportacionPlanDto,

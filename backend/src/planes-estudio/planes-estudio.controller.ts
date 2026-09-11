@@ -8,37 +8,40 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarPlanEstudioDto } from './dto/actualizar-plan-estudio.dto';
 import { CambiarEstadoPlanEstudioDto } from './dto/cambiar-estado-plan-estudio.dto';
 import { CrearPlanEstudioDto } from './dto/crear-plan-estudio.dto';
 import { PlanesEstudioService } from './planes-estudio.service';
 
 @Controller('planes-estudio')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class PlanesEstudioController {
   constructor(private readonly planesEstudioService: PlanesEstudioService) {}
 
   @Get()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
   listar() {
     return this.planesEstudioService.listar();
   }
 
   @Get(':id')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
     return this.planesEstudioService.obtenerPorId(id);
   }
 
   @Post()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   crear(@Body() dto: CrearPlanEstudioDto) {
     return this.planesEstudioService.crear(dto);
   }
 
   @Patch(':id')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarPlanEstudioDto,
@@ -47,6 +50,7 @@ export class PlanesEstudioController {
   }
 
   @Patch(':id/estado')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoPlanEstudioDto,

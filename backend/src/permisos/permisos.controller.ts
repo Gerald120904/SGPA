@@ -25,6 +25,11 @@ export class PermisosController {
     return this.permisosService.obtenerCatalogo();
   }
 
+  @Get('plantillas-roles')
+  obtenerPlantillasRoles() {
+    return this.permisosService.obtenerPlantillasRoles();
+  }
+
   @Get('usuarios/:usuarioId')
   listarUsuario(@Param('usuarioId', ParseIntPipe) usuarioId: number) {
     return this.permisosService.listarUsuario(usuarioId);

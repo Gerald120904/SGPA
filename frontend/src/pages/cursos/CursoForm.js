@@ -3,6 +3,8 @@ import {
   crearCurso,
   listarAsignaturasDisponiblesCurso,
 } from "../../services/cursos.service.js";
+import { usuarioTienePermiso } from "../../app/session.js";
+import { PERMISOS } from "../../config/permissions.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
 import {
@@ -25,6 +27,14 @@ export async function abrirFormularioCurso({
   planesDisponibles = [],
   onGuardado = null,
 }) {
+  if (!usuarioTienePermiso(PERMISOS.CURSOS_GESTIONAR)) {
+    mostrarError({
+      titulo: "Acceso denegado",
+      mensaje: "No posee permiso para gestionar cursos.",
+    });
+    return;
+  }
+
   const dialog =
     document.getElementById("cursoDialog");
 

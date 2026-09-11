@@ -5,8 +5,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { PlanesEstudioController } from './planes-estudio.controller';
 import { PlanesEstudioService } from './planes-estudio.service';
 
@@ -20,6 +22,12 @@ describe('PlanesEstudioController', () => {
     cambiarEstado: jest.fn(),
   };
 
+  let permisosAsignados: Set<PermisoSistema>;
+
+  const permisosService = {
+    usuarioTienePermisos: jest.fn(),
+  };
+
   let app: INestApplication<App>;
   let jwtService: JwtService;
 
@@ -29,10 +37,14 @@ describe('PlanesEstudioController', () => {
       controllers: [PlanesEstudioController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
         { provide: PlanesEstudioService, useValue: service },
       ],
@@ -52,6 +64,11 @@ describe('PlanesEstudioController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados = new Set<PermisoSistema>();
+    permisosService.usuarioTienePermisos.mockImplementation(
+      async (_usuarioId, requeridos: PermisoSistema[]) =>
+        requeridos.every((p) => permisosAsignados.has(p)),
+    );
     service.listar.mockResolvedValue([]);
     service.obtenerPorId.mockResolvedValue({ id: 1 });
     service.crear.mockResolvedValue({ id: 1 });
@@ -60,7 +77,9 @@ describe('PlanesEstudioController', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   async function token(rol: string) {
@@ -75,21 +94,35 @@ describe('PlanesEstudioController', () => {
     await request(app.getHttpServer()).get('/planes-estudio').expect(401);
   });
 
-  it.each(['ADMIN_GLOBAL', 'COORDINADOR'])('permite el rol %s', async (rol) => {
+  it('permite ADMIN_GLOBAL sin registros en usuario_permisos', async () => {
     await request(app.getHttpServer())
       .get('/planes-estudio')
-      .set('Authorization', `Bearer ${await token(rol)}`)
+      .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
       .expect(200, []);
+
+    expect(service.listar).toHaveBeenCalledTimes(1);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])('responde 403 para %s', async (rol) => {
+  it('permite listar planes con PLANES_ESTUDIO_VER', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_VER);
     await request(app.getHttpServer())
       .get('/planes-estudio')
-      .set('Authorization', `Bearer ${await token(rol)}`)
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .expect(200, []);
+
+    expect(service.listar).toHaveBeenCalledTimes(1);
+  });
+
+  it('responde 403 sin PLANES_ESTUDIO_VER', async () => {
+    await request(app.getHttpServer())
+      .get('/planes-estudio')
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
       .expect(403);
   });
 
-  it('crea un plan válido', async () => {
+  it('crea un plan válido con PLANES_ESTUDIO_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     const dto = {
       carreraId: 1,
       grado: GradoAcademico.BACHILLERATO,
@@ -106,7 +139,26 @@ describe('PlanesEstudioController', () => {
     expect(service.crear).toHaveBeenCalledWith(dto);
   });
 
+  it('rechaza crear un plan sin permiso PLANES_ESTUDIO_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_VER);
+    const dto = {
+      carreraId: 1,
+      grado: GradoAcademico.BACHILLERATO,
+      codigo: 'BA-INFORM 2012-10',
+      nombre: 'Plan de Bachillerato 2012-10',
+    };
+
+    await request(app.getHttpServer())
+      .post('/planes-estudio')
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .send(dto)
+      .expect(403);
+
+    expect(service.crear).not.toHaveBeenCalled();
+  });
+
   it('rechaza crear un plan sin carrera', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     await request(app.getHttpServer())
       .post('/planes-estudio')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
@@ -120,6 +172,7 @@ describe('PlanesEstudioController', () => {
   });
 
   it('rechaza carreraId menor a 1', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     await request(app.getHttpServer())
       .post('/planes-estudio')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
@@ -133,16 +186,18 @@ describe('PlanesEstudioController', () => {
     expect(service.crear).not.toHaveBeenCalled();
   });
 
-  it('consulta un plan por id', async () => {
+  it('consulta un plan por id con PLANES_ESTUDIO_VER', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_VER);
     await request(app.getHttpServer())
       .get('/planes-estudio/1')
-      .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
       .expect(200, { id: 1 });
 
     expect(service.obtenerPorId).toHaveBeenCalledWith(1);
   });
 
   it('rechaza un id inválido', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_VER);
     await request(app.getHttpServer())
       .get('/planes-estudio/no-es-id')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
@@ -151,7 +206,8 @@ describe('PlanesEstudioController', () => {
     expect(service.obtenerPorId).not.toHaveBeenCalled();
   });
 
-  it('actualiza un plan', async () => {
+  it('actualiza un plan con PLANES_ESTUDIO_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     const dto = {
       nombre: 'Plan actualizado',
     };
@@ -166,6 +222,7 @@ describe('PlanesEstudioController', () => {
   });
 
   it('rechaza carreraId durante la actualización', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     await request(app.getHttpServer())
       .patch('/planes-estudio/1')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
@@ -178,7 +235,8 @@ describe('PlanesEstudioController', () => {
     expect(service.actualizar).not.toHaveBeenCalled();
   });
 
-  it('cambia el estado de un plan', async () => {
+  it('cambia el estado de un plan con PLANES_ESTUDIO_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     await request(app.getHttpServer())
       .patch('/planes-estudio/1/estado')
       .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
@@ -189,6 +247,7 @@ describe('PlanesEstudioController', () => {
   });
 
   it('rechaza estado que no sea boolean', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
     await request(app.getHttpServer())
       .patch('/planes-estudio/1/estado')
       .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)

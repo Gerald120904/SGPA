@@ -5,17 +5,20 @@ import {
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PlanValidacionesService } from './plan-validaciones.service';
+
 @Controller('planes-estudio/:planId/validaciones')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class PlanValidacionesController {
   constructor(private readonly service: PlanValidacionesService) {}
-  @Get() validar(@Param('planId', ParseIntPipe) planId: number) {
+
+  @Get()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
+  validar(@Param('planId', ParseIntPipe) planId: number) {
     return this.service.validar(planId);
   }
 }

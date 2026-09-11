@@ -6,6 +6,8 @@ import { createHash } from 'node:crypto';
 import { AuthService } from './auth.service';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { MailService } from '../mail/mail.service';
+import { PermisosService } from '../permisos/permisos.service';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -27,6 +29,10 @@ describe('AuthService', () => {
     enviarCodigoRecuperacion: jest.fn(),
   };
 
+  const permisosService = {
+    obtenerPermisosEfectivos: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -34,11 +40,15 @@ describe('AuthService', () => {
         { provide: UsuariosService, useValue: usuariosService },
         { provide: JwtService, useValue: jwtService },
         { provide: MailService, useValue: mailService },
+        { provide: PermisosService, useValue: permisosService },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     jest.clearAllMocks();
+    permisosService.obtenerPermisosEfectivos.mockResolvedValue([
+      PermisoSistema.PERIODOS_VER,
+    ]);
   });
 
   it('should return access token and user roles for a valid login', async () => {
@@ -80,6 +90,7 @@ describe('AuthService', () => {
         apellido2: null,
         correo: 'admin@una.ac.cr',
         roles: ['ADMIN_GLOBAL'],
+        permisos: [PermisoSistema.PERIODOS_VER],
       },
     });
   });

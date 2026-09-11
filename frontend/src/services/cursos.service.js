@@ -33,3 +33,18 @@ export async function cambiarEstadoCurso(id, activo) {
   validarApi('cambiarEstadoCurso');
   return window.sgpa.cambiarEstadoCurso(id, activo);
 }
+
+export async function listarRequisitosCurso(cursoId) {
+  validarApi('listarRequisitosCurso');
+  return window.sgpa.listarRequisitosCurso(cursoId);
+}
+
+export async function crearRequisitoCurso(cursoId, datos) {
+  validarApi('crearRequisitoCurso');
+  return window.sgpa.crearRequisitoCurso(cursoId, datos);
+}
+
+export async function eliminarRequisitoCurso(cursoId, requisitoId) {
+  validarApi('eliminarRequisitoCurso');
+  return window.sgpa.eliminarRequisitoCurso(cursoId, requisitoId);
+}

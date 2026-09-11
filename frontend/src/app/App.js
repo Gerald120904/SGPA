@@ -66,6 +66,7 @@ import {
   guardarSesion,
   obtenerUsuario,
   obtenerRolesUsuario,
+  obtenerPermisosUsuario,
   tieneRolValido,
   limpiarSesion
 } from './session.js';
@@ -251,11 +252,17 @@ function mostrarAplicacion() {
       usuario
     );
 
+  const permisos =
+    obtenerPermisosUsuario(
+      usuario
+    );
+
 
   appRoot.innerHTML =
     AppLayout({
       usuario,
-      roles
+      roles,
+      permisos
     });
 
 
@@ -299,6 +306,11 @@ function renderizarRuta(
       usuario
     );
 
+  const permisos =
+    obtenerPermisosUsuario(
+      usuario
+    );
+
 
   let module =
     obtenerModuloPorRuta(
@@ -332,7 +344,8 @@ function renderizarRuta(
   if (
     !puedeAcceder(
       roles,
-      module.id
+      module.id,
+      permisos
     )
   ) {
 
@@ -596,11 +609,17 @@ function manejarClickGlobal(
       usuario
     );
 
+  const permisos =
+    obtenerPermisosUsuario(
+      usuario
+    );
+
 
   if (
     !puedeAcceder(
       roles,
-      module.id
+      module.id,
+      permisos
     )
   ) {
 

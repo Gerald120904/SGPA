@@ -69,11 +69,11 @@ import {
 } from '../../utils/icons.js';
 
 import {
-  obtenerRolesUsuario,
+  usuarioTienePermiso,
 } from '../../app/session.js';
 
 import {
-  ROLES,
+  PERMISOS,
 } from '../../config/permissions.js';
 
 
@@ -216,88 +216,71 @@ export function AulasPage() {
    PERMISOS
    ========================================================= */
 
-function puedeAdministrarAulas() {
-  const roles =
-    obtenerRolesUsuario();
-
-  return roles.includes(
-    ROLES.ADMIN_GLOBAL,
+function puedeGestionarAulas() {
+  return usuarioTienePermiso(
+    PERMISOS.AULAS_GESTIONAR,
   );
 }
 
 
-function puedeGestionarIndisponibilidades() {
-  const roles =
-    obtenerRolesUsuario();
-
-  return (
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    ) ||
-    roles.includes(
-      ROLES.COORDINADOR,
-    )
+function puedeAsignarAulas() {
+  return usuarioTienePermiso(
+    PERMISOS.AULAS_ASIGNAR,
   );
 }
 
 
-function puedeGestionarReservas() {
-  const roles =
-    obtenerRolesUsuario();
-
-  return (
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    ) ||
-    roles.includes(
-      ROLES.COORDINADOR,
-    )
+function puedeVerPeriodos() {
+  return usuarioTienePermiso(
+    PERMISOS.PERIODOS_VER,
   );
 }
 
 
-function puedeGestionarDisponibilidadAula() {
-  const roles =
-    obtenerRolesUsuario();
-
+function puedeBuscarAulasDisponibles() {
   return (
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    ) ||
-    roles.includes(
-      ROLES.COORDINADOR,
-    )
+    usuarioTienePermiso(
+      PERMISOS.AULAS_VER,
+    ) &&
+    puedeVerPeriodos()
   );
 }
 
 
-function puedeEvaluarAsignacionAula() {
-  const roles =
-    obtenerRolesUsuario();
-
+function puedeUsarEvaluacionAula() {
   return (
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    ) ||
-    roles.includes(
-      ROLES.COORDINADOR,
-    )
+    puedeAsignarAulas() &&
+    puedeVerPeriodos()
   );
+}
+
+
+function puedeEvaluarAulaParaAsignacion() {
+  return puedeAsignarAulas();
 }
 
 
 function puedeConsultarAuditoriaAula() {
-  const roles =
-    obtenerRolesUsuario();
+  return puedeGestionarAulas();
+}
 
-  return (
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    ) ||
-    roles.includes(
-      ROLES.COORDINADOR,
-    )
-  );
+
+function validarGestionAulas() {
+  if (
+    puedeGestionarAulas()
+  ) {
+    return true;
+  }
+
+  mostrarError({
+    titulo:
+      'Acceso restringido',
+
+    mensaje:
+      'No posee permiso para gestionar aulas.',
+  });
+
+  return false;
 }
 
 
@@ -809,10 +792,6 @@ function renderizarVistaListado() {
   }
 
 
-  const administrador =
-    puedeAdministrarAulas();
-
-
   vista.innerHTML = `
 
     <div
@@ -835,21 +814,27 @@ function renderizarVistaListado() {
 
       <div class="aulas-actions">
 
-        <button
-          id="buscarAulasDisponiblesButton"
-          class="aulas-secondary-button"
-          type="button"
-        >
-          <i
-            data-lucide="search"
-            aria-hidden="true"
-          ></i>
+        ${
+          puedeBuscarAulasDisponibles()
+            ? `
+              <button
+                id="buscarAulasDisponiblesButton"
+                class="aulas-secondary-button"
+                type="button"
+              >
+                <i
+                  data-lucide="search"
+                  aria-hidden="true"
+                ></i>
 
-          Buscar aulas disponibles
-        </button>
+                Buscar aulas disponibles
+              </button>
+            `
+            : ''
+        }
 
         ${
-          administrador
+          puedeGestionarAulas()
             ? `
                 <button
                   id="catalogoEquipamientosButton"
@@ -1159,8 +1144,8 @@ function renderizarAulas() {
     obtenerAulasFiltradas();
 
 
-  const administrador =
-    puedeAdministrarAulas();
+  const puedeGestionar =
+    puedeGestionarAulas();
 
 
   const filas =
@@ -1283,7 +1268,7 @@ function renderizarAulas() {
 
 
                 ${
-                  administrador
+                  puedeGestionar
                     ? `
                       <button
                         type="button"
@@ -1501,7 +1486,7 @@ async function manejarAccionTabla(
 
 
   if (
-    !puedeAdministrarAulas()
+    !puedeGestionarAulas()
   ) {
     return;
   }
@@ -1605,8 +1590,8 @@ function renderizarCatalogoEquipamientos() {
   }
 
 
-  const administrador =
-    puedeAdministrarAulas();
+  const puedeGestionar =
+    puedeGestionarAulas();
 
 
   const filas =
@@ -1655,7 +1640,7 @@ function renderizarCatalogoEquipamientos() {
             <td>
 
               ${
-                administrador
+                puedeGestionar
                   ? `
                     <div
                       class="aulas-actions"
@@ -1747,7 +1732,7 @@ function renderizarCatalogoEquipamientos() {
 
 
       ${
-        administrador
+        puedeGestionar
           ? `
             <button
               id="nuevoEquipamientoButton"
@@ -1819,6 +1804,12 @@ function renderizarCatalogoEquipamientos() {
 function abrirFormularioEquipamiento(
   equipamiento = null,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const dialog =
     document.getElementById(
       'aulaDialog',
@@ -2081,6 +2072,12 @@ async function manejarAccionCatalogoEquipamiento(
 async function cambiarEstadoCatalogoEquipamiento(
   equipamiento,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const activo =
     !equipamiento.activo;
 
@@ -2215,7 +2212,12 @@ async function abrirDetalleAula(
         aulaId,
       ),
 
-      listarPeriodosAcademicos(),
+      puedeVerPeriodos()
+        ? listarPeriodosAcademicos()
+        : Promise.resolve({
+            ok: true,
+            periodos: [],
+          }),
 
     ]);
 
@@ -2505,7 +2507,7 @@ async function abrirDetalleAula(
 
 
           ${
-            puedeAdministrarAulas() &&
+            puedeGestionarAulas() &&
             aula.activo
               ? `
                 <button
@@ -2558,7 +2560,7 @@ async function abrirDetalleAula(
 
 
           ${
-            puedeGestionarIndisponibilidades() &&
+            puedeGestionarAulas() &&
             aula.activo
               ? `
                 <button
@@ -2610,7 +2612,7 @@ async function abrirDetalleAula(
 
 
           ${
-            puedeGestionarReservas() &&
+            puedeGestionarAulas() &&
             aula.activo
               ? `
                 <button
@@ -2641,7 +2643,6 @@ async function abrirDetalleAula(
 
       ${renderizarSeccionOcupacion()}
 
-      ${renderizarSeccionDisponibilidadBase()}
 
       ${
         puedeConsultarAuditoriaAula()
@@ -3076,7 +3077,7 @@ function renderizarEquipamientoDelAula(
 
 
               ${
-                puedeAdministrarAulas()
+                puedeGestionarAulas()
                   ? `
                     <div
                       class="aulas-actions"
@@ -3137,6 +3138,12 @@ function renderizarEquipamientoDelAula(
 function abrirFormularioEquipamientoAula(
   relacion = null,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   if (!aulaDetalleActual) {
     return;
   }
@@ -3513,6 +3520,12 @@ function abrirFormularioEquipamientoAula(
 async function cambiarEstadoEquipamientoDelAula(
   relacion,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const activo =
     !relacion.activo;
 
@@ -3720,7 +3733,7 @@ function renderizarIndisponibilidades(
 
 
               ${
-                puedeGestionarIndisponibilidades()
+                puedeGestionarAulas()
                   ? `
                     <div
                       class="aulas-actions"
@@ -3778,6 +3791,12 @@ function renderizarIndisponibilidades(
 function abrirFormularioIndisponibilidad(
   indisponibilidad = null,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   if (!aulaDetalleActual) {
     return;
   }
@@ -4149,6 +4168,12 @@ function abrirFormularioIndisponibilidad(
 async function cambiarEstadoIndisponibilidad(
   indisponibilidad,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   if (!aulaDetalleActual) {
     return;
   }
@@ -4364,7 +4389,7 @@ function renderizarReservasAula(
 
 
               ${
-                puedeGestionarReservas()
+                puedeGestionarAulas()
                   ? `
                     <div
                       class="aulas-actions"
@@ -4422,6 +4447,12 @@ function renderizarReservasAula(
 function abrirFormularioReserva(
   reserva = null,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   if (!aulaDetalleActual) {
     return;
   }
@@ -4788,6 +4819,12 @@ function abrirFormularioReserva(
 async function cambiarEstadoReserva(
   reserva,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const activo =
     !reserva.activo;
 
@@ -5284,6 +5321,12 @@ function renderizarOcupacionAula() {
 function abrirFormularioAula(
   aula = null,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const dialog =
     document.getElementById(
       'aulaDialog',
@@ -5763,6 +5806,32 @@ function abrirFormularioAula(
    ========================================================= */
 
 function renderizarSeccionDisponibilidadBase() {
+  if (
+    !puedeVerPeriodos()
+  ) {
+    return `
+      <section
+        class="aulas-detail-card"
+      >
+        <div
+          class="aulas-section-header"
+        >
+          <div>
+            <h3>
+              Disponibilidad base
+            </h3>
+
+            <p
+              class="aulas-muted"
+            >
+              No posee permiso para consultar los periodos académicos necesarios para visualizar esta disponibilidad.
+            </p>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   return `
     <section
       class="aulas-detail-card"
@@ -5842,6 +5911,12 @@ function renderizarSeccionDisponibilidadBase() {
 
 
 function configurarDisponibilidadBaseAula() {
+  if (
+    !puedeVerPeriodos()
+  ) {
+    return;
+  }
+
   const selector =
     document.getElementById(
       'aulaPeriodoDisponibilidad',
@@ -5988,7 +6063,7 @@ function renderizarDisponibilidadBaseAula() {
 
 
   const puedeEditar =
-    puedeGestionarDisponibilidadAula() &&
+    puedeGestionarAulas() &&
     aulaDetalleActual?.activo &&
     periodoPermiteEditarDisponibilidad(
       periodoDisponibilidadActual,
@@ -6239,6 +6314,12 @@ function renderizarDisponibilidadBaseAula() {
 function abrirFormularioBloqueAula(
   bloque = null,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   if (
     !aulaDetalleActual ||
     !periodoDisponibilidadActual
@@ -6555,6 +6636,12 @@ function abrirFormularioBloqueAula(
 async function confirmarEliminarBloqueAula(
   bloque,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const confirmado =
     await confirmarAccion({
 
@@ -6642,6 +6729,12 @@ async function confirmarEliminarBloqueAula(
 async function cambiarEstadoAulaActual(
   aula,
 ) {
+  if (
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
   const nuevoEstado =
     !aula.activo;
 
@@ -7024,6 +7117,20 @@ function renderizarAuditoriaAula() {
    ========================================================= */
 
 async function abrirBusquedaAulasDisponibles() {
+  if (
+    !puedeBuscarAulasDisponibles()
+  ) {
+    mostrarError({
+      titulo:
+        'Acceso restringido',
+
+      mensaje:
+        'No posee permiso para buscar aulas disponibles.',
+    });
+
+    return;
+  }
+
   const vista =
     document.getElementById(
       'aulasVista',
@@ -8033,7 +8140,7 @@ function renderizarResultadosBusquedaAulas() {
 
 
   const puedeEvaluar =
-    puedeEvaluarAsignacionAula();
+    puedeUsarEvaluacionAula();
 
 
   const filas =
@@ -8280,6 +8387,20 @@ function renderizarResultadosBusquedaAulas() {
 async function evaluarAulaDisponible(
   aulaId,
 ) {
+  if (
+    !puedeAsignarAulas()
+  ) {
+    mostrarError({
+      titulo:
+        'Acceso restringido',
+
+      mensaje:
+        'No posee permiso para asignar aulas.',
+    });
+
+    return;
+  }
+
   if (
     !criteriosBusquedaAulasActual
   ) {

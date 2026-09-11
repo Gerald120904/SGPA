@@ -64,11 +64,38 @@ import {
 
 import {
   obtenerRolesUsuario,
+  usuarioTienePermiso,
 } from '../../app/session.js';
 
 import {
   ROLES,
+  PERMISOS,
 } from '../../config/permissions.js';
+
+function puedeGestionarProfesores() {
+  return usuarioTienePermiso(
+    PERMISOS.PROFESORES_VER,
+  );
+}
+
+function puedeValidarPerfilesDocentes() {
+  return usuarioTienePermiso(
+    PERMISOS.PERFILES_DOCENTES_VALIDAR,
+  );
+}
+
+function puedeValidarAtestados() {
+  return usuarioTienePermiso(
+    PERMISOS.ATESTADOS_VALIDAR,
+  );
+}
+
+function esProfesorActual() {
+  return obtenerRolesUsuario()
+    .includes(
+      ROLES.PROFESOR,
+    );
+}
 
 
 let profesores = [];
@@ -173,21 +200,11 @@ export function ProfesoresPage() {
 function renderizarSelectorModo(
   modoActual,
 ) {
-  const roles =
-    obtenerRolesUsuario();
-
   const tieneGestion =
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    ) ||
-    roles.includes(
-      ROLES.COORDINADOR,
-    );
+    puedeGestionarProfesores();
 
   const esProfesor =
-    roles.includes(
-      ROLES.PROFESOR,
-    );
+    esProfesorActual();
 
 
   if (
@@ -1003,6 +1020,28 @@ function abrirRevisionProfesor({
   id,
   estado,
 }) {
+  if (
+    tipo === 'perfil' &&
+    !puedeValidarPerfilesDocentes()
+  ) {
+    mostrarError({
+      titulo: 'Acceso restringido',
+      mensaje: 'No posee permiso para validar perfiles docentes.',
+    });
+    return;
+  }
+
+  if (
+    tipo === 'atestado' &&
+    !puedeValidarAtestados()
+  ) {
+    mostrarError({
+      titulo: 'Acceso restringido',
+      mensaje: 'No posee permiso para validar atestados.',
+    });
+    return;
+  }
+
   const dialog =
     document.getElementById(
       'profesorRevisionDialog',
@@ -1226,6 +1265,18 @@ function abrirRevisionProfesor({
 async function confirmarInactivacionPerfil(
   perfilId,
 ) {
+  if (
+    !puedeValidarPerfilesDocentes()
+  ) {
+    mostrarError({
+      titulo:
+        'Acceso restringido',
+      mensaje:
+        'No posee permiso para modificar perfiles docentes.',
+    });
+    return;
+  }
+
   if (!profesorDetalleActual) {
     return;
   }
@@ -1311,6 +1362,18 @@ async function confirmarInactivacionPerfil(
 async function abrirProfesor(
   profesorId,
 ) {
+  if (
+    !puedeGestionarProfesores()
+  ) {
+    mostrarError({
+      titulo:
+        'Acceso restringido',
+      mensaje:
+        'No posee permiso para consultar profesores.',
+    });
+    return;
+  }
+
   const vista =
     document.getElementById(
       'profesoresVista',
@@ -1330,6 +1393,11 @@ async function abrirProfesor(
 
   try {
 
+    const puedeVerPeriodos =
+      usuarioTienePermiso(
+        PERMISOS.PERIODOS_VER,
+      );
+
     const [
       resultado,
       resultadoPeriodos,
@@ -1338,7 +1406,12 @@ async function abrirProfesor(
         profesorId,
       ),
 
-      listarPeriodosAcademicos(),
+      puedeVerPeriodos
+        ? listarPeriodosAcademicos()
+        : Promise.resolve({
+            ok: true,
+            periodos: [],
+          }),
     ]);
 
 
@@ -1349,17 +1422,9 @@ async function abrirProfesor(
       );
     }
 
-    if (!resultadoPeriodos?.ok) {
-      throw new Error(
-        resultadoPeriodos?.message ||
-          'No fue posible consultar los periodos académicos.',
-      );
-    }
-
-
     periodosAcademicos =
       Array.isArray(
-        resultadoPeriodos.periodos,
+        resultadoPeriodos?.periodos,
       )
         ? resultadoPeriodos.periodos
         : [];
@@ -1372,6 +1437,12 @@ async function abrirProfesor(
     profesorDetalleActual =
       profesor;
 
+
+    const puedeRevisarPerfiles =
+      puedeValidarPerfilesDocentes();
+
+    const puedeRevisarAtestados =
+      puedeValidarAtestados();
 
     const carreras =
       obtenerCarreras(
@@ -1749,70 +1820,76 @@ async function abrirProfesor(
                         }
 
 
-                        <div
-                          class="profesores-review-actions"
-                        >
+                        ${
+                          puedeRevisarPerfiles
+                            ? `
+                              <div
+                                class="profesores-review-actions"
+                              >
 
-                          ${
-                            perfil.estado ===
-                            'PENDIENTE'
-                              ? `
-                                <button
-                                  type="button"
-                                  class="
-                                    profesores-action-button
-                                    is-success
-                                  "
-                                  data-action="aprobar-perfil"
-                                  data-perfil-id="${
-                                    perfil
-                                      .perfilAcademicoId
-                                  }"
-                                >
-                                  Aprobar
-                                </button>
+                                ${
+                                  perfil.estado ===
+                                  'PENDIENTE'
+                                    ? `
+                                      <button
+                                        type="button"
+                                        class="
+                                          profesores-action-button
+                                          is-success
+                                        "
+                                        data-action="aprobar-perfil"
+                                        data-perfil-id="${
+                                          perfil
+                                            .perfilAcademicoId
+                                        }"
+                                      >
+                                        Aprobar
+                                      </button>
 
-                                <button
-                                  type="button"
-                                  class="
-                                    profesores-action-button
-                                    is-danger
-                                  "
-                                  data-action="rechazar-perfil"
-                                  data-perfil-id="${
-                                    perfil
-                                      .perfilAcademicoId
-                                  }"
-                                >
-                                  Rechazar
-                                </button>
-                              `
-                              : ''
-                          }
+                                      <button
+                                        type="button"
+                                        class="
+                                          profesores-action-button
+                                          is-danger
+                                        "
+                                        data-action="rechazar-perfil"
+                                        data-perfil-id="${
+                                          perfil
+                                            .perfilAcademicoId
+                                        }"
+                                      >
+                                        Rechazar
+                                      </button>
+                                    `
+                                    : ''
+                                }
 
 
-                          ${
-                            perfil.estado !==
-                            'INACTIVO'
-                              ? `
-                                <button
-                                  type="button"
-                                  class="
-                                    profesores-action-button
-                                  "
-                                  data-action="inactivar-perfil"
-                                  data-perfil-id="${
-                                    perfil
-                                      .perfilAcademicoId
-                                  }"
-                                >
-                                  Inactivar
-                                </button>
-                              `
-                              : ''
-                          }
+                                ${
+                                  perfil.estado !==
+                                  'INACTIVO'
+                                    ? `
+                                      <button
+                                        type="button"
+                                        class="
+                                          profesores-action-button
+                                        "
+                                        data-action="inactivar-perfil"
+                                        data-perfil-id="${
+                                          perfil
+                                            .perfilAcademicoId
+                                        }"
+                                      >
+                                        Inactivar
+                                      </button>
+                                    `
+                                    : ''
+                                }
 
-                        </div>
+                              </div>
+                            `
+                            : ''
+                        }
 
                       </article>
                     `,
@@ -2024,8 +2101,9 @@ async function abrirProfesor(
 
 
                         ${
+                          puedeRevisarAtestados &&
                           atestado.estado !==
-                          'INACTIVO'
+                            'INACTIVO'
                             ? `
                               <div
                                 class="profesores-review-actions"
@@ -2099,79 +2177,101 @@ async function abrirProfesor(
       </section>
 
 
-      <section
-        class="profesores-detail-card"
-      >
+      ${
+        puedeVerPeriodos
+          ? `
+            <section
+              class="profesores-detail-card"
+            >
 
-        <div
-          class="profesores-section-header"
-        >
+              <div
+                class="profesores-section-header"
+              >
 
-          <div>
+                <div>
 
-            <h3>
-              Disponibilidad docente
-            </h3>
+                  <h3>
+                    Disponibilidad docente
+                  </h3>
 
-            <p>
-              Consulte la disponibilidad
-              registrada para cada periodo
-              académico.
-            </p>
+                  <p>
+                    Consulte la disponibilidad
+                    registrada para cada periodo
+                    académico.
+                  </p>
 
-          </div>
+                </div>
 
 
-          <select
-            id="profesorPeriodoDisponibilidad"
-            class="profesores-period-select"
-          >
+                <select
+                  id="profesorPeriodoDisponibilidad"
+                  class="profesores-period-select"
+                >
 
-            ${
-              periodosAcademicos.length
-                ? periodosAcademicos
-                    .map(
-                      (periodo) => `
-                        <option
-                          value="${periodo.id}"
-                        >
-                          ${escapeHtml(
-                            periodo.codigo,
-                          )}
-                          —
-                          ${escapeHtml(
-                            periodo.nombre,
-                          )}
+                  ${
+                    periodosAcademicos.length
+                      ? periodosAcademicos
+                          .map(
+                            (periodo) => `
+                              <option
+                                value="${periodo.id}"
+                              >
+                                ${escapeHtml(
+                                  periodo.codigo,
+                                )}
+                                —
+                                ${escapeHtml(
+                                  periodo.nombre,
+                                )}
+                              </option>
+                            `,
+                          )
+                          .join('')
+                      : `
+                        <option value="">
+                          No existen periodos
                         </option>
-                      `,
-                    )
-                    .join('')
-                : `
-                  <option value="">
-                    No existen periodos
-                  </option>
-                `
-            }
+                      `
+                  }
 
-          </select>
+                </select>
 
-        </div>
+              </div>
 
 
-        <div
-          id="profesorDisponibilidadContent"
-          class="profesores-disponibilidad-content"
-        >
+              <div
+                id="profesorDisponibilidadContent"
+                class="profesores-disponibilidad-content"
+              >
 
-          <div
-            class="profesores-loading-inline"
-          >
-            Seleccione un periodo.
-          </div>
+                <div
+                  class="profesores-loading-inline"
+                >
+                  Seleccione un periodo.
+                </div>
 
-        </div>
+              </div>
 
-      </section>
+            </section>
+          `
+          : `
+            <section
+              class="profesores-detail-card"
+            >
+              <h3>
+                Disponibilidad docente
+              </h3>
+
+              <p
+                class="profesores-muted"
+              >
+                No posee permiso para consultar
+                los periodos académicos necesarios
+                para visualizar la disponibilidad.
+              </p>
+            </section>
+          `
+      }
 
     `;
 
@@ -2431,6 +2531,12 @@ async function cargarProfesores(
    ========================================================= */
 
 function iniciarGestionProfesores() {
+  if (
+    !puedeGestionarProfesores()
+  ) {
+    return;
+  }
+
   const pagina =
     document.getElementById(
       'profesoresPage',
@@ -6523,27 +6629,11 @@ async function abrirHistorialMiDisponibilidad() {
    ========================================================= */
 
 export function iniciarProfesoresPage() {
-  const roles =
-    obtenerRolesUsuario();
-
-  const esAdministrador =
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    );
-
-  const esCoordinador =
-    roles.includes(
-      ROLES.COORDINADOR,
-    );
-
   const esProfesor =
-    roles.includes(
-      ROLES.PROFESOR,
-    );
+    esProfesorActual();
 
   const tieneGestion =
-    esAdministrador ||
-    esCoordinador;
+    puedeGestionarProfesores();
 
 
   if (

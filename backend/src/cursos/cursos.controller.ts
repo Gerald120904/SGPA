@@ -9,10 +9,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarCursoDto } from './dto/actualizar-curso.dto';
 import { CambiarEstadoCursoDto } from './dto/cambiar-estado-curso.dto';
 import { CrearCursoDto } from './dto/crear-curso.dto';
@@ -20,17 +20,18 @@ import { ListarAsignaturasDisponiblesDto } from './dto/listar-asignaturas-dispon
 import { CursosService } from './cursos.service';
 
 @Controller('cursos')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class CursosController {
   constructor(private readonly cursosService: CursosService) {}
 
   @Get()
+  @Permisos(PermisoSistema.CURSOS_VER)
   listar() {
     return this.cursosService.listar();
   }
 
   @Get('asignaturas-disponibles')
+  @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   listarAsignaturasDisponibles(
     @Query() filtros: ListarAsignaturasDisponiblesDto,
   ) {
@@ -38,16 +39,19 @@ export class CursosController {
   }
 
   @Get(':id')
+  @Permisos(PermisoSistema.CURSOS_VER)
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
     return this.cursosService.obtenerPorId(id);
   }
 
   @Post()
+  @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   crear(@Body() dto: CrearCursoDto) {
     return this.cursosService.crear(dto);
   }
 
   @Patch(':id')
+  @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarCursoDto,
@@ -56,6 +60,7 @@ export class CursosController {
   }
 
   @Patch(':id/estado')
+  @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoCursoDto,

@@ -1,4 +1,8 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  ForbiddenException,
+  INestApplication,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -9,6 +13,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { EstadoPerfilProfesor } from '../perfiles-academicos/constants/estado-perfil-profesor.constant';
 import { EstadoAtestadoProfesor } from './constants/estado-atestado-profesor.constant';
 import { TipoAtestadoProfesor } from './constants/tipo-atestado-profesor.constant';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { ProfesoresController } from './profesores.controller';
@@ -17,8 +22,13 @@ import { ProfesoresService } from './profesores.service';
 describe('ProfesoresController', () => {
   const jwtSecret = 'profesores-test-secret';
 
+  const permisosAsignados = new Set<string>();
   const permisosService = {
-    usuarioTienePermisos: jest.fn().mockResolvedValue(true),
+    usuarioTienePermisos: jest
+      .fn()
+      .mockImplementation(async (_usuarioId: number, permisos: string[]) =>
+        permisos.every((p) => permisosAsignados.has(p)),
+      ),
   };
 
   const profesoresService = {
@@ -92,6 +102,7 @@ describe('ProfesoresController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados.clear();
 
     profesoresService.listar.mockResolvedValue([]);
     profesoresService.obtenerPorId.mockResolvedValue({
@@ -149,7 +160,7 @@ describe('ProfesoresController', () => {
     expect(profesoresService.listar).not.toHaveBeenCalled();
   });
 
-  it('permite listar a ADMIN_GLOBAL', async () => {
+  it('permite listar a ADMIN_GLOBAL sin permisos guardados', async () => {
     const token = await crearToken(['ADMIN_GLOBAL']);
 
     await request(app.getHttpServer())
@@ -160,17 +171,20 @@ describe('ProfesoresController', () => {
     expect(profesoresService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite listar a COORDINADOR', async () => {
-    const token = await crearToken(['COORDINADOR']);
+  it('permite listar a ESTUDIANTE con PROFESORES_VER', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores')
       .set('Authorization', `Bearer ${token}`)
       .expect(200, []);
+
+    expect(profesoresService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('impide listar profesores a PROFESOR', async () => {
-    const token = await crearToken(['PROFESOR']);
+  it('impide listar profesores a usuario sin PROFESORES_VER', async () => {
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores')
@@ -193,8 +207,8 @@ describe('ProfesoresController', () => {
     expect(profesoresService.obtenerMiPerfil).toHaveBeenCalledWith(10);
   });
 
-  it('permite usuario COORDINADOR + PROFESOR usar su perfil', async () => {
-    const token = await crearToken(['COORDINADOR', 'PROFESOR']);
+  it('permite usuario con roles múltiples incluyendo PROFESOR usar su perfil', async () => {
+    const token = await crearToken(['ESTUDIANTE', 'PROFESOR']);
 
     await request(app.getHttpServer())
       .get('/profesores/mi-perfil')
@@ -205,7 +219,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza acceder a mi-perfil sin rol PROFESOR', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/mi-perfil')
@@ -248,8 +263,9 @@ describe('ProfesoresController', () => {
     expect(profesoresService.actualizarCarrerasMiPerfil).not.toHaveBeenCalled();
   });
 
-  it('consulta un profesor por id', async () => {
-    const token = await crearToken(['COORDINADOR']);
+  it('consulta un profesor por id con PROFESORES_VER', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/10')
@@ -262,7 +278,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza id inválido', async () => {
-    const token = await crearToken(['ADMIN_GLOBAL']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/no-es-id')
@@ -271,7 +288,8 @@ describe('ProfesoresController', () => {
   });
 
   it('transforma correctamente los filtros recibidos por query', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get(
@@ -292,7 +310,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza activo inválido', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores?activo=talvez')
@@ -303,7 +322,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza hora con formato inválido', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores?periodoAcademicoId=2&dia=LUNES&hora=10:00AM')
@@ -314,7 +334,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza día inválido en filtros', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores?periodoAcademicoId=2&dia=FUNDAY&hora=10:00')
@@ -323,7 +344,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza filtros desconocidos', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores?campoInventado=123')
@@ -344,8 +366,9 @@ describe('ProfesoresController', () => {
     expect(profesoresService.obtenerHistorialPerfil).toHaveBeenCalledWith(10);
   });
 
-  it('permite a COORDINADOR consultar el historial del perfil de un profesor', async () => {
-    const token = await crearToken(['COORDINADOR']);
+  it('permite a usuario con PROFESORES_VER consultar el historial del perfil de un profesor', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/10/historial-perfil')
@@ -355,18 +378,7 @@ describe('ProfesoresController', () => {
     expect(profesoresService.obtenerHistorialPerfil).toHaveBeenCalledWith(10);
   });
 
-  it('permite a ADMIN_GLOBAL consultar el historial del perfil de un profesor', async () => {
-    const token = await crearToken(['ADMIN_GLOBAL']);
-
-    await request(app.getHttpServer())
-      .get('/profesores/10/historial-perfil')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200, []);
-
-    expect(profesoresService.obtenerHistorialPerfil).toHaveBeenCalledWith(10);
-  });
-
-  it('impide a PROFESOR consultar el historial del perfil de otro profesor', async () => {
+  it('impide a usuario sin PROFESORES_VER consultar el historial del perfil de otro profesor', async () => {
     const token = await crearToken(['PROFESOR']);
 
     await request(app.getHttpServer())
@@ -378,7 +390,8 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza profesorId inválido al consultar historial administrativo', async () => {
-    const token = await crearToken(['COORDINADOR']);
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores/no-es-id/historial-perfil')
@@ -428,8 +441,22 @@ describe('ProfesoresController', () => {
     });
   });
 
-  it('permite a COORDINADOR revisar perfil docente', async () => {
-    const token = await crearToken(['COORDINADOR'], 2);
+  it('rechaza revisar perfil docente sin PERFILES_DOCENTES_VALIDAR', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE'], 2);
+
+    await request(app.getHttpServer())
+      .patch('/profesores/10/perfiles/1/revision')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: EstadoPerfilProfesor.APROBADO, observacion: 'Aprobado' })
+      .expect(403);
+
+    expect(profesoresService.revisarPerfilProfesor).not.toHaveBeenCalled();
+  });
+
+  it('permite revisar perfil docente con PERFILES_DOCENTES_VALIDAR', async () => {
+    permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
+    const token = await crearToken(['ESTUDIANTE'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/revision')
@@ -448,8 +475,25 @@ describe('ProfesoresController', () => {
     );
   });
 
-  it('permite a COORDINADOR inactivar perfil docente', async () => {
-    const token = await crearToken(['COORDINADOR'], 2);
+  it('rechaza revisar perfil si el servicio lanza ForbiddenException por falta de alcance', async () => {
+    permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
+    profesoresService.revisarPerfilProfesor.mockRejectedValueOnce(
+      new ForbiddenException(
+        'No posee autoridad académica sobre la carrera asociada a este perfil.',
+      ),
+    );
+    const token = await crearToken(['ESTUDIANTE'], 2);
+
+    await request(app.getHttpServer())
+      .patch('/profesores/10/perfiles/1/revision')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: EstadoPerfilProfesor.APROBADO, observacion: 'Aprobado' })
+      .expect(403);
+  });
+
+  it('permite a usuario con PERFILES_DOCENTES_VALIDAR inactivar perfil docente', async () => {
+    permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
+    const token = await crearToken(['ESTUDIANTE'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/inactivar')
@@ -463,6 +507,18 @@ describe('ProfesoresController', () => {
       2,
       'Inactivado',
     );
+  });
+
+  it('rechaza inactivar perfil docente sin PERFILES_DOCENTES_VALIDAR', async () => {
+    const token = await crearToken(['ESTUDIANTE'], 2);
+
+    await request(app.getHttpServer())
+      .patch('/profesores/10/perfiles/1/inactivar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ observacion: 'Inactivado' })
+      .expect(403);
+
+    expect(profesoresService.inactivarPerfilProfesor).not.toHaveBeenCalled();
   });
 
   it('permite a PROFESOR inactivar su propio perfil', async () => {
@@ -482,8 +538,9 @@ describe('ProfesoresController', () => {
     );
   });
 
-  it('permite filtrar profesores por perfilAcademicoId', async () => {
-    const token = await crearToken(['COORDINADOR']);
+  it('permite filtrar profesores por perfilAcademicoId con PROFESORES_VER', async () => {
+    permisosAsignados.add(PermisoSistema.PROFESORES_VER);
+    const token = await crearToken(['ESTUDIANTE']);
 
     await request(app.getHttpServer())
       .get('/profesores?perfilAcademicoId=1')
@@ -567,8 +624,9 @@ describe('ProfesoresController', () => {
     );
   });
 
-  it('permite a COORDINADOR revisar un atestado', async () => {
-    const token = await crearToken(['COORDINADOR'], 2);
+  it('permite a usuario con ATESTADOS_VALIDAR revisar un atestado', async () => {
+    permisosAsignados.add(PermisoSistema.ATESTADOS_VALIDAR);
+    const token = await crearToken(['ESTUDIANTE'], 2);
 
     const dto = {
       estado: EstadoAtestadoProfesor.APROBADO,
@@ -587,6 +645,23 @@ describe('ProfesoresController', () => {
       2,
       dto,
     );
+  });
+
+  it('rechaza revisar un atestado sin ATESTADOS_VALIDAR', async () => {
+    const token = await crearToken(['ESTUDIANTE'], 2);
+
+    const dto = {
+      estado: EstadoAtestadoProfesor.APROBADO,
+      observacion: 'Cumple con requisitos',
+    };
+
+    await request(app.getHttpServer())
+      .patch('/profesores/10/atestados/1/revision')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(403);
+
+    expect(profesoresService.revisarAtestadoProfesor).not.toHaveBeenCalled();
   });
 
   // --- Proyectos Endpoints ---

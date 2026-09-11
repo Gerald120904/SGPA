@@ -28,6 +28,14 @@ import {
 } from "../../utils/html.js";
 
 import {
+  usuarioTienePermiso,
+} from "../../app/session.js";
+
+import {
+  PERMISOS,
+} from "../../config/permissions.js";
+
+import {
   renderizarIconos,
 } from "../../utils/icons.js";
 
@@ -136,6 +144,13 @@ const TRANSICIONES = {
 };
 
 
+function puedeGestionarPeriodos() {
+  return usuarioTienePermiso(
+    PERMISOS.PERIODOS_GESTIONAR,
+  );
+}
+
+
 /* =========================================================
    PÁGINA
    ========================================================= */
@@ -163,20 +178,24 @@ export function PeriodosPage() {
         </div>
 
 
-        <button
-          id="nuevoPeriodoButton"
-          class="periodos-primary-button"
-          type="button"
-        >
+        ${
+          puedeGestionarPeriodos()
+            ? `
+              <button
+                id="nuevoPeriodoButton"
+                class="periodos-primary-button"
+                type="button"
+              >
+                <i
+                  data-lucide="plus"
+                  aria-hidden="true"
+                ></i>
 
-          <i
-            data-lucide="plus"
-            aria-hidden="true"
-          ></i>
-
-          Nuevo periodo
-
-        </button>
+                Nuevo periodo
+              </button>
+            `
+            : ''
+        }
 
       </div>
 
@@ -401,6 +420,9 @@ function renderizarPeriodos() {
   const filtrados =
     obtenerPeriodosFiltrados();
 
+  const puedeGestionar =
+    puedeGestionarPeriodos();
+
 
   const filas =
     filtrados
@@ -414,32 +436,34 @@ function renderizarPeriodos() {
 
 
           const accionesEstado =
-            transiciones
-              .map(
-                (
-                  transicion,
-                ) => `
-                  <button
-                    class="
-                      periodos-transition-button
-                      ${
-                        transicion.peligro
-                          ? "periodos-danger-button"
-                          : ""
-                      }
-                    "
-                    type="button"
-                    data-action="estado"
-                    data-id="${periodo.id}"
-                    data-estado="${transicion.estado}"
-                  >
-                    ${escapeHtml(
-                      transicion.texto,
-                    )}
-                  </button>
-                `,
-              )
-              .join("");
+            puedeGestionar
+              ? transiciones
+                  .map(
+                    (
+                      transicion,
+                    ) => `
+                      <button
+                        class="
+                          periodos-transition-button
+                          ${
+                            transicion.peligro
+                              ? "periodos-danger-button"
+                              : ""
+                          }
+                        "
+                        type="button"
+                        data-action="estado"
+                        data-id="${periodo.id}"
+                        data-estado="${transicion.estado}"
+                      >
+                        ${escapeHtml(
+                          transicion.texto,
+                        )}
+                      </button>
+                    `,
+                  )
+                  .join("")
+              : "";
 
 
           return `
@@ -544,6 +568,7 @@ function renderizarPeriodos() {
                 >
 
                   ${
+                    puedeGestionar &&
                     periodoEditable(
                       periodo,
                     )

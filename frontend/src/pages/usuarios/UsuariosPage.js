@@ -8,6 +8,13 @@ import {
   revocarRolUsuario,
   listarRoles,
 } from '../../services/usuarios.service.js';
+import {
+  listarCatalogoPermisos,
+  listarPlantillasPermisos,
+  listarPermisosUsuario,
+  reemplazarPermisosUsuario,
+} from '../../services/permisos.service.js';
+import { ROLES } from '../../config/permissions.js';
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 import { confirmarAccion } from '../../utils/confirm.js';
@@ -97,6 +104,185 @@ function mensajeResultado(resultado, mensajePredeterminado) {
   throw new Error(resultado?.message || mensajePredeterminado);
 }
 
+const INFORMACION_PERMISOS = {
+
+  PROFESORES_VER: {
+    nombre:
+      'Ver profesores',
+
+    descripcion:
+      'Permite consultar información administrativa de profesores.',
+  },
+
+  ATESTADOS_VALIDAR: {
+    nombre:
+      'Validar atestados',
+
+    descripcion:
+      'Permite aprobar o rechazar atestados de profesores.',
+  },
+
+  PERFILES_DOCENTES_VALIDAR: {
+    nombre:
+      'Validar perfiles docentes',
+
+    descripcion:
+      'Permite aprobar, rechazar o inactivar perfiles solicitados por profesores.',
+  },
+
+  PERFILES_ACADEMICOS_GESTIONAR: {
+    nombre:
+      'Gestionar perfiles académicos',
+
+    descripcion:
+      'Permite administrar perfiles académicos según el alcance autorizado.',
+  },
+
+  PROYECCION_VER: {
+    nombre:
+      'Ver proyección académica',
+
+    descripcion:
+      'Permite consultar información de proyección académica.',
+  },
+
+  PROYECCION_GESTIONAR: {
+    nombre:
+      'Gestionar proyección académica',
+
+    descripcion:
+      'Permite realizar operaciones de gestión sobre la proyección académica.',
+  },
+
+  OFERTA_VER: {
+    nombre:
+      'Ver oferta académica',
+
+    descripcion:
+      'Permite consultar la oferta académica.',
+  },
+
+  OFERTA_GESTIONAR: {
+    nombre:
+      'Gestionar oferta académica',
+
+    descripcion:
+      'Permite realizar operaciones administrativas sobre la oferta académica.',
+  },
+
+  PROFESORES_ASIGNAR: {
+    nombre:
+      'Asignar profesores',
+
+    descripcion:
+      'Permite asignar profesores dentro de los procesos académicos autorizados.',
+  },
+
+  AULAS_VER: {
+    nombre:
+      'Ver aulas',
+
+    descripcion:
+      'Permite consultar aulas, equipamiento, disponibilidad y ocupación.',
+  },
+
+  AULAS_GESTIONAR: {
+    nombre:
+      'Gestionar aulas',
+
+    descripcion:
+      'Permite administrar aulas y su información operativa.',
+  },
+
+  AULAS_ASIGNAR: {
+    nombre:
+      'Asignar aulas',
+
+    descripcion:
+      'Permite evaluar y utilizar aulas dentro de procesos de asignación académica.',
+  },
+
+  AULAS_CAMBIO_AUTORIZAR: {
+    nombre:
+      'Autorizar cambios de aula',
+
+    descripcion:
+      'Permite autorizar excepciones o cambios de aula cuando el proceso académico lo requiera.',
+  },
+
+};
+
+
+function obtenerInformacionPermiso(
+  permiso,
+) {
+  const etiquetas = {
+    VER: 'Ver',
+    GESTIONAR: 'Gestionar',
+    VALIDAR: 'Validar',
+    ASIGNAR: 'Asignar',
+    AUTORIZAR: 'Autorizar',
+  };
+
+  const partes = String(permiso)
+    .split('_');
+  const accion = partes.pop();
+  const recurso = partes
+    .join(' ')
+    .toLocaleLowerCase('es-CR')
+    .replace('academicos', 'académicos')
+    .replace('academica', 'académica')
+    .replace('proyeccion', 'proyección');
+
+  return (
+    INFORMACION_PERMISOS[
+      permiso
+    ] || {
+      nombre: `${
+        etiquetas[accion] || accion
+      } ${recurso}`,
+      descripcion:
+        `Permite ${
+          (etiquetas[accion] || accion)
+            .toLocaleLowerCase('es-CR')
+        } ${recurso}.`,
+    }
+  );
+}
+
+
+function usuarioEsAdminGlobal(
+  usuario,
+) {
+  return obtenerRoles(
+    usuario,
+  ).some(
+    (rol) =>
+      rol.nombre ===
+      'ADMIN_GLOBAL',
+  );
+}
+
+
+function obtenerCodigosPermisos(
+  permisos,
+) {
+  return new Set(
+    (
+      Array.isArray(permisos)
+        ? permisos
+        : []
+    )
+      .map(
+        (item) =>
+          typeof item === 'string'
+            ? item
+            : item?.permiso,
+      )
+      .filter(Boolean),
+  );
+}
+
 export async function iniciarUsuariosPage() {
   const pagina = document.getElementById('usuariosPage');
 
@@ -108,6 +294,8 @@ export async function iniciarUsuariosPage() {
   const estado = {
     usuarios: [],
     roles: [],
+    permisosCatalogo: [],
+    plantillasPermisos: {},
     filtro: '',
   };
 
@@ -120,6 +308,115 @@ export async function iniciarUsuariosPage() {
   const feedback = pagina.querySelector('#usuariosFeedback');
   const dialogo = pagina.querySelector('#usuarioDialog');
   const dialogoContenido = pagina.querySelector('#usuarioDialogContent');
+
+  function renderizarOpcionesPermisos(
+    seleccionados = new Set(),
+  ) {
+    return estado.permisosCatalogo
+      .map(
+        (permiso) => {
+          const informacion =
+            obtenerInformacionPermiso(
+              permiso,
+            );
+
+          return `
+            <label
+              class="usuario-permission-option"
+            >
+              <input
+                type="checkbox"
+                name="permisos"
+                value="${escapeHtml(
+                  permiso,
+                )}"
+                ${
+                  seleccionados.has(
+                    permiso,
+                  )
+                    ? 'checked'
+                    : ''
+                }
+              >
+
+              <span>
+                <strong>
+                  ${escapeHtml(
+                    informacion.nombre,
+                  )}
+                </strong>
+
+                <small>
+                  ${escapeHtml(
+                    informacion.descripcion,
+                  )}
+                </small>
+
+                <code>
+                  ${escapeHtml(
+                    permiso,
+                  )}
+                </code>
+              </span>
+            </label>
+          `;
+        },
+      )
+      .join('');
+  }
+
+  function obtenerPermisosSugeridosRoles(
+    roles,
+  ) {
+    if (
+      roles.includes(
+        ROLES.ADMIN_GLOBAL,
+      )
+    ) {
+      return new Set();
+    }
+
+    return new Set(
+      roles.flatMap(
+        (rol) =>
+          estado
+            .plantillasPermisos?.[
+              rol
+            ] || [],
+      ),
+    );
+  }
+
+  function aplicarPlantillaCreacion() {
+    const roles =
+      [
+        ...dialogoContenido
+          .querySelectorAll(
+            'input[name="roles"]:checked',
+          ),
+      ].map(
+        (input) =>
+          input.value,
+      );
+
+    const sugeridos =
+      obtenerPermisosSugeridosRoles(
+        roles,
+      );
+
+    dialogoContenido
+      .querySelectorAll(
+        'input[name="permisos"]',
+      )
+      .forEach(
+        (input) => {
+          input.checked =
+            sugeridos.has(
+              input.value,
+            );
+        },
+      );
+  }
 
   function mostrarFeedback(mensaje, tipo = 'success') {
     if (!feedback) return;
@@ -272,6 +569,40 @@ export async function iniciarUsuariosPage() {
     estado.roles = Array.isArray(resultado.data) ? resultado.data : [];
   }
 
+  async function cargarPermisosCatalogo() {
+    const resultado =
+      mensajeResultado(
+        await listarCatalogoPermisos(),
+        'No fue posible consultar el catálogo de permisos.',
+      );
+
+    if (!sigueActiva()) {
+      return;
+    }
+
+    estado.permisosCatalogo =
+      Array.isArray(
+        resultado.permisos,
+      )
+        ? resultado.permisos
+        : [];
+  }
+
+  async function cargarPlantillasPermisos() {
+    const resultado =
+      mensajeResultado(
+        await listarPlantillasPermisos(),
+        'No fue posible consultar las plantillas de permisos.',
+      );
+
+    if (!sigueActiva()) {
+      return;
+    }
+
+    estado.plantillasPermisos =
+      resultado.plantillas || {};
+  }
+
   function camposUsuario(usuario = null) {
     return `
       <div class="usuario-form-grid">
@@ -296,6 +627,152 @@ export async function iniciarUsuariosPage() {
           <input name="apellido2" maxlength="100" value="${escapeHtml(usuario?.apellido2 || '')}">
         </label>
       </div>
+    `;
+  }
+
+  function renderizarGestorPermisos(
+    usuario,
+    permisosUsuario,
+  ) {
+    const asignados =
+      obtenerCodigosPermisos(
+        permisosUsuario,
+      );
+
+    const esAdmin =
+      usuarioEsAdminGlobal(
+        usuario,
+      );
+
+    if (esAdmin) {
+      return `
+        <section
+          class="usuario-permission-manager"
+        >
+
+          <div
+            class="usuario-permission-header"
+          >
+
+            <div>
+
+              <h4>
+                Permisos granulares
+              </h4>
+
+              <p>
+                Este usuario posee el rol
+                ADMIN_GLOBAL.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <div
+            class="usuario-permission-superuser"
+          >
+
+            <i
+              data-lucide="shield-check"
+              aria-hidden="true"
+            ></i>
+
+
+            <div>
+
+              <strong>
+                Acceso de superusuario
+              </strong>
+
+              <p>
+                ADMIN_GLOBAL no necesita
+                permisos granulares individuales.
+                El backend le concede acceso
+                administrativo automáticamente.
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+      `;
+    }
+
+    return `
+      <section
+        class="usuario-permission-manager"
+      >
+
+        <div
+          class="usuario-permission-header"
+        >
+
+          <div>
+
+            <h4>
+              Permisos granulares
+            </h4>
+
+            <p>
+              Defina las operaciones
+              administrativas adicionales
+              permitidas para este usuario.
+            </p>
+
+          </div>
+
+
+          <span
+            class="usuario-permission-count"
+          >
+            ${
+              asignados.size
+            }
+            asignados
+          </span>
+
+        </div>
+
+
+        <div
+          class="usuario-permission-grid"
+        >
+          ${renderizarOpcionesPermisos(asignados)}
+        </div>
+
+
+        <div
+          class="usuario-permission-actions"
+        >
+
+          <small>
+            Los permisos no seleccionados
+            serán removidos al guardar.
+          </small>
+
+
+          <button
+            type="button"
+            class="usuarios-secondary-button"
+            data-action="guardar-permisos"
+            data-user-id="${
+              usuario.id
+            }"
+          >
+            <i
+              data-lucide="shield-check"
+              aria-hidden="true"
+            ></i>
+
+            Guardar permisos
+          </button>
+
+        </div>
+
+      </section>
     `;
   }
 
@@ -338,6 +815,34 @@ export async function iniciarUsuariosPage() {
           `).join('')}
         </fieldset>
 
+        <section
+          class="usuario-permission-manager"
+        >
+          <div
+            class="usuario-permission-header"
+          >
+            <div>
+              <h4>
+                Permisos iniciales
+              </h4>
+
+              <p>
+                Se sugieren según los roles,
+                pero puede agregar o quitar
+                cualquiera antes de crear
+                el usuario.
+              </p>
+            </div>
+          </div>
+
+          <div
+            id="permisosCreacionUsuario"
+            class="usuario-permission-grid"
+          >
+            ${renderizarOpcionesPermisos()}
+          </div>
+        </section>
+
         <div class="usuario-dialog-actions">
           <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
           <button class="usuarios-primary-button" type="submit">Crear usuario</button>
@@ -349,7 +854,10 @@ export async function iniciarUsuariosPage() {
     if (!dialogo.open) dialogo.showModal();
   }
 
-  function renderizarDialogoEdicion(usuario) {
+  function renderizarDialogoEdicion(
+    usuario,
+    permisosUsuario = [],
+  ) {
     const rolesUsuario = obtenerRoles(usuario);
     const nombresAsignados = new Set(rolesUsuario.map((rol) => rol.nombre));
     const rolesDisponibles = estado.roles.filter(
@@ -361,7 +869,7 @@ export async function iniciarUsuariosPage() {
         <div class="usuario-dialog-header">
           <div>
             <h3>Editar usuario</h3>
-            <p>Actualice sus datos administrativos y roles.</p>
+            <p>Actualice sus datos administrativos, roles y permisos.</p>
           </div>
           <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
             <i data-lucide="x" aria-hidden="true"></i>
@@ -413,6 +921,11 @@ export async function iniciarUsuariosPage() {
           </div>
         </section>
 
+        ${renderizarGestorPermisos(
+          usuario,
+          permisosUsuario,
+        )}
+
         <div class="usuario-dialog-actions">
           <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
           <button class="usuarios-primary-button" type="submit">Guardar cambios</button>
@@ -424,30 +937,116 @@ export async function iniciarUsuariosPage() {
     if (!dialogo.open) dialogo.showModal();
   }
 
-  async function abrirEdicion(id) {
+  async function abrirEdicion(
+    id,
+  ) {
     ocultarFeedback();
-    const resultado = mensajeResultado(
-      await obtenerUsuarioDetalle(id),
-      'No fue posible obtener el usuario.',
-    );
 
-    if (sigueActiva()) renderizarDialogoEdicion(resultado.data);
+
+    const [
+      resultadoUsuario,
+      resultadoPermisos,
+    ] = await Promise.all([
+
+      obtenerUsuarioDetalle(
+        id,
+      ),
+
+      listarPermisosUsuario(
+        id,
+      ),
+
+    ]);
+
+
+    const usuario =
+      mensajeResultado(
+        resultadoUsuario,
+        'No fue posible obtener el usuario.',
+      );
+
+
+    const permisos =
+      mensajeResultado(
+        resultadoPermisos,
+        'No fue posible consultar los permisos del usuario.',
+      );
+
+
+    if (!sigueActiva()) {
+      return;
+    }
+
+
+    renderizarDialogoEdicion(
+      usuario.data,
+      permisos.permisos,
+    );
   }
 
-  async function actualizarVistaYDialogo(id) {
-    await cargarUsuarios(false);
-    const resultado = mensajeResultado(
-      await obtenerUsuarioDetalle(id),
-      'No fue posible actualizar el detalle.',
+  async function actualizarVistaYDialogo(
+    id,
+  ) {
+    await cargarUsuarios(
+      false,
     );
 
-    if (sigueActiva()) renderizarDialogoEdicion(resultado.data);
+
+    const [
+      resultadoUsuario,
+      resultadoPermisos,
+    ] = await Promise.all([
+
+      obtenerUsuarioDetalle(
+        id,
+      ),
+
+      listarPermisosUsuario(
+        id,
+      ),
+
+    ]);
+
+
+    const usuario =
+      mensajeResultado(
+        resultadoUsuario,
+        'No fue posible actualizar el detalle.',
+      );
+
+
+    const permisos =
+      mensajeResultado(
+        resultadoPermisos,
+        'No fue posible actualizar los permisos.',
+      );
+
+
+    if (!sigueActiva()) {
+      return;
+    }
+
+
+    renderizarDialogoEdicion(
+      usuario.data,
+      permisos.permisos,
+    );
   }
 
   pagina.addEventListener('input', (event) => {
     if (event.target.id !== 'usuariosBuscar') return;
     estado.filtro = event.target.value;
     renderizarTabla();
+  });
+
+  pagina.addEventListener('change', (event) => {
+    if (
+      event.target.name === 'roles' &&
+      dialogo?.open &&
+      !dialogoContenido.querySelector('#usuarioForm')?.dataset.userId
+    ) {
+      aplicarPlantillaCreacion();
+    }
   });
 
   pagina.addEventListener('submit', async (event) => {
@@ -484,11 +1083,16 @@ export async function iniciarUsuariosPage() {
           throw new Error('Seleccione al menos un rol.');
         }
 
+        const permisos = datos.getAll('permisos');
+
         mensajeResultado(
           await crearUsuario({
             ...usuario,
             password: datos.get('password'),
             roles,
+            permisos: roles.includes(ROLES.ADMIN_GLOBAL)
+              ? []
+              : permisos,
           }),
           'No fue posible crear el usuario.',
         );
@@ -599,6 +1203,65 @@ export async function iniciarUsuariosPage() {
         mostrarFeedback(error.message, 'error');
         boton.disabled = false;
       }
+      return;
+    }
+
+    if (
+      accion ===
+      'guardar-permisos'
+    ) {
+
+      const seleccionados =
+        [
+          ...dialogoContenido
+            .querySelectorAll(
+              'input[name="permisos"]:checked',
+            ),
+        ].map(
+          (input) =>
+            input.value,
+        );
+
+
+      try {
+
+        boton.disabled =
+          true;
+
+
+        mensajeResultado(
+          await reemplazarPermisosUsuario(
+            id,
+            seleccionados,
+          ),
+          'No fue posible guardar los permisos.',
+        );
+
+
+        await actualizarVistaYDialogo(
+          id,
+        );
+
+
+        mostrarFeedback(
+          'Permisos actualizados correctamente.',
+        );
+
+      } catch (error) {
+
+        mostrarFeedback(
+          error.message,
+          'error',
+        );
+
+
+        boton.disabled =
+          false;
+
+      }
+
+
+      return;
     }
   });
 
@@ -612,7 +1275,12 @@ export async function iniciarUsuariosPage() {
   });
 
   try {
-    await Promise.all([cargarRoles(), cargarUsuarios()]);
+    await Promise.all([
+      cargarRoles(),
+      cargarPermisosCatalogo(),
+      cargarPlantillasPermisos(),
+      cargarUsuarios(),
+    ]);
   } catch (error) {
     console.error('Error cargando el módulo de usuarios:', error);
     if (!sigueActiva()) return;

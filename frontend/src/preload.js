@@ -1,4 +1,3 @@
-
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("sgpa", {
@@ -21,6 +20,35 @@ contextBridge.exposeInMainWorld("sgpa", {
   revocarRolUsuario: (usuarioId, rolId) =>
     ipcRenderer.invoke("usuarios:revocar-rol", usuarioId, rolId),
   listarRoles: () => ipcRenderer.invoke("roles:listar"),
+
+  listarCatalogoPermisos: () =>
+    ipcRenderer.invoke(
+      "permisos:catalogo",
+    ),
+
+  listarPlantillasPermisos: () =>
+    ipcRenderer.invoke(
+      'permisos:plantillas',
+    ),
+
+  listarPermisosUsuario: (
+    usuarioId,
+  ) =>
+    ipcRenderer.invoke(
+      "permisos:usuario",
+      usuarioId,
+    ),
+
+  reemplazarPermisosUsuario: (
+    usuarioId,
+    permisos,
+  ) =>
+    ipcRenderer.invoke(
+      "permisos:reemplazar",
+      usuarioId,
+      permisos,
+    ),
+
   listarCarreras: () => ipcRenderer.invoke("carreras:listar"),
   obtenerCarrera: (id) => ipcRenderer.invoke("carreras:obtener", id),
   crearCarrera: (datos) => ipcRenderer.invoke("carreras:crear", datos),
@@ -37,6 +65,12 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("cursos:actualizar", id, datos),
   cambiarEstadoCurso: (id, activo) =>
     ipcRenderer.invoke("cursos:cambiar-estado", id, activo),
+  listarRequisitosCurso: (cursoId) =>
+    ipcRenderer.invoke("cursos:requisitos:listar", cursoId),
+  crearRequisitoCurso: (cursoId, datos) =>
+    ipcRenderer.invoke("cursos:requisitos:crear", cursoId, datos),
+  eliminarRequisitoCurso: (cursoId, requisitoId) =>
+    ipcRenderer.invoke("cursos:requisitos:eliminar", cursoId, requisitoId),
   listarPeriodosAcademicos: () =>
     ipcRenderer.invoke(
       "periodos:listar",
