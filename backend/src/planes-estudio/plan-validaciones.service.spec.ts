@@ -1,26 +1,31 @@
 import { NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { PlanValidacionesService } from './plan-validaciones.service';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
+import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 
 describe('PlanValidacionesService', () => {
   let service: PlanValidacionesService;
   const planes = { findOne: jest.fn() },
     asignaturas = { find: jest.fn() },
     requisitos = { find: jest.fn() },
-    salidas = { find: jest.fn() };
+    salidas = { find: jest.fn() },
+    reglasOptativas = { findOne: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    reglasOptativas.findOne.mockResolvedValue(null);
     service = new PlanValidacionesService(
       planes as unknown as Repository<PlanEstudio>,
       asignaturas as unknown as Repository<PlanAsignatura>,
       requisitos as unknown as Repository<PlanRequisito>,
       salidas as unknown as Repository<SalidaAcademica>,
+      reglasOptativas as unknown as Repository<ReglaOptativaPlan>,
     );
   });
 
@@ -88,6 +93,7 @@ describe('PlanValidacionesService', () => {
         codigoReferencia: 'OPT',
         nombreReferencia: 'Optativo I',
         tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.DISCIPLINARIA,
         nivel: 3,
         ciclo: 1,
         activo: true,
@@ -100,6 +106,7 @@ describe('PlanValidacionesService', () => {
         codigoReferencia: 'OPT',
         nombreReferencia: 'Optativo II',
         tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.DISCIPLINARIA,
         nivel: 3,
         ciclo: 2,
         activo: true,
@@ -227,4 +234,151 @@ describe('PlanValidacionesService', () => {
     expect(codigosError).not.toContain('ASIGNATURA_SIN_NOMBRE');
     expect(r.valido).toBe(true);
   });
+
+  it('detecta una optativa activa sin clasificación', async () => {
+    planes.findOne.mockResolvedValue({ id: 1 });
+    asignaturas.find.mockResolvedValue([
+      {
+        id: 20,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'OPT-01',
+        nombreReferencia: 'Optativa I',
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: null,
+        nivel: 3,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+    ]);
+    requisitos.find.mockResolvedValue([]);
+    salidas.find.mockResolvedValue([]);
+
+    const r = await service.validar(1);
+
+    expect(r.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: 'OPTATIVA_SIN_CLASIFICAR',
+          asignaturaId: 20,
+        }),
+      ]),
+    );
+    expect(r.valido).toBe(false);
+  });
+
+  it('detecta que no se cumple el mínimo de optativas disciplinarias', async () => {
+    planes.findOne.mockResolvedValue({ id: 1 });
+    asignaturas.find.mockResolvedValue([
+      {
+        id: 21,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'OPT-01',
+        nombreReferencia: 'Optativa I',
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.DISCIPLINARIA,
+        nivel: 3,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+      {
+        id: 22,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'OPT-02',
+        nombreReferencia: 'Optativa II',
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.ABIERTA,
+        nivel: 3,
+        ciclo: 2,
+        activo: true,
+        horasTotales: null,
+      },
+    ]);
+    requisitos.find.mockResolvedValue([]);
+    salidas.find.mockResolvedValue([]);
+    reglasOptativas.findOne.mockResolvedValue({
+      planEstudioId: 1,
+      minimoDisciplinariasPropias: 2,
+      maximoOtrasAreas: 2,
+    });
+
+    const r = await service.validar(1);
+
+    expect(r.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: 'MINIMO_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDO',
+        }),
+      ]),
+    );
+    expect(r.valido).toBe(false);
+  });
+
+  it('detecta que se supera el máximo de optativas de otras áreas', async () => {
+    planes.findOne.mockResolvedValue({ id: 1 });
+    asignaturas.find.mockResolvedValue([
+      {
+        id: 31,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'OPT-01',
+        nombreReferencia: 'Optativa I',
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.ABIERTA,
+        nivel: 3,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+      {
+        id: 32,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'OPT-02',
+        nombreReferencia: 'Optativa II',
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.SEDE,
+        nivel: 3,
+        ciclo: 2,
+        activo: true,
+        horasTotales: null,
+      },
+      {
+        id: 33,
+        cursoId: null,
+        curso: null,
+        codigoReferencia: 'OPT-03',
+        nombreReferencia: 'Optativa III',
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.ABIERTA,
+        nivel: 4,
+        ciclo: 1,
+        activo: true,
+        horasTotales: null,
+      },
+    ]);
+    requisitos.find.mockResolvedValue([]);
+    salidas.find.mockResolvedValue([]);
+    reglasOptativas.findOne.mockResolvedValue({
+      planEstudioId: 1,
+      minimoDisciplinariasPropias: 0,
+      maximoOtrasAreas: 2,
+    });
+
+    const r = await service.validar(1);
+
+    expect(r.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          codigo: 'MAXIMO_OPTATIVAS_OTRAS_AREAS_SUPERADO',
+        }),
+      ]),
+    );
+    expect(r.valido).toBe(false);
+  });
+
 });

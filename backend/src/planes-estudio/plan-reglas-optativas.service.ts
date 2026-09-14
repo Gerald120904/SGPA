@@ -4,7 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { GuardarReglaOptativaPlanDto } from './dto/guardar-regla-optativa-plan.dto';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
@@ -48,6 +49,18 @@ export class PlanReglasOptativasService {
       where: {
         planEstudioId: planId,
         tipo: TipoPlanAsignatura.OPTATIVA,
+        activo: true,
+      },
+    });
+  }
+
+
+  private async contarOtrasAreas(planId: number): Promise<number> {
+    return this.asignaturaRepository.count({
+      where: {
+        planEstudioId: planId,
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: In([TipoOptativa.ABIERTA, TipoOptativa.SEDE]),
         activo: true,
       },
     });
@@ -101,6 +114,19 @@ export class PlanReglasOptativasService {
       throw new BadRequestException(
         `El máximo de optativas de otras áreas (${dto.maximoOtrasAreas}) no puede ser mayor a la cantidad de espacios optativos (${cantidadEspacios}).`,
       );
+    }
+
+    if (
+      dto.maximoOtrasAreas !== undefined &&
+      dto.maximoOtrasAreas !== null
+    ) {
+      const cantidadOtrasAreas = await this.contarOtrasAreas(planId);
+
+      if (cantidadOtrasAreas > dto.maximoOtrasAreas) {
+        throw new BadRequestException(
+          `El plan ya tiene ${cantidadOtrasAreas} optativas de otras áreas activas. No se puede fijar un máximo menor a esa cantidad.`,
+        );
+      }
     }
 
     let regla = await this.reglaRepository.findOne({

@@ -48,6 +48,7 @@ describe('PlanRequisitosService', () => {
     orden: id,
     creditos: 3,
     tipo: TipoPlanAsignatura.OBLIGATORIA,
+    tipoOptativa: null,
     codigoReferencia: `REF-${id}`,
     nombreReferencia: `Asignatura ${id}`,
     activo: true,

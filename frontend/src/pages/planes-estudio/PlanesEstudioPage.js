@@ -60,6 +60,72 @@ const GRADOS_PLAN = {
   OTRO: "Otro",
 };
 
+const TIPOS_OPTATIVA_PLAN = {
+  DISCIPLINARIA: {
+    etiqueta: "Disciplinaria / de carrera",
+    detalle: "Cuenta como optativa disciplinaria propia de la carrera.",
+    clase: "disciplinaria",
+  },
+  ABIERTA: {
+    etiqueta: "Abierta / otra área",
+    detalle: "Cuenta dentro del máximo de optativas de otras áreas.",
+    clase: "abierta",
+  },
+  SEDE: {
+    etiqueta: "De sede / otra área",
+    detalle: "Cuenta dentro del máximo de optativas de otras áreas.",
+    clase: "sede",
+  },
+};
+
+function obtenerPresentacionTipoOptativa(tipoOptativa) {
+  const codigo = String(tipoOptativa || "").toUpperCase();
+
+  return (
+    TIPOS_OPTATIVA_PLAN[codigo] || {
+      etiqueta: "Sin clasificar",
+      detalle: "La optativa todavía no tiene una clasificación asignada.",
+      clase: "sin-clasificar",
+    }
+  );
+}
+
+function obtenerConteoOptativasPlan() {
+  const optativas = asignaturasPlan.filter(
+    (asignatura) =>
+      asignatura.activo !== false &&
+      String(asignatura.tipo || "").toUpperCase() === "OPTATIVA",
+  );
+
+  const disciplinarias = optativas.filter(
+    (asignatura) =>
+      String(asignatura.tipoOptativa || "").toUpperCase() === "DISCIPLINARIA",
+  ).length;
+
+  const abiertas = optativas.filter(
+    (asignatura) =>
+      String(asignatura.tipoOptativa || "").toUpperCase() === "ABIERTA",
+  ).length;
+
+  const sede = optativas.filter(
+    (asignatura) =>
+      String(asignatura.tipoOptativa || "").toUpperCase() === "SEDE",
+  ).length;
+
+  const sinClasificar = optativas.filter(
+    (asignatura) => !String(asignatura.tipoOptativa || "").trim(),
+  ).length;
+
+  return {
+    total: optativas.length,
+    disciplinarias,
+    abiertas,
+    sede,
+    otrasAreas: abiertas + sede,
+    sinClasificar,
+  };
+}
+
 function formatearGradoPlan(grado) {
   return GRADOS_PLAN[grado] || grado || "—";
 }
@@ -1047,6 +1113,16 @@ function obtenerEtiquetaAsignatura(asignatura) {
 function obtenerPresentacionTipoAsignatura(asignatura) {
   const tipo = String(asignatura?.tipo || "OBLIGATORIA").toUpperCase();
 
+  if (tipo === "OPTATIVA") {
+    const optativa = obtenerPresentacionTipoOptativa(asignatura?.tipoOptativa);
+
+    return {
+      etiqueta: `Optativa · ${optativa.etiqueta}`,
+      detalle: optativa.detalle,
+      clase: "optativa",
+    };
+  }
+
   const presentaciones = {
     OBLIGATORIA: {
       etiqueta: "Obligatoria",
@@ -1057,11 +1133,6 @@ function obtenerPresentacionTipoAsignatura(asignatura) {
       etiqueta: "Estudios generales",
       detalle: "Espacio de Estudios Generales",
       clase: "general",
-    },
-    OPTATIVA: {
-      etiqueta: "Espacio optativo",
-      detalle: "Se cubre con una optativa válida",
-      clase: "optativa",
     },
     OTRA: {
       etiqueta: "Otra",
@@ -1084,7 +1155,7 @@ function obtenerAyudaTipoAsignatura(tipo) {
     GENERAL:
       "Espacio curricular de Estudios Generales. No se convierte directamente en un Curso institucional desde el flujo normal de Cursos.",
     OPTATIVA:
-      "Espacio optativo del plan. La regla de optativas define cómo debe cubrirse; los cursos optativos reales se administran en su catálogo independiente.",
+      "Espacio optativo del plan. Al seleccionarlo debe indicar si es disciplinaria, abierta o de sede para que se apliquen las reglas del plan.",
     OTRA:
       "Utilice este tipo para un espacio curricular especial que no corresponda a obligatoria, general u optativa.",
   };
@@ -1992,7 +2063,7 @@ function renderizarVistaPreviaAsignaturasExcel(asignaturas) {
   return `
     <section class="plan-import-preview-section">
       <header><strong>Vista previa de asignaturas</strong><small>Mostrando ${primeras.length} de ${asignaturas.length}</small></header>
-      <div class="plan-import-table-wrapper"><table class="plan-import-table"><thead><tr><th>Clave</th><th>Código</th><th>Asignatura</th><th>Nivel</th><th>Ciclo</th><th>Cr.</th></tr></thead><tbody>
+      <div class="plan-import-table-wrapper"><table class="plan-import-table"><thead><tr><th>Clave</th><th>Código</th><th>Asignatura</th><th>Tipo</th><th>Tipo optativa</th><th>Nivel</th><th>Ciclo</th><th>Cr.</th></tr></thead><tbody>
         ${primeras
           .map(
             (fila) => `
@@ -2000,6 +2071,8 @@ function renderizarVistaPreviaAsignaturasExcel(asignaturas) {
                 <td>${escapeHtml(fila.CLAVE || "")}</td>
                 <td>${escapeHtml(fila.CODIGO || "—")}</td>
                 <td>${escapeHtml(fila.NOMBRE || "—")}</td>
+                <td>${escapeHtml(fila.TIPO || "—")}</td>
+                <td>${escapeHtml(fila.TIPO_OPTATIVA || "—")}</td>
                 <td>${escapeHtml(fila.NIVEL || "")}</td>
                 <td>${escapeHtml(fila.CICLO || "")}</td>
                 <td>${escapeHtml(fila.CREDITOS || "")}</td>
@@ -2595,6 +2668,16 @@ function crearFilaCargaRapidaAsignatura(indice) {
         </select>
       </label>
 
+      <label class="carga-asignatura-tipo-optativa-field hidden">
+        <span>Tipo de optativa</span>
+        <select class="carga-asignatura-tipo-optativa" disabled>
+          <option value="" selected disabled>Seleccione...</option>
+          <option value="DISCIPLINARIA">Disciplinaria / de carrera</option>
+          <option value="ABIERTA">Abierta / otra área</option>
+          <option value="SEDE">De sede / otra área</option>
+        </select>
+      </label>
+
       <button
         type="button"
         class="planes-icon-button carga-eliminar-fila"
@@ -2605,6 +2688,27 @@ function crearFilaCargaRapidaAsignatura(indice) {
       </button>
     </div>
   `;
+}
+
+function actualizarTipoOptativaFilaCarga(fila) {
+  if (!fila) {
+    return;
+  }
+
+  const tipoSelect = fila.querySelector(".carga-asignatura-tipo");
+  const campo = fila.querySelector(".carga-asignatura-tipo-optativa-field");
+  const tipoOptativaSelect = fila.querySelector(
+    ".carga-asignatura-tipo-optativa",
+  );
+
+  const esOptativa = tipoSelect?.value === "OPTATIVA";
+
+  campo?.classList.toggle("hidden", !esOptativa);
+
+  if (tipoOptativaSelect) {
+    tipoOptativaSelect.disabled = !esOptativa;
+    tipoOptativaSelect.required = esOptativa;
+  }
 }
 
 function abrirCargaRapida() {
@@ -2695,6 +2799,10 @@ function renderizarCargaRapida() {
   renderizarIconos();
   mostrarDialogHerramienta();
 
+  document
+    .querySelectorAll("[data-asignatura-carga]")
+    .forEach(actualizarTipoOptativaFilaCarga);
+
   const cerrar = () => document.getElementById("asignaturaDialog")?.close();
 
   document
@@ -2727,7 +2835,26 @@ function renderizarCargaRapida() {
         "beforeend",
         crearFilaCargaRapidaAsignatura(total),
       );
+
+      actualizarTipoOptativaFilaCarga(
+        filasContainer.lastElementChild,
+      );
+
       renderizarIconos();
+    });
+
+  document
+    .getElementById("cargaAsignaturasFilas")
+    ?.addEventListener("change", (event) => {
+      const select = event.target.closest(".carga-asignatura-tipo");
+
+      if (!select) {
+        return;
+      }
+
+      actualizarTipoOptativaFilaCarga(
+        select.closest("[data-asignatura-carga]"),
+      );
     });
 
   document
@@ -2790,6 +2917,8 @@ function construirCargaRapida() {
     );
     const tipo =
       fila.querySelector(".carga-asignatura-tipo")?.value || "OBLIGATORIA";
+    const tipoOptativa =
+      fila.querySelector(".carga-asignatura-tipo-optativa")?.value || "";
 
     if (!codigoReferencia) {
       throw new Error(`Fila ${index + 1}: debe indicar el código.`);
@@ -2817,6 +2946,12 @@ function construirCargaRapida() {
       throw new Error(`Fila ${index + 1}: el orden debe estar entre 1 y 999.`);
     }
 
+    if (tipo === "OPTATIVA" && !tipoOptativa) {
+      throw new Error(
+        `Fila ${index + 1}: debe indicar si la optativa es disciplinaria, abierta o de sede.`,
+      );
+    }
+
     return {
       codigoReferencia,
       nombreReferencia,
@@ -2825,6 +2960,7 @@ function construirCargaRapida() {
       orden,
       creditos,
       tipo,
+      tipoOptativa: tipo === "OPTATIVA" ? tipoOptativa : null,
     };
   });
 }
@@ -2908,6 +3044,25 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
   const ordenInicial = editando
     ? Number(asignatura.orden || 1)
     : ordenSugerido;
+
+  const conteoOptativas = obtenerConteoOptativasPlan();
+  const maximoOtrasAreas =
+    reglaOptativasPlan?.regla?.maximoOtrasAreas === null ||
+    reglaOptativasPlan?.regla?.maximoOtrasAreas === undefined
+      ? null
+      : Number(reglaOptativasPlan.regla.maximoOtrasAreas);
+  const actualCuentaComoOtraArea =
+    editando &&
+    asignatura?.activo !== false &&
+    asignatura?.tipo === "OPTATIVA" &&
+    ["ABIERTA", "SEDE"].includes(asignatura?.tipoOptativa);
+  const otrasAreasSinActual = Math.max(
+    0,
+    conteoOptativas.otrasAreas - (actualCuentaComoOtraArea ? 1 : 0),
+  );
+  const limiteOtrasAreasAlcanzado =
+    maximoOtrasAreas !== null &&
+    otrasAreasSinActual >= maximoOtrasAreas;
 
   const body = `
     <div class="sgpa-form-grid">
@@ -3039,6 +3194,63 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
               `
             : ""
         }
+      </label>
+
+      <label
+        id="asignaturaTipoOptativaField"
+        class="sgpa-form-wide ${
+          asignatura?.tipo === "OPTATIVA" ? "" : "hidden"
+        }"
+      >
+        <span>Tipo de optativa</span>
+        <select
+          id="asignaturaTipoOptativa"
+          ${asignatura?.tipo === "OPTATIVA" ? "required" : "disabled"}
+        >
+          <option
+            value=""
+            ${!asignatura?.tipoOptativa ? "selected" : ""}
+            disabled
+          >
+            Seleccione el tipo de optativa...
+          </option>
+          <option
+            value="DISCIPLINARIA"
+            ${
+              asignatura?.tipoOptativa === "DISCIPLINARIA"
+                ? "selected"
+                : ""
+            }
+          >
+            Disciplinaria / de carrera
+          </option>
+          <option
+            value="ABIERTA"
+            ${asignatura?.tipoOptativa === "ABIERTA" ? "selected" : ""}
+            ${limiteOtrasAreasAlcanzado ? "disabled" : ""}
+          >
+            Abierta / otra área
+          </option>
+          <option
+            value="SEDE"
+            ${asignatura?.tipoOptativa === "SEDE" ? "selected" : ""}
+            ${limiteOtrasAreasAlcanzado ? "disabled" : ""}
+          >
+            De sede / otra área
+          </option>
+        </select>
+        <small class="sgpa-field-help">
+          DISCIPLINARIA cuenta para el mínimo de la carrera. ABIERTA y SEDE
+          comparten el máximo de optativas de otras áreas definido en la regla
+          del plan.
+          ${
+            limiteOtrasAreasAlcanzado
+              ? ` El plan ya alcanzó el máximo de ${maximoOtrasAreas} optativa${
+                  maximoOtrasAreas === 1 ? "" : "s"
+                } de otras áreas.`
+              : ""
+          }
+        </small>
       </label>
 
       <details
@@ -3196,14 +3408,28 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
 
   const tipoSelect = document.getElementById("asignaturaTipo");
   const tipoHelp = document.getElementById("asignaturaTipoHelp");
+  const tipoOptativaField = document.getElementById(
+    "asignaturaTipoOptativaField",
+  );
+  const tipoOptativaSelect = document.getElementById(
+    "asignaturaTipoOptativa",
+  );
   const codigoInput = document.getElementById("asignaturaCodigoReferencia");
   const nombreInput = document.getElementById("asignaturaNombreReferencia");
 
   const actualizarAyudaTipo = () => {
     const tipo = tipoSelect?.value || asignatura?.tipo || "OBLIGATORIA";
+    const esOptativa = tipo === "OPTATIVA";
 
     if (tipoHelp) {
       tipoHelp.textContent = obtenerAyudaTipoAsignatura(tipo);
+    }
+
+    tipoOptativaField?.classList.toggle("hidden", !esOptativa);
+
+    if (tipoOptativaSelect) {
+      tipoOptativaSelect.disabled = !esOptativa;
+      tipoOptativaSelect.required = esOptativa;
     }
 
     if (!vinculadaACurso && codigoInput && nombreInput) {
@@ -3313,6 +3539,18 @@ async function guardarAsignatura(asignatura, cerrar) {
     return;
   }
 
+  const tipo =
+    document.getElementById("asignaturaTipo")?.value || "OBLIGATORIA";
+  const tipoOptativa =
+    document.getElementById("asignaturaTipoOptativa")?.value || "";
+
+  if (tipo === "OPTATIVA" && !tipoOptativa) {
+    errorBox.textContent =
+      "Debe indicar si la optativa es disciplinaria, abierta o de sede.";
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
   const datos = {
     codigoReferencia,
     nombreReferencia,
@@ -3320,7 +3558,8 @@ async function guardarAsignatura(asignatura, cerrar) {
     ciclo: Number(document.getElementById("asignaturaCiclo")?.value),
     creditos: Number(document.getElementById("asignaturaCreditos")?.value),
     orden: Number(document.getElementById("asignaturaOrden")?.value),
-    tipo: document.getElementById("asignaturaTipo")?.value,
+    tipo,
+    tipoOptativa: tipo === "OPTATIVA" ? tipoOptativa : null,
   };
 
   const horas = {
@@ -3687,6 +3926,7 @@ function renderizarReglaOptativasPlan() {
   }
 
   const puedeGestionar = puedeGestionarPlanes();
+  const conteoOptativas = obtenerConteoOptativasPlan();
   const cantidadEspacios = Number(
     reglaOptativasPlan?.cantidadEspaciosOptativos || 0,
   );
@@ -3709,7 +3949,13 @@ function renderizarReglaOptativasPlan() {
           <span>Espacios optativos activos</span>
           <strong>${cantidadEspacios}</strong>
           <small>
-            Son las asignaturas del plan registradas con tipo OPTATIVA.
+            ${conteoOptativas.disciplinarias} disciplinaria${
+              conteoOptativas.disciplinarias === 1 ? "" : "s"
+            } · ${conteoOptativas.otrasAreas} de otras áreas${
+              conteoOptativas.sinClasificar > 0
+                ? ` · ${conteoOptativas.sinClasificar} sin clasificar`
+                : ""
+            }
           </small>
         </div>
 
@@ -3738,64 +3984,86 @@ function renderizarReglaOptativasPlan() {
           <span>Catálogo de optativas</span>
           <strong>Tipos reconocidos por el SGPA</strong>
           <p>
-            Estos tipos describen los cursos optativos reales del catálogo.
-            No son tipos adicionales de PlanAsignatura: dentro de la malla el
-            espacio continúa siendo OPTATIVA.
+            Toda asignatura del plan con tipo OPTATIVA debe clasificarse
+            también como DISCIPLINARIA, ABIERTA o SEDE. Esta clasificación
+            permite aplicar la regla académica del plan.
           </p>
         </header>
 
         <div class="plan-optative-kind-grid">
           <article class="plan-optative-kind is-disciplinary">
-            <span class="plan-optative-kind-icon">
-              <i data-lucide="graduation-cap" aria-hidden="true"></i>
-            </span>
-            <div>
-              <strong>De carrera / disciplinaria</strong>
-              <p>
-                Curso optativo propio de una carrera. En el catálogo se
-                registra como DISCIPLINARIA y requiere una carrera de origen.
-              </p>
-            </div>
-          </article>
+  <span class="plan-optative-kind-icon">
+    <i
+      data-lucide="graduation-cap"
+      aria-hidden="true"
+    ></i>
+  </span>
 
-          <article class="plan-optative-kind is-open">
-            <span class="plan-optative-kind-icon">
-              <i data-lucide="landmark" aria-hidden="true"></i>
-            </span>
-            <div>
-              <strong>Abierta</strong>
-              <p>
-                Curso optativo de tipo ABIERTA. Puede utilizarse como una
-                alternativa fuera de las disciplinarias propias según las
-                reglas académicas aplicables.
-              </p>
-            </div>
-          </article>
+  <div>
+    <strong>
+      De carrera / disciplinaria
+    </strong>
 
-          <article class="plan-optative-kind is-campus">
-            <span class="plan-optative-kind-icon">
-              <i data-lucide="map-pin" aria-hidden="true"></i>
-            </span>
-            <div>
-              <strong>De sede</strong>
-              <p>
-                Curso optativo de tipo SEDE. Forma parte del catálogo de
-                opciones administradas a nivel de sede.
-              </p>
-            </div>
-          </article>
-        </div>
-      </section>
+    <p>
+      Espacio optativo propio de la carrera del plan.
+      Cuenta para el mínimo de optativas disciplinarias propias.
+    </p>
+  </div>
+</article>
+
+
+<article class="plan-optative-kind is-open">
+  <span class="plan-optative-kind-icon">
+    <i
+      data-lucide="globe"
+      aria-hidden="true"
+    ></i>
+  </span>
+
+  <div>
+    <strong>
+      Abierta
+    </strong>
+
+    <p>
+      Espacio optativo abierto a otras áreas.
+      Cuenta dentro del máximo de optativas de otras áreas.
+    </p>
+  </div>
+</article>
+
+
+<article class="plan-optative-kind is-campus">
+  <span class="plan-optative-kind-icon">
+    <i
+      data-lucide="map-pinned"
+      aria-hidden="true"
+    ></i>
+  </span>
+
+  <div>
+    <strong>
+      De sede
+    </strong>
+
+    <p>
+      Espacio optativo de sede. Para la regla actual también
+      cuenta dentro del máximo de optativas de otras áreas.
+    </p>
+  </div>
+</article>
+</div>
+</section>
 
       <section class="plan-optative-rule-form">
         <header>
           <span>Regla del plan</span>
           <strong>Condiciones para cubrir los espacios optativos</strong>
           <p>
-            El backend actual del SGPA permite definir un mínimo de optativas
-            disciplinarias propias y, opcionalmente, un máximo de optativas de
-            otras áreas. ABIERTA y SEDE se distinguen en el catálogo, pero la
-            regla actual no guarda límites separados para cada una.
+            Defina el mínimo de optativas DISCIPLINARIAS que debe contener
+            el plan y, opcionalmente, el máximo conjunto de optativas ABIERTA
+            y SEDE. El máximo se controla al crear, editar o reactivar
+            asignaturas optativas.
           </p>
         </header>
 
@@ -3814,6 +4082,35 @@ function renderizarReglaOptativasPlan() {
                 </div>
               `
             : `
+                <div class="plan-optative-current-status">
+                  <div>
+                    <span>Disciplinarias</span>
+                    <strong>${conteoOptativas.disciplinarias}</strong>
+                  </div>
+                  <div>
+                    <span>Abiertas</span>
+                    <strong>${conteoOptativas.abiertas}</strong>
+                  </div>
+                  <div>
+                    <span>De sede</span>
+                    <strong>${conteoOptativas.sede}</strong>
+                  </div>
+                  <div>
+                    <span>Otras áreas</span>
+                    <strong>${conteoOptativas.otrasAreas}</strong>
+                  </div>
+                  ${
+                    conteoOptativas.sinClasificar > 0
+                      ? `
+                        <div class="is-warning">
+                          <span>Sin clasificar</span>
+                          <strong>${conteoOptativas.sinClasificar}</strong>
+                        </div>
+                      `
+                      : ""
+                  }
+                </div>
+
                 <div class="sgpa-form-grid plan-optative-fields">
                   <label>
                     <span>Mínimo de disciplinarias propias</span>
@@ -3992,6 +4289,19 @@ async function guardarReglaOptativasFrontend() {
       maximoOtrasAreas > cantidadEspacios)
   ) {
     errorBox.textContent = `El máximo de otras áreas debe estar vacío o ser un entero entre 0 y ${cantidadEspacios}.`;
+    errorBox.classList.remove("hidden");
+    return;
+  }
+
+  const conteoOptativas = obtenerConteoOptativasPlan();
+
+  if (
+    maximoOtrasAreas !== null &&
+    conteoOptativas.otrasAreas > maximoOtrasAreas
+  ) {
+    errorBox.textContent =
+      `El plan ya tiene ${conteoOptativas.otrasAreas} optativas de otras áreas. ` +
+      `No puede establecer un máximo de ${maximoOtrasAreas}.`;
     errorBox.classList.remove("hidden");
     return;
   }

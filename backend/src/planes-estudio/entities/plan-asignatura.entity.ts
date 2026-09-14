@@ -10,6 +10,7 @@ import {
   ValueTransformer,
 } from 'typeorm';
 import { Curso } from '../../cursos/entities/curso.entity';
+import { TipoOptativa } from '../../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from '../constants/tipo-plan-asignatura.constant';
 import { PlanEstudio } from './plan-estudio.entity';
 
@@ -155,6 +156,14 @@ export class PlanAsignatura {
     length: 20,
   })
   tipo!: TipoPlanAsignatura;
+
+  @Column({
+    name: 'tipo_optativa',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  tipoOptativa!: TipoOptativa | null;
 
   @Column({
     name: 'codigo_referencia',

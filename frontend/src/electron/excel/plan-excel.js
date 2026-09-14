@@ -127,11 +127,17 @@ function prepararHoja(workbook, nombre, columnas) {
   return worksheet;
 }
 
-function aplicarValidacionLista(worksheet, columna, hasta, valores) {
+function aplicarValidacionLista(
+  worksheet,
+  columna,
+  hasta,
+  valores,
+  permitirVacio = false,
+) {
   for (let fila = 2; fila <= hasta; fila += 1) {
     worksheet.getCell(`${columna}${fila}`).dataValidation = {
       type: "list",
-      allowBlank: false,
+      allowBlank: permitirVacio,
       formulae: [`"${valores.join(",")}"`],
     };
   }
@@ -170,6 +176,7 @@ export async function crearPlantillaExcelPlan(destino) {
     { header: "ORDEN", key: "orden", width: 10 },
     { header: "CREDITOS", key: "creditos", width: 12 },
     { header: "TIPO", key: "tipo", width: 16 },
+    { header: "TIPO_OPTATIVA", key: "tipoOptativa", width: 20 },
     { header: "T", key: "t", width: 8 },
     { header: "P", key: "p", width: 8 },
     { header: "L", key: "l", width: 8 },
@@ -226,6 +233,7 @@ export async function crearPlantillaExcelPlan(destino) {
       orden: 1,
       creditos: 3,
       tipo: "OPTATIVA",
+      tipoOptativa: "DISCIPLINARIA",
     },
   ]);
   aplicarValidacionLista(asignaturas, "H", 600, [
@@ -234,10 +242,17 @@ export async function crearPlantillaExcelPlan(destino) {
     "OPTATIVA",
     "OTRA",
   ]);
+  aplicarValidacionLista(
+    asignaturas,
+    "I",
+    600,
+    ["DISCIPLINARIA", "ABIERTA", "SEDE"],
+    true,
+  );
   for (const columna of ["D", "E", "F"])
     aplicarValidacionNumero(asignaturas, columna, 600, 1);
   aplicarValidacionNumero(asignaturas, "G", 600, 0);
-  for (const columna of ["I", "J", "K", "L", "M", "N", "O"])
+  for (const columna of ["J", "K", "L", "M", "N", "O", "P"])
     aplicarValidacionNumero(asignaturas, columna, 600, 0, true, "decimal");
 
   const requisitos = prepararHoja(workbook, "REQUISITOS", [
@@ -304,7 +319,7 @@ export async function crearPlantillaExcelPlan(destino) {
     ["", ""],
     [
       "ASIGNATURAS",
-      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan. TIPO admite OBLIGATORIA, GENERAL, OPTATIVA u OTRA.",
+      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan. TIPO admite OBLIGATORIA, GENERAL, OPTATIVA u OTRA. Cuando TIPO sea OPTATIVA, TIPO_OPTATIVA debe indicar DISCIPLINARIA, ABIERTA o SEDE; para los demás tipos debe quedar vacío.",
     ],
     [
       "Asignaturas",

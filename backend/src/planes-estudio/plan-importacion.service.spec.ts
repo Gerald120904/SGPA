@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
@@ -37,7 +38,10 @@ describe('PlanImportacionService', () => {
   });
   const dto = (cambios = {}) => ({
     asignaturas: [
-      asignatura('OPT-01', '1', { TIPO: TipoPlanAsignatura.OPTATIVA }),
+      asignatura('OPT-01', '1', {
+        TIPO: TipoPlanAsignatura.OPTATIVA,
+        TIPO_OPTATIVA: TipoOptativa.DISCIPLINARIA,
+      }),
     ],
     requisitos: [],
     salidas: [],
@@ -166,11 +170,13 @@ describe('PlanImportacionService', () => {
             CODIGO: 'OPT',
             NOMBRE: 'Optativo I',
             TIPO: TipoPlanAsignatura.OPTATIVA,
+            TIPO_OPTATIVA: TipoOptativa.DISCIPLINARIA,
           }),
           asignatura('OPT-02', '2', {
             CODIGO: 'OPT',
             NOMBRE: 'Optativo II',
             TIPO: TipoPlanAsignatura.OPTATIVA,
+            TIPO_OPTATIVA: TipoOptativa.DISCIPLINARIA,
           }),
           asignatura('GEN-01', '3', {
             CODIGO: 'EST GEN',
@@ -187,6 +193,47 @@ describe('PlanImportacionService', () => {
     );
     expect(resultado.valido).toBe(true);
     expect(resultado.errores).toEqual([]);
+  });
+
+
+  it('rechaza una fila OPTATIVA sin TIPO_OPTATIVA', async () => {
+    const resultado = await service.validar(
+      1,
+      dto({
+        asignaturas: [
+          asignatura('OPT-01', '1', {
+            TIPO: TipoPlanAsignatura.OPTATIVA,
+            TIPO_OPTATIVA: '',
+          }),
+        ],
+      }),
+    );
+
+    expect(resultado.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ codigo: 'TIPO_OPTATIVA_INVALIDO' }),
+      ]),
+    );
+  });
+
+  it('rechaza TIPO_OPTATIVA en una asignatura que no es OPTATIVA', async () => {
+    const resultado = await service.validar(
+      1,
+      dto({
+        asignaturas: [
+          asignatura('A01', '1', {
+            TIPO: TipoPlanAsignatura.OBLIGATORIA,
+            TIPO_OPTATIVA: TipoOptativa.ABIERTA,
+          }),
+        ],
+      }),
+    );
+
+    expect(resultado.errores).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ codigo: 'TIPO_OPTATIVA_NO_APLICA' }),
+      ]),
+    );
   });
 
   it('detecta claves de asignaturas duplicadas', async () => {

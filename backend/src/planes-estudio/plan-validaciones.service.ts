@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
+import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
 type Resultado = {
   codigo: string;
@@ -26,6 +28,8 @@ export class PlanValidacionesService {
     private readonly requisitos: Repository<PlanRequisito>,
     @InjectRepository(SalidaAcademica)
     private readonly salidas: Repository<SalidaAcademica>,
+    @InjectRepository(ReglaOptativaPlan)
+    private readonly reglasOptativas: Repository<ReglaOptativaPlan>,
   ) {}
   private nombre(a: PlanAsignatura) {
     const codigo = a.codigoReferencia?.trim() || a.curso?.codigo?.trim() || '';
@@ -82,20 +86,24 @@ export class PlanValidacionesService {
   async validar(planId: number) {
     const plan = await this.planes.findOne({ where: { id: planId } });
     if (!plan) throw new NotFoundException('El plan de estudio no existe.');
-    const [asignaturas, requisitos, salidas] = await Promise.all([
-      this.asignaturas.find({
-        where: { planEstudioId: planId },
-        relations: { curso: true },
-      }),
-      this.requisitos.find({
-        where: { asignatura: { planEstudioId: planId } },
-        relations: { asignatura: true, requisitoAsignatura: true },
-      }),
-      this.salidas.find({
-        where: { planEstudioId: planId },
-        relations: { asignaturas: true },
-      }),
-    ]);
+    const [asignaturas, requisitos, salidas, reglaOptativas] =
+      await Promise.all([
+        this.asignaturas.find({
+          where: { planEstudioId: planId },
+          relations: { curso: true },
+        }),
+        this.requisitos.find({
+          where: { asignatura: { planEstudioId: planId } },
+          relations: { asignatura: true, requisitoAsignatura: true },
+        }),
+        this.salidas.find({
+          where: { planEstudioId: planId },
+          relations: { asignaturas: true },
+        }),
+        this.reglasOptativas.findOne({
+          where: { planEstudioId: planId },
+        }),
+      ]);
     const advertencias: Resultado[] = [],
       errores: Resultado[] = [],
       activas = asignaturas.filter((a) => a.activo);
@@ -130,6 +138,61 @@ export class PlanValidacionesService {
           });
       }
     }
+    const optativasActivas = activas.filter(
+      (asignatura) => asignatura.tipo === TipoPlanAsignatura.OPTATIVA,
+    );
+
+    const optativasSinClasificar = optativasActivas.filter(
+      (asignatura) => !asignatura.tipoOptativa,
+    );
+
+    for (const optativa of optativasSinClasificar) {
+      errores.push({
+        codigo: 'OPTATIVA_SIN_CLASIFICAR',
+        nivel: 'ERROR',
+        asignaturaId: optativa.id,
+        mensaje: `${this.nombre(
+          optativa,
+        )} debe indicar si es una optativa DISCIPLINARIA, ABIERTA o SEDE.`,
+      });
+    }
+
+    if (reglaOptativas) {
+      const cantidadDisciplinarias = optativasActivas.filter(
+        (asignatura) =>
+          asignatura.tipoOptativa === TipoOptativa.DISCIPLINARIA,
+      ).length;
+
+      const cantidadOtrasAreas = optativasActivas.filter(
+        (asignatura) =>
+          asignatura.tipoOptativa === TipoOptativa.ABIERTA ||
+          asignatura.tipoOptativa === TipoOptativa.SEDE,
+      ).length;
+
+      if (
+        cantidadDisciplinarias <
+        Number(reglaOptativas.minimoDisciplinariasPropias)
+      ) {
+        errores.push({
+          codigo: 'MINIMO_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDO',
+          nivel: 'ERROR',
+          mensaje: `La regla del plan exige al menos ${reglaOptativas.minimoDisciplinariasPropias} optativas disciplinarias propias y actualmente hay ${cantidadDisciplinarias}.`,
+        });
+      }
+
+      if (
+        reglaOptativas.maximoOtrasAreas !== null &&
+        reglaOptativas.maximoOtrasAreas !== undefined &&
+        cantidadOtrasAreas > Number(reglaOptativas.maximoOtrasAreas)
+      ) {
+        errores.push({
+          codigo: 'MAXIMO_OPTATIVAS_OTRAS_AREAS_SUPERADO',
+          nivel: 'ERROR',
+          mensaje: `La regla del plan permite como máximo ${reglaOptativas.maximoOtrasAreas} optativas de otras áreas y actualmente hay ${cantidadOtrasAreas}.`,
+        });
+      }
+    }
+
     const codigosUsados = new Set<string>();
     for (const a of activas) {
       const codigo = this.codigo(a);
