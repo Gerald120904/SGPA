@@ -5,7 +5,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
 import { PlanRequisitosController } from './plan-requisitos.controller';
 import { PlanRequisitosService } from './plan-requisitos.service';
@@ -18,6 +20,13 @@ describe('PlanRequisitosController', () => {
     cargaMasiva: jest.fn(),
     eliminar: jest.fn(),
   };
+
+  let permisosAsignados: Set<PermisoSistema>;
+
+  const permisosService = {
+    usuarioTienePermisos: jest.fn(),
+  };
+
   let app: INestApplication<App>;
   let jwtService: JwtService;
 
@@ -27,10 +36,14 @@ describe('PlanRequisitosController', () => {
       controllers: [PlanRequisitosController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
         { provide: PlanRequisitosService, useValue: service },
       ],
@@ -50,6 +63,14 @@ describe('PlanRequisitosController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados = new Set<PermisoSistema>([
+      PermisoSistema.PLANES_ESTUDIO_VER,
+      PermisoSistema.PLANES_ESTUDIO_GESTIONAR,
+    ]);
+    permisosService.usuarioTienePermisos.mockImplementation(
+      async (_usuarioId, requeridos: PermisoSistema[]) =>
+        requeridos.every((p) => permisosAsignados.has(p)),
+    );
     service.listar.mockResolvedValue([]);
     service.crear.mockResolvedValue({ id: 5 });
     service.cargaMasiva.mockResolvedValue({ total: 2 });
@@ -59,7 +80,9 @@ describe('PlanRequisitosController', () => {
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   async function token(rol: string) {
@@ -78,23 +101,35 @@ describe('PlanRequisitosController', () => {
     expect(service.listar).not.toHaveBeenCalled();
   });
 
-  it.each(['ADMIN_GLOBAL', 'COORDINADOR'])('permite el rol %s', async (rol) => {
+  it('permite ADMIN_GLOBAL sin registros en usuario_permisos', async () => {
     await request(app.getHttpServer())
       .get('/planes-estudio/1/requisitos')
-      .set('Authorization', `Bearer ${await token(rol)}`)
+      .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
+      .expect(200, []);
+
+    expect(service.listar).toHaveBeenCalledWith(1);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
+  });
+
+  it('permite listar requisitos con PLANES_ESTUDIO_VER', async () => {
+    await request(app.getHttpServer())
+      .get('/planes-estudio/1/requisitos')
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
       .expect(200, []);
 
     expect(service.listar).toHaveBeenCalledWith(1);
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])('responde 403 para %s', async (rol) => {
+  it('responde 403 para listar sin PLANES_ESTUDIO_VER', async () => {
+    permisosAsignados.clear();
     await request(app.getHttpServer())
       .get('/planes-estudio/1/requisitos')
-      .set('Authorization', `Bearer ${await token(rol)}`)
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
       .expect(403);
 
     expect(service.listar).not.toHaveBeenCalled();
   });
+
 
   it('crea un requisito válido', async () => {
     const dto = {

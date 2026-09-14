@@ -15,7 +15,8 @@ import {
 } from '../../config/permissions.js';
 
 import {
-  obtenerRolesUsuario
+  obtenerRolesUsuario,
+  obtenerPermisosUsuario,
 } from '../../app/session.js';
 
 
@@ -279,6 +280,9 @@ function renderAcciones() {
   const roles =
     obtenerRolesUsuario();
 
+  const permisos =
+    obtenerPermisosUsuario();
+
   return DASHBOARD_MOCK
     .acciones
     .filter(
@@ -294,7 +298,8 @@ function renderAcciones() {
           module &&
           puedeAcceder(
             roles,
-            module.id
+            module.id,
+            permisos,
           )
         );
 

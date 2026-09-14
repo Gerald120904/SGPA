@@ -5,7 +5,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { AulasController } from './aulas.controller';
 import { AulasService } from './aulas.service';
 import { OrigenAula } from './constants/origen-aula.constant';
@@ -17,12 +19,19 @@ import { TipoReservaAula } from './constants/tipo-reserva-aula.constant';
 describe('AulasController', () => {
   const jwtSecret = 'aulas-test-secret';
 
+  let permisosAsignados: Set<PermisoSistema>;
+  const permisosService = {
+    usuarioTienePermisos: jest.fn(),
+  };
+
   const aulasService = {
     listar: jest.fn(),
     obtenerPorId: jest.fn(),
     crear: jest.fn(),
     actualizar: jest.fn(),
     cambiarEstado: jest.fn(),
+    buscarAulasDisponibles: jest.fn(),
+    evaluarAulaParaAsignacion: jest.fn(),
     listarEquipamientos: jest.fn(),
     obtenerEquipamientoPorId: jest.fn(),
     crearEquipamiento: jest.fn(),
@@ -63,12 +72,16 @@ describe('AulasController', () => {
       controllers: [AulasController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
           },
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
         {
           provide: AulasService,
@@ -94,20 +107,20 @@ describe('AulasController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados = new Set<PermisoSistema>();
+
+    permisosService.usuarioTienePermisos.mockImplementation(
+      async (_usuarioId: number, requeridos: PermisoSistema[]) =>
+        requeridos.every((permiso) => permisosAsignados.has(permiso)),
+    );
 
     aulasService.listar.mockResolvedValue([]);
-    aulasService.obtenerPorId.mockResolvedValue({
-      id: 1,
-    });
-    aulasService.crear.mockResolvedValue({
-      id: 1,
-    });
-    aulasService.actualizar.mockResolvedValue({
-      id: 1,
-    });
-    aulasService.cambiarEstado.mockResolvedValue({
-      id: 1,
-    });
+    aulasService.obtenerPorId.mockResolvedValue({ id: 1 });
+    aulasService.crear.mockResolvedValue({ id: 1 });
+    aulasService.actualizar.mockResolvedValue({ id: 1 });
+    aulasService.cambiarEstado.mockResolvedValue({ id: 1 });
+    aulasService.buscarAulasDisponibles.mockResolvedValue([]);
+    aulasService.evaluarAulaParaAsignacion.mockResolvedValue({ apta: true });
     aulasService.listarEquipamientos.mockResolvedValue([]);
     aulasService.obtenerEquipamientoPorId.mockResolvedValue({ id: 1 });
     aulasService.crearEquipamiento.mockResolvedValue({ id: 1 });
@@ -128,9 +141,7 @@ describe('AulasController', () => {
     aulasService.actualizarReservaAula.mockResolvedValue({ id: 1 });
     aulasService.cambiarEstadoReservaAula.mockResolvedValue({ id: 1 });
     aulasService.consultarOcupacionAula.mockResolvedValue({
-      aula: {
-        id: 1,
-      },
+      aula: { id: 1 },
       ocupaciones: [],
     });
     aulasService.listarAuditoriaAula.mockResolvedValue([]);
@@ -146,9 +157,9 @@ describe('AulasController', () => {
     await app.close();
   });
 
-  async function crearToken(rol: string) {
+  async function crearToken(rol: string, sub = 1) {
     return jwtService.signAsync({
-      sub: 1,
+      sub,
       correo: 'usuario@sgpa.local',
       roles: [rol],
     });
@@ -160,7 +171,7 @@ describe('AulasController', () => {
     expect(aulasService.listar).not.toHaveBeenCalled();
   });
 
-  it('permite listar aulas a ADMIN_GLOBAL', async () => {
+  it('permite listar aulas a ADMIN_GLOBAL sin permisos guardados', async () => {
     const token = await crearToken('ADMIN_GLOBAL');
 
     await request(app.getHttpServer())
@@ -171,8 +182,9 @@ describe('AulasController', () => {
     expect(aulasService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite listar aulas a COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('permite listar aulas a ESTUDIANTE con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas')
@@ -182,18 +194,7 @@ describe('AulasController', () => {
     expect(aulasService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite listar aulas a PROFESOR', async () => {
-    const token = await crearToken('PROFESOR');
-
-    await request(app.getHttpServer())
-      .get('/aulas')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200, []);
-
-    expect(aulasService.listar).toHaveBeenCalledTimes(1);
-  });
-
-  it('responde 403 al listar para ESTUDIANTE', async () => {
+  it('responde 403 al listar para usuario sin AULAS_VER', async () => {
     const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
@@ -204,8 +205,9 @@ describe('AulasController', () => {
     expect(aulasService.listar).not.toHaveBeenCalled();
   });
 
-  it('consulta un aula por id', async () => {
-    const token = await crearToken('PROFESOR');
+  it('consulta un aula por id con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas/1')
@@ -218,7 +220,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza un id inválido', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas/no-es-id')
@@ -228,8 +231,66 @@ describe('AulasController', () => {
     expect(aulasService.obtenerPorId).not.toHaveBeenCalled();
   });
 
-  it('permite crear un aula a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite buscar aulas disponibles con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    const dto = {
+      periodoId: 1,
+      fechaHoraInicio: '2027-10-10T08:00:00.000Z',
+      fechaHoraFin: '2027-10-10T10:00:00.000Z',
+    };
+
+    await request(app.getHttpServer())
+      .post('/aulas/buscar-disponibles')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(200, []);
+
+    expect(aulasService.buscarAulasDisponibles).toHaveBeenCalledWith(dto);
+  });
+
+  it('permite evaluar asignación con AULAS_ASIGNAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_ASIGNAR);
+    const token = await crearToken('ESTUDIANTE');
+
+    const dto = {
+      periodoId: 1,
+      fechaHoraInicio: '2027-10-10T08:00:00.000Z',
+      fechaHoraFin: '2027-10-10T10:00:00.000Z',
+    };
+
+    await request(app.getHttpServer())
+      .post('/aulas/1/evaluar-asignacion')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(200, { apta: true });
+
+    expect(aulasService.evaluarAulaParaAsignacion).toHaveBeenCalledWith(1, dto);
+  });
+
+  it('rechaza evaluar asignación sin AULAS_ASIGNAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    const dto = {
+      periodoId: 1,
+      fechaHoraInicio: '2027-10-10T08:00:00.000Z',
+      fechaHoraFin: '2027-10-10T10:00:00.000Z',
+    };
+
+    await request(app.getHttpServer())
+      .post('/aulas/1/evaluar-asignacion')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(403);
+
+    expect(aulasService.evaluarAulaParaAsignacion).not.toHaveBeenCalled();
+  });
+
+  it('permite crear un aula a usuario con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     const dto = {
       codigo: 'AULA-01',
@@ -252,30 +313,29 @@ describe('AulasController', () => {
     expect(aulasService.crear).toHaveBeenCalledWith(dto, 1);
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al crear para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al crear aula sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .post('/aulas')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          codigo: 'AULA-01',
-          nombre: 'Aula 1',
-          capacidad: 40,
-          tipo: TipoAula.AULA,
-          tipoMobiliario: TipoMobiliarioAula.PUPITRE,
-          origen: OrigenAula.UNA,
-        })
-        .expect(403);
+    await request(app.getHttpServer())
+      .post('/aulas')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        codigo: 'AULA-01',
+        nombre: 'Aula 1',
+        capacidad: 40,
+        tipo: TipoAula.AULA,
+        tipoMobiliario: TipoMobiliarioAula.PUPITRE,
+        origen: OrigenAula.UNA,
+      })
+      .expect(403);
 
-      expect(aulasService.crear).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.crear).not.toHaveBeenCalled();
+  });
 
   it('rechaza crear un aula sin código', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -293,7 +353,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza una capacidad menor a 1', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -312,7 +373,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza un tipo de aula inválido', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -331,7 +393,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza un tipo de mobiliario inválido', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -350,7 +413,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza crear un aula sin tipo de mobiliario', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -368,7 +432,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza un origen inválido', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -387,7 +452,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza campos adicionales al crear', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -406,8 +472,9 @@ describe('AulasController', () => {
     expect(aulasService.crear).not.toHaveBeenCalled();
   });
 
-  it('permite actualizar un aula a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite actualizar un aula con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     const dto = {
       nombre: 'Aula Principal',
@@ -425,25 +492,24 @@ describe('AulasController', () => {
     expect(aulasService.actualizar).toHaveBeenCalledWith(1, dto, 1);
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al actualizar para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al actualizar sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .patch('/aulas/1')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          nombre: 'Aula modificada',
-        })
-        .expect(403);
+    await request(app.getHttpServer())
+      .patch('/aulas/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nombre: 'Aula modificada',
+      })
+      .expect(403);
 
-      expect(aulasService.actualizar).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.actualizar).not.toHaveBeenCalled();
+  });
 
-  it('permite cambiar estado a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite cambiar estado con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/estado')
@@ -458,25 +524,24 @@ describe('AulasController', () => {
     expect(aulasService.cambiarEstado).toHaveBeenCalledWith(1, false, 1);
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al cambiar estado para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al cambiar estado sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .patch('/aulas/1/estado')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          activo: false,
-        })
-        .expect(403);
+    await request(app.getHttpServer())
+      .patch('/aulas/1/estado')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        activo: false,
+      })
+      .expect(403);
 
-      expect(aulasService.cambiarEstado).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.cambiarEstado).not.toHaveBeenCalled();
+  });
 
   it('rechaza estado que no sea boolean', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/estado')
@@ -489,21 +554,19 @@ describe('AulasController', () => {
     expect(aulasService.cambiarEstado).not.toHaveBeenCalled();
   });
 
-  it.each(['ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR'])(
-    'permite consultar el catálogo a %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('permite consultar el catálogo de equipamientos con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .get('/aulas/equipamientos')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200, []);
+    await request(app.getHttpServer())
+      .get('/aulas/equipamientos')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, []);
 
-      expect(aulasService.listarEquipamientos).toHaveBeenCalledTimes(1);
-    },
-  );
+    expect(aulasService.listarEquipamientos).toHaveBeenCalledTimes(1);
+  });
 
-  it('deniega el catálogo a ESTUDIANTE', async () => {
+  it('deniega el catálogo sin AULAS_VER', async () => {
     const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
@@ -514,8 +577,9 @@ describe('AulasController', () => {
     expect(aulasService.listarEquipamientos).not.toHaveBeenCalled();
   });
 
-  it('crea equipamiento únicamente como ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('crea equipamiento con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
     const dto = {
       nombre: 'Proyector',
       descripcion: 'Proyector multimedia',
@@ -530,8 +594,9 @@ describe('AulasController', () => {
     expect(aulasService.crearEquipamiento).toHaveBeenCalledWith(dto, 1);
   });
 
-  it('consulta un equipamiento por id', async () => {
-    const token = await crearToken('PROFESOR');
+  it('consulta un equipamiento por id con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas/equipamientos/1')
@@ -541,23 +606,22 @@ describe('AulasController', () => {
     expect(aulasService.obtenerEquipamientoPorId).toHaveBeenCalledWith(1);
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al crear equipamiento para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al crear equipamiento sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .post('/aulas/equipamientos')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ nombre: 'Proyector' })
-        .expect(403);
+    await request(app.getHttpServer())
+      .post('/aulas/equipamientos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nombre: 'Proyector' })
+      .expect(403);
 
-      expect(aulasService.crearEquipamiento).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.crearEquipamiento).not.toHaveBeenCalled();
+  });
 
   it('rechaza crear equipamiento sin nombre', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/equipamientos')
@@ -568,8 +632,9 @@ describe('AulasController', () => {
     expect(aulasService.crearEquipamiento).not.toHaveBeenCalled();
   });
 
-  it('permite actualizar equipamiento a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite actualizar equipamiento con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
     const dto = { nombre: 'Proyector multimedia' };
 
     await request(app.getHttpServer())
@@ -581,8 +646,9 @@ describe('AulasController', () => {
     expect(aulasService.actualizarEquipamiento).toHaveBeenCalledWith(1, dto, 1);
   });
 
-  it('permite cambiar estado de equipamiento a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite cambiar estado de equipamiento con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/equipamientos/1/estado')
@@ -598,7 +664,8 @@ describe('AulasController', () => {
   });
 
   it('no confunde equipamientos con el id de un aula', async () => {
-    const token = await crearToken('PROFESOR');
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas/equipamientos')
@@ -608,8 +675,9 @@ describe('AulasController', () => {
     expect(aulasService.obtenerPorId).not.toHaveBeenCalled();
   });
 
-  it('lista equipamiento de un aula para COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('lista equipamiento de un aula con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas/1/equipamientos')
@@ -619,8 +687,9 @@ describe('AulasController', () => {
     expect(aulasService.listarEquipamientoAula).toHaveBeenCalledWith(1);
   });
 
-  it('asigna equipamiento a un aula como ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('asigna equipamiento a un aula con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
     const dto = {
       equipamientoId: 1,
       cantidadTotal: 25,
@@ -642,7 +711,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza cantidades inválidas antes de llamar al servicio', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/1/equipamientos')
@@ -658,7 +728,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza cantidad disponible negativa', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/1/equipamientos')
@@ -673,27 +744,26 @@ describe('AulasController', () => {
     expect(aulasService.asignarEquipamientoAula).not.toHaveBeenCalled();
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al asignar equipamiento para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al asignar equipamiento sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .post('/aulas/1/equipamientos')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          equipamientoId: 1,
-          cantidadTotal: 1,
-          cantidadDisponible: 1,
-        })
-        .expect(403);
+    await request(app.getHttpServer())
+      .post('/aulas/1/equipamientos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        equipamientoId: 1,
+        cantidadTotal: 1,
+        cantidadDisponible: 1,
+      })
+      .expect(403);
 
-      expect(aulasService.asignarEquipamientoAula).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.asignarEquipamientoAula).not.toHaveBeenCalled();
+  });
 
-  it('permite actualizar equipamiento de un aula a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite actualizar equipamiento de un aula con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
     const dto = {
       cantidadDisponible: 22,
       observaciones: '3 computadoras en reparación',
@@ -713,8 +783,9 @@ describe('AulasController', () => {
     );
   });
 
-  it('cambia el estado de una asignación de equipamiento', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('cambia el estado de una asignación de equipamiento con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/equipamientos/2/estado')
@@ -730,36 +801,32 @@ describe('AulasController', () => {
     );
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al modificar equipamiento de aula para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al modificar equipamiento de aula sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .patch('/aulas/1/equipamientos/1')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ cantidadDisponible: 0 })
-        .expect(403);
+    await request(app.getHttpServer())
+      .patch('/aulas/1/equipamientos/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ cantidadDisponible: 0 })
+      .expect(403);
 
-      expect(aulasService.actualizarEquipamientoAula).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.actualizarEquipamientoAula).not.toHaveBeenCalled();
+  });
 
-  it.each(['ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR'])(
-    'permite consultar indisponibilidades a %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('permite consultar indisponibilidades con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .get('/aulas/1/indisponibilidades')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200, []);
+    await request(app.getHttpServer())
+      .get('/aulas/1/indisponibilidades')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, []);
 
-      expect(aulasService.listarIndisponibilidadesAula).toHaveBeenCalledWith(1);
-    },
-  );
+    expect(aulasService.listarIndisponibilidadesAula).toHaveBeenCalledWith(1);
+  });
 
-  it('deniega indisponibilidades a ESTUDIANTE', async () => {
+  it('deniega indisponibilidades sin AULAS_VER', async () => {
     const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
@@ -770,67 +837,62 @@ describe('AulasController', () => {
     expect(aulasService.listarIndisponibilidadesAula).not.toHaveBeenCalled();
   });
 
-  it('consulta una indisponibilidad por id', async () => {
-    const token = await crearToken('PROFESOR');
+  it('consulta una indisponibilidad por id con AULAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/aulas/1/indisponibilidades/2')
       .set('Authorization', `Bearer ${token}`)
       .expect(200, { id: 1 });
 
-    expect(aulasService.obtenerIndisponibilidadPorId).toHaveBeenCalledWith(
+    expect(aulasService.obtenerIndisponibilidadPorId).toHaveBeenCalledWith(1, 2);
+  });
+
+  it('permite crear una indisponibilidad con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
+    const dto = {
+      tipo: TipoIndisponibilidadAula.MANTENIMIENTO,
+      fechaHoraInicio: '2027-10-10T08:00:00',
+      fechaHoraFin: '2027-10-12T17:00:00',
+      motivo: 'Repair AC',
+    };
+
+    await request(app.getHttpServer())
+      .post('/aulas/1/indisponibilidades')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(201, { id: 1 });
+
+    expect(aulasService.crearIndisponibilidadAula).toHaveBeenCalledWith(
       1,
-      2,
+      dto,
+      1,
     );
   });
 
-  it.each(['ADMIN_GLOBAL', 'COORDINADOR'])(
-    'permite crear una indisponibilidad a %s',
-    async (rol) => {
-      const token = await crearToken(rol);
-      const dto = {
-        tipo: TipoIndisponibilidadAula.MANTENIMIENTO,
+  it('deniega crear una indisponibilidad sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .post('/aulas/1/indisponibilidades')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        tipo: TipoIndisponibilidadAula.BLOQUEO,
         fechaHoraInicio: '2027-10-10T08:00:00',
-        fechaHoraFin: '2027-10-12T17:00:00',
-        motivo: 'Repair AC',
-      };
+        fechaHoraFin: '2027-10-10T10:00:00',
+        motivo: 'Block',
+      })
+      .expect(403);
 
-      await request(app.getHttpServer())
-        .post('/aulas/1/indisponibilidades')
-        .set('Authorization', `Bearer ${token}`)
-        .send(dto)
-        .expect(201, { id: 1 });
+    expect(aulasService.crearIndisponibilidadAula).not.toHaveBeenCalled();
+  });
 
-      expect(aulasService.crearIndisponibilidadAula).toHaveBeenCalledWith(
-        1,
-        dto,
-        1,
-      );
-    },
-  );
-
-  it.each(['PROFESOR', 'ESTUDIANTE'])(
-    'deniega crear una indisponibilidad a %s',
-    async (rol) => {
-      const token = await crearToken(rol);
-
-      await request(app.getHttpServer())
-        .post('/aulas/1/indisponibilidades')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          tipo: TipoIndisponibilidadAula.BLOQUEO,
-          fechaHoraInicio: '2027-10-10T08:00:00',
-          fechaHoraFin: '2027-10-10T10:00:00',
-          motivo: 'Block',
-        })
-        .expect(403);
-
-      expect(aulasService.crearIndisponibilidadAula).not.toHaveBeenCalled();
-    },
-  );
-
-  it('validates an unavailability DTO before calling the service', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('valida DTO de indisponibilidad antes de llamar al servicio', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -846,8 +908,9 @@ describe('AulasController', () => {
     expect(aulasService.crearIndisponibilidadAula).not.toHaveBeenCalled();
   });
 
-  it('allows COORDINADOR to update and change an unavailability status', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('permite actualizar y cambiar estado de indisponibilidad con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
     const dto = { motivo: 'Updated reason' };
 
     await request(app.getHttpServer())
@@ -876,7 +939,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza una fecha inválida al crear una indisponibilidad', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -893,7 +957,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza crear una indisponibilidad sin motivo', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -909,7 +974,8 @@ describe('AulasController', () => {
   });
 
   it('rechaza propiedades no permitidas al crear una indisponibilidad', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -926,8 +992,9 @@ describe('AulasController', () => {
     expect(aulasService.crearIndisponibilidadAula).not.toHaveBeenCalled();
   });
 
-  it('permite actualizar una indisponibilidad a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite actualizar una indisponibilidad con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
     const dto = { motivo: 'Mantenimiento reprogramado' };
 
     await request(app.getHttpServer())
@@ -944,25 +1011,22 @@ describe('AulasController', () => {
     );
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al actualizar una indisponibilidad para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al actualizar una indisponibilidad sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .patch('/aulas/1/indisponibilidades/5')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ motivo: 'Cambio no permitido' })
-        .expect(403);
+    await request(app.getHttpServer())
+      .patch('/aulas/1/indisponibilidades/5')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ motivo: 'Cambio no permitido' })
+      .expect(403);
 
-      expect(
-        aulasService.actualizarIndisponibilidadAula,
-      ).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.actualizarIndisponibilidadAula).not.toHaveBeenCalled();
+  });
 
-  it('permite inactivar una indisponibilidad a ADMIN_GLOBAL', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('permite inactivar una indisponibilidad con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -978,8 +1042,9 @@ describe('AulasController', () => {
     );
   });
 
-  it('permite reactivar una indisponibilidad a COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('permite reactivar una indisponibilidad con AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -995,25 +1060,22 @@ describe('AulasController', () => {
     );
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])(
-    'responde 403 al cambiar estado de una indisponibilidad para %s',
-    async (rol) => {
-      const token = await crearToken(rol);
+  it('responde 403 al cambiar estado de una indisponibilidad sin AULAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.AULAS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
-      await request(app.getHttpServer())
-        .patch('/aulas/1/indisponibilidades/5/estado')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ activo: false })
-        .expect(403);
+    await request(app.getHttpServer())
+      .patch('/aulas/1/indisponibilidades/5/estado')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ activo: false })
+      .expect(403);
 
-      expect(
-        aulasService.cambiarEstadoIndisponibilidadAula,
-      ).not.toHaveBeenCalled();
-    },
-  );
+    expect(aulasService.cambiarEstadoIndisponibilidadAula).not.toHaveBeenCalled();
+  });
 
   it('rechaza un estado que no sea booleano', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+    permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -1021,9 +1083,7 @@ describe('AulasController', () => {
       .send({ activo: 'no' })
       .expect(400);
 
-    expect(
-      aulasService.cambiarEstadoIndisponibilidadAula,
-    ).not.toHaveBeenCalled();
+    expect(aulasService.cambiarEstadoIndisponibilidadAula).not.toHaveBeenCalled();
   });
 
   describe('reservas extraordinarias', () => {
@@ -1035,21 +1095,19 @@ describe('AulasController', () => {
       fechaHoraFin: '2027-10-15T10:00:00-06:00',
     };
 
-    it.each(['ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR'])(
-      'permite consultar reservas a %s',
-      async (rol) => {
-        const token = await crearToken(rol);
+    it('permite consultar reservas con AULAS_VER', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
-        await request(app.getHttpServer())
-          .get('/aulas/1/reservas')
-          .set('Authorization', `Bearer ${token}`)
-          .expect(200, []);
+      await request(app.getHttpServer())
+        .get('/aulas/1/reservas')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200, []);
 
-        expect(aulasService.listarReservasAula).toHaveBeenCalledWith(1);
-      },
-    );
+      expect(aulasService.listarReservasAula).toHaveBeenCalledWith(1);
+    });
 
-    it('deniega reservas a ESTUDIANTE', async () => {
+    it('deniega reservas sin AULAS_VER', async () => {
       const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
@@ -1060,8 +1118,9 @@ describe('AulasController', () => {
       expect(aulasService.listarReservasAula).not.toHaveBeenCalled();
     });
 
-    it('permite consultar una reserva por id a PROFESOR', async () => {
-      const token = await crearToken('PROFESOR');
+    it('permite consultar una reserva por id con AULAS_VER', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .get('/aulas/1/reservas/2')
@@ -1071,38 +1130,35 @@ describe('AulasController', () => {
       expect(aulasService.obtenerReservaPorId).toHaveBeenCalledWith(1, 2);
     });
 
-    it.each(['ADMIN_GLOBAL', 'COORDINADOR'])(
-      'permite crear una reserva a %s',
-      async (rol) => {
-        const token = await crearToken(rol);
+    it('permite crear una reserva con AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
 
-        await request(app.getHttpServer())
-          .post('/aulas/1/reservas')
-          .set('Authorization', `Bearer ${token}`)
-          .send(dto)
-          .expect(201, { id: 1 });
+      await request(app.getHttpServer())
+        .post('/aulas/1/reservas')
+        .set('Authorization', `Bearer ${token}`)
+        .send(dto)
+        .expect(201, { id: 1 });
 
-        expect(aulasService.crearReservaAula).toHaveBeenCalledWith(1, dto, 1);
-      },
-    );
+      expect(aulasService.crearReservaAula).toHaveBeenCalledWith(1, dto, 1);
+    });
 
-    it.each(['PROFESOR', 'ESTUDIANTE'])(
-      'deniega crear una reserva a %s',
-      async (rol) => {
-        const token = await crearToken(rol);
+    it('deniega crear una reserva sin AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
-        await request(app.getHttpServer())
-          .post('/aulas/1/reservas')
-          .set('Authorization', `Bearer ${token}`)
-          .send(dto)
-          .expect(403);
+      await request(app.getHttpServer())
+        .post('/aulas/1/reservas')
+        .set('Authorization', `Bearer ${token}`)
+        .send(dto)
+        .expect(403);
 
-        expect(aulasService.crearReservaAula).not.toHaveBeenCalled();
-      },
-    );
+      expect(aulasService.crearReservaAula).not.toHaveBeenCalled();
+    });
 
     it('valida el DTO de reserva antes de llamar al servicio', async () => {
-      const token = await crearToken('COORDINADOR');
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .post('/aulas/1/reservas')
@@ -1118,8 +1174,9 @@ describe('AulasController', () => {
       expect(aulasService.crearReservaAula).not.toHaveBeenCalled();
     });
 
-    it('permite actualizar y cambiar el estado a COORDINADOR', async () => {
-      const token = await crearToken('COORDINADOR');
+    it('permite actualizar y cambiar el estado con AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
       const cambios = { titulo: 'Examen reprogramado' };
 
       await request(app.getHttpServer())
@@ -1149,8 +1206,9 @@ describe('AulasController', () => {
   });
 
   describe('GET /aulas/:aulaId/ocupacion', () => {
-    it('permite consultar ocupación a PROFESOR', async () => {
-      const token = await crearToken('PROFESOR');
+    it('permite consultar ocupación con AULAS_VER', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .get(
@@ -1169,7 +1227,8 @@ describe('AulasController', () => {
     });
 
     it('rechaza consultar ocupación con fechas inválidas', async () => {
-      const token = await crearToken('COORDINADOR');
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .get(
@@ -1183,8 +1242,9 @@ describe('AulasController', () => {
   });
 
   describe('GET /aulas/:aulaId/auditoria', () => {
-    it('permite consultar auditoría a COORDINADOR', async () => {
-      const token = await crearToken('COORDINADOR');
+    it('permite consultar auditoría con AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .get('/aulas/1/auditoria')
@@ -1194,8 +1254,9 @@ describe('AulasController', () => {
       expect(aulasService.listarAuditoriaAula).toHaveBeenCalledWith(1);
     });
 
-    it('prohíbe consultar auditoría a PROFESOR', async () => {
-      const token = await crearToken('PROFESOR');
+    it('prohíbe consultar auditoría sin AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .get('/aulas/1/auditoria')
@@ -1207,8 +1268,9 @@ describe('AulasController', () => {
   });
 
   describe('disponibilidades de aulas', () => {
-    it('permite listar disponibilidades a PROFESOR', async () => {
-      const token = await crearToken('PROFESOR');
+    it('permite listar disponibilidades con AULAS_VER', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .get('/aulas/1/disponibilidades?periodoId=2')
@@ -1221,7 +1283,7 @@ describe('AulasController', () => {
       );
     });
 
-    it('deniega listar disponibilidades a ESTUDIANTE', async () => {
+    it('deniega listar disponibilidades sin AULAS_VER', async () => {
       const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
@@ -1232,8 +1294,9 @@ describe('AulasController', () => {
       expect(aulasService.listarDisponibilidadesAula).not.toHaveBeenCalled();
     });
 
-    it('permite crear disponibilidad a COORDINADOR', async () => {
-      const token = await crearToken('COORDINADOR');
+    it('permite crear disponibilidad con AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
       const dto = {
         periodoId: 2,
         diaSemana: 1,
@@ -1254,8 +1317,9 @@ describe('AulasController', () => {
       );
     });
 
-    it('deniega crear disponibilidad a PROFESOR', async () => {
-      const token = await crearToken('PROFESOR');
+    it('deniega crear disponibilidad sin AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_VER);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .post('/aulas/1/disponibilidades')
@@ -1271,8 +1335,9 @@ describe('AulasController', () => {
       expect(aulasService.crearDisponibilidadAula).not.toHaveBeenCalled();
     });
 
-    it('permite actualizar disponibilidad a ADMIN_GLOBAL', async () => {
-      const token = await crearToken('ADMIN_GLOBAL');
+    it('permite actualizar disponibilidad con AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
       const dto = {
         horaFin: '13:00',
       };
@@ -1291,8 +1356,9 @@ describe('AulasController', () => {
       );
     });
 
-    it('permite eliminar disponibilidad a COORDINADOR', async () => {
-      const token = await crearToken('COORDINADOR');
+    it('permite eliminar disponibilidad con AULAS_GESTIONAR', async () => {
+      permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
+      const token = await crearToken('ESTUDIANTE');
 
       await request(app.getHttpServer())
         .delete('/aulas/1/disponibilidades/5')

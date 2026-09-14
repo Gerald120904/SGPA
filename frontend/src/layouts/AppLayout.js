@@ -9,7 +9,8 @@ import {
 
 export function AppLayout({
   usuario,
-  roles
+  roles,
+  permisos,
 }) {
 
   return `
@@ -20,7 +21,8 @@ export function AppLayout({
 
       ${Sidebar({
         usuario,
-        roles
+        roles,
+        permisos,
       })}
 
 

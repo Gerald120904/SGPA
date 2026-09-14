@@ -4,9 +4,10 @@ import { AuthController } from './auth.controller';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { SecurityModule } from './security.module';
 import { MailModule } from '../mail/mail.module';
+import { PermisosModule } from '../permisos/permisos.module';
 
 @Module({
-  imports: [UsuariosModule, SecurityModule, MailModule],
+  imports: [UsuariosModule, SecurityModule, MailModule, PermisosModule],
   controllers: [AuthController],
   providers: [AuthService],
   exports: [AuthService],

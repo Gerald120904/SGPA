@@ -308,6 +308,36 @@ export class DisponibilidadProfesoresService {
     });
   }
 
+  async listarPeriodosMiDisponibilidad(
+    usuarioId: number,
+  ) {
+    await this.obtenerProfesor(
+      usuarioId,
+      true,
+    );
+
+    const periodos =
+      await this.periodoRepository.find({
+        order: {
+          anio: 'DESC',
+          ciclo: 'DESC',
+        },
+      });
+
+    return periodos.map(
+      (periodo) => ({
+        ...this.mapearPeriodo(
+          periodo,
+        ),
+
+        puedeEditar:
+          this.puedeEditarDisponibilidad(
+            periodo,
+          ),
+      }),
+    );
+  }
+
   async consultarMiDisponibilidad(usuarioId: number, periodoId: number) {
     await this.obtenerProfesor(usuarioId, true);
 

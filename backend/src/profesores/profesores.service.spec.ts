@@ -1750,5 +1750,116 @@ describe('ProfesoresService', () => {
         }),
       ).rejects.toThrow(ForbiddenException);
     });
+
+    it('inactiva perfil administrativamente cuando el revisor posee alcance sobre la carrera', async () => {
+      const perfilDocente = {
+        id: 1,
+        profesorUsuarioId: 10,
+        perfilAcademicoId: 5,
+        estado: EstadoPerfilProfesor.APROBADO,
+        perfilAcademico: { id: 5, carreraId: 2, activo: true },
+      };
+
+      profesorPerfilRepository.findOne
+        .mockResolvedValueOnce(perfilDocente)
+        .mockResolvedValueOnce({
+          ...perfilDocente,
+          estado: EstadoPerfilProfesor.INACTIVO,
+          revisadoPorUsuarioId: 2,
+        });
+
+      usuarioRepository.findOne.mockImplementation(async ({ where }) => {
+        if (where.id === 10) return crearProfesor({ id: 10 });
+        if (where.id === 2) {
+          return crearProfesor({
+            id: 2,
+            usuarioRoles: [
+              { rol: { nombre: RolSistema.COORDINADOR, activo: true } },
+            ] as any,
+          });
+        }
+        return null;
+      });
+
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      const resultado = await service.inactivarPerfilProfesor(
+        10,
+        5,
+        2,
+        'Inactivación admin',
+      );
+      expect(resultado.estado).toBe(EstadoPerfilProfesor.INACTIVO);
+      expect(
+        estructuraAcademicaService.tieneAlcanceSobreCarrera,
+      ).toHaveBeenCalledWith(2, 2);
+    });
+
+    it('rechaza inactivar perfil administrativamente si el usuario no tiene alcance sobre la carrera', async () => {
+      profesorPerfilRepository.findOne.mockResolvedValue({
+        id: 1,
+        profesorUsuarioId: 10,
+        perfilAcademicoId: 5,
+        estado: EstadoPerfilProfesor.APROBADO,
+        perfilAcademico: { id: 5, carreraId: 2, activo: true },
+      });
+
+      usuarioRepository.findOne.mockImplementation(async ({ where }) => {
+        if (where.id === 10) return crearProfesor({ id: 10 });
+        if (where.id === 2) {
+          return crearProfesor({
+            id: 2,
+            usuarioRoles: [
+              { rol: { nombre: RolSistema.COORDINADOR, activo: true } },
+            ] as any,
+          });
+        }
+        return null;
+      });
+
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        false,
+      );
+
+      await expect(
+        service.inactivarPerfilProfesor(10, 5, 2, 'Inactivar sin alcance'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('permite al profesor inactivar su propio perfil sin validar alcance académico', async () => {
+      const perfilDocente = {
+        id: 1,
+        profesorUsuarioId: 10,
+        perfilAcademicoId: 5,
+        estado: EstadoPerfilProfesor.APROBADO,
+        perfilAcademico: { id: 5, carreraId: 2, activo: true },
+      };
+
+      profesorPerfilRepository.findOne
+        .mockResolvedValueOnce(perfilDocente)
+        .mockResolvedValueOnce({
+          ...perfilDocente,
+          estado: EstadoPerfilProfesor.INACTIVO,
+          revisadoPorUsuarioId: 10,
+        });
+
+      usuarioRepository.findOne.mockImplementation(async ({ where }) => {
+        if (where.id === 10) return crearProfesor({ id: 10 });
+        return null;
+      });
+
+      const resultado = await service.inactivarPerfilProfesor(
+        10,
+        5,
+        10,
+        'Autogestión',
+      );
+      expect(resultado.estado).toBe(EstadoPerfilProfesor.INACTIVO);
+      expect(
+        estructuraAcademicaService.tieneAlcanceSobreCarrera,
+      ).not.toHaveBeenCalled();
+    });
   });
 });

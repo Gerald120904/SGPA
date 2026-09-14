@@ -9,6 +9,8 @@ import { RolSistema } from '../auth/constants/roles.constants';
 import { Rol } from '../roles/entities/rol.entity';
 import { UsuarioRol } from './entities/usuario-rol.entity';
 import { Usuario } from './entities/usuario.entity';
+import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { UsuariosService } from './usuarios.service';
 
 describe('UsuariosService', () => {
@@ -16,6 +18,20 @@ describe('UsuariosService', () => {
     id: 1,
     nombre: RolSistema.ADMIN_GLOBAL,
     descripcion: 'Administrador global',
+    activo: true,
+  } as Rol;
+
+  const rolCoordinador = {
+    id: 2,
+    nombre: RolSistema.COORDINADOR,
+    descripcion: 'Coordinador',
+    activo: true,
+  } as Rol;
+
+  const rolEstudiante = {
+    id: 4,
+    nombre: RolSistema.ESTUDIANTE,
+    descripcion: 'Estudiante',
     activo: true,
   } as Rol;
 
@@ -70,6 +86,10 @@ describe('UsuariosService', () => {
     create: jest.Mock;
     save: jest.Mock;
   };
+  let txUsuarioPermisoRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+  };
   let txRolRepository: {
     find: jest.Mock;
   };
@@ -97,6 +117,10 @@ describe('UsuariosService', () => {
       create: jest.fn((datos) => datos),
       save: jest.fn(),
     };
+    txUsuarioPermisoRepository = {
+      create: jest.fn((datos) => datos),
+      save: jest.fn(),
+    };
     txRolRepository = {
       find: jest.fn(),
     };
@@ -105,6 +129,7 @@ describe('UsuariosService', () => {
       getRepository: jest.fn((entidad) => {
         if (entidad === Usuario) return txUsuarioRepository;
         if (entidad === UsuarioRol) return txUsuarioRolRepository;
+        if (entidad === UsuarioPermiso) return txUsuarioPermisoRepository;
         if (entidad === Rol) return txRolRepository;
         throw new Error('Repositorio inesperado');
       }),
@@ -185,12 +210,101 @@ describe('UsuariosService', () => {
         rolId: 1,
       },
     ]);
+    expect(txUsuarioPermisoRepository.save).not.toHaveBeenCalled();
     const usuarioGuardado = txUsuarioRepository.save.mock.calls[0][0];
     await expect(
       bcrypt.compare('ClaveSegura123', usuarioGuardado.passwordHash),
     ).resolves.toBe(true);
     expect(usuarioGuardado.correo).toBe('admin@sgpa.local');
     expect(resultado).not.toHaveProperty('passwordHash');
+  });
+
+  it('crea ESTUDIANTE sin permisos personalizados y no guarda permisos', async () => {
+    const usuarioCreado = crearUsuario();
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(usuarioCreado);
+    txRolRepository.find.mockResolvedValue([rolEstudiante]);
+    txUsuarioRepository.save.mockImplementation(async (usuario) => ({
+      ...usuario,
+      id: 2,
+    }));
+
+    await service.crear({
+      cedula: '111111111',
+      nombres: 'Estudiante',
+      apellido1: 'Prueba',
+      correo: 'estudiante@sgpa.local',
+      password: 'ClaveSegura123',
+      roles: [RolSistema.ESTUDIANTE],
+    });
+
+    expect(txUsuarioPermisoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('crea COORDINADOR sin permisos y aplica la plantilla sugerida', async () => {
+    const usuarioCreado = crearUsuario();
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(usuarioCreado);
+    txRolRepository.find.mockResolvedValue([rolCoordinador]);
+    txUsuarioRepository.save.mockImplementation(async (usuario) => ({
+      ...usuario,
+      id: 3,
+    }));
+
+    await service.crear({
+      cedula: '222222222',
+      nombres: 'Coordinador',
+      apellido1: 'Prueba',
+      correo: 'coord@sgpa.local',
+      password: 'ClaveSegura123',
+      roles: [RolSistema.COORDINADOR],
+    });
+
+    expect(txUsuarioPermisoRepository.save).toHaveBeenCalledTimes(1);
+    const permisosGuardados = txUsuarioPermisoRepository.save.mock.calls[0][0];
+    expect(permisosGuardados.length).toBeGreaterThan(0);
+    expect(
+      permisosGuardados.some(
+        (p: { permiso: PermisoSistema }) => p.permiso === PermisoSistema.PERIODOS_VER,
+      ),
+    ).toBe(true);
+  });
+
+  it('crea COORDINADOR con permisos específicos y guarda solo los indicados', async () => {
+    const usuarioCreado = crearUsuario();
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(usuarioCreado);
+    txRolRepository.find.mockResolvedValue([rolCoordinador]);
+    txUsuarioRepository.save.mockImplementation(async (usuario) => ({
+      ...usuario,
+      id: 4,
+    }));
+
+    await service.crear({
+      cedula: '333333333',
+      nombres: 'Coordinador',
+      apellido1: 'Restringido',
+      correo: 'coord.res@sgpa.local',
+      password: 'ClaveSegura123',
+      roles: [RolSistema.COORDINADOR],
+      permisos: [PermisoSistema.PERIODOS_VER],
+    });
+
+    expect(txUsuarioPermisoRepository.save).toHaveBeenCalledTimes(1);
+    const permisosGuardados = txUsuarioPermisoRepository.save.mock.calls[0][0];
+    expect(permisosGuardados).toEqual([
+      {
+        usuarioId: 4,
+        permiso: PermisoSistema.PERIODOS_VER,
+        activo: true,
+      },
+    ]);
   });
 
   it('rechaza una cédula duplicada antes de crear', async () => {

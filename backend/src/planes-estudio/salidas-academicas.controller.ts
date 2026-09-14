@@ -9,10 +9,10 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarAsignaturasSalidaDto } from './dto/actualizar-asignaturas-salida.dto';
 import { ActualizarSalidaAcademicaDto } from './dto/actualizar-salida-academica.dto';
 import { CambiarEstadoSalidaAcademicaDto } from './dto/cambiar-estado-salida-academica.dto';
@@ -20,17 +20,18 @@ import { CrearSalidaAcademicaDto } from './dto/crear-salida-academica.dto';
 import { SalidasAcademicasService } from './salidas-academicas.service';
 
 @Controller('planes-estudio/:planId/salidas-academicas')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class SalidasAcademicasController {
   constructor(private readonly service: SalidasAcademicasService) {}
 
   @Get()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
   listar(@Param('planId', ParseIntPipe) planId: number) {
     return this.service.listar(planId);
   }
 
   @Get(':id')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
   obtener(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -39,6 +40,7 @@ export class SalidasAcademicasController {
   }
 
   @Post()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   crear(
     @Param('planId', ParseIntPipe) planId: number,
     @Body() dto: CrearSalidaAcademicaDto,
@@ -47,6 +49,7 @@ export class SalidasAcademicasController {
   }
 
   @Patch(':id')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   actualizar(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -56,6 +59,7 @@ export class SalidasAcademicasController {
   }
 
   @Put(':id/asignaturas')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   reemplazarAsignaturas(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -65,6 +69,7 @@ export class SalidasAcademicasController {
   }
 
   @Patch(':id/estado')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   cambiarEstado(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,

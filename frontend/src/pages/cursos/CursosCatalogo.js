@@ -395,6 +395,7 @@ export function CursosTabla({
   cursos = [],
   asignaturasPlan = [],
   requisitosPlan = [],
+  puedeGestionar = false,
 }) {
   const filas = cursos
     .map((curso) => {
@@ -478,52 +479,72 @@ export function CursosTabla({
           <td class="cursos-actions">
             <button
               class="cursos-icon-button"
-              data-action="editar"
+              data-action="requisitos"
               data-id="${curso.id}"
               type="button"
-              title="Editar curso"
-              aria-label="Editar ${escapeHtml(
-                curso.nombre,
-              )}"
+              title="Requisitos del curso"
+              aria-label="Requisitos de ${escapeHtml(curso.nombre)}"
             >
               <i
-                data-lucide="pencil"
+                data-lucide="git-branch"
                 aria-hidden="true"
               ></i>
             </button>
 
-            <button
-              class="
-                cursos-icon-button
-                ${
-                  curso.activo
-                    ? "cursos-danger-button"
-                    : "cursos-success-button"
-                }
-              "
-              data-action="estado"
-              data-id="${curso.id}"
-              type="button"
-              title="${
-                curso.activo
-                  ? "Desactivar curso"
-                  : "Activar curso"
-              }"
-              aria-label="${
-                curso.activo
-                  ? "Desactivar"
-                  : "Activar"
-              } ${escapeHtml(curso.nombre)}"
-            >
-              <i
-                data-lucide="${
-                  curso.activo
-                    ? "circle-pause"
-                    : "circle-check"
-                }"
-                aria-hidden="true"
-              ></i>
-            </button>
+            ${
+              puedeGestionar
+                ? `
+                  <button
+                    class="cursos-icon-button"
+                    data-action="editar"
+                    data-id="${curso.id}"
+                    type="button"
+                    title="Editar curso"
+                    aria-label="Editar ${escapeHtml(
+                      curso.nombre,
+                    )}"
+                  >
+                    <i
+                      data-lucide="pencil"
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+
+                  <button
+                    class="
+                      cursos-icon-button
+                      ${
+                        curso.activo
+                          ? "cursos-danger-button"
+                          : "cursos-success-button"
+                      }
+                    "
+                    data-action="estado"
+                    data-id="${curso.id}"
+                    type="button"
+                    title="${
+                      curso.activo
+                        ? "Desactivar curso"
+                        : "Activar curso"
+                    }"
+                    aria-label="${
+                      curso.activo
+                        ? "Desactivar"
+                        : "Activar"
+                    } ${escapeHtml(curso.nombre)}"
+                  >
+                    <i
+                      data-lucide="${
+                        curso.activo
+                          ? "circle-pause"
+                          : "circle-check"
+                      }"
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+                `
+                : ""
+            }
           </td>
         </tr>
       `;

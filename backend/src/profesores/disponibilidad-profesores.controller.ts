@@ -15,12 +15,19 @@ import { RolSistema } from '../auth/constants/roles.constants';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { CopiarDisponibilidadDto } from './dto/copiar-disponibilidad.dto';
 import { GuardarDisponibilidadDto } from './dto/guardar-disponibilidad.dto';
 import { DisponibilidadProfesoresService } from './disponibilidad-profesores.service';
 
 @Controller('profesores')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(
+  AuthGuard,
+  RolesGuard,
+  PermisosGuard,
+)
 export class DisponibilidadProfesoresController {
   constructor(
     private readonly disponibilidadService: DisponibilidadProfesoresService,
@@ -32,6 +39,17 @@ export class DisponibilidadProfesoresController {
     }
 
     return request.user.sub;
+  }
+
+  @Get('mi-disponibilidad/periodos')
+  @Roles(RolSistema.PROFESOR)
+  listarPeriodosMiDisponibilidad(
+    @Req() request: Request,
+  ) {
+    return this.disponibilidadService
+      .listarPeriodosMiDisponibilidad(
+        this.obtenerUsuarioId(request),
+      );
   }
 
   @Get('mi-disponibilidad/:periodoId/historial')
@@ -87,7 +105,7 @@ export class DisponibilidadProfesoresController {
   }
 
   @Get(':profesorId/disponibilidad/:periodoId')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.PROFESORES_VER)
   consultarDisponibilidadProfesor(
     @Param('profesorId', ParseIntPipe)
     profesorId: number,

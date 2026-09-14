@@ -5,7 +5,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { CarrerasController } from './carreras.controller';
 import { CarrerasService } from './carreras.service';
 
@@ -18,6 +20,12 @@ describe('CarrerasController', () => {
     crear: jest.fn(),
     actualizar: jest.fn(),
     cambiarEstado: jest.fn(),
+  };
+
+  let permisosAsignados: Set<PermisoSistema>;
+
+  const permisosService = {
+    usuarioTienePermisos: jest.fn(),
   };
 
   let app: INestApplication<App>;
@@ -33,12 +41,16 @@ describe('CarrerasController', () => {
       controllers: [CarrerasController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
           },
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
         {
           provide: CarrerasService,
@@ -65,27 +77,24 @@ describe('CarrerasController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    permisosAsignados = new Set<PermisoSistema>();
+
+    permisosService.usuarioTienePermisos.mockImplementation(
+      async (_usuarioId, requeridos: PermisoSistema[]) =>
+        requeridos.every((permiso) => permisosAsignados.has(permiso)),
+    );
+
     carrerasService.listar.mockResolvedValue([]);
-
-    carrerasService.obtenerPorId.mockResolvedValue({
-      id: 1,
-    });
-
-    carrerasService.crear.mockResolvedValue({
-      id: 1,
-    });
-
-    carrerasService.actualizar.mockResolvedValue({
-      id: 1,
-    });
-
-    carrerasService.cambiarEstado.mockResolvedValue({
-      id: 1,
-    });
+    carrerasService.obtenerPorId.mockResolvedValue({ id: 1 });
+    carrerasService.crear.mockResolvedValue({ id: 1 });
+    carrerasService.actualizar.mockResolvedValue({ id: 1 });
+    carrerasService.cambiarEstado.mockResolvedValue({ id: 1 });
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   async function crearToken(rol: string) {
@@ -102,7 +111,7 @@ describe('CarrerasController', () => {
     expect(carrerasService.listar).not.toHaveBeenCalled();
   });
 
-  it('permite ADMIN_GLOBAL', async () => {
+  it('permite ADMIN_GLOBAL sin registros en usuario_permisos', async () => {
     const token = await crearToken('ADMIN_GLOBAL');
 
     await request(app.getHttpServer())
@@ -111,10 +120,13 @@ describe('CarrerasController', () => {
       .expect(200, []);
 
     expect(carrerasService.listar).toHaveBeenCalledTimes(1);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
-  it('permite COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('permite consultar carreras a un ESTUDIANTE con CARRERAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.CARRERAS_VER);
+
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/carreras')
@@ -124,8 +136,8 @@ describe('CarrerasController', () => {
     expect(carrerasService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])('responde 403 para %s', async (rol) => {
-    const token = await crearToken(rol);
+  it('rechaza consultar carreras sin CARRERAS_VER', async () => {
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/carreras')
@@ -135,12 +147,31 @@ describe('CarrerasController', () => {
     expect(carrerasService.listar).not.toHaveBeenCalled();
   });
 
-  it('crea una carrera válida', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('no permite crear con solo CARRERAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.CARRERAS_VER);
+
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .post('/carreras')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        codigo: 'EIF',
+        nombre: 'Ingeniería en Sistemas',
+      })
+      .expect(403);
+
+    expect(carrerasService.crear).not.toHaveBeenCalled();
+  });
+
+  it('permite crear con CARRERAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CARRERAS_GESTIONAR);
+
+    const token = await crearToken('ESTUDIANTE');
 
     const dto = {
       codigo: 'EIF',
-      nombre: 'Ingeniería en Sistemas de Información',
+      nombre: 'Ingeniería en Sistemas',
       descripcion: 'Carrera de informática',
     };
 
@@ -148,28 +179,26 @@ describe('CarrerasController', () => {
       .post('/carreras')
       .set('Authorization', `Bearer ${token}`)
       .send(dto)
-      .expect(201, {
-        id: 1,
-      });
+      .expect(201, { id: 1 });
 
     expect(carrerasService.crear).toHaveBeenCalledWith(dto);
   });
 
-  it('consulta una carrera por id', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
+  it('consulta una carrera por id con CARRERAS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.CARRERAS_VER);
+    const token = await crearToken('PROFESOR');
 
     await request(app.getHttpServer())
       .get('/carreras/1')
       .set('Authorization', `Bearer ${token}`)
-      .expect(200, {
-        id: 1,
-      });
+      .expect(200, { id: 1 });
 
     expect(carrerasService.obtenerPorId).toHaveBeenCalledWith(1);
   });
 
-  it('actualiza una carrera', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('actualiza una carrera con CARRERAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CARRERAS_GESTIONAR);
+    const token = await crearToken('PROFESOR');
 
     const dto = {
       nombre: 'Ingeniería en Sistemas',
@@ -179,25 +208,20 @@ describe('CarrerasController', () => {
       .patch('/carreras/1')
       .set('Authorization', `Bearer ${token}`)
       .send(dto)
-      .expect(200, {
-        id: 1,
-      });
+      .expect(200, { id: 1 });
 
     expect(carrerasService.actualizar).toHaveBeenCalledWith(1, dto);
   });
 
-  it('cambia el estado de una carrera', async () => {
+  it('cambia el estado de una carrera con CARRERAS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CARRERAS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
       .patch('/carreras/1/estado')
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        activo: false,
-      })
-      .expect(200, {
-        id: 1,
-      });
+      .send({ activo: false })
+      .expect(200, { id: 1 });
 
     expect(carrerasService.cambiarEstado).toHaveBeenCalledWith(1, false);
   });
@@ -208,9 +232,7 @@ describe('CarrerasController', () => {
     await request(app.getHttpServer())
       .patch('/carreras/1/estado')
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        activo: 'no',
-      })
+      .send({ activo: 'no' })
       .expect(400);
 
     expect(carrerasService.cambiarEstado).not.toHaveBeenCalled();

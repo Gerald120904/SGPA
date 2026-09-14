@@ -4,6 +4,12 @@ import {
   crearCarrera,
   listarCarreras,
 } from '../../services/carreras.service.js';
+import {
+  usuarioTienePermiso,
+} from '../../app/session.js';
+import {
+  PERMISOS,
+} from '../../config/permissions.js';
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 import { confirmarAccion } from '../../utils/confirm.js';
@@ -14,19 +20,9 @@ import { mostrarExito, mostrarError } from '../../components/AlertModal.js';
 let carreras = [];
 let instanciaActual = 0;
 
-const GRADOS = [
-  { value: 'DIPLOMADO', label: 'Diplomado' },
-  { value: 'BACHILLERATO', label: 'Bachillerato' },
-  { value: 'LICENCIATURA', label: 'Licenciatura' },
-  { value: 'MAESTRIA', label: 'Maestría' },
-  { value: 'OTRO', label: 'Otro' },
-];
-
-function formatearGrado(grado) {
-  return (
-    GRADOS.find((item) => item.value === grado)?.label ||
-    grado ||
-    'Sin especificar'
+function puedeGestionarCarreras() {
+  return usuarioTienePermiso(
+    PERMISOS.CARRERAS_GESTIONAR,
   );
 }
 
@@ -39,14 +35,20 @@ export function CarrerasPage() {
           <p>Administración de las carreras académicas del SGPA.</p>
         </div>
 
-        <button
-          id="nuevaCarreraButton"
-          class="carreras-primary-button"
-          type="button"
-        >
-          <i data-lucide="plus" aria-hidden="true"></i>
-          Nueva carrera
-        </button>
+        ${
+          puedeGestionarCarreras()
+            ? `
+              <button
+                id="nuevaCarreraButton"
+                class="carreras-primary-button"
+                type="button"
+              >
+                <i data-lucide="plus" aria-hidden="true"></i>
+                Nueva carrera
+              </button>
+            `
+            : ''
+        }
       </div>
 
       <div
@@ -61,7 +63,7 @@ export function CarrerasPage() {
           <input
             id="carrerasBuscar"
             type="search"
-            placeholder="Buscar por código, nombre o grado..."
+            placeholder="Buscar por código, nombre o descripción..."
             autocomplete="off"
           >
         </label>
@@ -86,12 +88,13 @@ export function CarrerasPage() {
       </div>
 
       <dialog
-  id="carreraDialog"
-  class="sgpa-form-dialog sgpa-form-dialog-md">
-      <div id="carreraDialogContent"></div>
-        </dialog> 
-    </section>`
-    ;
+        id="carreraDialog"
+        class="sgpa-form-dialog sgpa-form-dialog-md"
+      >
+        <div id="carreraDialogContent"></div>
+      </dialog>
+    </section>
+  `;
 }
 
 function mostrarFeedback(
@@ -138,7 +141,7 @@ function obtenerCarrerasFiltradas() {
   return carreras.filter((carrera) => {
     const coincideBusqueda =
       !busqueda ||
-      [carrera.codigo, carrera.nombre, formatearGrado(carrera.grado)]
+      [carrera.codigo, carrera.nombre, carrera.descripcion]
         .filter(Boolean)
         .some((valor) =>
           String(valor).toLowerCase().includes(busqueda),
@@ -173,6 +176,9 @@ function renderizarCarreras() {
 
   const filtradas =
     obtenerCarrerasFiltradas();
+
+  const puedeGestionar =
+    puedeGestionarCarreras();
 
 
   const filas =
@@ -214,15 +220,6 @@ function renderizarCarreras() {
 
 
             <td>
-              ${escapeHtml(
-                formatearGrado(
-                  carrera.grado
-                )
-              )}
-            </td>
-
-
-            <td>
 
               <span
                 class="
@@ -246,55 +243,61 @@ function renderizarCarreras() {
             </td>
 
 
-            <td class="carreras-actions">
+            ${
+              puedeGestionar
+                ? `
+                  <td class="carreras-actions">
 
-              <button
-                class="carreras-icon-button"
-                data-action="editar"
-                data-id="${carrera.id}"
-                type="button"
-                title="Editar carrera"
-              >
+                    <button
+                      class="carreras-icon-button"
+                      data-action="editar"
+                      data-id="${carrera.id}"
+                      type="button"
+                      title="Editar carrera"
+                    >
 
-                <i
-                  data-lucide="pencil"
-                  aria-hidden="true"
-                ></i>
+                      <i
+                        data-lucide="pencil"
+                        aria-hidden="true"
+                      ></i>
 
-              </button>
+                    </button>
 
 
-              <button
-                class="
-                  carreras-icon-button
-                  ${
-                    carrera.activo
-                      ? 'carreras-danger-button'
-                      : 'carreras-success-button'
-                  }
-                "
-                data-action="estado"
-                data-id="${carrera.id}"
-                type="button"
-                title="${
-                  carrera.activo
-                    ? 'Desactivar carrera'
-                    : 'Activar carrera'
-                }"
-              >
+                    <button
+                      class="
+                        carreras-icon-button
+                        ${
+                          carrera.activo
+                            ? 'carreras-danger-button'
+                            : 'carreras-success-button'
+                        }
+                      "
+                      data-action="estado"
+                      data-id="${carrera.id}"
+                      type="button"
+                      title="${
+                        carrera.activo
+                          ? 'Desactivar carrera'
+                          : 'Activar carrera'
+                      }"
+                    >
 
-                <i
-                  data-lucide="${
-                    carrera.activo
-                      ? 'circle-pause'
-                      : 'circle-check'
-                  }"
-                  aria-hidden="true"
-                ></i>
+                      <i
+                        data-lucide="${
+                          carrera.activo
+                            ? 'circle-pause'
+                            : 'circle-check'
+                        }"
+                        aria-hidden="true"
+                      ></i>
 
-              </button>
+                    </button>
 
-            </td>
+                  </td>
+                `
+                : ''
+            }
 
           </tr>
         `
@@ -305,13 +308,19 @@ function renderizarCarreras() {
   contenedor.innerHTML =
     DataTable({
 
-      columns: [
-        'Código',
-        'Carrera',
-        'Grado académico',
-        'Estado',
-        'Acciones'
-      ],
+      columns:
+        puedeGestionar
+          ? [
+              'Código',
+              'Carrera',
+              'Estado',
+              'Acciones',
+            ]
+          : [
+              'Código',
+              'Carrera',
+              'Estado',
+            ],
 
       rows:
         filas,
@@ -369,6 +378,14 @@ async function cargarCarreras(instancia) {
 
 function abrirFormulario(carrera = null) {
 
+  if (!puedeGestionarCarreras()) {
+    mostrarError({
+      titulo: 'Acceso restringido',
+      mensaje: 'No posee permiso para gestionar carreras.',
+    });
+    return;
+  }
+
   const dialog =
     document.getElementById(
       'carreraDialog'
@@ -393,25 +410,6 @@ function abrirFormulario(carrera = null) {
     Boolean(carrera);
 
 
-  const opcionesGrado =
-    GRADOS
-      .map(
-        (grado) => `
-          <option
-            value="${grado.value}"
-            ${
-              carrera?.grado === grado.value
-                ? 'selected'
-                : ''
-            }
-          >
-            ${escapeHtml(grado.label)}
-          </option>
-        `
-      )
-      .join('');
-
-
   const body = `
 
     <label>
@@ -433,39 +431,6 @@ function abrirFormulario(carrera = null) {
         placeholder="Ej. INFO"
         required
       >
-
-    </label>
-
-
-    <label>
-
-      <span>
-        Grado académico
-      </span>
-
-      <select
-        id="carreraGrado"
-        name="grado"
-        required
-      >
-
-        ${
-          !editando
-            ? `
-                <option
-                  value=""
-                  disabled
-                  selected
-                >
-                  Seleccione...
-                </option>
-              `
-            : ''
-        }
-
-        ${opcionesGrado}
-
-      </select>
 
     </label>
 
@@ -517,38 +482,38 @@ function abrirFormulario(carrera = null) {
 
 
   content.innerHTML =
-FormDialog({
+    FormDialog({
 
-  formId:
-    'carreraForm',
+      formId:
+        'carreraForm',
 
-  title:
-    editando
-      ? 'Editar carrera'
-      : 'Nueva carrera',
+      title:
+        editando
+          ? 'Editar carrera'
+          : 'Nueva carrera',
 
-  description:
-    editando
-      ? 'Actualice la información académica de la carrera.'
-      : 'Registre una nueva carrera académica en el SGPA.',
+      description:
+        editando
+          ? 'Actualice la información académica de la carrera.'
+          : 'Registre una nueva carrera académica en el SGPA.',
 
-  body,
+      body,
 
-  errorId:
-    'carreraFormError',
+      errorId:
+        'carreraFormError',
 
-  cancelButtonId:
-    'cancelarCarreraButton',
+      cancelButtonId:
+        'cancelarCarreraButton',
 
-  submitButtonId:
-    'guardarCarreraButton',
+      submitButtonId:
+        'guardarCarreraButton',
 
-  submitText:
-    editando
-      ? 'Guardar cambios'
-      : 'Crear carrera'
+      submitText:
+        editando
+          ? 'Guardar cambios'
+          : 'Crear carrera'
 
-});
+    });
 
 
   renderizarIconos();
@@ -557,9 +522,9 @@ FormDialog({
   dialog.showModal();
 
 
-habilitarCierreExterior(
-  dialog
-);
+  habilitarCierreExterior(
+    dialog
+  );
 
 
   const cerrar =
@@ -621,12 +586,6 @@ habilitarCierreExterior(
           );
 
 
-        const gradoInput =
-          document.getElementById(
-            'carreraGrado'
-          );
-
-
         const descripcionInput =
           document.getElementById(
             'carreraDescripcion'
@@ -637,7 +596,6 @@ habilitarCierreExterior(
           !guardarButton ||
           !codigoInput ||
           !nombreInput ||
-          !gradoInput ||
           !descripcionInput
         ) {
           return;
@@ -655,9 +613,6 @@ habilitarCierreExterior(
             nombreInput
               .value
               .trim(),
-
-          grado:
-            gradoInput.value,
 
           descripcion:
             descripcionInput
@@ -716,22 +671,22 @@ habilitarCierreExterior(
           );
 
 
-        }catch (error) {
+        } catch (error) {
 
-  mostrarError({
+          mostrarError({
 
-    titulo:
-      editando
-        ? 'No se pudo actualizar la carrera'
-        : 'No se pudo crear la carrera',
+            titulo:
+              editando
+                ? 'No se pudo actualizar la carrera'
+                : 'No se pudo crear la carrera',
 
-    mensaje:
-      error?.message ||
-      'No fue posible guardar la carrera.'
+            mensaje:
+              error?.message ||
+              'No fue posible guardar la carrera.'
 
-  });
+          });
 
-} finally {
+        } finally {
 
           guardarButton.disabled =
             false;
@@ -744,6 +699,14 @@ habilitarCierreExterior(
 }
 
 async function alternarEstado(carrera) {
+  if (!puedeGestionarCarreras()) {
+    mostrarError({
+      titulo: 'Acceso restringido',
+      mensaje: 'No posee permiso para cambiar el estado de carreras.',
+    });
+    return;
+  }
+
   const nuevoEstado = !carrera.activo;
   const accion = nuevoEstado ? 'activar' : 'desactivar';
   const confirmado = await confirmarAccion({

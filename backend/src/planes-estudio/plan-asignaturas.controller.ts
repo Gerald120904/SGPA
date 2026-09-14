@@ -8,10 +8,10 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarPlanAsignaturaDto } from './dto/actualizar-plan-asignatura.dto';
 import { CambiarEstadoPlanAsignaturaDto } from './dto/cambiar-estado-plan-asignatura.dto';
 import { CargaMasivaPlanAsignaturasDto } from './dto/carga-masiva-plan-asignaturas.dto';
@@ -19,19 +19,20 @@ import { CrearPlanAsignaturaDto } from './dto/crear-plan-asignatura.dto';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
 
 @Controller('planes-estudio/:planId/asignaturas')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class PlanAsignaturasController {
   constructor(
     private readonly planAsignaturasService: PlanAsignaturasService,
   ) {}
 
   @Get()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
   listar(@Param('planId', ParseIntPipe) planId: number) {
     return this.planAsignaturasService.listar(planId);
   }
 
   @Post('carga-masiva')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   cargaMasiva(
     @Param('planId', ParseIntPipe) planId: number,
     @Body() dto: CargaMasivaPlanAsignaturasDto,
@@ -40,6 +41,7 @@ export class PlanAsignaturasController {
   }
 
   @Get(':id')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
   obtenerPorId(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -48,6 +50,7 @@ export class PlanAsignaturasController {
   }
 
   @Post()
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   crear(
     @Param('planId', ParseIntPipe) planId: number,
     @Body() dto: CrearPlanAsignaturaDto,
@@ -56,6 +59,7 @@ export class PlanAsignaturasController {
   }
 
   @Patch(':id')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   actualizar(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -65,6 +69,7 @@ export class PlanAsignaturasController {
   }
 
   @Patch(':id/estado')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   cambiarEstado(
     @Param('planId', ParseIntPipe) planId: number,
     @Param('id', ParseIntPipe) id: number,

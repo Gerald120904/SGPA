@@ -5,7 +5,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { TipoSalidaAcademica } from './entities/salida-academica.entity';
 import { SalidasAcademicasController } from './salidas-academicas.controller';
 import { SalidasAcademicasService } from './salidas-academicas.service';
@@ -20,6 +22,13 @@ describe('SalidasAcademicasController', () => {
     reemplazarAsignaturas: jest.fn(),
     cambiarEstado: jest.fn(),
   };
+
+  let permisosAsignados: Set<PermisoSistema>;
+
+  const permisosService = {
+    usuarioTienePermisos: jest.fn(),
+  };
+
   let app: INestApplication<App>;
   let jwtService: JwtService;
 
@@ -29,10 +38,14 @@ describe('SalidasAcademicasController', () => {
       controllers: [SalidasAcademicasController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
         { provide: SalidasAcademicasService, useValue: service },
       ],
@@ -52,6 +65,14 @@ describe('SalidasAcademicasController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados = new Set<PermisoSistema>([
+      PermisoSistema.PLANES_ESTUDIO_VER,
+      PermisoSistema.PLANES_ESTUDIO_GESTIONAR,
+    ]);
+    permisosService.usuarioTienePermisos.mockImplementation(
+      async (_usuarioId, requeridos: PermisoSistema[]) =>
+        requeridos.every((p) => permisosAsignados.has(p)),
+    );
     service.listar.mockResolvedValue([]);
     service.obtenerPorId.mockResolvedValue({ id: 1 });
     service.crear.mockResolvedValue({ id: 1 });
@@ -60,7 +81,11 @@ describe('SalidasAcademicasController', () => {
     service.cambiarEstado.mockResolvedValue({ id: 1 });
   });
 
-  afterAll(async () => app.close());
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
 
   const token = (rol: string) =>
     jwtService.signAsync({
@@ -75,19 +100,33 @@ describe('SalidasAcademicasController', () => {
       .expect(401);
   });
 
-  it.each(['ADMIN_GLOBAL', 'COORDINADOR'])('permite el rol %s', async (rol) => {
+  it('permite ADMIN_GLOBAL sin registros en usuario_permisos', async () => {
     await request(app.getHttpServer())
       .get('/planes-estudio/1/salidas-academicas')
-      .set('Authorization', `Bearer ${await token(rol)}`)
+      .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
       .expect(200, []);
+
+    expect(service.listar).toHaveBeenCalledWith(1);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
-  it('rechaza roles sin permiso', async () => {
+  it('permite consultar salidas con PLANES_ESTUDIO_VER', async () => {
     await request(app.getHttpServer())
       .get('/planes-estudio/1/salidas-academicas')
-      .set('Authorization', `Bearer ${await token('PROFESOR')}`)
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .expect(200, []);
+
+    expect(service.listar).toHaveBeenCalledWith(1);
+  });
+
+  it('rechaza consultar salidas sin PLANES_ESTUDIO_VER', async () => {
+    permisosAsignados.clear();
+    await request(app.getHttpServer())
+      .get('/planes-estudio/1/salidas-academicas')
+      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
       .expect(403);
   });
+
 
   it('crea una salida válida', async () => {
     const dto = {
@@ -192,6 +231,7 @@ describe('SalidasAcademicasController', () => {
   });
 
   it('no permite administrar salidas académicas a un estudiante', async () => {
+    permisosAsignados.clear();
     await request(app.getHttpServer())
       .post('/planes-estudio/1/salidas-academicas')
       .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
@@ -206,4 +246,5 @@ describe('SalidasAcademicasController', () => {
 
     expect(service.crear).not.toHaveBeenCalled();
   });
+
 });

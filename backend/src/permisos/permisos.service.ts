@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { RolSistema } from '../auth/constants/roles.constants';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import {
   PermisoSistema,
   PERMISOS_SISTEMA,
 } from './constants/permisos.constant';
+import {
+  PERMISOS_PREDETERMINADOS_POR_ROL,
+} from './constants/plantillas-permisos.constant';
 import { UsuarioPermiso } from './entities/usuario-permiso.entity';
 
 @Injectable()
@@ -22,6 +26,14 @@ export class PermisosService {
 
   obtenerCatalogo(): PermisoSistema[] {
     return PERMISOS_SISTEMA;
+  }
+
+  obtenerPlantillasRoles(): Record<RolSistema, PermisoSistema[]> {
+    return Object.fromEntries(
+      Object.entries(PERMISOS_PREDETERMINADOS_POR_ROL).map(
+        ([rol, permisos]) => [rol, [...permisos]],
+      ),
+    ) as Record<RolSistema, PermisoSistema[]>;
   }
 
   private async obtenerUsuario(usuarioId: number): Promise<Usuario> {
@@ -69,6 +81,23 @@ export class PermisosService {
         permiso: 'ASC',
       },
     });
+  }
+
+  async listarCodigosUsuario(usuarioId: number): Promise<PermisoSistema[]> {
+    const relaciones = await this.listarUsuario(usuarioId);
+
+    return relaciones.map((item) => item.permiso);
+  }
+
+  async obtenerPermisosEfectivos(
+    usuarioId: number,
+    roles: RolSistema[],
+  ): Promise<PermisoSistema[]> {
+    if (roles.includes(RolSistema.ADMIN_GLOBAL)) {
+      return [...PERMISOS_SISTEMA];
+    }
+
+    return this.listarCodigosUsuario(usuarioId);
   }
 
   async reemplazarPermisos(

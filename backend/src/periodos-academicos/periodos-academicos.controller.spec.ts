@@ -5,7 +5,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { EstadoPeriodoAcademico } from './constants/estado-periodo-academico.constant';
 import { PeriodosAcademicosController } from './periodos-academicos.controller';
 import { PeriodosAcademicosService } from './periodos-academicos.service';
@@ -21,6 +23,10 @@ describe('PeriodosAcademicosController', () => {
     cambiarEstado: jest.fn(),
   };
 
+  const permisosService = {
+    usuarioTienePermisos: jest.fn(),
+  };
+
   let app: INestApplication<App>;
   let jwtService: JwtService;
 
@@ -34,7 +40,7 @@ describe('PeriodosAcademicosController', () => {
       controllers: [PeriodosAcademicosController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: {
@@ -44,6 +50,10 @@ describe('PeriodosAcademicosController', () => {
         {
           provide: PeriodosAcademicosService,
           useValue: periodosAcademicosService,
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
       ],
     }).compile();
@@ -71,10 +81,13 @@ describe('PeriodosAcademicosController', () => {
     periodosAcademicosService.crear.mockResolvedValue({ id: 1 });
     periodosAcademicosService.actualizar.mockResolvedValue({ id: 1 });
     periodosAcademicosService.cambiarEstado.mockResolvedValue({ id: 1 });
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
   });
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   async function crearToken(rol: string) {
@@ -91,7 +104,7 @@ describe('PeriodosAcademicosController', () => {
     expect(periodosAcademicosService.listar).not.toHaveBeenCalled();
   });
 
-  it('permite listar periodos a ADMIN_GLOBAL', async () => {
+  it('permite listar periodos a ADMIN_GLOBAL sin consultar permisos individuales', async () => {
     const token = await crearToken('ADMIN_GLOBAL');
 
     await request(app.getHttpServer())
@@ -100,21 +113,28 @@ describe('PeriodosAcademicosController', () => {
       .expect(200, []);
 
     expect(periodosAcademicosService.listar).toHaveBeenCalledTimes(1);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
-  it('permite listar periodos a COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('permite listar periodos a un usuario con PERIODOS_VER', async () => {
+    const token = await crearToken('ESTUDIANTE');
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
 
     await request(app.getHttpServer())
       .get('/periodos-academicos')
       .set('Authorization', `Bearer ${token}`)
       .expect(200, []);
 
+    expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(
+      1,
+      [PermisoSistema.PERIODOS_VER],
+    );
     expect(periodosAcademicosService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])('responde 403 para %s', async (rol) => {
-    const token = await crearToken(rol);
+  it('responde 403 cuando el usuario no posee PERIODOS_VER', async () => {
+    const token = await crearToken('ESTUDIANTE');
+    permisosService.usuarioTienePermisos.mockResolvedValue(false);
 
     await request(app.getHttpServer())
       .get('/periodos-academicos')
@@ -122,6 +142,25 @@ describe('PeriodosAcademicosController', () => {
       .expect(403);
 
     expect(periodosAcademicosService.listar).not.toHaveBeenCalled();
+  });
+
+  it('responde 403 al intentar crear periodo sin PERIODOS_GESTIONAR', async () => {
+    const token = await crearToken('ESTUDIANTE');
+    permisosService.usuarioTienePermisos.mockResolvedValue(false);
+
+    await request(app.getHttpServer())
+      .post('/periodos-academicos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        anio: 2027,
+        ciclo: 1,
+        fechaInicio: '2027-02-15',
+        fechaFin: '2027-06-25',
+        fechaLimiteDisponibilidad: '2027-01-20',
+      })
+      .expect(403);
+
+    expect(periodosAcademicosService.crear).not.toHaveBeenCalled();
   });
 
   it('consulta un periodo por id', async () => {

@@ -941,6 +941,48 @@ export class ProfesoresService {
     }
   }
 
+  private async validarAlcanceSobrePerfilProfesor(
+    usuarioId: number,
+    carreraId?: number,
+  ): Promise<void> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: {
+        id: usuarioId,
+      },
+      relations: {
+        usuarioRoles: {
+          rol: true,
+        },
+      },
+    });
+
+    const esAdmin = (usuario?.usuarioRoles ?? []).some(
+      (relacion) =>
+        relacion.rol?.activo &&
+        relacion.rol.nombre === RolSistema.ADMIN_GLOBAL,
+    );
+
+    if (esAdmin) {
+      return;
+    }
+
+    if (!carreraId) {
+      return;
+    }
+
+    const tieneAlcance =
+      await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+        usuarioId,
+        carreraId,
+      );
+
+    if (!tieneAlcance) {
+      throw new ForbiddenException(
+        'No posee autoridad académica sobre la carrera asociada a este perfil.',
+      );
+    }
+  }
+
   async revisarPerfilProfesor(
     profesorId: number,
     perfilId: number,
@@ -975,38 +1017,11 @@ export class ProfesoresService {
       );
     }
 
-    const revisor = await this.usuarioRepository.findOne({
-      where: { id: revisorUsuarioId },
-      relations: {
-        usuarioRoles: {
-          rol: true,
-        },
-      },
-    });
-
-    const esAdminRevisor = (revisor?.usuarioRoles ?? []).some(
-      (rel) => rel.rol?.activo && rel.rol.nombre === RolSistema.ADMIN_GLOBAL,
+    await this.validarAlcanceSobrePerfilProfesor(
+      revisorUsuarioId,
+      solicitud.perfilAcademico?.carreraId ??
+        solicitud.perfilAcademico?.carrera?.id,
     );
-
-    if (!esAdminRevisor) {
-      const carreraId =
-        solicitud.perfilAcademico?.carreraId ??
-        solicitud.perfilAcademico?.carrera?.id;
-
-      if (carreraId) {
-        const tieneAlcance =
-          await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
-            revisorUsuarioId,
-            carreraId,
-          );
-
-        if (!tieneAlcance) {
-          throw new ForbiddenException(
-            'No posee autoridad académica sobre la carrera asociada a este perfil.',
-          );
-        }
-      }
-    }
 
     if (dto.estado === EstadoPerfilProfesor.APROBADO) {
       if (!profesor.activo) {
@@ -1107,6 +1122,16 @@ export class ProfesoresService {
     if (!relacion) {
       throw new NotFoundException(
         'El perfil académico no se encuentra registrado en el perfil del profesor.',
+      );
+    }
+
+    const esAutogestion = usuarioAccionId === profesorId;
+
+    if (!esAutogestion) {
+      await this.validarAlcanceSobrePerfilProfesor(
+        usuarioAccionId,
+        relacion.perfilAcademico?.carreraId ??
+          relacion.perfilAcademico?.carrera?.id,
       );
     }
 

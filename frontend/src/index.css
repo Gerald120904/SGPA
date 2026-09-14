@@ -10,3 +10,7 @@
 
 @import "./styles/planes-estudio.css";
 @import "./styles/ver-plan.css";
+
+@import "./styles/periodos.css";
+@import "./styles/profesores.css";
+@import "./styles/aulas.css";

@@ -32,6 +32,21 @@ import {
 } from '../pages/cursos/CursosPage.js';
 
 import {
+  PeriodosPage,
+  iniciarPeriodosPage
+} from '../pages/periodos/PeriodosPage.js';
+
+import {
+  ProfesoresPage,
+  iniciarProfesoresPage
+} from '../pages/profesores/ProfesoresPage.js';
+
+import {
+  AulasPage,
+  iniciarAulasPage
+} from '../pages/aulas/AulasPage.js';
+
+import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
 
@@ -51,6 +66,7 @@ import {
   guardarSesion,
   obtenerUsuario,
   obtenerRolesUsuario,
+  obtenerPermisosUsuario,
   tieneRolValido,
   limpiarSesion
 } from './session.js';
@@ -98,7 +114,16 @@ const PAGE_RENDERERS = {
     PlanesEstudioPage,
 
   cursos:
-    CursosPage
+    CursosPage,
+
+  periodos:
+    PeriodosPage,
+
+  profesores:
+    ProfesoresPage,
+
+  aulas:
+    AulasPage
 
 };
 
@@ -227,11 +252,17 @@ function mostrarAplicacion() {
       usuario
     );
 
+  const permisos =
+    obtenerPermisosUsuario(
+      usuario
+    );
+
 
   appRoot.innerHTML =
     AppLayout({
       usuario,
-      roles
+      roles,
+      permisos
     });
 
 
@@ -275,6 +306,11 @@ function renderizarRuta(
       usuario
     );
 
+  const permisos =
+    obtenerPermisosUsuario(
+      usuario
+    );
+
 
   let module =
     obtenerModuloPorRuta(
@@ -308,7 +344,8 @@ function renderizarRuta(
   if (
     !puedeAcceder(
       roles,
-      module.id
+      module.id,
+      permisos
     )
   ) {
 
@@ -432,6 +469,33 @@ function renderizarRuta(
 
   }
 
+
+  if (
+    module.id === 'periodos'
+  ) {
+
+    iniciarPeriodosPage();
+
+  }
+
+
+  if (
+    module.id === 'profesores'
+  ) {
+
+    iniciarProfesoresPage();
+
+  }
+
+
+  if (
+    module.id === 'aulas'
+  ) {
+
+    iniciarAulasPage();
+
+  }
+
 }
 
 
@@ -545,11 +609,17 @@ function manejarClickGlobal(
       usuario
     );
 
+  const permisos =
+    obtenerPermisosUsuario(
+      usuario
+    );
+
 
   if (
     !puedeAcceder(
       roles,
-      module.id
+      module.id,
+      permisos
     )
   ) {
 

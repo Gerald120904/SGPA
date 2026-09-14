@@ -310,6 +310,104 @@ ipcMain.handle("roles:listar", async () => {
 });
 
 /* =========================================================
+   PERMISOS
+   ========================================================= */
+
+ipcMain.handle(
+  "permisos:catalogo",
+  async () => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        "/permisos/catalogo",
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  "permisos:usuario",
+  async (_event, usuarioId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/permisos/usuarios/${usuarioId}`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  "permisos:reemplazar",
+  async (
+    _event,
+    usuarioId,
+    permisos,
+  ) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/permisos/usuarios/${usuarioId}`,
+        {
+          method: "PUT",
+          body: {
+            permisos,
+          },
+        },
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  'permisos:plantillas',
+  async () => {
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/permisos/plantillas-roles',
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      plantillas:
+        resultado.data,
+    };
+
+  },
+);
+
+/* =========================================================
    CARRERAS
    ========================================================= */
 
@@ -430,6 +528,110 @@ ipcMain.handle("cursos:cambiar-estado", async (_event, id, activo) => {
     body: { activo },
   });
 });
+
+ipcMain.handle("cursos:requisitos:listar", async (_event, cursoId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/cursos/${cursoId}/requisitos`,
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return {
+    ok: true,
+    requisitos: resultado.data,
+  };
+});
+
+ipcMain.handle("cursos:requisitos:crear", async (_event, cursoId, datos) => {
+  return ejecutarPeticionAutenticada(`/cursos/${cursoId}/requisitos`, {
+    method: "POST",
+    body: datos,
+  });
+});
+
+ipcMain.handle(
+  "cursos:requisitos:eliminar",
+  async (_event, cursoId, requisitoId) => {
+    return ejecutarPeticionAutenticada(
+      `/cursos/${cursoId}/requisitos/${requisitoId}`,
+      {
+        method: "DELETE",
+      },
+    );
+  },
+);
+
+/* =========================================================
+   PERIODOS ACADÉMICOS
+   ========================================================= */
+
+ipcMain.handle("periodos:listar", async () => {
+  const resultado =
+    await ejecutarPeticionAutenticada(
+      "/periodos-academicos",
+    );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return {
+    ok: true,
+    periodos: resultado.data,
+  };
+});
+
+ipcMain.handle(
+  "periodos:obtener",
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/periodos-academicos/${id}`,
+    );
+  },
+);
+
+ipcMain.handle(
+  "periodos:crear",
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      "/periodos-academicos",
+      {
+        method: "POST",
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  "periodos:actualizar",
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/periodos-academicos/${id}`,
+      {
+        method: "PATCH",
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  "periodos:cambiar-estado",
+  async (_event, id, estado) => {
+    return ejecutarPeticionAutenticada(
+      `/periodos-academicos/${id}/estado`,
+      {
+        method: "PATCH",
+        body: {
+          estado,
+        },
+      },
+    );
+  },
+);
 
 /* =========================================================
    PLANES DE ESTUDIO
@@ -763,6 +965,979 @@ ipcMain.handle("plan-validaciones:validar", async (_event, planId) => {
 
   return { ok: true, validacion: resultado.data };
 });
+
+/* =========================================================
+   BLOQUES DEL PLAN
+   ========================================================= */
+
+ipcMain.handle("bloques-plan:listar", async (_event, planId) => {
+  const resultado = await ejecutarPeticionAutenticada(
+    `/planes-estudio/${planId}/bloques`,
+  );
+
+  if (!resultado.ok) {
+    return resultado;
+  }
+
+  return {
+    ok: true,
+    bloques: resultado.data,
+  };
+});
+
+ipcMain.handle("bloques-plan:crear", async (_event, planId, datos) => {
+  return ejecutarPeticionAutenticada(`/planes-estudio/${planId}/bloques`, {
+    method: "POST",
+    body: datos,
+  });
+});
+
+ipcMain.handle(
+  "bloques-plan:actualizar",
+  async (_event, planId, bloqueId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/planes-estudio/${planId}/bloques/${bloqueId}`,
+      {
+        method: "PATCH",
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  "bloques-plan:cambiar-estado",
+  async (_event, planId, bloqueId, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/planes-estudio/${planId}/bloques/${bloqueId}/estado`,
+      {
+        method: "PATCH",
+        body: { activo },
+      },
+    );
+  },
+);
+
+/* =========================================================
+   PROFESORES
+   ========================================================= */
+
+ipcMain.handle(
+  'profesores:listar',
+  async (_event, filtros = {}) => {
+    const params = new URLSearchParams();
+
+    Object.entries(filtros).forEach(
+      ([clave, valor]) => {
+        if (
+          valor !== undefined &&
+          valor !== null &&
+          valor !== ''
+        ) {
+          params.set(
+            clave,
+            String(valor),
+          );
+        }
+      },
+    );
+
+    const query = params.toString();
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/profesores${query ? `?${query}` : ''}`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      profesores: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'profesores:obtener',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${id}`,
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:disponibilidad',
+  async (
+    _event,
+    profesorId,
+    periodoId,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${profesorId}/disponibilidad/${periodoId}`,
+    );
+  },
+);
+
+/* =========================================================
+   PROFESORES - PERFILES Y ATESTADOS
+   ========================================================= */
+
+ipcMain.handle(
+  'profesores:revisar-perfil',
+  async (
+    _event,
+    profesorId,
+    perfilId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${profesorId}/perfiles/${perfilId}/revision`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:inactivar-perfil',
+  async (
+    _event,
+    profesorId,
+    perfilId,
+    observacion,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${profesorId}/perfiles/${perfilId}/inactivar`,
+      {
+        method: 'PATCH',
+        body: {
+          observacion,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:revisar-atestado',
+  async (
+    _event,
+    profesorId,
+    atestadoId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${profesorId}/atestados/${atestadoId}/revision`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+/* =========================================================
+   PROFESORES - AUTOGESTIÓN
+   ========================================================= */
+
+ipcMain.handle(
+  'profesores:mi-perfil',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:mis-carreras-disponibles',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/carreras-disponibles',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:actualizar-mis-carreras',
+  async (_event, carreraIds) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/carreras',
+      {
+        method: 'PUT',
+        body: {
+          carreraIds,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:mis-perfiles',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/perfiles',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:perfiles-disponibles',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/perfiles-disponibles',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:solicitar-perfil',
+  async (_event, perfilAcademicoId) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/perfiles',
+      {
+        method: 'POST',
+        body: {
+          perfilAcademicoId,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:mis-atestados',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/atestados',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:crear-atestado',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/atestados',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:actualizar-atestado',
+  async (_event, atestadoId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/atestados/${atestadoId}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:inactivar-mi-atestado',
+  async (_event, atestadoId) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/atestados/${atestadoId}/inactivar`,
+      {
+        method: 'PATCH',
+      },
+    );
+  },
+);
+
+/* =========================================================
+   PROFESORES - PROYECTOS / LABORATORIOS
+   ========================================================= */
+
+ipcMain.handle(
+  'profesores:mis-proyectos',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/proyectos',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:crear-proyecto',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/proyectos',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:actualizar-proyecto',
+  async (_event, proyectoId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/proyectos/${proyectoId}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:cambiar-estado-proyecto',
+  async (_event, proyectoId, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/proyectos/${proyectoId}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+/* =========================================================
+   PROFESORES - MI DISPONIBILIDAD
+   ========================================================= */
+
+ipcMain.handle(
+  'profesores:periodos-mi-disponibilidad',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-disponibilidad/periodos',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:consultar-mi-disponibilidad',
+  async (_event, periodoId) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-disponibilidad/${periodoId}`,
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:guardar-mi-disponibilidad',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-disponibilidad',
+      {
+        method: 'PUT',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:copiar-mi-disponibilidad',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-disponibilidad/copiar',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:historial-mi-disponibilidad',
+  async (_event, periodoId) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-disponibilidad/${periodoId}/historial`,
+    );
+  },
+);
+
+/* =========================================================
+   AULAS
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:listar',
+  async (_event, filtros = {}) => {
+    const params =
+      new URLSearchParams();
+
+    Object.entries(filtros).forEach(
+      ([clave, valor]) => {
+        if (
+          valor !== undefined &&
+          valor !== null &&
+          valor !== ''
+        ) {
+          params.set(
+            clave,
+            String(valor),
+          );
+        }
+      },
+    );
+
+    const query =
+      params.toString();
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas${query ? `?${query}` : ''}`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      aulas: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:obtener',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${id}`,
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:crear',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/aulas',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:actualizar',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:cambiar-estado',
+  async (_event, id, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - EQUIPAMIENTO
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:equipamientos:listar',
+  async () => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/aulas/equipamientos',
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      equipamientos: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipamientos:crear',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/aulas/equipamientos',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipamientos:actualizar',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/equipamientos/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipamientos:cambiar-estado',
+  async (_event, id, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/equipamientos/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/equipamientos`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      equipamientos: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:asignar',
+  async (_event, aulaId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/equipamientos`,
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:actualizar',
+  async (
+    _event,
+    aulaId,
+    equipamientoId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/equipamientos/${equipamientoId}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:cambiar-estado',
+  async (
+    _event,
+    aulaId,
+    equipamientoId,
+    activo,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/equipamientos/${equipamientoId}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - INDISPONIBILIDADES
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:indisponibilidades:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/indisponibilidades`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      indisponibilidades: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:indisponibilidades:obtener',
+  async (_event, aulaId, id) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/indisponibilidades/${id}`,
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:indisponibilidades:crear',
+  async (_event, aulaId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/indisponibilidades`,
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:indisponibilidades:actualizar',
+  async (_event, aulaId, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/indisponibilidades/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:indisponibilidades:cambiar-estado',
+  async (
+    _event,
+    aulaId,
+    id,
+    activo,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/indisponibilidades/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - RESERVAS EXTRAORDINARIAS
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:reservas:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/reservas`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      reservas: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:reservas:obtener',
+  async (_event, aulaId, id) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas/${id}`,
+    ),
+);
+
+ipcMain.handle(
+  'aulas:reservas:crear',
+  async (_event, aulaId, datos) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas`,
+      {
+        method: 'POST',
+        body: datos,
+      },
+    ),
+);
+
+ipcMain.handle(
+  'aulas:reservas:actualizar',
+  async (_event, aulaId, id, datos) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    ),
+);
+
+ipcMain.handle(
+  'aulas:reservas:cambiar-estado',
+  async (
+    _event,
+    aulaId,
+    id,
+    activo,
+  ) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: { activo },
+      },
+    ),
+);
+
+/* =========================================================
+   AULAS - OCUPACIÓN
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:ocupacion',
+  async (
+    _event,
+    aulaId,
+    filtros,
+  ) => {
+    const params =
+      new URLSearchParams({
+        fechaHoraInicio:
+          filtros.fechaHoraInicio,
+
+        fechaHoraFin:
+          filtros.fechaHoraFin,
+      });
+
+
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/ocupacion?${params.toString()}`,
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - DISPONIBILIDAD BASE
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:disponibilidades:listar',
+  async (
+    _event,
+    aulaId,
+    periodoId,
+  ) => {
+    const params =
+      new URLSearchParams({
+        periodoId:
+          String(periodoId),
+      });
+
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/disponibilidades?${params.toString()}`,
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      disponibilidades:
+        resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  'aulas:disponibilidades:crear',
+  async (
+    _event,
+    aulaId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/disponibilidades`,
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+
+ipcMain.handle(
+  'aulas:disponibilidades:actualizar',
+  async (
+    _event,
+    aulaId,
+    id,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/disponibilidades/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+
+ipcMain.handle(
+  'aulas:disponibilidades:eliminar',
+  async (
+    _event,
+    aulaId,
+    id,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/disponibilidades/${id}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - BÚSQUEDA / EVALUACIÓN
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:buscar-disponibles',
+  async (_event, criterios) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/aulas/buscar-disponibles',
+        {
+          method: 'POST',
+          body: criterios,
+        },
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      aulas: resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  'aulas:evaluar-asignacion',
+  async (
+    _event,
+    aulaId,
+    criterios,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/evaluar-asignacion`,
+      {
+        method: 'POST',
+        body: criterios,
+      },
+    );
+  },
+);
+
+
+/* =========================================================
+   AULAS - AUDITORÍA
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:auditoria:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/auditoria`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      auditoria: resultado.data,
+    };
+  },
+);
+
+
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({

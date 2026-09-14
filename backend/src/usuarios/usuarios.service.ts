@@ -13,6 +13,8 @@ import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
 import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { UsuarioRol } from './entities/usuario-rol.entity';
 import { Usuario } from './entities/usuario.entity';
+import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
+import { obtenerPermisosPredeterminadosPorRoles } from '../permisos/constants/plantillas-permisos.constant';
 
 @Injectable()
 export class UsuariosService {
@@ -158,6 +160,10 @@ export class UsuariosService {
 
     await this.validarDuplicados(cedula, correo);
 
+    const permisosFinales = dto.roles.includes(RolSistema.ADMIN_GLOBAL)
+      ? []
+      : (dto.permisos ?? obtenerPermisosPredeterminadosPorRoles(dto.roles));
+
     let usuarioId: number;
 
     try {
@@ -165,6 +171,7 @@ export class UsuariosService {
         const usuarios = manager.getRepository(Usuario);
         const relaciones = manager.getRepository(UsuarioRol);
         const rolesRepository = manager.getRepository(Rol);
+        const permisosRepository = manager.getRepository(UsuarioPermiso);
 
         const roles = await rolesRepository.find({
           where: {
@@ -202,6 +209,18 @@ export class UsuariosService {
             }),
           ),
         );
+
+        if (permisosFinales.length > 0) {
+          await permisosRepository.save(
+            permisosFinales.map((permiso) =>
+              permisosRepository.create({
+                usuarioId: guardado.id,
+                permiso,
+                activo: true,
+              }),
+            ),
+          );
+        }
 
         return guardado.id;
       });

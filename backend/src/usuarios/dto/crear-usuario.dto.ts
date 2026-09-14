@@ -10,6 +10,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { RolSistema } from '../../auth/constants/roles.constants';
+import { PermisoSistema } from '../../permisos/constants/permisos.constant';
 
 export class CrearUsuarioDto {
   @IsString()
@@ -48,4 +49,12 @@ export class CrearUsuarioDto {
     each: true,
   })
   roles!: RolSistema[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(PermisoSistema, {
+    each: true,
+  })
+  permisos?: PermisoSistema[];
 }

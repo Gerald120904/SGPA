@@ -5,7 +5,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { CursosController } from './cursos.controller';
 import { CursosService } from './cursos.service';
 
@@ -21,6 +23,15 @@ describe('CursosController', () => {
     cambiarEstado: jest.fn(),
   };
 
+  const permisosAsignados = new Set<string>();
+  const permisosService = {
+    usuarioTienePermisos: jest
+      .fn()
+      .mockImplementation(async (_usuarioId: number, permisos: string[]) =>
+        permisos.every((p) => permisosAsignados.has(p)),
+      ),
+  };
+
   let app: INestApplication<App>;
   let jwtService: JwtService;
 
@@ -34,12 +45,16 @@ describe('CursosController', () => {
       controllers: [CursosController],
       providers: [
         AuthGuard,
-        RolesGuard,
+        PermisosGuard,
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
           },
+        },
+        {
+          provide: PermisosService,
+          useValue: permisosService,
         },
         {
           provide: CursosService,
@@ -65,6 +80,7 @@ describe('CursosController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permisosAsignados.clear();
 
     cursosService.listar.mockResolvedValue([]);
     cursosService.listarAsignaturasDisponibles.mockResolvedValue([]);
@@ -92,7 +108,7 @@ describe('CursosController', () => {
     expect(cursosService.listar).not.toHaveBeenCalled();
   });
 
-  it('permite ADMIN_GLOBAL', async () => {
+  it('permite ADMIN_GLOBAL sin permisos explícitos en BD', async () => {
     const token = await crearToken('ADMIN_GLOBAL');
 
     await request(app.getHttpServer())
@@ -103,17 +119,20 @@ describe('CursosController', () => {
     expect(cursosService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite COORDINADOR', async () => {
-    const token = await crearToken('COORDINADOR');
+  it('permite consultar cursos con CURSOS_VER (incluso rol ESTUDIANTE)', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/cursos')
       .set('Authorization', `Bearer ${token}`)
       .expect(200, []);
+
+    expect(cursosService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['PROFESOR', 'ESTUDIANTE'])('responde 403 para %s', async (rol) => {
-    const token = await crearToken(rol);
+  it('responde 403 al listar cursos si el usuario no tiene CURSOS_VER', async () => {
+    const token = await crearToken('ESTUDIANTE');
 
     await request(app.getHttpServer())
       .get('/cursos')
@@ -123,8 +142,68 @@ describe('CursosController', () => {
     expect(cursosService.listar).not.toHaveBeenCalled();
   });
 
-  it('crea un curso desde una asignatura del plan', async () => {
+  it('permite consultar un curso por id con CURSOS_VER', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .get('/cursos/1')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { id: 1 });
+
+    expect(cursosService.obtenerPorId).toHaveBeenCalledWith(1);
+  });
+
+  it('responde 403 al consultar asignaturas disponibles sin CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .get('/cursos/asignaturas-disponibles?carreraId=1&planId=2')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+
+    expect(cursosService.listarAsignaturasDisponibles).not.toHaveBeenCalled();
+  });
+
+  it('permite listar asignaturas disponibles con CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
+
+    await request(app.getHttpServer())
+      .get(
+        '/cursos/asignaturas-disponibles?carreraId=1&planId=2&nivel=1&ciclo=2',
+      )
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, []);
+
+    expect(cursosService.listarAsignaturasDisponibles).toHaveBeenCalledWith({
+      carreraId: 1,
+      planId: 2,
+      nivel: 1,
+      ciclo: 2,
+    });
+  });
+
+  it('responde 403 al crear un curso sin CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .post('/cursos')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        planAsignaturaId: 17,
+        descripcion: 'Curso introductorio',
+      })
+      .expect(403);
+
+    expect(cursosService.crear).not.toHaveBeenCalled();
+  });
+
+  it('crea un curso desde una asignatura del plan con CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
+    const token = await crearToken('ESTUDIANTE');
 
     const dto = {
       planAsignaturaId: 17,
@@ -143,6 +222,7 @@ describe('CursosController', () => {
   });
 
   it('rechaza crear un curso sin planAsignaturaId', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -157,6 +237,7 @@ describe('CursosController', () => {
   });
 
   it('rechaza planAsignaturaId menor a 1', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -171,6 +252,7 @@ describe('CursosController', () => {
   });
 
   it('rechaza código, nombre y carreraIds enviados manualmente', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -187,38 +269,8 @@ describe('CursosController', () => {
     expect(cursosService.crear).not.toHaveBeenCalled();
   });
 
-  it('lista asignaturas disponibles para crear curso', async () => {
-    const token = await crearToken('COORDINADOR');
-
-    await request(app.getHttpServer())
-      .get(
-        '/cursos/asignaturas-disponibles?carreraId=1&planId=2&nivel=1&ciclo=2',
-      )
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200, []);
-
-    expect(cursosService.listarAsignaturasDisponibles).toHaveBeenCalledWith({
-      carreraId: 1,
-      planId: 2,
-      nivel: 1,
-      ciclo: 2,
-    });
-  });
-
-  it('consulta un curso por id', async () => {
-    const token = await crearToken('ADMIN_GLOBAL');
-
-    await request(app.getHttpServer())
-      .get('/cursos/1')
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200, {
-        id: 1,
-      });
-
-    expect(cursosService.obtenerPorId).toHaveBeenCalledWith(1);
-  });
-
-  it('rechaza un id inválido', async () => {
+  it('rechaza un id inválido en GET /cursos/:id', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -229,7 +281,21 @@ describe('CursosController', () => {
     expect(cursosService.obtenerPorId).not.toHaveBeenCalled();
   });
 
-  it('actualiza la descripción de un curso', async () => {
+  it('responde 403 al actualizar un curso sin CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .patch('/cursos/1')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ descripcion: 'Test' })
+      .expect(403);
+
+    expect(cursosService.actualizar).not.toHaveBeenCalled();
+  });
+
+  it('actualiza la descripción de un curso con CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     const dto = {
@@ -248,6 +314,7 @@ describe('CursosController', () => {
   });
 
   it('rechaza modificar manualmente el código de un curso', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -261,7 +328,21 @@ describe('CursosController', () => {
     expect(cursosService.actualizar).not.toHaveBeenCalled();
   });
 
-  it('cambia el estado del curso', async () => {
+  it('responde 403 al cambiar estado sin CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_VER);
+    const token = await crearToken('ESTUDIANTE');
+
+    await request(app.getHttpServer())
+      .patch('/cursos/1/estado')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ activo: false })
+      .expect(403);
+
+    expect(cursosService.cambiarEstado).not.toHaveBeenCalled();
+  });
+
+  it('cambia el estado del curso con CURSOS_GESTIONAR', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -278,6 +359,7 @@ describe('CursosController', () => {
   });
 
   it('rechaza estado que no sea boolean', async () => {
+    permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
     const token = await crearToken('ADMIN_GLOBAL');
 
     await request(app.getHttpServer())

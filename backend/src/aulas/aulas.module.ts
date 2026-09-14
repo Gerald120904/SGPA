@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
+import { PermisosModule } from '../permisos/permisos.module';
 import { AulasController } from './aulas.controller';
 import { AulasService } from './aulas.service';
 import { Aula } from './entities/aula.entity';
@@ -24,6 +25,7 @@ import { ReservaAula } from './entities/reserva-aula.entity';
       DisponibilidadAula,
     ]),
     SecurityModule,
+    PermisosModule,
     PeriodosAcademicosModule,
   ],
   controllers: [AulasController],

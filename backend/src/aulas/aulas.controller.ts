@@ -11,11 +11,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { AulasService } from './aulas.service';
 import { ActualizarAulaDto } from './dto/actualizar-aula.dto';
 import { ActualizarEquipamientoAulaDto } from './dto/actualizar-equipamiento-aula.dto';
@@ -39,20 +39,20 @@ import { ConsultarOcupacionAulaDto } from './dto/consultar-ocupacion-aula.dto';
 import { FiltrarAulasDto } from './dto/filtrar-aulas.dto';
 
 @Controller('aulas')
-@UseGuards(AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, PermisosGuard)
 export class AulasController {
   constructor(private readonly aulasService: AulasService) {}
 
   @Post('buscar-disponibles')
   @HttpCode(200)
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   buscarAulasDisponibles(@Body() dto: BuscarAulasDisponiblesDto) {
     return this.aulasService.buscarAulasDisponibles(dto);
   }
 
   @Post(':aulaId/evaluar-asignacion')
   @HttpCode(200)
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_ASIGNAR)
   evaluarAulaParaAsignacion(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -64,19 +64,19 @@ export class AulasController {
   }
 
   @Get('equipamientos')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   listarEquipamientos() {
     return this.aulasService.listarEquipamientos();
   }
 
   @Get('equipamientos/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   obtenerEquipamientoPorId(@Param('id', ParseIntPipe) id: number) {
     return this.aulasService.obtenerEquipamientoPorId(id);
   }
 
   @Post('equipamientos')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   crearEquipamiento(
     @Body() dto: CrearEquipamientoDto,
     @UsuarioActualId() usuarioId: number,
@@ -85,7 +85,7 @@ export class AulasController {
   }
 
   @Patch('equipamientos/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   actualizarEquipamiento(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarEquipamientoDto,
@@ -95,7 +95,7 @@ export class AulasController {
   }
 
   @Patch('equipamientos/:id/estado')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   cambiarEstadoEquipamiento(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoEquipamientoDto,
@@ -109,19 +109,19 @@ export class AulasController {
   }
 
   @Get()
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   listar(@Query() filtros: FiltrarAulasDto) {
     return this.aulasService.listar(filtros);
   }
 
   @Get(':aulaId/equipamientos')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   listarEquipamientoAula(@Param('aulaId', ParseIntPipe) aulaId: number) {
     return this.aulasService.listarEquipamientoAula(aulaId);
   }
 
   @Post(':aulaId/equipamientos')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   asignarEquipamientoAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Body() dto: AsignarEquipamientoAulaDto,
@@ -131,7 +131,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/equipamientos/:equipamientoId')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   actualizarEquipamientoAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('equipamientoId', ParseIntPipe) equipamientoId: number,
@@ -147,7 +147,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/equipamientos/:equipamientoId/estado')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   cambiarEstadoEquipamientoAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('equipamientoId', ParseIntPipe) equipamientoId: number,
@@ -163,13 +163,13 @@ export class AulasController {
   }
 
   @Get(':aulaId/indisponibilidades')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   listarIndisponibilidadesAula(@Param('aulaId', ParseIntPipe) aulaId: number) {
     return this.aulasService.listarIndisponibilidadesAula(aulaId);
   }
 
   @Get(':aulaId/indisponibilidades/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   obtenerIndisponibilidadPorId(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -178,7 +178,7 @@ export class AulasController {
   }
 
   @Post(':aulaId/indisponibilidades')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   crearIndisponibilidadAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Body() dto: CrearIndisponibilidadAulaDto,
@@ -188,7 +188,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/indisponibilidades/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   actualizarIndisponibilidadAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -204,7 +204,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/indisponibilidades/:id/estado')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   cambiarEstadoIndisponibilidadAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -220,13 +220,13 @@ export class AulasController {
   }
 
   @Get(':aulaId/reservas')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   listarReservasAula(@Param('aulaId', ParseIntPipe) aulaId: number) {
     return this.aulasService.listarReservasAula(aulaId);
   }
 
   @Get(':aulaId/reservas/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   obtenerReservaPorId(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -235,7 +235,7 @@ export class AulasController {
   }
 
   @Post(':aulaId/reservas')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   crearReservaAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Body() dto: CrearReservaAulaDto,
@@ -245,7 +245,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/reservas/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   actualizarReservaAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -256,7 +256,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/reservas/:id/estado')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   cambiarEstadoReservaAula(
     @Param('aulaId', ParseIntPipe) aulaId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -272,7 +272,7 @@ export class AulasController {
   }
 
   @Get(':aulaId/ocupacion')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   consultarOcupacionAula(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -284,7 +284,7 @@ export class AulasController {
   }
 
   @Get(':aulaId/auditoria')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   listarAuditoriaAula(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -297,7 +297,7 @@ export class AulasController {
   // =========================================================
 
   @Get(':aulaId/disponibilidades')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   listarDisponibilidadesAula(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -309,7 +309,7 @@ export class AulasController {
   }
 
   @Post(':aulaId/disponibilidades')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   crearDisponibilidadAula(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -324,7 +324,7 @@ export class AulasController {
   }
 
   @Patch(':aulaId/disponibilidades/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   actualizarDisponibilidadAula(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -347,7 +347,7 @@ export class AulasController {
   }
 
   @Delete(':aulaId/disponibilidades/:id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   eliminarDisponibilidadAula(
     @Param('aulaId', ParseIntPipe)
     aulaId: number,
@@ -362,19 +362,19 @@ export class AulasController {
   }
 
   @Get(':id')
-  @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.PROFESOR)
+  @Permisos(PermisoSistema.AULAS_VER)
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
     return this.aulasService.obtenerPorId(id);
   }
 
   @Post()
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   crear(@Body() dto: CrearAulaDto, @UsuarioActualId() usuarioId: number) {
     return this.aulasService.crear(dto, usuarioId);
   }
 
   @Patch(':id')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarAulaDto,
@@ -384,7 +384,7 @@ export class AulasController {
   }
 
   @Patch(':id/estado')
-  @Roles(RolSistema.ADMIN_GLOBAL)
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoAulaDto,
