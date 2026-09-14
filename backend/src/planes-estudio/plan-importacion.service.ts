@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
 import { ValidarImportacionPlanDto } from './dto/validar-importacion-plan.dto';
@@ -103,12 +104,14 @@ export class PlanImportacionService {
     const claves = new Set<string>();
     const codigos = new Set<string>();
     const tipos = new Set(Object.values(TipoPlanAsignatura));
+    const tiposOptativa = new Set(Object.values(TipoOptativa));
 
     for (const fila of filas) {
       const clave = this.mayuscula(fila.CLAVE);
       const codigo = this.mayuscula(fila.CODIGO);
       const nombre = this.texto(fila.NOMBRE);
       const tipo = this.mayuscula(fila.TIPO);
+      const tipoOptativa = this.mayuscula(fila.TIPO_OPTATIVA);
 
       if (!clave)
         this.agregar(
@@ -178,6 +181,29 @@ export class PlanImportacionService {
           fila,
           `El tipo "${tipo}" no es válido.`,
         );
+
+      if (tipo === TipoPlanAsignatura.OPTATIVA) {
+        if (!tiposOptativa.has(tipoOptativa as TipoOptativa)) {
+          this.agregar(
+            problemas,
+            'ERROR',
+            'TIPO_OPTATIVA_INVALIDO',
+            'ASIGNATURAS',
+            fila,
+            'Las asignaturas OPTATIVA deben indicar TIPO_OPTATIVA como DISCIPLINARIA, ABIERTA o SEDE.',
+          );
+        }
+      } else if (tipoOptativa) {
+        this.agregar(
+          problemas,
+          'ERROR',
+          'TIPO_OPTATIVA_NO_APLICA',
+          'ASIGNATURAS',
+          fila,
+          'TIPO_OPTATIVA solo debe utilizarse cuando TIPO sea OPTATIVA.',
+        );
+      }
+
       for (const campo of ['NIVEL', 'CICLO', 'ORDEN'])
         this.enteroPositivo(fila[campo], campo, 'ASIGNATURAS', fila, problemas);
       this.enteroPositivo(
@@ -496,6 +522,10 @@ export class PlanImportacionService {
               orden: Number(this.numero(fila.ORDEN)),
               creditos: Number(this.numero(fila.CREDITOS)),
               tipo: this.mayuscula(fila.TIPO) as TipoPlanAsignatura,
+              tipoOptativa:
+                this.mayuscula(fila.TIPO) === TipoPlanAsignatura.OPTATIVA
+                  ? (this.mayuscula(fila.TIPO_OPTATIVA) as TipoOptativa)
+                  : null,
               codigoReferencia: this.mayuscula(fila.CODIGO),
               nombreReferencia: this.texto(fila.NOMBRE),
               horasTeoria: this.numero(fila.T),

@@ -6,9 +6,11 @@ import {
 import { DataSource, Repository } from 'typeorm';
 import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
+import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
 
 describe('PlanAsignaturasService', () => {
@@ -19,8 +21,10 @@ describe('PlanAsignaturasService', () => {
     create: jest.Mock;
     save: jest.Mock;
     update: jest.Mock;
+    count: jest.Mock;
   };
   let planRepository: { findOne: jest.Mock };
+  let reglaOptativaRepository: { findOne: jest.Mock };
   let transactionRepository: { save: jest.Mock };
   let dataSource: { transaction: jest.Mock };
 
@@ -66,6 +70,7 @@ describe('PlanAsignaturasService', () => {
     horasDocente: null,
     observacionHoras: null,
     tipo: TipoPlanAsignatura.OBLIGATORIA,
+    tipoOptativa: null,
     codigoReferencia: 'EIF201',
     nombreReferencia: 'Programación I',
     activo: true,
@@ -83,8 +88,10 @@ describe('PlanAsignaturasService', () => {
       create: jest.fn((datos: Partial<PlanAsignatura>) => datos),
       save: jest.fn(),
       update: jest.fn(),
+      count: jest.fn(),
     };
     planRepository = { findOne: jest.fn() };
+    reglaOptativaRepository = { findOne: jest.fn() };
     transactionRepository = { save: jest.fn() };
     dataSource = {
       transaction: jest.fn(async (callback) =>
@@ -97,6 +104,7 @@ describe('PlanAsignaturasService', () => {
     service = new PlanAsignaturasService(
       asignaturaRepository as unknown as Repository<PlanAsignatura>,
       planRepository as unknown as Repository<PlanEstudio>,
+      reglaOptativaRepository as unknown as Repository<ReglaOptativaPlan>,
       dataSource as unknown as DataSource,
     );
   });
@@ -203,12 +211,14 @@ describe('PlanAsignaturasService', () => {
       codigoReferencia: 'OPT',
       nombreReferencia: 'Optativo I',
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
     });
     const opt2 = crearAsignatura({
       id: 12,
       codigoReferencia: 'OPT',
       nombreReferencia: 'Optativo II',
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
     });
 
     planRepository.findOne.mockResolvedValue(plan);
@@ -225,6 +235,7 @@ describe('PlanAsignaturasService', () => {
       orden: 1,
       creditos: 3,
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
       codigoReferencia: 'OPT',
       nombreReferencia: 'Optativo I',
     });
@@ -235,6 +246,7 @@ describe('PlanAsignaturasService', () => {
       orden: 2,
       creditos: 3,
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
       codigoReferencia: 'OPT',
       nombreReferencia: 'Optativo II',
     });
@@ -247,6 +259,61 @@ describe('PlanAsignaturasService', () => {
         where: expect.objectContaining({ codigoReferencia: 'OPT' }),
       }),
     );
+  });
+
+
+  it('rechaza crear una tercera optativa de otras áreas cuando el máximo es 2', async () => {
+    planRepository.findOne.mockResolvedValue(plan);
+    reglaOptativaRepository.findOne.mockResolvedValue({
+      id: 1,
+      planEstudioId: 1,
+      minimoDisciplinariasPropias: 2,
+      maximoOtrasAreas: 2,
+    });
+    asignaturaRepository.count.mockResolvedValue(2);
+
+    await expect(
+      service.crear(1, {
+        nivel: 4,
+        ciclo: 1,
+        orden: 3,
+        creditos: 3,
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.ABIERTA,
+        codigoReferencia: 'OPT-03',
+        nombreReferencia: 'Optativa III',
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(asignaturaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('permite crear una optativa disciplinaria aunque ya se alcanzó el máximo de otras áreas', async () => {
+    const optativa = crearAsignatura({
+      id: 13,
+      tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
+      codigoReferencia: 'OPT-03',
+      nombreReferencia: 'Optativa III',
+    });
+
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.save.mockResolvedValue(optativa);
+    asignaturaRepository.findOne.mockResolvedValue(optativa);
+
+    const resultado = await service.crear(1, {
+      nivel: 4,
+      ciclo: 1,
+      orden: 3,
+      creditos: 3,
+      tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
+      codigoReferencia: 'OPT-03',
+      nombreReferencia: 'Optativa III',
+    });
+
+    expect(resultado.tipoOptativa).toBe(TipoOptativa.DISCIPLINARIA);
+    expect(asignaturaRepository.count).not.toHaveBeenCalled();
   });
 
   it('permite crear múltiples asignaturas GENERALES con el mismo código dentro del plan', async () => {
@@ -486,6 +553,7 @@ describe('PlanAsignaturasService', () => {
       cursoId: null,
       curso: null,
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
       codigoReferencia: 'OPT-1',
       nombreReferencia: 'Optativa',
     });
@@ -499,6 +567,7 @@ describe('PlanAsignaturasService', () => {
       orden: 3,
       creditos: 3,
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
       codigoReferencia: ' opt-1 ',
       nombreReferencia: ' Optativa ',
     });
@@ -524,6 +593,7 @@ describe('PlanAsignaturasService', () => {
         orden: 3,
         creditos: 3,
         tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.DISCIPLINARIA,
         codigoReferencia: 'OPT-1',
         nombreReferencia: '   ',
       }),

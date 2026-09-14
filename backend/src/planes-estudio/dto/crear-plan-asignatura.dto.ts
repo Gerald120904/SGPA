@@ -8,7 +8,9 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
+import { TipoOptativa } from '../../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from '../constants/tipo-plan-asignatura.constant';
 
 export class CrearPlanAsignaturaDto {
@@ -81,6 +83,12 @@ export class CrearPlanAsignaturaDto {
 
   @IsEnum(TipoPlanAsignatura)
   tipo!: TipoPlanAsignatura;
+
+  @ValidateIf((dto: CrearPlanAsignaturaDto) =>
+    dto.tipo === TipoPlanAsignatura.OPTATIVA,
+  )
+  @IsEnum(TipoOptativa)
+  tipoOptativa?: TipoOptativa;
 
   @IsString()
   @MinLength(1)
