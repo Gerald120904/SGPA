@@ -9,6 +9,88 @@ import {
 } from '../../utils/icons.js';
 
 
+const CLAVE_CUENTAS_RECORDADAS =
+  'sgpa-cuentas-recordadas';
+
+const CLAVE_CORREO_ANTERIOR =
+  'sgpa-correo-recordado';
+
+const MAXIMO_CUENTAS_RECORDADAS = 8;
+
+
+function obtenerCuentasRecordadas() {
+
+  let cuentas = [];
+
+  try {
+
+    const guardadas = JSON.parse(
+      localStorage.getItem(
+        CLAVE_CUENTAS_RECORDADAS
+      ) || '[]'
+    );
+
+    if (Array.isArray(guardadas)) {
+
+      cuentas = guardadas;
+
+    }
+
+  } catch {
+
+    cuentas = [];
+
+  }
+
+
+  const correoAnterior =
+    localStorage.getItem(
+      CLAVE_CORREO_ANTERIOR
+    );
+
+  if (correoAnterior) {
+
+    cuentas.unshift(
+      correoAnterior
+    );
+
+    localStorage.removeItem(
+      CLAVE_CORREO_ANTERIOR
+    );
+
+  }
+
+
+  return [...new Set(
+    cuentas
+      .filter(
+        (cuenta) =>
+          typeof cuenta === 'string'
+      )
+      .map(
+        (cuenta) => cuenta.trim()
+      )
+      .filter(Boolean)
+  )].slice(
+    0,
+    MAXIMO_CUENTAS_RECORDADAS
+  );
+
+}
+
+
+function guardarCuentasRecordadas(
+  cuentas
+) {
+
+  localStorage.setItem(
+    CLAVE_CUENTAS_RECORDADAS,
+    JSON.stringify(cuentas)
+  );
+
+}
+
+
 export function LoginPage() {
 
   return `
@@ -114,10 +196,15 @@ export function LoginPage() {
                     name="correo"
                     type="text"
                     autocomplete="username"
+                    list="cuentasRecordadasLista"
                     placeholder="Ingrese su usuario"
                     spellcheck="false"
                     required
                   />
+
+                  <datalist
+                    id="cuentasRecordadasLista"
+                  ></datalist>
 
                 </div>
 
@@ -609,22 +696,39 @@ export function iniciarLoginPage({
     );
 
 
-  const correoRecordado =
-    localStorage.getItem(
-      'sgpa-correo-recordado'
+  const cuentasRecordadasLista =
+    document.getElementById(
+      'cuentasRecordadasLista'
     );
 
 
-  if (correoRecordado) {
+  let cuentasRecordadas =
+    obtenerCuentasRecordadas();
 
-    correoInput.value =
-      correoRecordado;
 
-    rememberMe.checked =
-      true;
+  function renderizarCuentasRecordadas() {
+
+    cuentasRecordadasLista.replaceChildren();
+
+
+    for (const correo of cuentasRecordadas) {
+
+      const opcion =
+        document.createElement(
+          'option'
+        );
+
+      opcion.value = correo;
+
+      cuentasRecordadasLista.appendChild(
+        opcion
+      );
+
+    }
 
   }
 
+  renderizarCuentasRecordadas();
 
   function ocultarError() {
 
@@ -895,16 +999,22 @@ export function iniciarLoginPage({
 
         if (rememberMe.checked) {
 
-          localStorage.setItem(
-            'sgpa-correo-recordado',
-            correo
+          cuentasRecordadas = [
+            correo,
+            ...cuentasRecordadas.filter(
+              (cuentaGuardada) =>
+                cuentaGuardada !== correo
+            )
+          ].slice(
+            0,
+            MAXIMO_CUENTAS_RECORDADAS
           );
 
-        } else {
-
-          localStorage.removeItem(
-            'sgpa-correo-recordado'
+          guardarCuentasRecordadas(
+            cuentasRecordadas
           );
+
+          renderizarCuentasRecordadas();
 
         }
 
