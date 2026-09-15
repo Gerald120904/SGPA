@@ -14,6 +14,9 @@ describe('FormulariosEstudiantesController', () => {
   let reflector: Reflector;
   let service: {
     crear: jest.Mock;
+    listar: jest.Mock;
+    obtenerPorId: jest.Mock;
+    cerrar: jest.Mock;
   };
   let syncService: {
     sincronizar: jest.Mock;
@@ -27,6 +30,9 @@ describe('FormulariosEstudiantesController', () => {
     reflector = new Reflector();
     service = {
       crear: jest.fn(),
+      listar: jest.fn(),
+      obtenerPorId: jest.fn(),
+      cerrar: jest.fn(),
     };
     syncService = {
       sincronizar: jest.fn(),
@@ -54,6 +60,58 @@ describe('FormulariosEstudiantesController', () => {
         FormulariosEstudiantesController,
       );
       expect(guards).toEqual([AuthGuard, PermisosGuard]);
+    });
+  });
+
+  describe('listar', () => {
+    it('delega al servicio con usuarioId extraído de req.user.sub', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = [{ id: 1, titulo: 'Form 1' }];
+      service.listar.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.listar(mockReq);
+
+      expect(service.listar).toHaveBeenCalledWith(42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para FORMULARIOS_ESTUDIANTES_VER', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.listar,
+      );
+      expect(permisos).toEqual([PermisoSistema.FORMULARIOS_ESTUDIANTES_VER]);
+    });
+  });
+
+  describe('obtenerPorId', () => {
+    it('delega al servicio con id y usuarioId extraído de req.user.sub', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = { id: 1, titulo: 'Form 1' };
+      service.obtenerPorId.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.obtenerPorId(mockReq, 1);
+
+      expect(service.obtenerPorId).toHaveBeenCalledWith(1, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para FORMULARIOS_ESTUDIANTES_VER', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.obtenerPorId,
+      );
+      expect(permisos).toEqual([PermisoSistema.FORMULARIOS_ESTUDIANTES_VER]);
     });
   });
 
@@ -154,6 +212,34 @@ describe('FormulariosEstudiantesController', () => {
       const permisos = reflector.get<PermisoSistema[]>(
         PERMISOS_KEY,
         FormulariosEstudiantesController.prototype.procesar,
+      );
+      expect(permisos).toEqual([
+        PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
+      ]);
+    });
+  });
+
+  describe('cerrar', () => {
+    it('delega al service.cerrar con id y req.user.sub', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = { id: 1, estado: 'CERRADO' };
+      service.cerrar.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.cerrar(mockReq, 1);
+
+      expect(service.cerrar).toHaveBeenCalledWith(1, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para FORMULARIOS_ESTUDIANTES_GESTIONAR', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.cerrar,
       );
       expect(permisos).toEqual([
         PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,

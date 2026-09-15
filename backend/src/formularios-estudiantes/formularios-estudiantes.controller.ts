@@ -27,6 +27,24 @@ export class FormulariosEstudiantesController {
     private readonly procesamientoService: FormulariosEstudiantesProcesamientoService,
   ) {}
 
+  @Get()
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER)
+  listar(@Req() req: Request) {
+    return this.formulariosService.listar(req.user!.sub);
+  }
+
+  @Get(':id')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER)
+  obtenerPorId(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.formulariosService.obtenerPorId(
+      id,
+      req.user!.sub,
+    );
+  }
+
   @Post()
   @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_CREAR)
   crear(
@@ -58,6 +76,18 @@ export class FormulariosEstudiantesController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.procesamientoService.procesar(
+      id,
+      req.user!.sub,
+    );
+  }
+
+  @Post(':id/cerrar')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
+  cerrar(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.formulariosService.cerrar(
       id,
       req.user!.sub,
     );

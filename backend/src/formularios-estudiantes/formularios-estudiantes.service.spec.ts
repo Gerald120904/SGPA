@@ -15,6 +15,11 @@ describe('FormulariosEstudiantesService', () => {
   let formularioRepo: {
     create: jest.Mock;
     save: jest.Mock;
+    find: jest.Mock;
+    findOne: jest.Mock;
+  };
+  let respuestaRepo: {
+    createQueryBuilder: jest.Mock;
   };
   let carreraRepo: {
     findOne: jest.Mock;
@@ -33,12 +38,14 @@ describe('FormulariosEstudiantesService', () => {
     actualizarFormulario: jest.Mock;
     publicarFormulario: jest.Mock;
     obtenerFormulario: jest.Mock;
+    cerrarFormulario: jest.Mock;
   };
   let googleDriveClient: {
     permitirCualquieraConEnlaceResponder: jest.Mock;
   };
   let estructuraAcademicaService: {
     tieneAlcanceSobreCarrera: jest.Mock;
+    obtenerCarreraIdsConAlcance: jest.Mock;
   };
 
   const usuarioId = 10;
@@ -131,6 +138,21 @@ describe('FormulariosEstudiantesService', () => {
         ...entidad,
         id: entidad.id ?? 99,
       })),
+      find: jest.fn(),
+      findOne: jest.fn(),
+    };
+
+    const mockQueryBuilder = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      addGroupBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    };
+
+    respuestaRepo = {
+      createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder),
     };
 
     carreraRepo = {
@@ -172,6 +194,7 @@ describe('FormulariosEstudiantesService', () => {
         formId: 'google-form-123',
         responderUri: 'https://docs.google.com/forms/d/e/abc/viewform',
       }),
+      cerrarFormulario: jest.fn().mockResolvedValue({}),
     };
 
     googleDriveClient = {
@@ -180,10 +203,12 @@ describe('FormulariosEstudiantesService', () => {
 
     estructuraAcademicaService = {
       tieneAlcanceSobreCarrera: jest.fn().mockResolvedValue(true),
+      obtenerCarreraIdsConAlcance: jest.fn().mockResolvedValue([1]),
     };
 
     service = new FormulariosEstudiantesService(
       formularioRepo as never,
+      respuestaRepo as never,
       carreraRepo as never,
       planEstudioRepo as never,
       planAsignaturaRepo as never,
@@ -540,6 +565,259 @@ describe('FormulariosEstudiantesService', () => {
       await expect(service.crear(usuarioId, dto)).rejects.toThrow(
         'Google no devolvió la URL para responder el formulario',
       );
+    });
+  });
+
+  describe('listar', () => {
+    it('listar respeta alcance académico retornando [] si el usuario no tiene carreras con alcance', async () => {
+      estructuraAcademicaService.obtenerCarreraIdsConAlcance.mockResolvedValue(
+        [],
+      );
+
+      const resultado = await service.listar(usuarioId);
+
+      expect(resultado).toEqual([]);
+      expect(formularioRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('ADMIN_GLOBAL puede listar todos los formularios de sus carreras con alcance', async () => {
+      estructuraAcademicaService.obtenerCarreraIdsConAlcance.mockResolvedValue([
+        1, 2, 3,
+      ]);
+
+      const mockFormularios = [
+        {
+          id: 1,
+          titulo: 'Formulario 1',
+          carreraId: 1,
+          planEstudioId: 1,
+          googleFormId: 'g-1',
+          responderUri: 'https://form1',
+          estado: EstadoFormularioEstudiante.PUBLICADO,
+          mapaPreguntas: { algo: 'mapa' },
+          carrera: { id: 1, nombre: 'Carrera 1' },
+          planEstudio: { id: 1, nombre: 'Plan 1' },
+        },
+      ];
+      formularioRepo.find.mockResolvedValue(mockFormularios);
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        addGroupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { formularioId: '1', estado: 'PENDIENTE', cantidad: '2' },
+          { formularioId: '1', estado: 'PROCESADO', cantidad: '3' },
+        ]),
+      };
+      respuestaRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      const resultado = await service.listar(usuarioId);
+
+      expect(resultado).toHaveLength(1);
+      expect(resultado[0]).toEqual({
+        id: 1,
+        titulo: 'Formulario 1',
+        carreraId: 1,
+        planEstudioId: 1,
+        googleFormId: 'g-1',
+        responderUri: 'https://form1',
+        estado: EstadoFormularioEstudiante.PUBLICADO,
+        carrera: { id: 1, nombre: 'Carrera 1' },
+        planEstudio: { id: 1, nombre: 'Plan 1' },
+        totalRespuestas: 5,
+        pendientes: 2,
+        procesadas: 3,
+        requierenRevision: 0,
+        errores: 0,
+      });
+      // Verifica que mapaPreguntas no se devuelva en el listado
+      expect((resultado[0] as any).mapaPreguntas).toBeUndefined();
+    });
+  });
+
+  describe('obtenerPorId', () => {
+    it('falla con NotFoundException si el formulario no existe', async () => {
+      formularioRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.obtenerPorId(999, usuarioId)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.obtenerPorId(999, usuarioId)).rejects.toThrow(
+        'El formulario indicado no existe',
+      );
+    });
+
+    it('falla con ForbiddenException si el usuario no tiene alcance académico sobre la carrera', async () => {
+      formularioRepo.findOne.mockResolvedValue({
+        id: 1,
+        carreraId: 5,
+      });
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        false,
+      );
+
+      await expect(service.obtenerPorId(1, usuarioId)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.obtenerPorId(1, usuarioId)).rejects.toThrow(
+        'No posee alcance académico sobre la carrera indicada.',
+      );
+    });
+
+    it('devuelve el detalle del formulario completo con conteos correctos', async () => {
+      const mockForm = {
+        id: 1,
+        titulo: 'Formulario 1',
+        carreraId: 1,
+        planEstudioId: 2,
+        googleFormId: 'g-1',
+        responderUri: 'https://form1',
+        estado: EstadoFormularioEstudiante.PUBLICADO,
+        mapaPreguntas: { algo: 'mapa' },
+        detalleError: null,
+        carrera: { id: 1, nombre: 'Carrera 1' },
+        planEstudio: { id: 2, nombre: 'Plan 2' },
+      };
+      formularioRepo.findOne.mockResolvedValue(mockForm);
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      const mockQueryBuilder = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { estado: 'PENDIENTE', cantidad: '1' },
+          { estado: 'PROCESADO', cantidad: '4' },
+          { estado: 'REQUIERE_REVISION', cantidad: '2' },
+          { estado: 'ERROR', cantidad: '1' },
+        ]),
+      };
+      respuestaRepo.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+
+      const resultado = await service.obtenerPorId(1, usuarioId);
+
+      expect(resultado).toEqual({
+        ...mockForm,
+        totalRespuestas: 8,
+        pendientes: 1,
+        procesadas: 4,
+        requierenRevision: 2,
+        errores: 1,
+      });
+    });
+  });
+
+  describe('cerrar', () => {
+    it('falla con NotFoundException si el formulario no existe', async () => {
+      formularioRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.cerrar(999, usuarioId)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('falla con ForbiddenException si el usuario no tiene alcance académico', async () => {
+      formularioRepo.findOne.mockResolvedValue({
+        id: 1,
+        carreraId: 5,
+      });
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        false,
+      );
+
+      await expect(service.cerrar(1, usuarioId)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('cerrar CERRADO es idempotente y no vuelve a llamar a Google', async () => {
+      const mockForm = {
+        id: 1,
+        carreraId: 1,
+        googleFormId: 'g-1',
+        estado: EstadoFormularioEstudiante.CERRADO,
+      };
+      formularioRepo.findOne.mockResolvedValue(mockForm);
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      const resultado = await service.cerrar(1, usuarioId);
+
+      expect(resultado).toBe(mockForm);
+      expect(googleFormsClient.cerrarFormulario).not.toHaveBeenCalled();
+      expect(formularioRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('cerrar CREANDO falla con BadRequestException', async () => {
+      const mockForm = {
+        id: 1,
+        carreraId: 1,
+        googleFormId: 'g-1',
+        estado: EstadoFormularioEstudiante.CREANDO,
+      };
+      formularioRepo.findOne.mockResolvedValue(mockForm);
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      await expect(service.cerrar(1, usuarioId)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(googleFormsClient.cerrarFormulario).not.toHaveBeenCalled();
+    });
+
+    it('cerrar ERROR falla con BadRequestException', async () => {
+      const mockForm = {
+        id: 1,
+        carreraId: 1,
+        googleFormId: 'g-1',
+        estado: EstadoFormularioEstudiante.ERROR,
+      };
+      formularioRepo.findOne.mockResolvedValue(mockForm);
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      await expect(service.cerrar(1, usuarioId)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(googleFormsClient.cerrarFormulario).not.toHaveBeenCalled();
+    });
+
+    it('cerrar PUBLICADO llama Google y cambia estado a CERRADO', async () => {
+      const mockForm = {
+        id: 1,
+        carreraId: 1,
+        googleFormId: 'g-1',
+        estado: EstadoFormularioEstudiante.PUBLICADO,
+      };
+      formularioRepo.findOne.mockResolvedValue(mockForm);
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      const resultado = await service.cerrar(1, usuarioId);
+
+      expect(googleFormsClient.cerrarFormulario).toHaveBeenCalledWith(
+        usuarioId,
+        'g-1',
+      );
+      expect(mockForm.estado).toBe(EstadoFormularioEstudiante.CERRADO);
+      expect(formularioRepo.save).toHaveBeenCalledWith(mockForm);
+      expect(resultado.estado).toBe(EstadoFormularioEstudiante.CERRADO);
+    });
+
+    it('garantiza que no existe método de eliminación en el servicio', () => {
+      expect((service as any).eliminar).toBeUndefined();
+      expect((service as any).delete).toBeUndefined();
+      expect((service as any).borrar).toBeUndefined();
     });
   });
 });

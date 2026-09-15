@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { forms_v1 } from 'googleapis';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
 import { GoogleDriveClientService } from '../integraciones/google/google-drive-client.service';
@@ -16,8 +16,10 @@ import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academ
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
+import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
+import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
 import { MapaPreguntasFormulario } from './types/mapa-preguntas-formulario.type';
 
 @Injectable()
@@ -25,6 +27,9 @@ export class FormulariosEstudiantesService {
   constructor(
     @InjectRepository(FormularioEstudiante)
     private readonly formularioRepo: Repository<FormularioEstudiante>,
+
+    @InjectRepository(RespuestaFormularioEstudiante)
+    private readonly respuestaRepo: Repository<RespuestaFormularioEstudiante>,
 
     @InjectRepository(Carrera)
     private readonly carreraRepo: Repository<Carrera>,
@@ -42,6 +47,221 @@ export class FormulariosEstudiantesService {
     private readonly googleDriveClient: GoogleDriveClientService,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
   ) {}
+
+  async listar(usuarioId: number) {
+    const carrerasPermitidas =
+      await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(
+        usuarioId,
+      );
+
+    if (carrerasPermitidas.length === 0) {
+      return [];
+    }
+
+    const formularios = await this.formularioRepo.find({
+      where: {
+        carreraId: In(carrerasPermitidas),
+      },
+      relations: {
+        carrera: true,
+        planEstudio: true,
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+
+    if (formularios.length === 0) {
+      return [];
+    }
+
+    const formularioIds = formularios.map((f) => f.id);
+
+    const conteosMap = new Map<
+      number,
+      {
+        totalRespuestas: number;
+        pendientes: number;
+        procesadas: number;
+        requierenRevision: number;
+        errores: number;
+      }
+    >();
+
+    for (const id of formularioIds) {
+      conteosMap.set(id, {
+        totalRespuestas: 0,
+        pendientes: 0,
+        procesadas: 0,
+        requierenRevision: 0,
+        errores: 0,
+      });
+    }
+
+    const rawCounts = await this.respuestaRepo
+      .createQueryBuilder('r')
+      .select('r.formularioId', 'formularioId')
+      .addSelect('r.estado', 'estado')
+      .addSelect('COUNT(r.id)', 'cantidad')
+      .where('r.formularioId IN (:...formularioIds)', { formularioIds })
+      .groupBy('r.formularioId')
+      .addGroupBy('r.estado')
+      .getRawMany();
+
+    for (const row of rawCounts) {
+      const formId = Number(row.formularioId);
+      const estado = row.estado as EstadoRespuestaFormulario;
+      const count = Number(row.cantidad);
+      const c = conteosMap.get(formId);
+
+      if (c) {
+        c.totalRespuestas += count;
+        if (estado === EstadoRespuestaFormulario.PENDIENTE) {
+          c.pendientes += count;
+        } else if (estado === EstadoRespuestaFormulario.PROCESADO) {
+          c.procesadas += count;
+        } else if (estado === EstadoRespuestaFormulario.REQUIERE_REVISION) {
+          c.requierenRevision += count;
+        } else if (estado === EstadoRespuestaFormulario.ERROR) {
+          c.errores += count;
+        }
+      }
+    }
+
+    return formularios.map((formulario) => {
+      const c = conteosMap.get(formulario.id) ?? {
+        totalRespuestas: 0,
+        pendientes: 0,
+        procesadas: 0,
+        requierenRevision: 0,
+        errores: 0,
+      };
+
+      const { mapaPreguntas: _mapa, ...resto } = formulario;
+
+      return {
+        ...resto,
+        totalRespuestas: c.totalRespuestas,
+        pendientes: c.pendientes,
+        procesadas: c.procesadas,
+        requierenRevision: c.requierenRevision,
+        errores: c.errores,
+      };
+    });
+  }
+
+  async obtenerPorId(id: number, usuarioId: number) {
+    const formulario = await this.formularioRepo.findOne({
+      where: { id },
+      relations: {
+        carrera: true,
+        planEstudio: true,
+      },
+    });
+
+    if (!formulario) {
+      throw new NotFoundException('El formulario indicado no existe');
+    }
+
+    const tieneAlcance =
+      await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+        usuarioId,
+        formulario.carreraId,
+      );
+
+    if (!tieneAlcance) {
+      throw new ForbiddenException(
+        'No posee alcance académico sobre la carrera indicada.',
+      );
+    }
+
+    const rawCounts = await this.respuestaRepo
+      .createQueryBuilder('r')
+      .select('r.estado', 'estado')
+      .addSelect('COUNT(r.id)', 'cantidad')
+      .where('r.formularioId = :id', { id })
+      .groupBy('r.estado')
+      .getRawMany();
+
+    const conteos = {
+      totalRespuestas: 0,
+      pendientes: 0,
+      procesadas: 0,
+      requierenRevision: 0,
+      errores: 0,
+    };
+
+    for (const row of rawCounts) {
+      const estado = row.estado as EstadoRespuestaFormulario;
+      const count = Number(row.cantidad);
+      conteos.totalRespuestas += count;
+
+      if (estado === EstadoRespuestaFormulario.PENDIENTE) {
+        conteos.pendientes += count;
+      } else if (estado === EstadoRespuestaFormulario.PROCESADO) {
+        conteos.procesadas += count;
+      } else if (estado === EstadoRespuestaFormulario.REQUIERE_REVISION) {
+        conteos.requierenRevision += count;
+      } else if (estado === EstadoRespuestaFormulario.ERROR) {
+        conteos.errores += count;
+      }
+    }
+
+    return {
+      ...formulario,
+      ...conteos,
+    };
+  }
+
+  async cerrar(id: number, usuarioId: number): Promise<FormularioEstudiante> {
+    const formulario = await this.formularioRepo.findOne({
+      where: { id },
+      relations: {
+        carrera: true,
+        planEstudio: true,
+      },
+    });
+
+    if (!formulario) {
+      throw new NotFoundException('El formulario indicado no existe');
+    }
+
+    const tieneAlcance =
+      await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+        usuarioId,
+        formulario.carreraId,
+      );
+
+    if (!tieneAlcance) {
+      throw new ForbiddenException(
+        'No posee alcance académico sobre la carrera indicada.',
+      );
+    }
+
+    if (formulario.estado === EstadoFormularioEstudiante.CERRADO) {
+      return formulario;
+    }
+
+    if (formulario.estado !== EstadoFormularioEstudiante.PUBLICADO) {
+      throw new BadRequestException(
+        `No se puede cerrar un formulario en estado ${formulario.estado}. Solo formularios PUBLICADOS pueden ser cerrados.`,
+      );
+    }
+
+    if (!formulario.googleFormId) {
+      throw new BadRequestException(
+        'El formulario no posee un identificador de Google Forms asociado.',
+      );
+    }
+
+    await this.googleFormsClient.cerrarFormulario(
+      usuarioId,
+      formulario.googleFormId,
+    );
+
+    formulario.estado = EstadoFormularioEstudiante.CERRADO;
+    return await this.formularioRepo.save(formulario);
+  }
 
   async crear(
     usuarioId: number,
