@@ -15,11 +15,6 @@ import { EstudiantesController } from './estudiantes.controller';
 import { EstudiantesImportacionController } from './estudiantes-importacion.controller';
 import { EstudiantesImportacionService } from './estudiantes-importacion.service';
 import { EstudiantesService } from './estudiantes.service';
-import { ConfiguracionFormularioEstudiantes } from './google-forms/entities/configuracion-formulario-estudiantes.entity';
-import { ImportacionGoogleEstudiante } from './google-forms/entities/importacion-google-estudiante.entity';
-import { GoogleFormsController } from './google-forms/google-forms.controller';
-import { GoogleFormsSyncService } from './google-forms/google-forms-sync.service';
-import { GoogleFormsService } from './google-forms/google-forms.service';
 
 @Module({
   imports: [
@@ -32,8 +27,6 @@ import { GoogleFormsService } from './google-forms/google-forms.service';
       PlanAsignatura,
       PlanRequisito,
       PeriodoAcademico,
-      ConfiguracionFormularioEstudiantes,
-      ImportacionGoogleEstudiante,
     ]),
     SecurityModule,
     PermisosModule,
@@ -42,19 +35,14 @@ import { GoogleFormsService } from './google-forms/google-forms.service';
   controllers: [
     EstudiantesController,
     EstudiantesImportacionController,
-    GoogleFormsController,
   ],
   providers: [
     EstudiantesService,
     EstudiantesImportacionService,
-    GoogleFormsService,
-    GoogleFormsSyncService,
   ],
   exports: [
     EstudiantesService,
     EstudiantesImportacionService,
-    GoogleFormsService,
-    GoogleFormsSyncService,
   ],
 })
 export class EstudiantesModule {}
