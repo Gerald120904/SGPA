@@ -327,9 +327,9 @@ describe('DisponibilidadProfesoresController', () => {
     ).toHaveBeenCalledWith(10, 2);
   });
 
-  it('permite a ESTUDIANTE con PROFESORES_VER consultar disponibilidad de un profesor', async () => {
+  it('permite a ASISTENTE_ESTUDIANTIL con PROFESORES_VER consultar disponibilidad de un profesor', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/10/disponibilidad/2')
@@ -354,8 +354,8 @@ describe('DisponibilidadProfesoresController', () => {
     ).toHaveBeenCalledWith(10, 2);
   });
 
-  it('impide a ESTUDIANTE sin PROFESORES_VER consultar disponibilidad de un profesor', async () => {
-    const token = await crearToken(['ESTUDIANTE']);
+  it('impide a ASISTENTE_ESTUDIANTIL sin PROFESORES_VER consultar disponibilidad de un profesor', async () => {
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/99/disponibilidad/2')
@@ -369,7 +369,7 @@ describe('DisponibilidadProfesoresController', () => {
 
   it('impide a usuario sin rol PROFESOR modificar disponibilidad', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .put('/profesores/mi-disponibilidad')
@@ -439,7 +439,7 @@ describe('DisponibilidadProfesoresController', () => {
 
   it('rechaza profesorId inválido para consulta administrativa', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/no-es-id/disponibilidad/2')

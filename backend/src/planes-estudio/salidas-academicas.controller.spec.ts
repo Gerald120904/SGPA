@@ -113,7 +113,7 @@ describe('SalidasAcademicasController', () => {
   it('permite consultar salidas con PLANES_ESTUDIO_VER', async () => {
     await request(app.getHttpServer())
       .get('/planes-estudio/1/salidas-academicas')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200, []);
 
     expect(service.listar).toHaveBeenCalledWith(1);
@@ -123,7 +123,7 @@ describe('SalidasAcademicasController', () => {
     permisosAsignados.clear();
     await request(app.getHttpServer())
       .get('/planes-estudio/1/salidas-academicas')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(403);
   });
 
@@ -234,7 +234,7 @@ describe('SalidasAcademicasController', () => {
     permisosAsignados.clear();
     await request(app.getHttpServer())
       .post('/planes-estudio/1/salidas-academicas')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .send({
         codigo: 'ENF-SEG',
         nombre: 'Énfasis en Ciberseguridad',

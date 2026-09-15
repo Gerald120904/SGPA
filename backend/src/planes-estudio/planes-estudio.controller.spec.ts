@@ -108,7 +108,7 @@ describe('PlanesEstudioController', () => {
     permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_VER);
     await request(app.getHttpServer())
       .get('/planes-estudio')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200, []);
 
     expect(service.listar).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe('PlanesEstudioController', () => {
   it('responde 403 sin PLANES_ESTUDIO_VER', async () => {
     await request(app.getHttpServer())
       .get('/planes-estudio')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(403);
   });
 
@@ -150,7 +150,7 @@ describe('PlanesEstudioController', () => {
 
     await request(app.getHttpServer())
       .post('/planes-estudio')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .send(dto)
       .expect(403);
 
@@ -190,7 +190,7 @@ describe('PlanesEstudioController', () => {
     permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_VER);
     await request(app.getHttpServer())
       .get('/planes-estudio/1')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200, { id: 1 });
 
     expect(service.obtenerPorId).toHaveBeenCalledWith(1);

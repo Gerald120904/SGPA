@@ -5,7 +5,7 @@ const ROLES_OFICIALES = [
   ['ADMIN_GLOBAL', 'Administrador global del sistema', 1],
   ['COORDINADOR', 'Coordinador académico', 1],
   ['PROFESOR', 'Profesor', 1],
-  ['ESTUDIANTE', 'Estudiante', 1],
+  ['ASISTENTE_ESTUDIANTIL', 'Estudiante asistente', 1],
 ];
 
 async function migrateOfficialRoles() {
@@ -20,6 +20,36 @@ async function migrateOfficialRoles() {
   try {
     await connection.beginTransaction();
 
+    const [[rolAnterior]] = await connection.query(
+      "SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' FOR UPDATE",
+    );
+    const [[rolNuevo]] = await connection.query(
+      "SELECT id FROM roles WHERE nombre = 'ASISTENTE_ESTUDIANTIL' FOR UPDATE",
+    );
+
+    if (rolAnterior && !rolNuevo) {
+      await connection.query(
+        `UPDATE roles
+         SET nombre = 'ASISTENTE_ESTUDIANTIL',
+             descripcion = 'Estudiante asistente',
+             activo = 1
+         WHERE id = ?`,
+        [rolAnterior.id],
+      );
+    } else if (rolAnterior && rolNuevo) {
+      await connection.query(
+        `INSERT IGNORE INTO usuario_roles (usuario_id, rol_id)
+         SELECT usuario_id, ? FROM usuario_roles WHERE rol_id = ?`,
+        [rolNuevo.id, rolAnterior.id],
+      );
+      await connection.query('DELETE FROM usuario_roles WHERE rol_id = ?', [
+        rolAnterior.id,
+      ]);
+      await connection.query('DELETE FROM roles WHERE id = ?', [
+        rolAnterior.id,
+      ]);
+    }
+
     await connection.query(
       "UPDATE roles SET nombre = 'ADMIN_GLOBAL' WHERE nombre = 'ADMINISTRADOR'",
     );
@@ -27,8 +57,11 @@ async function migrateOfficialRoles() {
       "UPDATE roles SET nombre = 'COORDINADOR' WHERE nombre = 'COORDINADOR_ACADEMICO'",
     );
     await connection.query(
-      `INSERT IGNORE INTO roles (nombre, descripcion, activo)
-       VALUES ?`,
+      `INSERT INTO roles (nombre, descripcion, activo)
+       VALUES ?
+       ON DUPLICATE KEY UPDATE
+         descripcion = VALUES(descripcion),
+         activo = VALUES(activo)`,
       [ROLES_OFICIALES],
     );
 

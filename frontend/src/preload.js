@@ -21,33 +21,15 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("usuarios:revocar-rol", usuarioId, rolId),
   listarRoles: () => ipcRenderer.invoke("roles:listar"),
 
-  listarCatalogoPermisos: () =>
-    ipcRenderer.invoke(
-      "permisos:catalogo",
-    ),
+  listarCatalogoPermisos: () => ipcRenderer.invoke("permisos:catalogo"),
 
-  listarPlantillasPermisos: () =>
-    ipcRenderer.invoke(
-      'permisos:plantillas',
-    ),
+  listarPlantillasPermisos: () => ipcRenderer.invoke("permisos:plantillas"),
 
-  listarPermisosUsuario: (
-    usuarioId,
-  ) =>
-    ipcRenderer.invoke(
-      "permisos:usuario",
-      usuarioId,
-    ),
+  listarPermisosUsuario: (usuarioId) =>
+    ipcRenderer.invoke("permisos:usuario", usuarioId),
 
-  reemplazarPermisosUsuario: (
-    usuarioId,
-    permisos,
-  ) =>
-    ipcRenderer.invoke(
-      "permisos:reemplazar",
-      usuarioId,
-      permisos,
-    ),
+  reemplazarPermisosUsuario: (usuarioId, permisos) =>
+    ipcRenderer.invoke("permisos:reemplazar", usuarioId, permisos),
 
   listarCarreras: () => ipcRenderer.invoke("carreras:listar"),
   obtenerCarrera: (id) => ipcRenderer.invoke("carreras:obtener", id),
@@ -71,42 +53,17 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("cursos:requisitos:crear", cursoId, datos),
   eliminarRequisitoCurso: (cursoId, requisitoId) =>
     ipcRenderer.invoke("cursos:requisitos:eliminar", cursoId, requisitoId),
-  listarPeriodosAcademicos: () =>
-    ipcRenderer.invoke(
-      "periodos:listar",
-    ),
+  listarPeriodosAcademicos: () => ipcRenderer.invoke("periodos:listar"),
 
-  obtenerPeriodoAcademico: (id) =>
-    ipcRenderer.invoke(
-      "periodos:obtener",
-      id,
-    ),
+  obtenerPeriodoAcademico: (id) => ipcRenderer.invoke("periodos:obtener", id),
 
-  crearPeriodoAcademico: (datos) =>
-    ipcRenderer.invoke(
-      "periodos:crear",
-      datos,
-    ),
+  crearPeriodoAcademico: (datos) => ipcRenderer.invoke("periodos:crear", datos),
 
-  actualizarPeriodoAcademico: (
-    id,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      "periodos:actualizar",
-      id,
-      datos,
-    ),
+  actualizarPeriodoAcademico: (id, datos) =>
+    ipcRenderer.invoke("periodos:actualizar", id, datos),
 
-  cambiarEstadoPeriodoAcademico: (
-    id,
-    estado,
-  ) =>
-    ipcRenderer.invoke(
-      "periodos:cambiar-estado",
-      id,
-      estado,
-    ),
+  cambiarEstadoPeriodoAcademico: (id, estado) =>
+    ipcRenderer.invoke("periodos:cambiar-estado", id, estado),
   listarPlanesEstudio: () => ipcRenderer.invoke("planes-estudio:listar"),
   obtenerPlanEstudio: (id) => ipcRenderer.invoke("planes-estudio:obtener", id),
   crearPlanEstudio: (datos) =>
@@ -178,6 +135,14 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("plan-importacion:ejecutar", planId, datos),
   guardarPlantillaExcelPlan: () =>
     ipcRenderer.invoke("plan-importacion:guardar-plantilla"),
+  seleccionarExcelEstudiantes: () =>
+    ipcRenderer.invoke("estudiantes-importacion:seleccionar-excel"),
+  guardarPlantillaExcelEstudiantes: () =>
+    ipcRenderer.invoke("estudiantes-importacion:guardar-plantilla"),
+  validarImportacionEstudiantes: (contexto, datos) =>
+    ipcRenderer.invoke("estudiantes-importacion:validar", contexto, datos),
+  ejecutarImportacionEstudiantes: (contexto, datos) =>
+    ipcRenderer.invoke("estudiantes-importacion:ejecutar", contexto, datos),
   listarBloquesPlan: (planId) =>
     ipcRenderer.invoke("bloques-plan:listar", planId),
   crearBloquePlan: (planId, datos) =>
@@ -187,473 +152,203 @@ contextBridge.exposeInMainWorld("sgpa", {
   cambiarEstadoBloquePlan: (planId, bloqueId, activo) =>
     ipcRenderer.invoke("bloques-plan:cambiar-estado", planId, bloqueId, activo),
   listarProfesores: (filtros = {}) =>
-    ipcRenderer.invoke(
-      'profesores:listar',
-      filtros,
-    ),
+    ipcRenderer.invoke("profesores:listar", filtros),
 
-  obtenerProfesor: (id) =>
-    ipcRenderer.invoke(
-      'profesores:obtener',
-      id,
-    ),
+  obtenerProfesor: (id) => ipcRenderer.invoke("profesores:obtener", id),
 
-  obtenerDisponibilidadProfesor: (
-    profesorId,
-    periodoId,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:disponibilidad',
-      profesorId,
-      periodoId,
-    ),
+  obtenerDisponibilidadProfesor: (profesorId, periodoId) =>
+    ipcRenderer.invoke("profesores:disponibilidad", profesorId, periodoId),
 
-  revisarPerfilProfesor: (
-    profesorId,
-    perfilId,
-    datos,
-  ) =>
+  revisarPerfilProfesor: (profesorId, perfilId, datos) =>
     ipcRenderer.invoke(
-      'profesores:revisar-perfil',
+      "profesores:revisar-perfil",
       profesorId,
       perfilId,
       datos,
     ),
 
-  inactivarPerfilProfesor: (
-    profesorId,
-    perfilId,
-    observacion,
-  ) =>
+  inactivarPerfilProfesor: (profesorId, perfilId, observacion) =>
     ipcRenderer.invoke(
-      'profesores:inactivar-perfil',
+      "profesores:inactivar-perfil",
       profesorId,
       perfilId,
       observacion,
     ),
 
-  revisarAtestadoProfesor: (
-    profesorId,
-    atestadoId,
-    datos,
-  ) =>
+  revisarAtestadoProfesor: (profesorId, atestadoId, datos) =>
     ipcRenderer.invoke(
-      'profesores:revisar-atestado',
+      "profesores:revisar-atestado",
       profesorId,
       atestadoId,
       datos,
     ),
 
-  obtenerMiPerfilProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:mi-perfil',
-    ),
+  obtenerMiPerfilProfesor: () => ipcRenderer.invoke("profesores:mi-perfil"),
 
   listarCarrerasDisponiblesProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:mis-carreras-disponibles',
-    ),
+    ipcRenderer.invoke("profesores:mis-carreras-disponibles"),
 
-  actualizarMisCarrerasProfesor: (
-    carreraIds,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:actualizar-mis-carreras',
-      carreraIds,
-    ),
+  actualizarMisCarrerasProfesor: (carreraIds) =>
+    ipcRenderer.invoke("profesores:actualizar-mis-carreras", carreraIds),
 
   listarMisPerfilesProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:mis-perfiles',
-    ),
+    ipcRenderer.invoke("profesores:mis-perfiles"),
 
   listarPerfilesDisponiblesProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:perfiles-disponibles',
-    ),
+    ipcRenderer.invoke("profesores:perfiles-disponibles"),
 
-  solicitarPerfilProfesor: (
-    perfilAcademicoId,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:solicitar-perfil',
-      perfilAcademicoId,
-    ),
+  solicitarPerfilProfesor: (perfilAcademicoId) =>
+    ipcRenderer.invoke("profesores:solicitar-perfil", perfilAcademicoId),
 
   listarMisAtestadosProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:mis-atestados',
-    ),
+    ipcRenderer.invoke("profesores:mis-atestados"),
 
   crearAtestadoProfesor: (datos) =>
-    ipcRenderer.invoke(
-      'profesores:crear-atestado',
-      datos,
-    ),
+    ipcRenderer.invoke("profesores:crear-atestado", datos),
 
-  actualizarAtestadoProfesor: (
-    atestadoId,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:actualizar-atestado',
-      atestadoId,
-      datos,
-    ),
+  actualizarAtestadoProfesor: (atestadoId, datos) =>
+    ipcRenderer.invoke("profesores:actualizar-atestado", atestadoId, datos),
 
-  inactivarMiAtestadoProfesor: (
-    atestadoId,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:inactivar-mi-atestado',
-      atestadoId,
-    ),
+  inactivarMiAtestadoProfesor: (atestadoId) =>
+    ipcRenderer.invoke("profesores:inactivar-mi-atestado", atestadoId),
 
   listarMisProyectosProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:mis-proyectos',
-    ),
+    ipcRenderer.invoke("profesores:mis-proyectos"),
 
   crearProyectoProfesor: (datos) =>
-    ipcRenderer.invoke(
-      'profesores:crear-proyecto',
-      datos,
-    ),
+    ipcRenderer.invoke("profesores:crear-proyecto", datos),
 
-  actualizarProyectoProfesor: (
-    proyectoId,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:actualizar-proyecto',
-      proyectoId,
-      datos,
-    ),
+  actualizarProyectoProfesor: (proyectoId, datos) =>
+    ipcRenderer.invoke("profesores:actualizar-proyecto", proyectoId, datos),
 
-  cambiarEstadoProyectoProfesor: (
-    proyectoId,
-    activo,
-  ) =>
+  cambiarEstadoProyectoProfesor: (proyectoId, activo) =>
     ipcRenderer.invoke(
-      'profesores:cambiar-estado-proyecto',
+      "profesores:cambiar-estado-proyecto",
       proyectoId,
       activo,
     ),
 
   listarPeriodosMiDisponibilidadProfesor: () =>
-    ipcRenderer.invoke(
-      'profesores:periodos-mi-disponibilidad',
-    ),
+    ipcRenderer.invoke("profesores:periodos-mi-disponibilidad"),
 
-  consultarMiDisponibilidadProfesor: (
-    periodoId,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:consultar-mi-disponibilidad',
-      periodoId,
-    ),
+  consultarMiDisponibilidadProfesor: (periodoId) =>
+    ipcRenderer.invoke("profesores:consultar-mi-disponibilidad", periodoId),
 
-  guardarMiDisponibilidadProfesor: (
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:guardar-mi-disponibilidad',
-      datos,
-    ),
+  guardarMiDisponibilidadProfesor: (datos) =>
+    ipcRenderer.invoke("profesores:guardar-mi-disponibilidad", datos),
 
-  copiarMiDisponibilidadProfesor: (
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:copiar-mi-disponibilidad',
-      datos,
-    ),
+  copiarMiDisponibilidadProfesor: (datos) =>
+    ipcRenderer.invoke("profesores:copiar-mi-disponibilidad", datos),
 
-  obtenerHistorialMiDisponibilidadProfesor: (
-    periodoId,
-  ) =>
-    ipcRenderer.invoke(
-      'profesores:historial-mi-disponibilidad',
-      periodoId,
-    ),
+  obtenerHistorialMiDisponibilidadProfesor: (periodoId) =>
+    ipcRenderer.invoke("profesores:historial-mi-disponibilidad", periodoId),
 
-  listarAulas: (filtros = {}) =>
-    ipcRenderer.invoke(
-      'aulas:listar',
-      filtros,
-    ),
+  listarAulas: (filtros = {}) => ipcRenderer.invoke("aulas:listar", filtros),
 
-  obtenerAula: (id) =>
-    ipcRenderer.invoke(
-      'aulas:obtener',
-      id,
-    ),
+  obtenerAula: (id) => ipcRenderer.invoke("aulas:obtener", id),
 
-  crearAula: (datos) =>
-    ipcRenderer.invoke(
-      'aulas:crear',
-      datos,
-    ),
+  crearAula: (datos) => ipcRenderer.invoke("aulas:crear", datos),
 
   actualizarAula: (id, datos) =>
-    ipcRenderer.invoke(
-      'aulas:actualizar',
-      id,
-      datos,
-    ),
+    ipcRenderer.invoke("aulas:actualizar", id, datos),
 
-  cambiarEstadoAula: (
-    id,
-    activo,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:cambiar-estado',
-      id,
-      activo,
-    ),
+  cambiarEstadoAula: (id, activo) =>
+    ipcRenderer.invoke("aulas:cambiar-estado", id, activo),
 
-  listarEquipamientos: () =>
-    ipcRenderer.invoke(
-      'aulas:equipamientos:listar',
-    ),
+  listarEquipamientos: () => ipcRenderer.invoke("aulas:equipamientos:listar"),
 
   crearEquipamiento: (datos) =>
-    ipcRenderer.invoke(
-      'aulas:equipamientos:crear',
-      datos,
-    ),
+    ipcRenderer.invoke("aulas:equipamientos:crear", datos),
 
-  actualizarEquipamiento: (
-    id,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:equipamientos:actualizar',
-      id,
-      datos,
-    ),
+  actualizarEquipamiento: (id, datos) =>
+    ipcRenderer.invoke("aulas:equipamientos:actualizar", id, datos),
 
-  cambiarEstadoEquipamiento: (
-    id,
-    activo,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:equipamientos:cambiar-estado',
-      id,
-      activo,
-    ),
+  cambiarEstadoEquipamiento: (id, activo) =>
+    ipcRenderer.invoke("aulas:equipamientos:cambiar-estado", id, activo),
 
-  listarEquipamientoAula: (
-    aulaId,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:equipo-aula:listar',
-      aulaId,
-    ),
+  listarEquipamientoAula: (aulaId) =>
+    ipcRenderer.invoke("aulas:equipo-aula:listar", aulaId),
 
-  asignarEquipamientoAula: (
-    aulaId,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:equipo-aula:asignar',
-      aulaId,
-      datos,
-    ),
+  asignarEquipamientoAula: (aulaId, datos) =>
+    ipcRenderer.invoke("aulas:equipo-aula:asignar", aulaId, datos),
 
-  actualizarEquipamientoAula: (
-    aulaId,
-    equipamientoId,
-    datos,
-  ) =>
+  actualizarEquipamientoAula: (aulaId, equipamientoId, datos) =>
     ipcRenderer.invoke(
-      'aulas:equipo-aula:actualizar',
+      "aulas:equipo-aula:actualizar",
       aulaId,
       equipamientoId,
       datos,
     ),
 
-  cambiarEstadoEquipamientoAula: (
-    aulaId,
-    equipamientoId,
-    activo,
-  ) =>
+  cambiarEstadoEquipamientoAula: (aulaId, equipamientoId, activo) =>
     ipcRenderer.invoke(
-      'aulas:equipo-aula:cambiar-estado',
+      "aulas:equipo-aula:cambiar-estado",
       aulaId,
       equipamientoId,
       activo,
     ),
 
-  listarIndisponibilidadesAula: (
-    aulaId,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:indisponibilidades:listar',
-      aulaId,
-    ),
+  listarIndisponibilidadesAula: (aulaId) =>
+    ipcRenderer.invoke("aulas:indisponibilidades:listar", aulaId),
 
-  obtenerIndisponibilidadAula: (
-    aulaId,
-    id,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:indisponibilidades:obtener',
-      aulaId,
-      id,
-    ),
+  obtenerIndisponibilidadAula: (aulaId, id) =>
+    ipcRenderer.invoke("aulas:indisponibilidades:obtener", aulaId, id),
 
-  crearIndisponibilidadAula: (
-    aulaId,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:indisponibilidades:crear',
-      aulaId,
-      datos,
-    ),
+  crearIndisponibilidadAula: (aulaId, datos) =>
+    ipcRenderer.invoke("aulas:indisponibilidades:crear", aulaId, datos),
 
-  actualizarIndisponibilidadAula: (
-    aulaId,
-    id,
-    datos,
-  ) =>
+  actualizarIndisponibilidadAula: (aulaId, id, datos) =>
     ipcRenderer.invoke(
-      'aulas:indisponibilidades:actualizar',
+      "aulas:indisponibilidades:actualizar",
       aulaId,
       id,
       datos,
     ),
 
-  cambiarEstadoIndisponibilidadAula: (
-    aulaId,
-    id,
-    activo,
-  ) =>
+  cambiarEstadoIndisponibilidadAula: (aulaId, id, activo) =>
     ipcRenderer.invoke(
-      'aulas:indisponibilidades:cambiar-estado',
+      "aulas:indisponibilidades:cambiar-estado",
       aulaId,
       id,
       activo,
     ),
 
   listarReservasAula: (aulaId) =>
-    ipcRenderer.invoke(
-      'aulas:reservas:listar',
-      aulaId,
-    ),
+    ipcRenderer.invoke("aulas:reservas:listar", aulaId),
 
   obtenerReservaAula: (aulaId, id) =>
-    ipcRenderer.invoke(
-      'aulas:reservas:obtener',
-      aulaId,
-      id,
-    ),
+    ipcRenderer.invoke("aulas:reservas:obtener", aulaId, id),
 
   crearReservaAula: (aulaId, datos) =>
-    ipcRenderer.invoke(
-      'aulas:reservas:crear',
-      aulaId,
-      datos,
-    ),
+    ipcRenderer.invoke("aulas:reservas:crear", aulaId, datos),
 
-  actualizarReservaAula: (
-    aulaId,
-    id,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:reservas:actualizar',
-      aulaId,
-      id,
-      datos,
-    ),
+  actualizarReservaAula: (aulaId, id, datos) =>
+    ipcRenderer.invoke("aulas:reservas:actualizar", aulaId, id, datos),
 
-  cambiarEstadoReservaAula: (
-    aulaId,
-    id,
-    activo,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:reservas:cambiar-estado',
-      aulaId,
-      id,
-      activo,
-    ),
+  cambiarEstadoReservaAula: (aulaId, id, activo) =>
+    ipcRenderer.invoke("aulas:reservas:cambiar-estado", aulaId, id, activo),
 
-  consultarOcupacionAula: (
-    aulaId,
-    filtros,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:ocupacion',
-      aulaId,
-      filtros,
-    ),
+  consultarOcupacionAula: (aulaId, filtros) =>
+    ipcRenderer.invoke("aulas:ocupacion", aulaId, filtros),
 
-  listarDisponibilidadesAula: (
-    aulaId,
-    periodoId,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:disponibilidades:listar',
-      aulaId,
-      periodoId,
-    ),
+  listarDisponibilidadesAula: (aulaId, periodoId) =>
+    ipcRenderer.invoke("aulas:disponibilidades:listar", aulaId, periodoId),
 
-  crearDisponibilidadAula: (
-    aulaId,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:disponibilidades:crear',
-      aulaId,
-      datos,
-    ),
+  crearDisponibilidadAula: (aulaId, datos) =>
+    ipcRenderer.invoke("aulas:disponibilidades:crear", aulaId, datos),
 
-  actualizarDisponibilidadAula: (
-    aulaId,
-    id,
-    datos,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:disponibilidades:actualizar',
-      aulaId,
-      id,
-      datos,
-    ),
+  actualizarDisponibilidadAula: (aulaId, id, datos) =>
+    ipcRenderer.invoke("aulas:disponibilidades:actualizar", aulaId, id, datos),
 
-  eliminarDisponibilidadAula: (
-    aulaId,
-    id,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:disponibilidades:eliminar',
-      aulaId,
-      id,
-    ),
+  eliminarDisponibilidadAula: (aulaId, id) =>
+    ipcRenderer.invoke("aulas:disponibilidades:eliminar", aulaId, id),
 
-  buscarAulasDisponibles: (
-    criterios,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:buscar-disponibles',
-      criterios,
-    ),
+  buscarAulasDisponibles: (criterios) =>
+    ipcRenderer.invoke("aulas:buscar-disponibles", criterios),
 
-  evaluarAulaParaAsignacion: (
-    aulaId,
-    criterios,
-  ) =>
-    ipcRenderer.invoke(
-      'aulas:evaluar-asignacion',
-      aulaId,
-      criterios,
-    ),
+  evaluarAulaParaAsignacion: (aulaId, criterios) =>
+    ipcRenderer.invoke("aulas:evaluar-asignacion", aulaId, criterios),
 
   listarAuditoriaAula: (aulaId) =>
-    ipcRenderer.invoke(
-      'aulas:auditoria:listar',
-      aulaId,
-    ),
+    ipcRenderer.invoke("aulas:auditoria:listar", aulaId),
 });

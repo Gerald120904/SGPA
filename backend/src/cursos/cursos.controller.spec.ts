@@ -119,9 +119,9 @@ describe('CursosController', () => {
     expect(cursosService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite consultar cursos con CURSOS_VER (incluso rol ESTUDIANTE)', async () => {
+  it('permite consultar cursos con CURSOS_VER (incluso rol ASISTENTE_ESTUDIANTIL)', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/cursos')
@@ -132,7 +132,7 @@ describe('CursosController', () => {
   });
 
   it('responde 403 al listar cursos si el usuario no tiene CURSOS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/cursos')
@@ -144,7 +144,7 @@ describe('CursosController', () => {
 
   it('permite consultar un curso por id con CURSOS_VER', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/cursos/1')
@@ -156,7 +156,7 @@ describe('CursosController', () => {
 
   it('responde 403 al consultar asignaturas disponibles sin CURSOS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/cursos/asignaturas-disponibles?carreraId=1&planId=2')
@@ -187,7 +187,7 @@ describe('CursosController', () => {
 
   it('responde 403 al crear un curso sin CURSOS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/cursos')
@@ -203,7 +203,7 @@ describe('CursosController', () => {
 
   it('crea un curso desde una asignatura del plan con CURSOS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       planAsignaturaId: 17,
@@ -283,7 +283,7 @@ describe('CursosController', () => {
 
   it('responde 403 al actualizar un curso sin CURSOS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/cursos/1')
@@ -330,7 +330,7 @@ describe('CursosController', () => {
 
   it('responde 403 al cambiar estado sin CURSOS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/cursos/1/estado')

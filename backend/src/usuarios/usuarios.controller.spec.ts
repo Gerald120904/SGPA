@@ -77,7 +77,7 @@ describe('UsuariosController', () => {
     expect(usuariosService.listar).not.toHaveBeenCalled();
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ESTUDIANTE'])(
+  it.each(['COORDINADOR', 'PROFESOR', 'ASISTENTE_ESTUDIANTIL'])(
     'responde 403 para %s',
     async (rol) => {
       const token = await jwtService.signAsync({

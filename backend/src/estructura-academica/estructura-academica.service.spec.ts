@@ -39,6 +39,7 @@ describe('EstructuraAcademicaService', () => {
   };
 
   let carreraRepository: {
+    find: jest.Mock;
     findOne: jest.Mock;
   };
 
@@ -74,6 +75,7 @@ describe('EstructuraAcademicaService', () => {
     };
 
     carreraRepository = {
+      find: jest.fn(),
       findOne: jest.fn(),
     };
 
@@ -225,6 +227,45 @@ describe('EstructuraAcademicaService', () => {
       expect(alcance1).toBe(true);
       expect(alcance2).toBe(true);
       expect(alcance3).toBe(false);
+    });
+  });
+
+  describe('obtenerCarreraIdsConAlcance', () => {
+    it('consolida carreras directas y carreras asociadas a áreas sin N+1', async () => {
+      asignacionRepository.find.mockResolvedValue([
+        {
+          tipo: TipoAsignacionAcademica.COORDINADOR_CARRERA,
+          carreraId: 1,
+          activo: true,
+        },
+        {
+          tipo: TipoAsignacionAcademica.COORDINADOR_AREA,
+          areaAcademicaId: 5,
+          activo: true,
+        },
+      ]);
+      areaCarreraRepository.find.mockResolvedValue([
+        { areaAcademicaId: 5, carreraId: 2 },
+        { areaAcademicaId: 5, carreraId: 1 },
+      ]);
+
+      await expect(service.obtenerCarreraIdsConAlcance(10)).resolves.toEqual([
+        1, 2,
+      ]);
+      expect(areaCarreraRepository.find).toHaveBeenCalledTimes(1);
+      expect(areaCarreraRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('devuelve todas las carreras para ADMIN_GLOBAL', async () => {
+      usuarioRepository.findOne.mockResolvedValue({
+        usuarioRoles: [{ rol: { nombre: 'ADMIN_GLOBAL', activo: true } }],
+      });
+      carreraRepository.find.mockResolvedValue([{ id: 1 }, { id: 4 }]);
+
+      await expect(service.obtenerCarreraIdsConAlcance(1)).resolves.toEqual([
+        1, 4,
+      ]);
+      expect(asignacionRepository.find).not.toHaveBeenCalled();
     });
   });
 

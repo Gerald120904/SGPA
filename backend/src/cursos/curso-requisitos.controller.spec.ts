@@ -97,7 +97,7 @@ describe('CursoRequisitosController', () => {
 
     const response = await request(app.getHttpServer())
       .get('/cursos/1/requisitos')
-      .set('Authorization', `Bearer ${generarToken('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${generarToken('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200);
 
     expect(response.body).toEqual([]);
@@ -107,7 +107,7 @@ describe('CursoRequisitosController', () => {
   it('GET /cursos/:cursoId/requisitos - responde 403 sin CURSOS_VER', async () => {
     await request(app.getHttpServer())
       .get('/cursos/1/requisitos')
-      .set('Authorization', `Bearer ${generarToken('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${generarToken('ASISTENTE_ESTUDIANTIL')}`)
       .expect(403);
 
     expect(requisitosService.listar).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('CursoRequisitosController', () => {
 
     await request(app.getHttpServer())
       .post('/cursos/1/requisitos')
-      .set('Authorization', `Bearer ${generarToken('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${generarToken('ASISTENTE_ESTUDIANTIL')}`)
       .send({
         requisitoCursoId: 2,
         tipo: TipoRequisito.REQUISITO,
@@ -160,7 +160,7 @@ describe('CursoRequisitosController', () => {
 
     await request(app.getHttpServer())
       .delete('/cursos/1/requisitos/5')
-      .set('Authorization', `Bearer ${generarToken('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${generarToken('ASISTENTE_ESTUDIANTIL')}`)
       .expect(403);
 
     expect(requisitosService.eliminar).not.toHaveBeenCalled();

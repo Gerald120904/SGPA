@@ -10,8 +10,8 @@ export const ROLES =
     PROFESOR:
       'PROFESOR',
 
-    ESTUDIANTE:
-      'ESTUDIANTE',
+    ASISTENTE_ESTUDIANTIL:
+      'ASISTENTE_ESTUDIANTIL',
 
   });
 

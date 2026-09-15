@@ -10,7 +10,7 @@ const ROLE_PRIORITY = [
   ROLES.ADMIN_GLOBAL,
   ROLES.COORDINADOR,
   ROLES.PROFESOR,
-  ROLES.ESTUDIANTE
+  ROLES.ASISTENTE_ESTUDIANTIL
 ];
 
 
@@ -222,8 +222,8 @@ export function formatearRol(
     [ROLES.PROFESOR]:
       'Profesor',
 
-    [ROLES.ESTUDIANTE]:
-      'Estudiante'
+    [ROLES.ASISTENTE_ESTUDIANTIL]:
+      'Estudiante asistente'
 
   };
 

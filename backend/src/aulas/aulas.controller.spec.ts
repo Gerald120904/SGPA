@@ -182,9 +182,9 @@ describe('AulasController', () => {
     expect(aulasService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite listar aulas a ESTUDIANTE con AULAS_VER', async () => {
+  it('permite listar aulas a ASISTENTE_ESTUDIANTIL con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas')
@@ -195,7 +195,7 @@ describe('AulasController', () => {
   });
 
   it('responde 403 al listar para usuario sin AULAS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas')
@@ -207,7 +207,7 @@ describe('AulasController', () => {
 
   it('consulta un aula por id con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/1')
@@ -221,7 +221,7 @@ describe('AulasController', () => {
 
   it('rechaza un id inválido', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/no-es-id')
@@ -233,7 +233,7 @@ describe('AulasController', () => {
 
   it('permite buscar aulas disponibles con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       periodoId: 1,
@@ -252,7 +252,7 @@ describe('AulasController', () => {
 
   it('permite evaluar asignación con AULAS_ASIGNAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_ASIGNAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       periodoId: 1,
@@ -271,7 +271,7 @@ describe('AulasController', () => {
 
   it('rechaza evaluar asignación sin AULAS_ASIGNAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       periodoId: 1,
@@ -290,7 +290,7 @@ describe('AulasController', () => {
 
   it('permite crear un aula a usuario con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       codigo: 'AULA-01',
@@ -315,7 +315,7 @@ describe('AulasController', () => {
 
   it('responde 403 al crear aula sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -335,7 +335,7 @@ describe('AulasController', () => {
 
   it('rechaza crear un aula sin código', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -354,7 +354,7 @@ describe('AulasController', () => {
 
   it('rechaza una capacidad menor a 1', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -374,7 +374,7 @@ describe('AulasController', () => {
 
   it('rechaza un tipo de aula inválido', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -394,7 +394,7 @@ describe('AulasController', () => {
 
   it('rechaza un tipo de mobiliario inválido', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -414,7 +414,7 @@ describe('AulasController', () => {
 
   it('rechaza crear un aula sin tipo de mobiliario', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -433,7 +433,7 @@ describe('AulasController', () => {
 
   it('rechaza un origen inválido', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -453,7 +453,7 @@ describe('AulasController', () => {
 
   it('rechaza campos adicionales al crear', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas')
@@ -474,7 +474,7 @@ describe('AulasController', () => {
 
   it('permite actualizar un aula con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       nombre: 'Aula Principal',
@@ -494,7 +494,7 @@ describe('AulasController', () => {
 
   it('responde 403 al actualizar sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1')
@@ -509,7 +509,7 @@ describe('AulasController', () => {
 
   it('permite cambiar estado con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/estado')
@@ -526,7 +526,7 @@ describe('AulasController', () => {
 
   it('responde 403 al cambiar estado sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/estado')
@@ -541,7 +541,7 @@ describe('AulasController', () => {
 
   it('rechaza estado que no sea boolean', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/estado')
@@ -556,7 +556,7 @@ describe('AulasController', () => {
 
   it('permite consultar el catálogo de equipamientos con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/equipamientos')
@@ -567,7 +567,7 @@ describe('AulasController', () => {
   });
 
   it('deniega el catálogo sin AULAS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/equipamientos')
@@ -579,7 +579,7 @@ describe('AulasController', () => {
 
   it('crea equipamiento con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = {
       nombre: 'Proyector',
       descripcion: 'Proyector multimedia',
@@ -596,7 +596,7 @@ describe('AulasController', () => {
 
   it('consulta un equipamiento por id con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/equipamientos/1')
@@ -608,7 +608,7 @@ describe('AulasController', () => {
 
   it('responde 403 al crear equipamiento sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/equipamientos')
@@ -621,7 +621,7 @@ describe('AulasController', () => {
 
   it('rechaza crear equipamiento sin nombre', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/equipamientos')
@@ -634,7 +634,7 @@ describe('AulasController', () => {
 
   it('permite actualizar equipamiento con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = { nombre: 'Proyector multimedia' };
 
     await request(app.getHttpServer())
@@ -648,7 +648,7 @@ describe('AulasController', () => {
 
   it('permite cambiar estado de equipamiento con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/equipamientos/1/estado')
@@ -665,7 +665,7 @@ describe('AulasController', () => {
 
   it('no confunde equipamientos con el id de un aula', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/equipamientos')
@@ -677,7 +677,7 @@ describe('AulasController', () => {
 
   it('lista equipamiento de un aula con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/1/equipamientos')
@@ -689,7 +689,7 @@ describe('AulasController', () => {
 
   it('asigna equipamiento a un aula con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = {
       equipamientoId: 1,
       cantidadTotal: 25,
@@ -712,7 +712,7 @@ describe('AulasController', () => {
 
   it('rechaza cantidades inválidas antes de llamar al servicio', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/equipamientos')
@@ -729,7 +729,7 @@ describe('AulasController', () => {
 
   it('rechaza cantidad disponible negativa', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/equipamientos')
@@ -746,7 +746,7 @@ describe('AulasController', () => {
 
   it('responde 403 al asignar equipamiento sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/equipamientos')
@@ -763,7 +763,7 @@ describe('AulasController', () => {
 
   it('permite actualizar equipamiento de un aula con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = {
       cantidadDisponible: 22,
       observaciones: '3 computadoras en reparación',
@@ -785,7 +785,7 @@ describe('AulasController', () => {
 
   it('cambia el estado de una asignación de equipamiento con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/equipamientos/2/estado')
@@ -803,7 +803,7 @@ describe('AulasController', () => {
 
   it('responde 403 al modificar equipamiento de aula sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/equipamientos/1')
@@ -816,7 +816,7 @@ describe('AulasController', () => {
 
   it('permite consultar indisponibilidades con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/1/indisponibilidades')
@@ -827,7 +827,7 @@ describe('AulasController', () => {
   });
 
   it('deniega indisponibilidades sin AULAS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/1/indisponibilidades')
@@ -839,7 +839,7 @@ describe('AulasController', () => {
 
   it('consulta una indisponibilidad por id con AULAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/aulas/1/indisponibilidades/2')
@@ -851,7 +851,7 @@ describe('AulasController', () => {
 
   it('permite crear una indisponibilidad con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = {
       tipo: TipoIndisponibilidadAula.MANTENIMIENTO,
       fechaHoraInicio: '2027-10-10T08:00:00',
@@ -874,7 +874,7 @@ describe('AulasController', () => {
 
   it('deniega crear una indisponibilidad sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -892,7 +892,7 @@ describe('AulasController', () => {
 
   it('valida DTO de indisponibilidad antes de llamar al servicio', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -910,7 +910,7 @@ describe('AulasController', () => {
 
   it('permite actualizar y cambiar estado de indisponibilidad con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = { motivo: 'Updated reason' };
 
     await request(app.getHttpServer())
@@ -940,7 +940,7 @@ describe('AulasController', () => {
 
   it('rechaza una fecha inválida al crear una indisponibilidad', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -958,7 +958,7 @@ describe('AulasController', () => {
 
   it('rechaza crear una indisponibilidad sin motivo', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -975,7 +975,7 @@ describe('AulasController', () => {
 
   it('rechaza propiedades no permitidas al crear una indisponibilidad', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/aulas/1/indisponibilidades')
@@ -994,7 +994,7 @@ describe('AulasController', () => {
 
   it('permite actualizar una indisponibilidad con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = { motivo: 'Mantenimiento reprogramado' };
 
     await request(app.getHttpServer())
@@ -1013,7 +1013,7 @@ describe('AulasController', () => {
 
   it('responde 403 al actualizar una indisponibilidad sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5')
@@ -1026,7 +1026,7 @@ describe('AulasController', () => {
 
   it('permite inactivar una indisponibilidad con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -1044,7 +1044,7 @@ describe('AulasController', () => {
 
   it('permite reactivar una indisponibilidad con AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -1062,7 +1062,7 @@ describe('AulasController', () => {
 
   it('responde 403 al cambiar estado de una indisponibilidad sin AULAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_VER);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -1075,7 +1075,7 @@ describe('AulasController', () => {
 
   it('rechaza un estado que no sea booleano', async () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .patch('/aulas/1/indisponibilidades/5/estado')
@@ -1097,7 +1097,7 @@ describe('AulasController', () => {
 
     it('permite consultar reservas con AULAS_VER', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/reservas')
@@ -1108,7 +1108,7 @@ describe('AulasController', () => {
     });
 
     it('deniega reservas sin AULAS_VER', async () => {
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/reservas')
@@ -1120,7 +1120,7 @@ describe('AulasController', () => {
 
     it('permite consultar una reserva por id con AULAS_VER', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/reservas/2')
@@ -1132,7 +1132,7 @@ describe('AulasController', () => {
 
     it('permite crear una reserva con AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .post('/aulas/1/reservas')
@@ -1145,7 +1145,7 @@ describe('AulasController', () => {
 
     it('deniega crear una reserva sin AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .post('/aulas/1/reservas')
@@ -1158,7 +1158,7 @@ describe('AulasController', () => {
 
     it('valida el DTO de reserva antes de llamar al servicio', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .post('/aulas/1/reservas')
@@ -1176,7 +1176,7 @@ describe('AulasController', () => {
 
     it('permite actualizar y cambiar el estado con AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
       const cambios = { titulo: 'Examen reprogramado' };
 
       await request(app.getHttpServer())
@@ -1208,7 +1208,7 @@ describe('AulasController', () => {
   describe('GET /aulas/:aulaId/ocupacion', () => {
     it('permite consultar ocupación con AULAS_VER', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get(
@@ -1228,7 +1228,7 @@ describe('AulasController', () => {
 
     it('rechaza consultar ocupación con fechas inválidas', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get(
@@ -1244,7 +1244,7 @@ describe('AulasController', () => {
   describe('GET /aulas/:aulaId/auditoria', () => {
     it('permite consultar auditoría con AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/auditoria')
@@ -1256,7 +1256,7 @@ describe('AulasController', () => {
 
     it('prohíbe consultar auditoría sin AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/auditoria')
@@ -1270,7 +1270,7 @@ describe('AulasController', () => {
   describe('disponibilidades de aulas', () => {
     it('permite listar disponibilidades con AULAS_VER', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/disponibilidades?periodoId=2')
@@ -1284,7 +1284,7 @@ describe('AulasController', () => {
     });
 
     it('deniega listar disponibilidades sin AULAS_VER', async () => {
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .get('/aulas/1/disponibilidades?periodoId=2')
@@ -1296,7 +1296,7 @@ describe('AulasController', () => {
 
     it('permite crear disponibilidad con AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
       const dto = {
         periodoId: 2,
         diaSemana: 1,
@@ -1319,7 +1319,7 @@ describe('AulasController', () => {
 
     it('deniega crear disponibilidad sin AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_VER);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .post('/aulas/1/disponibilidades')
@@ -1337,7 +1337,7 @@ describe('AulasController', () => {
 
     it('permite actualizar disponibilidad con AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
       const dto = {
         horaFin: '13:00',
       };
@@ -1358,7 +1358,7 @@ describe('AulasController', () => {
 
     it('permite eliminar disponibilidad con AULAS_GESTIONAR', async () => {
       permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
-      const token = await crearToken('ESTUDIANTE');
+      const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
       await request(app.getHttpServer())
         .delete('/aulas/1/disponibilidades/5')

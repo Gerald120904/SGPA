@@ -30,7 +30,7 @@ describe('UsuariosService', () => {
 
   const rolEstudiante = {
     id: 4,
-    nombre: RolSistema.ESTUDIANTE,
+    nombre: RolSistema.ASISTENTE_ESTUDIANTIL,
     descripcion: 'Estudiante',
     activo: true,
   } as Rol;
@@ -219,7 +219,7 @@ describe('UsuariosService', () => {
     expect(resultado).not.toHaveProperty('passwordHash');
   });
 
-  it('crea ESTUDIANTE sin permisos personalizados y no guarda permisos', async () => {
+  it('crea ASISTENTE_ESTUDIANTIL sin permisos personalizados y no guarda permisos', async () => {
     const usuarioCreado = crearUsuario();
     usuarioRepository.findOne
       .mockResolvedValueOnce(null)
@@ -237,7 +237,7 @@ describe('UsuariosService', () => {
       apellido1: 'Prueba',
       correo: 'estudiante@sgpa.local',
       password: 'ClaveSegura123',
-      roles: [RolSistema.ESTUDIANTE],
+      roles: [RolSistema.ASISTENTE_ESTUDIANTIL],
     });
 
     expect(txUsuarioPermisoRepository.save).not.toHaveBeenCalled();

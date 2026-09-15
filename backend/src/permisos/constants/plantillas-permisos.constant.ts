@@ -87,10 +87,10 @@ export const PERMISOS_PREDETERMINADOS_POR_ROL:
 
 
   /* =======================================================
-     ESTUDIANTE
+     ASISTENTE_ESTUDIANTIL
      ======================================================= */
 
-  [RolSistema.ESTUDIANTE]: [],
+  [RolSistema.ASISTENTE_ESTUDIANTIL]: [],
 
 };
 

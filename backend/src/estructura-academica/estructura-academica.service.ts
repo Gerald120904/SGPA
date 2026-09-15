@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { RolSistema } from '../auth/constants/roles.constants';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -134,6 +135,10 @@ export class EstructuraAcademicaService {
     usuarioId: number,
     carreraId: number,
   ): Promise<boolean> {
+    if (await this.esAdminGlobal(usuarioId)) {
+      return true;
+    }
+
     const asignaciones = await this.obtenerAsignacionesVigentes(usuarioId);
 
     if (
@@ -172,13 +177,80 @@ export class EstructuraAcademicaService {
     }
 
     const relacion = await this.areaCarreraRepository.findOne({
-      where: {
-        areaAcademicaId: In(areaIds),
-        carreraId,
-      },
+      where: { areaAcademicaId: In(areaIds), carreraId },
     });
 
     return Boolean(relacion);
+  }
+
+  async obtenerCarreraIdsConAlcance(usuarioId: number): Promise<number[]> {
+    if (await this.esAdminGlobal(usuarioId)) {
+      const carreras = await this.carreraRepository.find({
+        select: { id: true },
+      });
+      return carreras.map((carrera) => carrera.id);
+    }
+
+    const asignaciones = await this.obtenerAsignacionesVigentes(usuarioId);
+
+    if (
+      asignaciones.some(
+        (item) => item.tipo === TipoAsignacionAcademica.DIRECCION_ACADEMICA,
+      )
+    ) {
+      const carreras = await this.carreraRepository.find({
+        select: { id: true },
+      });
+      return carreras.map((carrera) => carrera.id);
+    }
+
+    const carreraIds = asignaciones
+      .filter((item) =>
+        [
+          TipoAsignacionAcademica.COORDINADOR_CARRERA,
+          TipoAsignacionAcademica.ASISTENTE_CARRERA,
+        ].includes(item.tipo),
+      )
+      .map((item) => item.carreraId!)
+      .filter(Boolean);
+
+    const areaIds = asignaciones
+      .filter((item) =>
+        [
+          TipoAsignacionAcademica.COORDINADOR_AREA,
+          TipoAsignacionAcademica.ASISTENTE_AREA,
+        ].includes(item.tipo),
+      )
+      .map((item) => item.areaAcademicaId!)
+      .filter(Boolean);
+
+    if (!areaIds.length) {
+      return [...new Set(carreraIds)];
+    }
+
+    const relaciones = await this.areaCarreraRepository.find({
+      where: { areaAcademicaId: In(areaIds) },
+      select: { carreraId: true },
+    });
+
+    return [
+      ...new Set([
+        ...carreraIds,
+        ...relaciones.map((relacion) => relacion.carreraId),
+      ]),
+    ];
+  }
+
+  private async esAdminGlobal(usuarioId: number): Promise<boolean> {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: usuarioId },
+      relations: { usuarioRoles: { rol: true } },
+    });
+
+    return (usuario?.usuarioRoles ?? []).some(
+      (relacion) =>
+        relacion.rol?.activo && relacion.rol.nombre === RolSistema.ADMIN_GLOBAL,
+    );
   }
 
   async tieneAlcanceSobreProfesor(
