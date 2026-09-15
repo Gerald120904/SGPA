@@ -109,7 +109,10 @@ describe('GoogleFormsClientService', () => {
 
     expect(formsClient.forms.batchUpdate).toHaveBeenCalledWith({
       formId: 'form-1',
-      requestBody: { requests },
+      requestBody: {
+        includeFormInResponse: true,
+        requests,
+      },
     });
   });
 

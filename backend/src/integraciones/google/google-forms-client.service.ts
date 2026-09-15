@@ -54,6 +54,7 @@ export class GoogleFormsClientService {
     const { data } = await client.forms.batchUpdate({
       formId,
       requestBody: {
+        includeFormInResponse: true,
         requests,
       },
     });

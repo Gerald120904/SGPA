@@ -15,6 +15,8 @@ import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { EstadoFormularioEstudiante } from '../constants/estado-formulario-estudiante.constant';
 import { RespuestaFormularioEstudiante } from './respuesta-formulario-estudiante.entity';
 
+import { MapaPreguntasFormulario } from '../types/mapa-preguntas-formulario.type';
+
 @Entity({ name: 'formularios_estudiantes' })
 export class FormularioEstudiante {
   @PrimaryGeneratedColumn({
@@ -73,7 +75,14 @@ export class FormularioEstudiante {
     type: 'json',
     nullable: true,
   })
-  mapaPreguntas!: Record<string, any> | null;
+  mapaPreguntas!: MapaPreguntasFormulario | null;
+
+  @Column({
+    name: 'detalle_error',
+    type: 'text',
+    nullable: true,
+  })
+  detalleError!: string | null;
 
   @Column({
     name: 'ultima_sincronizacion_at',
