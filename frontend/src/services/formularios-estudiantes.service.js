@@ -84,3 +84,16 @@ export async function cerrarFormularioEstudiantes(id) {
   return window.sgpa
     .cerrarFormularioEstudiantes(id);
 }
+
+export async function listarRespuestasFormularioEstudiantes(
+  id
+) {
+  validarApi(
+    'listarRespuestasFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .listarRespuestasFormularioEstudiantes(
+      id
+    );
+}

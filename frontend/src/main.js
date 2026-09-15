@@ -1722,6 +1722,15 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'formularios-estudiantes:respuestas',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/${id}/respuestas`
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

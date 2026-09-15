@@ -6,7 +6,8 @@ import {
   crearFormularioEstudiantes,
   sincronizarFormularioEstudiantes,
   procesarFormularioEstudiantes,
-  cerrarFormularioEstudiantes
+  cerrarFormularioEstudiantes,
+  listarRespuestasFormularioEstudiantes
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -279,6 +280,11 @@ function renderizarFilaFormulario(
       PERMISOS.GESTIONAR
     );
 
+  const puedeVerRespuestas =
+    usuarioTienePermiso(
+      PERMISOS.VER_RESPUESTAS
+    );
+
   const publicado =
     formulario.estado === 'PUBLICADO';
 
@@ -341,6 +347,25 @@ function renderizarFilaFormulario(
                 >
                   <i
                     data-lucide="copy"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            puedeVerRespuestas
+              ? `
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="ver-respuestas"
+                  data-id="${formulario.id}"
+                  title="Ver respuestas"
+                >
+                  <i
+                    data-lucide="inbox"
                     aria-hidden="true"
                   ></i>
                 </button>
@@ -525,6 +550,12 @@ async function manejarAccionFormulario(event) {
       );
       break;
 
+    case 'ver-respuestas':
+      await verRespuestasFormulario(
+        formulario
+      );
+      break;
+
     case 'sincronizar':
       await sincronizarFormulario(
         formulario,
@@ -582,6 +613,262 @@ async function copiarEnlaceFormulario(
         'No se pudo acceder al portapapeles.'
     });
   }
+}
+
+async function verRespuestasFormulario(
+  formulario
+) {
+  const dialog =
+    document.getElementById(
+      'formularioEstudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'formularioEstudianteDialogContent'
+    );
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  content.innerHTML =
+    FormDialog({
+      formId:
+        'respuestasFormularioEstudianteForm',
+
+      title:
+        'Respuestas del formulario',
+
+      description:
+        formulario.titulo,
+
+      body: `
+        <div
+          id="respuestasFormularioContent"
+        >
+          <div
+            class="sgpa-table-empty"
+            role="status"
+          >
+            <strong>
+              Cargando respuestas...
+            </strong>
+          </div>
+        </div>
+      `,
+
+      cancelButtonId:
+        'cerrarRespuestasFormularioButton',
+
+      cancelText:
+        'Cerrar',
+
+      showFooter:
+        true,
+
+      layout:
+        'custom'
+    });
+
+  renderizarIconos();
+  dialog.showModal();
+  habilitarCierreExterior(dialog);
+
+  document
+    .getElementById(
+      'cerrarRespuestasFormularioButton'
+    )
+    ?.addEventListener(
+      'click',
+      () => dialog.close()
+    );
+
+  try {
+    const res =
+      await listarRespuestasFormularioEstudiantes(
+        formulario.id
+      );
+
+    if (res && res.ok === false) {
+      throw new Error(
+        res.message || 'No fue posible cargar las respuestas.'
+      );
+    }
+
+    const data = res?.data ?? res;
+
+    const respuestas =
+      Array.isArray(data)
+        ? data
+        : [];
+
+    renderizarRespuestasFormulario(
+      respuestas
+    );
+  } catch (error) {
+    dialog.close();
+
+    mostrarError({
+      titulo:
+        'No fue posible cargar las respuestas',
+      mensaje:
+        error?.message ||
+        'Ocurrió un error al consultar la bandeja de respuestas.'
+    });
+  }
+}
+
+function renderizarRespuestasFormulario(
+  respuestas
+) {
+  const contenedor =
+    document.getElementById(
+      'respuestasFormularioContent'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  const rows =
+    respuestas
+      .map(
+        renderizarFilaRespuesta
+      )
+      .join('');
+
+  contenedor.innerHTML =
+    DataTable({
+      columns: [
+        'Estudiante',
+        'Identificación',
+        'Correo',
+        'Aprobadas',
+        'Estado',
+        'Procesada',
+        'Detalle'
+      ],
+
+      rows,
+
+      emptyMessage:
+        'Este formulario todavía no tiene respuestas sincronizadas.',
+
+      ariaLabel:
+        'Respuestas del formulario'
+    });
+
+  renderizarIconos();
+}
+
+function renderizarFilaRespuesta(
+  respuesta
+) {
+  const datos =
+    respuesta.datosNormalizadosJson;
+
+  const nombre =
+    datos
+      ? [
+          datos.primerNombre,
+          datos.segundoNombre,
+          datos.primerApellido,
+          datos.segundoApellido
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : 'Sin normalizar';
+
+  const identificacion =
+    datos?.identificacion ??
+    '—';
+
+  const correo =
+    datos?.correoEstudiantil ??
+    '—';
+
+  const aprobadas =
+    Array.isArray(
+      datos?.asignaturasAprobadas
+    )
+      ? datos.asignaturasAprobadas.length
+      : 0;
+
+  return `
+    <tr>
+      <td>
+        ${escapeHtml(nombre)}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          identificacion
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(correo)}
+      </td>
+
+      <td>
+        ${aprobadas}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          respuesta.estado ||
+          '—'
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          formatearFechaHora(
+            respuesta.procesadoAt
+          )
+        )}
+      </td>
+
+      <td>
+        ${escapeHtml(
+          respuesta.detalleError ||
+          datos?.optativasNoDisciplinarias ||
+          '—'
+        )}
+      </td>
+    </tr>
+  `;
+}
+
+function formatearFechaHora(
+  valor
+) {
+  if (!valor) {
+    return '—';
+  }
+
+  const fecha =
+    new Date(valor);
+
+  if (
+    Number.isNaN(
+      fecha.getTime()
+    )
+  ) {
+    return String(valor);
+  }
+
+  return new Intl.DateTimeFormat(
+    'es-CR',
+    {
+      dateStyle:
+        'medium',
+
+      timeStyle:
+        'short'
+    }
+  ).format(fecha);
 }
 
 async function sincronizarFormulario(

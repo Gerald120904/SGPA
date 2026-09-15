@@ -395,4 +395,10 @@ contextBridge.exposeInMainWorld("sgpa", {
       'formularios-estudiantes:cerrar',
       id
     ),
+
+  listarRespuestasFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:respuestas',
+      id
+    ),
 });
