@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net } from "electron";
+import { app, BrowserWindow, ipcMain, net, shell } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 
@@ -1624,6 +1624,54 @@ ipcMain.handle('formularios-estudiantes:listar', async () => {
     '/formularios-estudiantes'
   );
 });
+
+ipcMain.handle(
+  'formularios-estudiantes:google-estado',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/integraciones/google/oauth/estado'
+    );
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:google-conectar',
+  async () => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/integraciones/google/oauth/iniciar',
+        {
+          method: 'POST'
+        }
+      );
+
+    const url = resultado?.data?.url || resultado?.url;
+
+    if (!url) {
+      throw new Error(
+        resultado?.message || 'No se recibió la URL de autorización de Google.'
+      );
+    }
+
+    await shell.openExternal(url);
+
+    return {
+      abierto: true
+    };
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:google-desconectar',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/integraciones/google/oauth/desconectar',
+      {
+        method: 'DELETE'
+      }
+    );
+  }
+);
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({

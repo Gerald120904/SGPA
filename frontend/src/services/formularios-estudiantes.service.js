@@ -17,3 +17,30 @@ export async function listarFormulariosEstudiantes() {
   return window.sgpa
     .listarFormulariosEstudiantes();
 }
+
+export async function obtenerEstadoGoogleFormularios() {
+  validarApi(
+    'obtenerEstadoGoogleFormularios'
+  );
+
+  return window.sgpa
+    .obtenerEstadoGoogleFormularios();
+}
+
+export async function conectarGoogleFormularios() {
+  validarApi(
+    'conectarGoogleFormularios'
+  );
+
+  return window.sgpa
+    .conectarGoogleFormularios();
+}
+
+export async function desconectarGoogleFormularios() {
+  validarApi(
+    'desconectarGoogleFormularios'
+  );
+
+  return window.sgpa
+    .desconectarGoogleFormularios();
+}
