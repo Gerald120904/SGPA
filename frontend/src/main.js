@@ -1731,6 +1731,77 @@ ipcMain.handle(
   }
 );
 
+/* =========================================================
+   ESTUDIANTES
+   ========================================================= */
+
+ipcMain.handle(
+  'estudiantes:listar',
+  async (_event, filtros = {}) => {
+    const params =
+      new URLSearchParams();
+
+    if (filtros.texto?.trim()) {
+      params.set(
+        'texto',
+        filtros.texto.trim()
+      );
+    }
+
+    if (filtros.carreraId) {
+      params.set(
+        'carreraId',
+        String(filtros.carreraId)
+      );
+    }
+
+    if (filtros.planEstudioId) {
+      params.set(
+        'planEstudioId',
+        String(filtros.planEstudioId)
+      );
+    }
+
+    if (filtros.periodoIngresoId) {
+      params.set(
+        'periodoIngresoId',
+        String(filtros.periodoIngresoId)
+      );
+    }
+
+    if (filtros.estado) {
+      params.set(
+        'estado',
+        filtros.estado
+      );
+    }
+
+    const query =
+      params.toString();
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/estudiantes${
+          query
+            ? `?${query}`
+            : ''
+        }`
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      estudiantes:
+        Array.isArray(resultado.data)
+          ? resultado.data
+          : []
+    };
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

@@ -401,4 +401,10 @@ contextBridge.exposeInMainWorld("sgpa", {
       'formularios-estudiantes:respuestas',
       id
     ),
+
+  listarEstudiantes: (filtros = {}) =>
+    ipcRenderer.invoke(
+      'estudiantes:listar',
+      filtros
+    ),
 });
