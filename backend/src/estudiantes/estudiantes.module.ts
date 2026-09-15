@@ -50,6 +50,11 @@ import { GoogleFormsService } from './google-forms/google-forms.service';
     GoogleFormsService,
     GoogleFormsSyncService,
   ],
-  exports: [EstudiantesService, GoogleFormsService, GoogleFormsSyncService],
+  exports: [
+    EstudiantesService,
+    EstudiantesImportacionService,
+    GoogleFormsService,
+    GoogleFormsSyncService,
+  ],
 })
 export class EstudiantesModule {}

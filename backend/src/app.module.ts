@@ -19,6 +19,8 @@ import { OfertaAcademicaModule } from './oferta-academica/oferta-academica.modul
 import { PermisosModule } from './permisos/permisos.module';
 import { EstructuraAcademicaModule } from './estructura-academica/estructura-academica.module';
 import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
+import { GoogleModule } from './integraciones/google/google.module';
+import { FormulariosEstudiantesModule } from './formularios-estudiantes/formularios-estudiantes.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
     PeriodosAcademicosModule,
     ProyeccionModule,
     OfertaAcademicaModule,
+    GoogleModule,
+    FormulariosEstudiantesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,6 @@
+export enum EstadoRespuestaFormulario {
+  PENDIENTE = 'PENDIENTE',
+  PROCESADO = 'PROCESADO',
+  REQUIERE_REVISION = 'REQUIERE_REVISION',
+  ERROR = 'ERROR',
+}
