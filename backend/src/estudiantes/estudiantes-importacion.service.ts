@@ -84,6 +84,29 @@ export class EstudiantesImportacionService {
   }
 
   async ejecutar(usuarioId: number, dto: ImportarEstudiantesDto) {
+    return this.ejecutarConFuente(
+      usuarioId,
+      dto,
+      FuenteRegistroAcademico.EXCEL,
+    );
+  }
+
+  async ejecutarDesdeGoogleForms(
+    usuarioId: number,
+    dto: ImportarEstudiantesDto,
+  ) {
+    return this.ejecutarConFuente(
+      usuarioId,
+      dto,
+      FuenteRegistroAcademico.GOOGLE_FORMS,
+    );
+  }
+
+  private async ejecutarConFuente(
+    usuarioId: number,
+    dto: ImportarEstudiantesDto,
+    fuente: FuenteRegistroAcademico,
+  ) {
     await this.validarContexto(usuarioId, dto.carreraId, dto.planEstudioId);
     const filas = await this.validarFilas(dto);
     const procesables = filas.filter(
@@ -122,7 +145,7 @@ export class EstudiantesImportacionService {
               estudianteId!,
               aprobacion.planAsignaturaId,
               usuarioId,
-              FuenteRegistroAcademico.EXCEL,
+              fuente,
             );
             aprobacionesNuevas += 1;
           }

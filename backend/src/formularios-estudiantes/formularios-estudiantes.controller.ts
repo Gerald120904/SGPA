@@ -14,6 +14,7 @@ import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
+import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
 
@@ -23,6 +24,7 @@ export class FormulariosEstudiantesController {
   constructor(
     private readonly formulariosService: FormulariosEstudiantesService,
     private readonly syncService: FormulariosEstudiantesSyncService,
+    private readonly procesamientoService: FormulariosEstudiantesProcesamientoService,
   ) {}
 
   @Post()
@@ -44,6 +46,18 @@ export class FormulariosEstudiantesController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.syncService.sincronizar(
+      id,
+      req.user!.sub,
+    );
+  }
+
+  @Post(':id/procesar')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
+  procesar(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.procesamientoService.procesar(
       id,
       req.user!.sub,
     );

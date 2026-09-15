@@ -303,6 +303,31 @@ describe('EstudiantesImportacionService', () => {
     );
   });
 
+  it('ejecuta aprobaciones Google Forms con período nulo y fuente GOOGLE_FORMS', async () => {
+    const save = jest.fn(async (valor) => ({ ...valor, id: 20 }));
+    const create = jest.fn((valor) => valor);
+    const update = jest.fn();
+    dataSource.transaction.mockImplementation(async (callback) =>
+      callback({
+        getRepository: (entity: unknown) =>
+          entity === Estudiante ? { save, create, update } : { save, create },
+      } as never),
+    );
+    const resultado = await service.ejecutarDesdeGoogleForms(9, dto());
+    expect(resultado).toMatchObject({
+      creados: 1,
+      aprobacionesNuevas: 1,
+      errores: 0,
+    });
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        periodoId: null,
+        resultado: ResultadoAcademico.APROBADO,
+        fuenteRegistro: FuenteRegistroAcademico.GOOGLE_FORMS,
+      }),
+    );
+  });
+
   it('rechaza usuarios sin alcance académico', async () => {
     alcance.tieneAlcanceSobreCarrera.mockResolvedValue(false);
     await expect(service.validar(9, dto())).rejects.toBeInstanceOf(

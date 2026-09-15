@@ -264,4 +264,26 @@ describe('NormalizadorRespuestaFormularioService', () => {
     expect(resultado.optativasNoDisciplinarias).toBe('Arte y Comunicación');
     expect(resultado.requiereRevisionOptativas).toBe(true);
   });
+
+  it('optativa con "Ninguna", "No", "N/A" se normaliza como null y no requiere revisión', () => {
+    const conNinguna = {
+      answers: {
+        'q-nombre1': { textAnswers: { answers: [{ value: 'Ana' }] } },
+        'q-apellido1': { textAnswers: { answers: [{ value: 'Solano' }] } },
+        'q-cedula': { textAnswers: { answers: [{ value: '1111' }] } },
+        'q-email': { textAnswers: { answers: [{ value: 'ana@est.cr' }] } },
+        'q-periodo': {
+          textAnswers: { answers: [{ value: '2026-C1 - I Ciclo 2026' }] },
+        },
+        'q-optativas': {
+          textAnswers: { answers: [{ value: ' Ninguna ' }] },
+        },
+      },
+    };
+
+    const resultado = service.normalizar(conNinguna as never, mockMapa);
+
+    expect(resultado.optativasNoDisciplinarias).toBeNull();
+    expect(resultado.requiereRevisionOptativas).toBe(false);
+  });
 });

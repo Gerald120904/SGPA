@@ -15,6 +15,7 @@ import { GoogleModule } from '../integraciones/google/google.module';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
 import { FormulariosEstudiantesController } from './formularios-estudiantes.controller';
+import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
 import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta-formulario.service';
@@ -42,11 +43,13 @@ import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta
   providers: [
     FormulariosEstudiantesService,
     FormulariosEstudiantesSyncService,
+    FormulariosEstudiantesProcesamientoService,
     NormalizadorRespuestaFormularioService,
   ],
   exports: [
     FormulariosEstudiantesService,
     FormulariosEstudiantesSyncService,
+    FormulariosEstudiantesProcesamientoService,
   ],
 })
 export class FormulariosEstudiantesModule {}

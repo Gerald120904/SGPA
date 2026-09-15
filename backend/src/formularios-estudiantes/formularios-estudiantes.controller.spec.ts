@@ -5,6 +5,7 @@ import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PERMISOS_KEY } from '../permisos/decorators/permisos.decorator';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
 import { FormulariosEstudiantesController } from './formularios-estudiantes.controller';
+import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
 
@@ -18,6 +19,9 @@ describe('FormulariosEstudiantesController', () => {
     sincronizar: jest.Mock;
     listarRespuestas: jest.Mock;
   };
+  let procesamientoService: {
+    procesar: jest.Mock;
+  };
 
   beforeEach(() => {
     reflector = new Reflector();
@@ -28,10 +32,14 @@ describe('FormulariosEstudiantesController', () => {
       sincronizar: jest.fn(),
       listarRespuestas: jest.fn(),
     };
+    procesamientoService = {
+      procesar: jest.fn(),
+    };
 
     controller = new FormulariosEstudiantesController(
       service as unknown as FormulariosEstudiantesService,
       syncService as unknown as FormulariosEstudiantesSyncService,
+      procesamientoService as unknown as FormulariosEstudiantesProcesamientoService,
     );
   });
 
@@ -109,6 +117,43 @@ describe('FormulariosEstudiantesController', () => {
       const permisos = reflector.get<PermisoSistema[]>(
         PERMISOS_KEY,
         FormulariosEstudiantesController.prototype.sincronizar,
+      );
+      expect(permisos).toEqual([
+        PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
+      ]);
+    });
+  });
+
+  describe('procesar', () => {
+    it('delega al procesamientoService con id y req.user.sub', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = {
+        candidatas: 1,
+        procesadas: 1,
+        omitidasYaProcesadas: 0,
+        requierenRevision: 0,
+        errores: 0,
+        estudiantesCreados: 1,
+        estudiantesActualizados: 0,
+        aprobacionesNuevas: 2,
+      };
+      procesamientoService.procesar.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.procesar(mockReq, 1);
+
+      expect(procesamientoService.procesar).toHaveBeenCalledWith(1, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para FORMULARIOS_ESTUDIANTES_GESTIONAR', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.procesar,
       );
       expect(permisos).toEqual([
         PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,

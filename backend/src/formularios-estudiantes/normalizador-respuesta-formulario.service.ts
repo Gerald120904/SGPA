@@ -54,10 +54,16 @@ export class NormalizadorRespuestaFormularioService {
       mapa.asignaturasAprobadas.questionId,
     );
 
-    const optativasNoDisciplinarias = this.obtenerValor(
+    const optativasRaw = this.obtenerValor(
       respuesta,
       mapa.optativasNoDisciplinarias.questionId,
     );
+
+    const optativasNoDisciplinarias =
+      this.normalizarOptativas(optativasRaw);
+
+    const requiereRevisionOptativas =
+      optativasNoDisciplinarias !== null;
 
     if (
       !primerNombre ||
@@ -99,9 +105,6 @@ export class NormalizadorRespuestaFormularioService {
       },
     );
 
-    const requiereRevisionOptativas =
-      Boolean(optativasNoDisciplinarias?.trim());
-
     return {
       primerNombre,
       segundoNombre,
@@ -115,6 +118,32 @@ export class NormalizadorRespuestaFormularioService {
       optativasNoDisciplinarias,
       requiereRevisionOptativas,
     };
+  }
+
+  private normalizarOptativas(valor: string | null): string | null {
+    if (!valor) {
+      return null;
+    }
+
+    const limpio = valor.trim();
+
+    if (!limpio) {
+      return null;
+    }
+
+    const sinContenido = new Set([
+      'ninguna',
+      'ninguno',
+      'no',
+      'n/a',
+      'na',
+      'no aplica',
+      'no aplica.',
+    ]);
+
+    return sinContenido.has(limpio.toLowerCase())
+      ? null
+      : limpio;
   }
 
   private obtenerValores(
