@@ -1611,6 +1611,20 @@ ipcMain.handle("aulas:auditoria:listar", async (_event, aulaId) => {
   };
 });
 
+/* =========================================================
+   FORMULARIOS DE ESTUDIANTES
+   ========================================================= */
+
+console.log(
+  '[IPC] Registrando formularios-estudiantes:listar'
+);
+
+ipcMain.handle('formularios-estudiantes:listar', async () => {
+  return ejecutarPeticionAutenticada(
+    '/formularios-estudiantes'
+  );
+});
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

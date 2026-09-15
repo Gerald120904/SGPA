@@ -351,4 +351,9 @@ contextBridge.exposeInMainWorld("sgpa", {
 
   listarAuditoriaAula: (aulaId) =>
     ipcRenderer.invoke("aulas:auditoria:listar", aulaId),
+
+  listarFormulariosEstudiantes: () =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:listar'
+    ),
 });

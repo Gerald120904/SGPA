@@ -47,6 +47,11 @@ import {
 } from '../pages/aulas/AulasPage.js';
 
 import {
+  FormulariosEstudiantesPage,
+  iniciarFormulariosEstudiantesPage
+} from '../pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
+
+import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
 
@@ -123,7 +128,10 @@ const PAGE_RENDERERS = {
     ProfesoresPage,
 
   aulas:
-    AulasPage
+    AulasPage,
+
+  'formularios-estudiantes':
+    FormulariosEstudiantesPage
 
 };
 
@@ -493,6 +501,16 @@ function renderizarRuta(
   ) {
 
     iniciarAulasPage();
+
+  }
+
+
+  if (
+    module.id ===
+    'formularios-estudiantes'
+  ) {
+
+    iniciarFormulariosEstudiantesPage();
 
   }
 
