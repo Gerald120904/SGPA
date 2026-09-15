@@ -6,8 +6,10 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { EstadoRespuestaFormulario } from '../constants/estado-respuesta-formulario.constant';
+import { DatosNormalizadosFormulario } from '../types/datos-normalizados-formulario.type';
 import { FormularioEstudiante } from './formulario-estudiante.entity';
 
 @Entity({ name: 'respuestas_formularios_estudiantes' })
@@ -39,14 +41,14 @@ export class RespuestaFormularioEstudiante {
     name: 'payload_json',
     type: 'json',
   })
-  payloadJson!: Record<string, any>;
+  payloadJson!: Record<string, unknown>;
 
   @Column({
     name: 'datos_normalizados_json',
     type: 'json',
     nullable: true,
   })
-  datosNormalizadosJson!: Record<string, any> | null;
+  datosNormalizadosJson!: DatosNormalizadosFormulario | null;
 
   @Column({
     type: 'enum',
@@ -91,7 +93,11 @@ export class RespuestaFormularioEstudiante {
 
   @CreateDateColumn({
     name: 'created_at',
-    type: 'datetime',
   })
   createdAt!: Date;
+
+  @UpdateDateColumn({
+    name: 'updated_at',
+  })
+  updatedAt!: Date;
 }

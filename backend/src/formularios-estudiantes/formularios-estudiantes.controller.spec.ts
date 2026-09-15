@@ -14,14 +14,20 @@ describe('FormulariosEstudiantesController', () => {
   let service: {
     crear: jest.Mock;
   };
-  let syncService: Record<string, jest.Mock>;
+  let syncService: {
+    sincronizar: jest.Mock;
+    listarRespuestas: jest.Mock;
+  };
 
   beforeEach(() => {
     reflector = new Reflector();
     service = {
       crear: jest.fn(),
     };
-    syncService = {};
+    syncService = {
+      sincronizar: jest.fn(),
+      listarRespuestas: jest.fn(),
+    };
 
     controller = new FormulariosEstudiantesController(
       service as unknown as FormulariosEstudiantesService,
@@ -72,6 +78,69 @@ describe('FormulariosEstudiantesController', () => {
         FormulariosEstudiantesController.prototype.crear,
       );
       expect(permisos).toEqual([PermisoSistema.FORMULARIOS_ESTUDIANTES_CREAR]);
+    });
+  });
+
+  describe('sincronizar', () => {
+    it('delega al syncService con id y req.user.sub', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = {
+        recibidasGoogle: 1,
+        nuevas: 1,
+        ignoradasExistentes: 0,
+        pendientes: 1,
+        requierenRevision: 0,
+        errores: 0,
+      };
+      syncService.sincronizar.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.sincronizar(mockReq, 1);
+
+      expect(syncService.sincronizar).toHaveBeenCalledWith(1, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para FORMULARIOS_ESTUDIANTES_GESTIONAR', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.sincronizar,
+      );
+      expect(permisos).toEqual([
+        PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
+      ]);
+    });
+  });
+
+  describe('listarRespuestas', () => {
+    it('delega al syncService con id y req.user.sub', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = [{ id: 1 }];
+      syncService.listarRespuestas.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.listarRespuestas(mockReq, 1);
+
+      expect(syncService.listarRespuestas).toHaveBeenCalledWith(1, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.listarRespuestas,
+      );
+      expect(permisos).toEqual([
+        PermisoSistema.FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS,
+      ]);
     });
   });
 });

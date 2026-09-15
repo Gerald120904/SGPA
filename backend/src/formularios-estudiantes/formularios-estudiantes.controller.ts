@@ -1,6 +1,9 @@
 import {
   Body,
   Controller,
+  Get,
+  Param,
+  ParseIntPipe,
   Post,
   Req,
   UseGuards,
@@ -31,6 +34,30 @@ export class FormulariosEstudiantesController {
     return this.formulariosService.crear(
       req.user!.sub,
       dto,
+    );
+  }
+
+  @Post(':id/sincronizar')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
+  sincronizar(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.syncService.sincronizar(
+      id,
+      req.user!.sub,
+    );
+  }
+
+  @Get(':id/respuestas')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS)
+  listarRespuestas(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.syncService.listarRespuestas(
+      id,
+      req.user!.sub,
     );
   }
 }
