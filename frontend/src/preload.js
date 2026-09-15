@@ -377,4 +377,22 @@ contextBridge.exposeInMainWorld("sgpa", {
       'formularios-estudiantes:crear',
       datos
     ),
+
+  sincronizarFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:sincronizar',
+      id
+    ),
+
+  procesarFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:procesar',
+      id
+    ),
+
+  cerrarFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:cerrar',
+      id
+    ),
 });

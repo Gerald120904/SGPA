@@ -1686,6 +1686,42 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'formularios-estudiantes:sincronizar',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/${id}/sincronizar`,
+      {
+        method: 'POST'
+      }
+    );
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:procesar',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/${id}/procesar`,
+      {
+        method: 'POST'
+      }
+    );
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:cerrar',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/${id}/cerrar`,
+      {
+        method: 'POST'
+      }
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

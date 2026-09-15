@@ -57,3 +57,30 @@ export async function crearFormularioEstudiantes(
       datos
     );
 }
+
+export async function sincronizarFormularioEstudiantes(id) {
+  validarApi(
+    'sincronizarFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .sincronizarFormularioEstudiantes(id);
+}
+
+export async function procesarFormularioEstudiantes(id) {
+  validarApi(
+    'procesarFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .procesarFormularioEstudiantes(id);
+}
+
+export async function cerrarFormularioEstudiantes(id) {
+  validarApi(
+    'cerrarFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .cerrarFormularioEstudiantes(id);
+}

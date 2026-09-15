@@ -3,7 +3,10 @@ import {
   obtenerEstadoGoogleFormularios,
   conectarGoogleFormularios,
   desconectarGoogleFormularios,
-  crearFormularioEstudiantes
+  crearFormularioEstudiantes,
+  sincronizarFormularioEstudiantes,
+  procesarFormularioEstudiantes,
+  cerrarFormularioEstudiantes
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -53,7 +56,10 @@ const PERMISOS = {
     'FORMULARIOS_ESTUDIANTES_CREAR',
 
   GESTIONAR:
-    'FORMULARIOS_ESTUDIANTES_GESTIONAR'
+    'FORMULARIOS_ESTUDIANTES_GESTIONAR',
+
+  VER_RESPUESTAS:
+    'FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS'
 };
 
 let formularios = [];
@@ -268,6 +274,20 @@ function renderizarFilaFormulario(
   const revision =
     formulario.requierenRevision ?? 0;
 
+  const puedeGestionar =
+    usuarioTienePermiso(
+      PERMISOS.GESTIONAR
+    );
+
+  const publicado =
+    formulario.estado === 'PUBLICADO';
+
+  const cerrado =
+    formulario.estado === 'CERRADO';
+
+  const operable =
+    publicado || cerrado;
+
   return `
     <tr
       data-formulario-id="${formulario.id}"
@@ -308,21 +328,77 @@ function renderizarFilaFormulario(
       </td>
 
       <td>
-        <button
-          type="button"
-          class="btn btn-secondary btn-sm"
-          data-action="ver-formulario"
-          data-id="${formulario.id}"
-          disabled
-          title="Disponible en el siguiente bloque"
-        >
-          <i
-            data-lucide="eye"
-            aria-hidden="true"
-          ></i>
+        <div class="table-actions" style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+          ${
+            formulario.responderUri
+              ? `
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="copiar-enlace"
+                  data-id="${formulario.id}"
+                  title="Copiar enlace del formulario"
+                >
+                  <i
+                    data-lucide="copy"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
 
-          Ver
-        </button>
+          ${
+            puedeGestionar && operable
+              ? `
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="sincronizar"
+                  data-id="${formulario.id}"
+                  title="Sincronizar respuestas"
+                >
+                  <i
+                    data-lucide="refresh-cw"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="procesar"
+                  data-id="${formulario.id}"
+                  title="Procesar respuestas pendientes"
+                >
+                  <i
+                    data-lucide="play"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            puedeGestionar && publicado
+              ? `
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="cerrar"
+                  data-id="${formulario.id}"
+                  title="Cerrar formulario"
+                >
+                  <i
+                    data-lucide="lock"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
+        </div>
       </td>
     </tr>
   `;
@@ -410,6 +486,248 @@ function enlazarEventos() {
       'click',
       abrirNuevoFormulario
     );
+}
+
+async function manejarAccionFormulario(event) {
+  const button =
+    event.target.closest(
+      '[data-action][data-id]'
+    );
+
+  if (!button) {
+    return;
+  }
+
+  const id =
+    Number(button.dataset.id);
+
+  if (!id) {
+    return;
+  }
+
+  const formulario =
+    formularios.find(
+      (item) =>
+        item.id === id
+    );
+
+  if (!formulario) {
+    return;
+  }
+
+  const accion =
+    button.dataset.action;
+
+  switch (accion) {
+    case 'copiar-enlace':
+      await copiarEnlaceFormulario(
+        formulario
+      );
+      break;
+
+    case 'sincronizar':
+      await sincronizarFormulario(
+        formulario,
+        button
+      );
+      break;
+
+    case 'procesar':
+      await procesarFormulario(
+        formulario,
+        button
+      );
+      break;
+
+    case 'cerrar':
+      await cerrarFormulario(
+        formulario,
+        button
+      );
+      break;
+  }
+}
+
+async function copiarEnlaceFormulario(
+  formulario
+) {
+  if (!formulario.responderUri) {
+    mostrarError({
+      titulo:
+        'Enlace no disponible',
+      mensaje:
+        'Este formulario no posee un enlace de respuesta disponible.'
+    });
+
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      formulario.responderUri
+    );
+
+    mostrarExito({
+      titulo:
+        'Enlace copiado',
+      mensaje:
+        'El enlace del formulario fue copiado al portapapeles.'
+    });
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible copiar el enlace',
+      mensaje:
+        error?.message ||
+        'No se pudo acceder al portapapeles.'
+    });
+  }
+}
+
+async function sincronizarFormulario(
+  formulario,
+  button
+) {
+  button.disabled = true;
+
+  try {
+    const res =
+      await sincronizarFormularioEstudiantes(
+        formulario.id
+      );
+
+    if (res && res.ok === false) {
+      throw new Error(
+        res.message || 'No fue posible sincronizar las respuestas.'
+      );
+    }
+
+    const resultado = res?.data ?? res;
+
+    mostrarExito({
+      titulo:
+        'Respuestas sincronizadas',
+
+      mensaje:
+        `Google reportó ${resultado.recibidasGoogle ?? 0} respuestas. ` +
+        `${resultado.nuevas ?? 0} nuevas, ` +
+        `${resultado.ignoradasExistentes ?? 0} ya existentes, ` +
+        `${resultado.errores ?? 0} con error.`
+    });
+
+    await cargarFormularios();
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible sincronizar',
+      mensaje:
+        error?.message ||
+        'Ocurrió un error al consultar Google Forms.'
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function procesarFormulario(
+  formulario,
+  button
+) {
+  button.disabled = true;
+
+  try {
+    const res =
+      await procesarFormularioEstudiantes(
+        formulario.id
+      );
+
+    if (res && res.ok === false) {
+      throw new Error(
+        res.message || 'No fue posible procesar las respuestas.'
+      );
+    }
+
+    const resultado = res?.data ?? res;
+
+    mostrarExito({
+      titulo:
+        'Respuestas procesadas',
+
+      mensaje:
+        `${resultado.procesadas ?? 0} procesadas. ` +
+        `${resultado.estudiantesCreados ?? 0} estudiantes creados, ` +
+        `${resultado.estudiantesActualizados ?? 0} actualizados y ` +
+        `${resultado.aprobacionesNuevas ?? 0} aprobaciones nuevas.`
+    });
+
+    await cargarFormularios();
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible procesar las respuestas',
+      mensaje:
+        error?.message ||
+        'Ocurrió un error durante el procesamiento.'
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function cerrarFormulario(
+  formulario,
+  button
+) {
+  const aceptado =
+    await confirmarAccion({
+      titulo:
+        'Cerrar formulario',
+
+      mensaje:
+        `El formulario "${formulario.titulo}" dejará de aceptar nuevas respuestas. Las respuestas existentes se conservarán.`,
+
+      textoConfirmar:
+        'Cerrar formulario',
+
+      peligro: true
+    });
+
+  if (!aceptado) {
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    const res = await cerrarFormularioEstudiantes(
+      formulario.id
+    );
+
+    if (res && res.ok === false) {
+      throw new Error(
+        res.message || 'No fue posible cerrar el formulario.'
+      );
+    }
+
+    mostrarExito({
+      titulo:
+        'Formulario cerrado',
+      mensaje:
+        'Google Forms dejó de aceptar nuevas respuestas. La información existente permanece disponible.'
+    });
+
+    await cargarFormularios();
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible cerrar el formulario',
+      mensaje:
+        error?.message ||
+        'Ocurrió un error al cerrar el formulario.'
+    });
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function conectarGoogle() {
@@ -918,16 +1236,16 @@ async function abrirNuevoFormulario() {
         }
 
         try {
-          const resultado =
+          const res =
             await crearFormularioEstudiantes({
               titulo,
               carreraId,
               planEstudioId
             });
 
-          if (!resultado?.ok) {
+          if (res && res.ok === false) {
             throw new Error(
-              resultado?.message ||
+              res.message ||
               'No fue posible crear el formulario.'
             );
           }
@@ -1033,6 +1351,20 @@ function registrarActualizacionAlVolver() {
 
 export async function iniciarFormulariosEstudiantesPage() {
   renderizarCarga();
+
+  const contenido =
+    document.getElementById(
+      'formulariosEstudiantesContent'
+    );
+
+  contenido?.removeEventListener(
+    'click',
+    manejarAccionFormulario
+  );
+  contenido?.addEventListener(
+    'click',
+    manejarAccionFormulario
+  );
 
   try {
     const [
