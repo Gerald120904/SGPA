@@ -1673,6 +1673,19 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'formularios-estudiantes:crear',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/formularios-estudiantes',
+      {
+        method: 'POST',
+        body: datos
+      }
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

@@ -371,4 +371,10 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke(
       'formularios-estudiantes:google-desconectar'
     ),
+
+  crearFormularioEstudiantes: (datos) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:crear',
+      datos
+    ),
 });

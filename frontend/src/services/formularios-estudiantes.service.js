@@ -44,3 +44,16 @@ export async function desconectarGoogleFormularios() {
   return window.sgpa
     .desconectarGoogleFormularios();
 }
+
+export async function crearFormularioEstudiantes(
+  datos
+) {
+  validarApi(
+    'crearFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .crearFormularioEstudiantes(
+      datos
+    );
+}
