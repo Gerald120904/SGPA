@@ -63,7 +63,7 @@ export class FormulariosEstudiantesSyncService {
     }
 
     const respuestasGoogle = await this.googleFormsClient.listarRespuestas(
-      usuarioId,
+      formulario.creadoPorUsuarioId,
       formulario.googleFormId,
     );
 

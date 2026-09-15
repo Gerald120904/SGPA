@@ -30,12 +30,14 @@ describe('FormulariosEstudiantesSyncService', () => {
     tieneAlcanceSobreCarrera: jest.Mock;
   };
 
-  const usuarioId = 10;
+  const usuarioAId = 55;
+  const usuarioBId = 99;
   const formularioId = 1;
 
   const mockFormulario = {
     id: 1,
     carreraId: 2,
+    creadoPorUsuarioId: 55,
     googleFormId: 'form-google-123',
     estado: EstadoFormularioEstudiante.PUBLICADO,
     mapaPreguntas: {
@@ -90,9 +92,9 @@ describe('FormulariosEstudiantesSyncService', () => {
     it('falla con NotFoundException si el formulario no existe', async () => {
       formularioRepo.findOne.mockResolvedValue(null);
 
-      await expect(service.sincronizar(formularioId, usuarioId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.sincronizar(formularioId, usuarioBId),
+      ).rejects.toThrow(NotFoundException);
       expect(googleFormsClient.listarRespuestas).not.toHaveBeenCalled();
     });
 
@@ -100,24 +102,56 @@ describe('FormulariosEstudiantesSyncService', () => {
       formularioRepo.findOne.mockResolvedValue({
         id: 1,
         carreraId: 2,
+        creadoPorUsuarioId: usuarioAId,
         googleFormId: null,
         mapaPreguntas: null,
       });
 
-      await expect(service.sincronizar(formularioId, usuarioId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.sincronizar(formularioId, usuarioBId),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it('falla con ForbiddenException si el usuario no tiene alcance sobre la carrera', async () => {
+    it('usuario B sin alcance no puede sincronizar', async () => {
       estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
         false,
       );
 
-      await expect(service.sincronizar(formularioId, usuarioId)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.sincronizar(formularioId, usuarioBId),
+      ).rejects.toThrow(ForbiddenException);
+      expect(
+        estructuraAcademicaService.tieneAlcanceSobreCarrera,
+      ).toHaveBeenCalledWith(usuarioBId, 2);
       expect(googleFormsClient.listarRespuestas).not.toHaveBeenCalled();
+    });
+
+    it('usuario B con alcance puede sincronizar formulario creado por usuario A', async () => {
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+      googleFormsClient.listarRespuestas.mockResolvedValue([]);
+
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
+
+      expect(
+        estructuraAcademicaService.tieneAlcanceSobreCarrera,
+      ).toHaveBeenCalledWith(usuarioBId, 2);
+      expect(resultado.recibidasGoogle).toBe(0);
+    });
+
+    it('Forms API recibe usuario A como propietario Google', async () => {
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+      googleFormsClient.listarRespuestas.mockResolvedValue([]);
+
+      await service.sincronizar(formularioId, usuarioBId);
+
+      expect(googleFormsClient.listarRespuestas).toHaveBeenCalledWith(
+        usuarioAId,
+        'form-google-123',
+      );
     });
 
     it('permite sincronizar formularios en estado CERRADO', async () => {
@@ -128,11 +162,11 @@ describe('FormulariosEstudiantesSyncService', () => {
 
       googleFormsClient.listarRespuestas.mockResolvedValue([]);
 
-      const resultado = await service.sincronizar(formularioId, usuarioId);
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
 
       expect(resultado.recibidasGoogle).toBe(0);
       expect(googleFormsClient.listarRespuestas).toHaveBeenCalledWith(
-        usuarioId,
+        usuarioAId,
         'form-google-123',
       );
     });
@@ -144,7 +178,7 @@ describe('FormulariosEstudiantesSyncService', () => {
       };
       googleFormsClient.listarRespuestas.mockResolvedValue([respGoogle]);
 
-      const resultado = await service.sincronizar(formularioId, usuarioId);
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
 
       expect(resultado).toEqual({
         recibidasGoogle: 1,
@@ -186,7 +220,7 @@ describe('FormulariosEstudiantesSyncService', () => {
         { responseId: 'resp-2' },
       ]);
 
-      const resultado = await service.sincronizar(formularioId, usuarioId);
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
 
       expect(resultado.requierenRevision).toBe(1);
       expect(resultado.pendientes).toBe(0);
@@ -206,7 +240,7 @@ describe('FormulariosEstudiantesSyncService', () => {
         { responseId: 'resp-1' },
       ]);
 
-      const resultado = await service.sincronizar(formularioId, usuarioId);
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
 
       expect(resultado).toEqual({
         recibidasGoogle: 1,
@@ -237,7 +271,7 @@ describe('FormulariosEstudiantesSyncService', () => {
         { responseId: 'resp-ok' },
       ]);
 
-      const resultado = await service.sincronizar(formularioId, usuarioId);
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
 
       expect(resultado).toEqual({
         recibidasGoogle: 2,
@@ -276,7 +310,7 @@ describe('FormulariosEstudiantesSyncService', () => {
       formularioRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.listarRespuestas(formularioId, usuarioId),
+        service.listarRespuestas(formularioId, usuarioBId),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -286,7 +320,7 @@ describe('FormulariosEstudiantesSyncService', () => {
       );
 
       await expect(
-        service.listarRespuestas(formularioId, usuarioId),
+        service.listarRespuestas(formularioId, usuarioBId),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -297,7 +331,7 @@ describe('FormulariosEstudiantesSyncService', () => {
       ];
       respuestaRepo.find.mockResolvedValue(mockRespuestas);
 
-      const res = await service.listarRespuestas(formularioId, usuarioId);
+      const res = await service.listarRespuestas(formularioId, usuarioBId);
 
       expect(respuestaRepo.find).toHaveBeenCalledWith({
         where: { formularioId: 1 },

@@ -457,4 +457,35 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     );
     expect(mockRespuesta2.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
   });
+
+  it('procesamiento académico sigue registrando al usuario B como quien ejecutó el proceso', async () => {
+    const usuarioBId = 88;
+    const mockRespuesta = {
+      id: 1,
+      formularioId: 1,
+      estado: EstadoRespuestaFormulario.PENDIENTE,
+      procesadoAt: null,
+      datosNormalizadosJson: {
+        primerNombre: 'Ana',
+        segundoNombre: null,
+        primerApellido: 'Vargas',
+        segundoApellido: null,
+        identificacion: '401110222',
+        correoEstudiantil: 'ana@est.una.ac.cr',
+        contacto: null,
+        periodoIngresoId: 20,
+        asignaturasAprobadas: [],
+        optativasNoDisciplinarias: null,
+        requiereRevisionOptativas: false,
+      },
+    };
+
+    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
+
+    await service.procesar(formularioId, usuarioBId);
+
+    expect(
+      estudiantesImportacionService.ejecutarDesdeGoogleForms,
+    ).toHaveBeenCalledWith(usuarioBId, expect.any(Object));
+  });
 });

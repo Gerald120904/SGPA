@@ -791,10 +791,13 @@ describe('FormulariosEstudiantesService', () => {
       expect(googleFormsClient.cerrarFormulario).not.toHaveBeenCalled();
     });
 
-    it('cerrar PUBLICADO llama Google y cambia estado a CERRADO', async () => {
+    it('usuario B con alcance puede cerrar formulario de A', async () => {
+      const usuarioAId = 55;
+      const usuarioBId = 99;
       const mockForm = {
         id: 1,
         carreraId: 1,
+        creadoPorUsuarioId: usuarioAId,
         googleFormId: 'g-1',
         estado: EstadoFormularioEstudiante.PUBLICADO,
       };
@@ -803,15 +806,37 @@ describe('FormulariosEstudiantesService', () => {
         true,
       );
 
-      const resultado = await service.cerrar(1, usuarioId);
+      const resultado = await service.cerrar(1, usuarioBId);
+
+      expect(
+        estructuraAcademicaService.tieneAlcanceSobreCarrera,
+      ).toHaveBeenCalledWith(usuarioBId, 1);
+      expect(resultado.estado).toBe(EstadoFormularioEstudiante.CERRADO);
+    });
+
+    it('cerrar usa conexión Google del creador A', async () => {
+      const usuarioAId = 55;
+      const usuarioBId = 99;
+      const mockForm = {
+        id: 1,
+        carreraId: 1,
+        creadoPorUsuarioId: usuarioAId,
+        googleFormId: 'g-1',
+        estado: EstadoFormularioEstudiante.PUBLICADO,
+      };
+      formularioRepo.findOne.mockResolvedValue(mockForm);
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(
+        true,
+      );
+
+      await service.cerrar(1, usuarioBId);
 
       expect(googleFormsClient.cerrarFormulario).toHaveBeenCalledWith(
-        usuarioId,
+        usuarioAId,
         'g-1',
       );
       expect(mockForm.estado).toBe(EstadoFormularioEstudiante.CERRADO);
       expect(formularioRepo.save).toHaveBeenCalledWith(mockForm);
-      expect(resultado.estado).toBe(EstadoFormularioEstudiante.CERRADO);
     });
 
     it('garantiza que no existe método de eliminación en el servicio', () => {

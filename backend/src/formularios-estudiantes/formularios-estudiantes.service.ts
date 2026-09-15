@@ -255,7 +255,7 @@ export class FormulariosEstudiantesService {
     }
 
     await this.googleFormsClient.cerrarFormulario(
-      usuarioId,
+      formulario.creadoPorUsuarioId,
       formulario.googleFormId,
     );
 
