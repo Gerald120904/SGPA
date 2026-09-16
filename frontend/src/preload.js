@@ -462,4 +462,14 @@ contextBridge.exposeInMainWorld("sgpa", {
       id,
       periodoReferenciaId
     ),
+
+  registrarResultadoAcademicoEstudiante: (
+    id,
+    datos
+  ) =>
+    ipcRenderer.invoke(
+      'estudiantes:registrar-resultado',
+      id,
+      datos
+    ),
 });

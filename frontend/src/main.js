@@ -1896,6 +1896,19 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'estudiantes:registrar-resultado',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}/historial-academico`,
+      {
+        method: 'POST',
+        body: datos
+      }
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

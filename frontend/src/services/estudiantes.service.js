@@ -120,3 +120,18 @@ export async function obtenerProgresoEstudiante(
       periodoReferenciaId
     );
 }
+
+export async function registrarResultadoAcademicoEstudiante(
+  id,
+  datos
+) {
+  validarApi(
+    'registrarResultadoAcademicoEstudiante'
+  );
+
+  return window.sgpa
+    .registrarResultadoAcademicoEstudiante(
+      id,
+      datos
+    );
+}

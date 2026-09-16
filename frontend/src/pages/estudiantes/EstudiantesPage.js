@@ -25,8 +25,13 @@ import {
   cambiarPlanEstudiante,
   obtenerHistorialAcademicoEstudiante,
   obtenerHistorialPlanesEstudiante,
-  obtenerProgresoEstudiante
+  obtenerProgresoEstudiante,
+  registrarResultadoAcademicoEstudiante
 } from '../../services/estudiantes.service.js';
+
+import {
+  listarPlanAsignaturas
+} from '../../services/plan-asignaturas.service.js';
 
 import {
   listarCarreras
@@ -81,6 +86,36 @@ const ESTADOS = [
   {
     value: 'RETIRADO',
     label: 'Retirado'
+  }
+];
+
+const ORIGENES_ACADEMICOS = [
+  {
+    value: 'CURSADO',
+    label: 'Cursado'
+  },
+  {
+    value: 'RECONOCIMIENTO',
+    label: 'Reconocimiento'
+  },
+  {
+    value: 'EQUIVALENCIA',
+    label: 'Equivalencia'
+  },
+  {
+    value: 'NO_ESPECIFICADO',
+    label: 'No especificado'
+  }
+];
+
+const RESULTADOS_ACADEMICOS = [
+  {
+    value: 'APROBADO',
+    label: 'Aprobado'
+  },
+  {
+    value: 'REPROBADO',
+    label: 'Reprobado'
   }
 ];
 
@@ -2705,6 +2740,30 @@ async function abrirExpedienteEstudiante(
           </div>
 
 
+          ${
+            usuarioTienePermiso(
+              PERMISOS.GESTIONAR
+            )
+              ? `
+                <div class="sgpa-form-wide" style="margin-bottom: 0.5rem;">
+                  <button
+                    id="registrarResultadoAcademicoButton"
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                  >
+                    <i
+                      data-lucide="plus"
+                      aria-hidden="true"
+                    ></i>
+
+                    Registrar resultado
+                  </button>
+                </div>
+              `
+              : ''
+          }
+
+
           <div class="sgpa-form-wide">
             <h3>
               Historial académico
@@ -2755,6 +2814,19 @@ async function abrirExpedienteEstudiante(
 
     document
       .getElementById(
+        'registrarResultadoAcademicoButton'
+      )
+      ?.addEventListener(
+        'click',
+        () => {
+          abrirRegistrarResultadoAcademico(
+            estudiante
+          );
+        }
+      );
+
+    document
+      .getElementById(
         'expedientePeriodoReferencia'
       )
       ?.addEventListener(
@@ -2783,6 +2855,390 @@ async function abrirExpedienteEstudiante(
       mensaje:
         error?.message ||
         'Ocurrió un error al consultar la información académica.'
+    });
+  }
+}
+
+async function abrirRegistrarResultadoAcademico(
+  estudiante
+) {
+  const dialog =
+    document.getElementById(
+      'estudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'estudianteDialogContent'
+    );
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  try {
+    const [
+      resultadoAsignaturas,
+      resultadoPeriodos
+    ] =
+      await Promise.all([
+        listarPlanAsignaturas(
+          estudiante.planEstudioId
+        ),
+
+        listarPeriodosAcademicos()
+      ]);
+
+    if (!resultadoAsignaturas?.ok) {
+      throw new Error(
+        resultadoAsignaturas?.message ||
+        'No fue posible consultar las asignaturas del plan.'
+      );
+    }
+
+    if (!resultadoPeriodos?.ok) {
+      throw new Error(
+        resultadoPeriodos?.message ||
+        'No fue posible consultar los períodos académicos.'
+      );
+    }
+
+    const asignaturas =
+      Array.isArray(
+        resultadoAsignaturas.asignaturas
+      )
+        ? resultadoAsignaturas.asignaturas
+            .filter(
+              (item) =>
+                item.activo !== false &&
+                (
+                  item.cursoId != null ||
+                  item.curso?.id != null
+                )
+            )
+        : [];
+
+    const periodos =
+      Array.isArray(
+        resultadoPeriodos.periodos
+      )
+        ? resultadoPeriodos.periodos
+        : [];
+
+    content.innerHTML =
+      FormDialog({
+        formId:
+          'registrarResultadoAcademicoForm',
+
+        title:
+          'Registrar resultado académico',
+
+        description:
+          `${obtenerNombreCompleto(
+            estudiante
+          )} · ${estudiante.cedula}`,
+
+        errorId:
+          'registrarResultadoAcademicoError',
+
+        cancelButtonId:
+          'cancelarResultadoAcademico',
+
+        submitButtonId:
+          'guardarResultadoAcademico',
+
+        submitText:
+          'Registrar resultado',
+
+        submitIcon:
+          'save',
+
+        body: `
+          <label class="sgpa-form-wide">
+            <span>
+              Asignatura
+            </span>
+
+            <select
+              id="resultadoPlanAsignatura"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione una asignatura...
+              </option>
+
+              ${asignaturas
+                .map(
+                  (item) => `
+                    <option
+                      value="${item.id}"
+                    >
+                      ${escapeHtml(
+                        obtenerTextoAsignatura(
+                          item
+                        )
+                      )}
+                    </option>
+                  `
+                )
+                .join('')}
+            </select>
+          </label>
+
+
+          <label>
+            <span>
+              Período
+            </span>
+
+            <select
+              id="resultadoPeriodo"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${periodos
+                .map(
+                  (periodo) => `
+                    <option
+                      value="${periodo.id}"
+                    >
+                      ${escapeHtml(
+                        obtenerTextoPeriodo(
+                          periodo
+                        )
+                      )}
+                    </option>
+                  `
+                )
+                .join('')}
+            </select>
+          </label>
+
+
+          <label>
+            <span>
+              Resultado
+            </span>
+
+            <select
+              id="resultadoAcademico"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${RESULTADOS_ACADEMICOS
+                .map(
+                  (item) => `
+                    <option
+                      value="${item.value}"
+                    >
+                      ${item.label}
+                    </option>
+                  `
+                )
+                .join('')}
+            </select>
+          </label>
+
+
+          <label class="sgpa-form-wide">
+            <span>
+              Origen académico
+            </span>
+
+            <select
+              id="resultadoOrigenAcademico"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${ORIGENES_ACADEMICOS
+                .map(
+                  (item) => `
+                    <option
+                      value="${item.value}"
+                    >
+                      ${item.label}
+                    </option>
+                  `
+                )
+                .join('')}
+            </select>
+          </label>
+
+
+          <label class="sgpa-form-wide">
+            <span>
+              Observaciones
+            </span>
+
+            <textarea
+              id="resultadoObservaciones"
+              rows="3"
+              maxlength="500"
+              placeholder="Opcional"
+            ></textarea>
+          </label>
+        `
+      });
+
+    renderizarIconos();
+
+    document
+      .getElementById(
+        'cancelarResultadoAcademico'
+      )
+      ?.addEventListener(
+        'click',
+        async () => {
+          dialog.close();
+
+          await abrirExpedienteEstudiante(
+            estudiante.id
+          );
+        }
+      );
+
+    document
+      .getElementById(
+        'registrarResultadoAcademicoForm'
+      )
+      ?.addEventListener(
+        'submit',
+        async (event) => {
+          event.preventDefault();
+
+          const button =
+            document.getElementById(
+              'guardarResultadoAcademico'
+            );
+
+          if (button) {
+            button.disabled = true;
+          }
+
+          try {
+            const planAsignaturaId =
+              Number(
+                document
+                  .getElementById(
+                    'resultadoPlanAsignatura'
+                  )
+                  .value
+              );
+
+            const periodoId =
+              Number(
+                document
+                  .getElementById(
+                    'resultadoPeriodo'
+                  )
+                  .value
+              );
+
+            const resultado =
+              document
+                .getElementById(
+                  'resultadoAcademico'
+                )
+                .value;
+
+            const origenAcademico =
+              document
+                .getElementById(
+                  'resultadoOrigenAcademico'
+                )
+                .value;
+
+            const observaciones =
+              document
+                .getElementById(
+                  'resultadoObservaciones'
+                )
+                .value
+                .trim();
+
+            const respuesta =
+              await registrarResultadoAcademicoEstudiante(
+                estudiante.id,
+                {
+                  planAsignaturaId,
+                  periodoId,
+                  resultado,
+                  origenAcademico,
+                  observaciones:
+                    observaciones ||
+                    null
+                }
+              );
+
+            if (!respuesta?.ok) {
+              throw new Error(
+                respuesta?.message ||
+                'No fue posible registrar el resultado.'
+              );
+            }
+
+            dialog.close();
+
+            mostrarExito({
+              titulo:
+                'Resultado registrado',
+
+              mensaje:
+                'El resultado académico fue registrado correctamente en el expediente.'
+            });
+
+            await abrirExpedienteEstudiante(
+              estudiante.id
+            );
+          } catch (error) {
+            mostrarError({
+              titulo:
+                'No fue posible registrar el resultado',
+
+              mensaje:
+                error?.message ||
+                'Revise los datos seleccionados.'
+            });
+          } finally {
+            if (button) {
+              button.disabled = false;
+            }
+          }
+        }
+      );
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible preparar el registro',
+
+      mensaje:
+        error?.message ||
+        'No se pudieron consultar las asignaturas o períodos.'
     });
   }
 }
