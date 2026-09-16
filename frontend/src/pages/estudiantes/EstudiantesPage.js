@@ -19,8 +19,27 @@ import {
 import {
   listarEstudiantes,
   obtenerEstudiante,
-  actualizarEstudiante
+  actualizarEstudiante,
+  crearEstudiante,
+  cambiarEstadoEstudiante,
+  cambiarPlanEstudiante
 } from '../../services/estudiantes.service.js';
+
+import {
+  listarCarreras
+} from '../../services/carreras.service.js';
+
+import {
+  listarPlanesEstudio
+} from '../../services/planes-estudio.service.js';
+
+import {
+  listarPeriodosAcademicos
+} from '../../services/periodos.service.js';
+
+import {
+  confirmarAccion
+} from '../../utils/confirm.js';
 
 import {
   escapeHtml
@@ -79,6 +98,27 @@ export function EstudiantesPage() {
             y seguimiento académico.
           </p>
         </div>
+
+        ${
+          usuarioTienePermiso(
+            PERMISOS.GESTIONAR
+          )
+            ? `
+              <button
+                id="nuevoEstudianteButton"
+                type="button"
+                class="btn btn-primary"
+              >
+                <i
+                  data-lucide="user-plus"
+                  aria-hidden="true"
+                ></i>
+
+                Nuevo estudiante
+              </button>
+            `
+            : ''
+        }
       </div>
 
       <div class="planes-filters">
@@ -298,6 +338,32 @@ function renderizarEstudiantes() {
                       >
                         <i
                           data-lucide="pencil"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-action="estado"
+                        data-id="${estudiante.id}"
+                        title="Cambiar estado"
+                      >
+                        <i
+                          data-lucide="toggle-left"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-action="plan"
+                        data-id="${estudiante.id}"
+                        title="Cambiar plan"
+                      >
+                        <i
+                          data-lucide="repeat-2"
                           aria-hidden="true"
                         ></i>
                       </button>
@@ -616,6 +682,14 @@ async function manejarAccionEstudiante(
 
     case 'editar':
       await abrirEditarEstudiante(id);
+      break;
+
+    case 'estado':
+      await abrirCambiarEstadoEstudiante(id);
+      break;
+
+    case 'plan':
+      await abrirCambiarPlanEstudiante(id);
       break;
   }
 }
@@ -1052,6 +1126,839 @@ async function abrirEditarEstudiante(
   }
 }
 
+async function obtenerCatalogosEstudiante() {
+  const [
+    resultadoCarreras,
+    resultadoPlanes,
+    resultadoPeriodos
+  ] = await Promise.all([
+    listarCarreras(),
+    listarPlanesEstudio(),
+    listarPeriodosAcademicos()
+  ]);
+
+  if (!resultadoCarreras?.ok) {
+    throw new Error(
+      resultadoCarreras?.message ||
+      'No fue posible consultar las carreras.'
+    );
+  }
+
+  if (!resultadoPlanes?.ok) {
+    throw new Error(
+      resultadoPlanes?.message ||
+      'No fue posible consultar los planes.'
+    );
+  }
+
+  if (!resultadoPeriodos?.ok) {
+    throw new Error(
+      resultadoPeriodos?.message ||
+      'No fue posible consultar los períodos.'
+    );
+  }
+
+  return {
+    carreras:
+      (resultadoCarreras.carreras ?? [])
+        .filter((item) => item.activo),
+
+    planes:
+      (resultadoPlanes.planes ?? [])
+        .filter((item) => item.activo),
+
+    periodos:
+      resultadoPeriodos.periodos ?? []
+  };
+}
+
+async function abrirNuevoEstudiante() {
+  const dialog =
+    document.getElementById(
+      'estudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'estudianteDialogContent'
+    );
+
+  if (!dialog || !content) return;
+
+  try {
+    const {
+      carreras,
+      planes,
+      periodos
+    } =
+      await obtenerCatalogosEstudiante();
+
+    const opcionesCarreras =
+      carreras
+        .map(
+          (item) => `
+            <option value="${item.id}">
+              ${escapeHtml(item.codigo)}
+              -
+              ${escapeHtml(item.nombre)}
+            </option>
+          `
+        )
+        .join('');
+
+    const opcionesPeriodos =
+      periodos
+        .map(
+          (item) => `
+            <option value="${item.id}">
+              ${escapeHtml(
+                item.codigo ||
+                item.nombre
+              )}
+            </option>
+          `
+        )
+        .join('');
+
+    content.innerHTML =
+      FormDialog({
+        formId:
+          'nuevoEstudianteForm',
+
+        title:
+          'Nuevo estudiante',
+
+        description:
+          'Registre los datos personales y académicos iniciales.',
+
+        errorId:
+          'nuevoEstudianteError',
+
+        cancelButtonId:
+          'cancelarNuevoEstudiante',
+
+        submitButtonId:
+          'crearEstudianteButton',
+
+        submitText:
+          'Crear estudiante',
+
+        body: `
+          <label>
+            <span>Cédula</span>
+            <input
+              id="nuevoCedula"
+              maxlength="30"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Nombres</span>
+            <input
+              id="nuevoNombres"
+              maxlength="100"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Primer apellido</span>
+            <input
+              id="nuevoApellido1"
+              maxlength="100"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Segundo apellido</span>
+            <input
+              id="nuevoApellido2"
+              maxlength="100"
+            >
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>Correo institucional</span>
+            <input
+              id="nuevoCorreo"
+              type="email"
+              maxlength="150"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Teléfono</span>
+            <input
+              id="nuevoTelefono"
+              maxlength="30"
+            >
+          </label>
+
+          <label>
+            <span>Carrera</span>
+            <select
+              id="nuevoCarrera"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${opcionesCarreras}
+            </select>
+          </label>
+
+          <label>
+            <span>Plan de estudio</span>
+            <select
+              id="nuevoPlan"
+              disabled
+              required
+            >
+              <option value="">
+                Seleccione primero una carrera...
+              </option>
+            </select>
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>Período de ingreso</span>
+            <select
+              id="nuevoPeriodo"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${opcionesPeriodos}
+            </select>
+          </label>
+        `
+      });
+
+    renderizarIconos();
+
+    dialog.showModal();
+
+    habilitarCierreExterior(dialog);
+
+    const carreraInput =
+      document.getElementById(
+        'nuevoCarrera'
+      );
+
+    const planInput =
+      document.getElementById(
+        'nuevoPlan'
+      );
+
+    carreraInput?.addEventListener(
+      'change',
+      () => {
+        const carreraId =
+          Number(carreraInput.value);
+
+        const disponibles =
+          planes.filter(
+            (plan) =>
+              plan.carreraId === carreraId
+          );
+
+        planInput.innerHTML = `
+          <option
+            value=""
+            selected
+            disabled
+          >
+            Seleccione...
+          </option>
+
+          ${disponibles
+            .map(
+              (plan) => `
+                <option value="${plan.id}">
+                  ${escapeHtml(plan.codigo)}
+                  -
+                  ${escapeHtml(plan.nombre)}
+                </option>
+              `
+            )
+            .join('')}
+        `;
+
+        planInput.disabled =
+          disponibles.length === 0;
+      }
+    );
+
+    document
+      .getElementById(
+        'cancelarNuevoEstudiante'
+      )
+      ?.addEventListener(
+        'click',
+        () => dialog.close()
+      );
+
+    document
+      .getElementById(
+        'nuevoEstudianteForm'
+      )
+      ?.addEventListener(
+        'submit',
+        async (event) => {
+          event.preventDefault();
+
+          const button =
+            document.getElementById(
+              'crearEstudianteButton'
+            );
+
+          button.disabled = true;
+
+          try {
+            const resultado =
+              await crearEstudiante({
+                cedula:
+                  document
+                    .getElementById('nuevoCedula')
+                    .value.trim(),
+
+                nombres:
+                  document
+                    .getElementById('nuevoNombres')
+                    .value.trim(),
+
+                apellido1:
+                  document
+                    .getElementById('nuevoApellido1')
+                    .value.trim(),
+
+                apellido2:
+                  document
+                    .getElementById('nuevoApellido2')
+                    .value.trim() || null,
+
+                correoInstitucional:
+                  document
+                    .getElementById('nuevoCorreo')
+                    .value.trim(),
+
+                telefono:
+                  document
+                    .getElementById('nuevoTelefono')
+                    .value.trim() || null,
+
+                carreraId:
+                  Number(
+                    carreraInput.value
+                  ),
+
+                planEstudioId:
+                  Number(
+                    planInput.value
+                  ),
+
+                periodoIngresoId:
+                  Number(
+                    document
+                      .getElementById(
+                        'nuevoPeriodo'
+                      )
+                      .value
+                  )
+              });
+
+            if (!resultado?.ok) {
+              throw new Error(
+                resultado?.message ||
+                'No fue posible crear el estudiante.'
+              );
+            }
+
+            dialog.close();
+
+            mostrarExito({
+              titulo:
+                'Estudiante creado',
+              mensaje:
+                'El estudiante fue registrado correctamente.'
+            });
+
+            await cargarEstudiantes(
+              instanciaActual,
+              true
+            );
+          } catch (error) {
+            mostrarError({
+              titulo:
+                'No fue posible crear el estudiante',
+              mensaje:
+                error?.message ||
+                'Revise los datos ingresados.'
+            });
+          } finally {
+            button.disabled = false;
+          }
+        }
+      );
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible preparar el formulario',
+      mensaje:
+        error?.message ||
+        'No se pudieron cargar los datos académicos.'
+    });
+  }
+}
+
+async function abrirCambiarEstadoEstudiante(
+  id
+) {
+  const resultado =
+    await obtenerEstudiante(id);
+
+  if (!resultado?.ok) {
+    mostrarError({
+      titulo:
+        'No fue posible consultar el estudiante',
+      mensaje:
+        resultado?.message
+    });
+
+    return;
+  }
+
+  const estudiante =
+    resultado.data;
+
+  const dialog =
+    document.getElementById(
+      'estudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'estudianteDialogContent'
+    );
+
+  if (!dialog || !content) return;
+
+  content.innerHTML =
+    FormDialog({
+      formId:
+        'cambiarEstadoEstudianteForm',
+
+      title:
+        'Cambiar estado',
+
+      description:
+        obtenerNombreCompleto(
+          estudiante
+        ),
+
+      cancelButtonId:
+        'cancelarCambioEstado',
+
+      submitButtonId:
+        'guardarEstadoEstudiante',
+
+      submitText:
+        'Cambiar estado',
+
+      body: `
+        <label class="sgpa-form-wide">
+          <span>Nuevo estado</span>
+
+          <select
+            id="nuevoEstadoEstudiante"
+            required
+          >
+            ${ESTADOS
+              .filter(
+                (item) =>
+                  item.value !==
+                  estudiante.estado
+              )
+              .map(
+                (item) => `
+                  <option
+                    value="${item.value}"
+                  >
+                    ${item.label}
+                  </option>
+                `
+              )
+              .join('')}
+          </select>
+        </label>
+      `
+    });
+
+  renderizarIconos();
+  dialog.showModal();
+  habilitarCierreExterior(dialog);
+
+  document
+    .getElementById(
+      'cancelarCambioEstado'
+    )
+    ?.addEventListener(
+      'click',
+      () => dialog.close()
+    );
+
+  document
+    .getElementById(
+      'cambiarEstadoEstudianteForm'
+    )
+    ?.addEventListener(
+      'submit',
+      async (event) => {
+        event.preventDefault();
+
+        const estado =
+          document.getElementById(
+            'nuevoEstadoEstudiante'
+          ).value;
+
+        const confirmado =
+          await confirmarAccion({
+            titulo:
+              'Confirmar cambio de estado',
+
+            mensaje:
+              `El estudiante pasará de ${formatearEstado(
+                estudiante.estado
+              )} a ${formatearEstado(
+                estado
+              )}.`,
+
+            textoConfirmar:
+              'Cambiar estado',
+
+            peligro:
+              estado === 'RETIRADO'
+          });
+
+        if (!confirmado) return;
+
+        try {
+          const respuesta =
+            await cambiarEstadoEstudiante(
+              id,
+              estado
+            );
+
+          if (!respuesta?.ok) {
+            throw new Error(
+              respuesta?.message ||
+              'No fue posible cambiar el estado.'
+            );
+          }
+
+          dialog.close();
+
+          mostrarExito({
+            titulo:
+              'Estado actualizado',
+            mensaje:
+              'El estado del estudiante se actualizó correctamente.'
+          });
+
+          await cargarEstudiantes(
+            instanciaActual
+          );
+        } catch (error) {
+          mostrarError({
+            titulo:
+              'No fue posible cambiar el estado',
+            mensaje:
+              error?.message
+          });
+        }
+      }
+    );
+}
+
+async function abrirCambiarPlanEstudiante(
+  id
+) {
+  try {
+    const [
+      resultadoEstudiante,
+      resultadoPlanes,
+      resultadoPeriodos
+    ] =
+      await Promise.all([
+        obtenerEstudiante(id),
+        listarPlanesEstudio(),
+        listarPeriodosAcademicos()
+      ]);
+
+    if (!resultadoEstudiante?.ok) {
+      throw new Error(
+        resultadoEstudiante?.message
+      );
+    }
+
+    if (!resultadoPlanes?.ok) {
+      throw new Error(
+        resultadoPlanes?.message
+      );
+    }
+
+    if (!resultadoPeriodos?.ok) {
+      throw new Error(
+        resultadoPeriodos?.message
+      );
+    }
+
+    const estudiante =
+      resultadoEstudiante.data;
+
+    const planes =
+      (resultadoPlanes.planes ?? [])
+        .filter(
+          (plan) =>
+            plan.activo &&
+            plan.carreraId ===
+              estudiante.carreraId &&
+            plan.id !==
+              estudiante.planEstudioId
+        );
+
+    const periodos =
+      resultadoPeriodos.periodos ?? [];
+
+    const dialog =
+      document.getElementById(
+        'estudianteDialog'
+      );
+
+    const content =
+      document.getElementById(
+        'estudianteDialogContent'
+      );
+
+    if (!dialog || !content) return;
+
+    content.innerHTML =
+      FormDialog({
+        formId:
+          'cambiarPlanEstudianteForm',
+
+        title:
+          'Cambiar plan de estudio',
+
+        description:
+          obtenerNombreCompleto(
+            estudiante
+          ),
+
+        errorId:
+          'cambiarPlanError',
+
+        cancelButtonId:
+          'cancelarCambioPlan',
+
+        submitButtonId:
+          'guardarCambioPlan',
+
+        submitText:
+          'Cambiar plan',
+
+        body: `
+          <label class="sgpa-form-wide">
+            <span>Nuevo plan</span>
+
+            <select
+              id="planNuevoEstudiante"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${planes
+                .map(
+                  (plan) => `
+                    <option
+                      value="${plan.id}"
+                    >
+                      ${escapeHtml(
+                        plan.codigo
+                      )}
+                      -
+                      ${escapeHtml(
+                        plan.nombre
+                      )}
+                    </option>
+                  `
+                )
+                .join('')}
+            </select>
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>
+              Período del cambio
+            </span>
+
+            <select
+              id="periodoCambioEstudiante"
+              required
+            >
+              <option
+                value=""
+                selected
+                disabled
+              >
+                Seleccione...
+              </option>
+
+              ${periodos
+                .map(
+                  (periodo) => `
+                    <option
+                      value="${periodo.id}"
+                    >
+                      ${escapeHtml(
+                        periodo.codigo ||
+                        periodo.nombre
+                      )}
+                    </option>
+                  `
+                )
+                .join('')}
+            </select>
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>Motivo</span>
+
+            <textarea
+              id="motivoCambioPlan"
+              maxlength="500"
+              rows="3"
+              placeholder="Opcional"
+            ></textarea>
+          </label>
+        `
+      });
+
+    renderizarIconos();
+    dialog.showModal();
+    habilitarCierreExterior(dialog);
+
+    document
+      .getElementById(
+        'cancelarCambioPlan'
+      )
+      ?.addEventListener(
+        'click',
+        () => dialog.close()
+      );
+
+    document
+      .getElementById(
+        'cambiarPlanEstudianteForm'
+      )
+      ?.addEventListener(
+        'submit',
+        async (event) => {
+          event.preventDefault();
+
+          try {
+            const respuesta =
+              await cambiarPlanEstudiante(
+                id,
+                {
+                  planNuevoId:
+                    Number(
+                      document
+                        .getElementById(
+                          'planNuevoEstudiante'
+                        )
+                        .value
+                    ),
+
+                  periodoCambioId:
+                    Number(
+                      document
+                        .getElementById(
+                          'periodoCambioEstudiante'
+                        )
+                        .value
+                    ),
+
+                  motivo:
+                    document
+                      .getElementById(
+                        'motivoCambioPlan'
+                      )
+                      .value
+                      .trim() || null
+                }
+              );
+
+            if (!respuesta?.ok) {
+              throw new Error(
+                respuesta?.message ||
+                'No fue posible cambiar el plan.'
+              );
+            }
+
+            dialog.close();
+
+            mostrarExito({
+              titulo:
+                'Plan actualizado',
+              mensaje:
+                'El cambio de plan se registró correctamente en el historial del estudiante.'
+            });
+
+            await cargarEstudiantes(
+              instanciaActual,
+              true
+            );
+          } catch (error) {
+            mostrarError({
+              titulo:
+                'No fue posible cambiar el plan',
+              mensaje:
+                error?.message
+            });
+          }
+        }
+      );
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible preparar el cambio de plan',
+      mensaje:
+        error?.message
+    });
+  }
+}
+
 export function iniciarEstudiantesPage() {
   instanciaActual += 1;
 
@@ -1090,6 +1997,11 @@ export function iniciarEstudiantesPage() {
   const contenedor =
     document.getElementById(
       'estudiantesContent'
+    );
+
+  const nuevoBtn =
+    document.getElementById(
+      'nuevoEstudianteButton'
     );
 
   buscar?.addEventListener(
@@ -1154,6 +2066,11 @@ export function iniciarEstudiantesPage() {
   contenedor?.addEventListener(
     'click',
     manejarAccionEstudiante
+  );
+
+  nuevoBtn?.addEventListener(
+    'click',
+    abrirNuevoEstudiante
   );
 
   renderizarIconos();

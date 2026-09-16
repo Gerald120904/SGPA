@@ -1824,6 +1824,45 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'estudiantes:crear',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/estudiantes',
+      {
+        method: 'POST',
+        body: datos
+      }
+    );
+  }
+);
+
+ipcMain.handle(
+  'estudiantes:cambiar-estado',
+  async (_event, id, estado) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: { estado }
+      }
+    );
+  }
+);
+
+ipcMain.handle(
+  'estudiantes:cambiar-plan',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}/plan`,
+      {
+        method: 'PATCH',
+        body: datos
+      }
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

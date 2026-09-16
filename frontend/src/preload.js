@@ -420,4 +420,24 @@ contextBridge.exposeInMainWorld("sgpa", {
       id,
       datos
     ),
+
+  crearEstudiante: (datos) =>
+    ipcRenderer.invoke(
+      'estudiantes:crear',
+      datos
+    ),
+
+  cambiarEstadoEstudiante: (id, estado) =>
+    ipcRenderer.invoke(
+      'estudiantes:cambiar-estado',
+      id,
+      estado
+    ),
+
+  cambiarPlanEstudiante: (id, datos) =>
+    ipcRenderer.invoke(
+      'estudiantes:cambiar-plan',
+      id,
+      datos
+    ),
 });

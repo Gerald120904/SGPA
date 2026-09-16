@@ -42,3 +42,40 @@ export async function actualizarEstudiante(
       datos
     );
 }
+
+export async function crearEstudiante(datos) {
+  validarApi('crearEstudiante');
+
+  return window.sgpa
+    .crearEstudiante(datos);
+}
+
+export async function cambiarEstadoEstudiante(
+  id,
+  estado
+) {
+  validarApi(
+    'cambiarEstadoEstudiante'
+  );
+
+  return window.sgpa
+    .cambiarEstadoEstudiante(
+      id,
+      estado
+    );
+}
+
+export async function cambiarPlanEstudiante(
+  id,
+  datos
+) {
+  validarApi(
+    'cambiarPlanEstudiante'
+  );
+
+  return window.sgpa
+    .cambiarPlanEstudiante(
+      id,
+      datos
+    );
+}
