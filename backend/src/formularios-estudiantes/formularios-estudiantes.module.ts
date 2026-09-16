@@ -14,6 +14,7 @@ import { EstructuraAcademicaModule } from '../estructura-academica/estructura-ac
 import { GoogleModule } from '../integraciones/google/google.module';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
+import { FormulariosEstudiantesAutoSyncService } from './formularios-estudiantes-auto-sync.service';
 import { FormulariosEstudiantesController } from './formularios-estudiantes.controller';
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
@@ -43,12 +44,14 @@ import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta
   providers: [
     FormulariosEstudiantesService,
     FormulariosEstudiantesSyncService,
+    FormulariosEstudiantesAutoSyncService,
     FormulariosEstudiantesProcesamientoService,
     NormalizadorRespuestaFormularioService,
   ],
   exports: [
     FormulariosEstudiantesService,
     FormulariosEstudiantesSyncService,
+    FormulariosEstudiantesAutoSyncService,
     FormulariosEstudiantesProcesamientoService,
   ],
 })

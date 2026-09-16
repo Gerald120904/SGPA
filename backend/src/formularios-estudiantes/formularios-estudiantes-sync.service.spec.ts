@@ -303,6 +303,15 @@ describe('FormulariosEstudiantesSyncService', () => {
         }),
       );
     });
+
+    it('sincronizarFormulario directo falla si no hay googleFormId o mapaPreguntas', async () => {
+      await expect(
+        service.sincronizarFormulario({
+          ...mockFormulario,
+          googleFormId: null,
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('listarRespuestas', () => {

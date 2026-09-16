@@ -44,12 +44,6 @@ export class FormulariosEstudiantesSyncService {
       throw new NotFoundException('El formulario indicado no existe');
     }
 
-    if (!formulario.googleFormId || !formulario.mapaPreguntas) {
-      throw new BadRequestException(
-        'El formulario no posee una configuración válida de Google Forms',
-      );
-    }
-
     const tieneAlcance =
       await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
         usuarioId,
@@ -59,6 +53,18 @@ export class FormulariosEstudiantesSyncService {
     if (!tieneAlcance) {
       throw new ForbiddenException(
         'No posee alcance académico sobre la carrera del formulario.',
+      );
+    }
+
+    return this.sincronizarFormulario(formulario);
+  }
+
+  async sincronizarFormulario(
+    formulario: FormularioEstudiante,
+  ): Promise<ResultadoSincronizacionFormulario> {
+    if (!formulario.googleFormId || !formulario.mapaPreguntas) {
+      throw new BadRequestException(
+        'El formulario no posee una configuración válida de Google Forms',
       );
     }
 
