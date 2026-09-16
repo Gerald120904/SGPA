@@ -22,7 +22,10 @@ import {
   actualizarEstudiante,
   crearEstudiante,
   cambiarEstadoEstudiante,
-  cambiarPlanEstudiante
+  cambiarPlanEstudiante,
+  obtenerHistorialAcademicoEstudiante,
+  obtenerHistorialPlanesEstudiante,
+  obtenerProgresoEstudiante
 } from '../../services/estudiantes.service.js';
 
 import {
@@ -207,6 +210,20 @@ export function EstudiantesPage() {
   `;
 }
 
+function extraerData(resultado) {
+  if (
+    resultado &&
+    Object.prototype.hasOwnProperty.call(
+      resultado,
+      'data'
+    )
+  ) {
+    return resultado.data;
+  }
+
+  return resultado;
+}
+
 function obtenerNombreCompleto(
   estudiante
 ) {
@@ -230,6 +247,129 @@ function formatearEstado(
     estado ||
     '—'
   );
+}
+
+function obtenerTextoAsignatura(item) {
+  const asignatura =
+    item?.planAsignatura ??
+    item?.asignatura ??
+    item ??
+    {};
+
+  const curso =
+    asignatura.curso ?? {};
+
+  const codigo =
+    curso.codigo ??
+    asignatura.codigo ??
+    '';
+
+  const nombre =
+    curso.nombre ??
+    asignatura.nombre ??
+    '';
+
+  if (codigo && nombre) {
+    return `${codigo} - ${nombre}`;
+  }
+
+  return (
+    codigo ||
+    nombre ||
+    `Asignatura #${
+      asignatura.id ??
+      asignatura.planAsignaturaId ??
+      '—'
+    }`
+  );
+}
+
+function obtenerTextoPeriodo(periodo) {
+  if (!periodo) {
+    return '—';
+  }
+
+  return (
+    periodo.codigo ||
+    periodo.nombre ||
+    `Período #${periodo.id}`
+  );
+}
+
+function obtenerTextoPlan(plan) {
+  if (!plan) {
+    return '—';
+  }
+
+  const codigo =
+    plan.codigo || '';
+
+  const nombre =
+    plan.nombre || '';
+
+  if (codigo && nombre) {
+    return `${codigo} - ${nombre}`;
+  }
+
+  return (
+    codigo ||
+    nombre ||
+    `Plan #${plan.id}`
+  );
+}
+
+function obtenerNombreResponsable(usuario) {
+  if (!usuario) {
+    return '—';
+  }
+
+  return (
+    usuario.nombreCompleto ||
+    usuario.nombre ||
+    usuario.correo ||
+    usuario.email ||
+    '—'
+  );
+}
+
+function formatearFechaHora(valor) {
+  if (!valor) {
+    return '—';
+  }
+
+  const fecha =
+    new Date(valor);
+
+  if (
+    Number.isNaN(
+      fecha.getTime()
+    )
+  ) {
+    return String(valor);
+  }
+
+  return new Intl.DateTimeFormat(
+    'es-CR',
+    {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }
+  ).format(fecha);
+}
+
+function formatearTextoEnum(valor) {
+  if (!valor) {
+    return '—';
+  }
+
+  return String(valor)
+    .replaceAll('_', ' ')
+    .toLowerCase()
+    .replace(
+      /^\w/,
+      (letra) =>
+        letra.toUpperCase()
+    );
 }
 
 function renderizarEstudiantes() {
@@ -326,6 +466,19 @@ function renderizarEstudiantes() {
                   ></i>
                 </button>
 
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="expediente"
+                  data-id="${estudiante.id}"
+                  title="Ver expediente académico"
+                >
+                  <i
+                    data-lucide="folder-open"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+
                 ${
                   puedeGestionar
                     ? `
@@ -398,6 +551,412 @@ function renderizarEstudiantes() {
       ariaLabel:
         'Listado de estudiantes'
     });
+
+  renderizarIconos();
+}
+
+function renderizarHistorialAcademico(
+  historial
+) {
+  const contenedor =
+    document.getElementById(
+      'expedienteHistorialAcademico'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  const rows =
+    historial
+      .map(
+        (item) => `
+          <tr>
+            <td>
+              ${escapeHtml(
+                obtenerTextoAsignatura(
+                  item
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                obtenerTextoPeriodo(
+                  item.periodo
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                item.resultado ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formatearTextoEnum(
+                  item.origenAcademico
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formatearTextoEnum(
+                  item.fuenteRegistro
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                item.observaciones ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                obtenerNombreResponsable(
+                  item.registradoPor
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formatearFechaHora(
+                  item.createdAt
+                )
+              )}
+            </td>
+          </tr>
+        `
+      )
+      .join('');
+
+  contenedor.innerHTML =
+    DataTable({
+      columns: [
+        'Asignatura',
+        'Período',
+        'Resultado',
+        'Origen',
+        'Fuente',
+        'Observaciones',
+        'Registrado por',
+        'Fecha'
+      ],
+
+      rows,
+
+      emptyMessage:
+        'El estudiante todavía no posee historial académico.',
+
+      ariaLabel:
+        'Historial académico del estudiante'
+    });
+}
+
+function renderizarHistorialPlanes(
+  historial
+) {
+  const contenedor =
+    document.getElementById(
+      'expedienteHistorialPlanes'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  const rows =
+    historial
+      .map(
+        (item) => `
+          <tr>
+            <td>
+              ${escapeHtml(
+                obtenerTextoPlan(
+                  item.planAnterior
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                obtenerTextoPlan(
+                  item.planNuevo
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                obtenerTextoPeriodo(
+                  item.periodoCambio
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                item.motivo ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                obtenerNombreResponsable(
+                  item.cambiadoPor
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formatearFechaHora(
+                  item.createdAt
+                )
+              )}
+            </td>
+          </tr>
+        `
+      )
+      .join('');
+
+  contenedor.innerHTML =
+    DataTable({
+      columns: [
+        'Plan anterior',
+        'Plan nuevo',
+        'Período',
+        'Motivo',
+        'Responsable',
+        'Fecha'
+      ],
+
+      rows,
+
+      emptyMessage:
+        'El estudiante no registra cambios de plan.',
+
+      ariaLabel:
+        'Historial de planes del estudiante'
+    });
+}
+
+function renderizarProgresoEstudiante(
+  progreso
+) {
+  const contenedor =
+    document.getElementById(
+      'expedienteProgreso'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  const resumen =
+    progreso?.resumen ?? {};
+
+  const reprobadas =
+    Array.isArray(
+      progreso?.reprobadas
+    )
+      ? progreso.reprobadas.length
+      : 0;
+
+  const resumenTable =
+    DataTable({
+      columns: [
+        'Total del plan',
+        'Aprobadas',
+        'Reprobadas',
+        'Pendientes',
+        'Rezagadas'
+      ],
+
+      rows: `
+        <tr>
+          <td>
+            ${resumen.totalPlan ?? 0}
+          </td>
+
+          <td>
+            ${resumen.aprobadas ?? 0}
+          </td>
+
+          <td>
+            ${reprobadas}
+          </td>
+
+          <td>
+            ${resumen.pendientes ?? 0}
+          </td>
+
+          <td>
+            ${resumen.rezagadas ?? 0}
+          </td>
+        </tr>
+      `,
+
+      emptyMessage:
+        'No existe información de progreso.',
+
+      ariaLabel:
+        'Resumen de progreso académico'
+    });
+
+  const habilitadas =
+    Array.isArray(
+      progreso?.habilitadas
+    )
+      ? progreso.habilitadas
+      : [];
+
+  const filasHabilitadas =
+    habilitadas
+      .map(
+        (item) => {
+          const requisitos =
+            Array.isArray(
+              item.requisitosFaltantes
+            )
+              ? item
+                  .requisitosFaltantes
+                  .map(
+                    obtenerTextoAsignatura
+                  )
+                  .join(', ')
+              : '';
+
+          const correquisitos =
+            Array.isArray(
+              item.correquisitos
+            )
+              ? item.correquisitos
+                  .map(
+                    obtenerTextoAsignatura
+                  )
+                  .join(', ')
+              : '';
+
+          return `
+            <tr>
+              <td>
+                ${escapeHtml(
+                  obtenerTextoAsignatura(
+                    item
+                  )
+                )}
+              </td>
+
+              <td>
+                ${
+                  item.habilitada
+                    ? 'Habilitada'
+                    : 'Bloqueada'
+                }
+              </td>
+
+              <td>
+                ${escapeHtml(
+                  requisitos || '—'
+                )}
+              </td>
+
+              <td>
+                ${escapeHtml(
+                  correquisitos || '—'
+                )}
+              </td>
+            </tr>
+          `;
+        }
+      )
+      .join('');
+
+  const habilitadasTable =
+    DataTable({
+      columns: [
+        'Asignatura',
+        'Estado',
+        'Requisitos faltantes',
+        'Correquisitos'
+      ],
+
+      rows:
+        filasHabilitadas,
+
+      emptyMessage:
+        'No hay asignaturas pendientes para evaluar.',
+
+      ariaLabel:
+        'Asignaturas habilitadas del estudiante'
+    });
+
+  const rezagadas =
+    Array.isArray(
+      progreso?.rezagadas
+    )
+      ? progreso.rezagadas
+      : [];
+
+  const rezagadasTable =
+    DataTable({
+      columns: [
+        'Asignatura'
+      ],
+
+      rows:
+        rezagadas
+          .map(
+            (item) => `
+              <tr>
+                <td>
+                  ${escapeHtml(
+                    obtenerTextoAsignatura(
+                      item
+                    )
+                  )}
+                </td>
+              </tr>
+            `
+          )
+          .join(''),
+
+      emptyMessage:
+        'No hay asignaturas rezagadas para este período de referencia.',
+
+      ariaLabel:
+        'Asignaturas rezagadas'
+    });
+
+  contenedor.innerHTML = `
+    <h3>
+      Resumen
+    </h3>
+
+    ${resumenTable}
+
+    <h3>
+      Habilitación de asignaturas
+    </h3>
+
+    ${habilitadasTable}
+
+    <h3>
+      Rezago académico
+    </h3>
+
+    ${rezagadasTable}
+  `;
 
   renderizarIconos();
 }
@@ -678,6 +1237,10 @@ async function manejarAccionEstudiante(
   switch (button.dataset.action) {
     case 'ver':
       await abrirDetalleEstudiante(id);
+      break;
+
+    case 'expediente':
+      await abrirExpedienteEstudiante(id);
       break;
 
     case 'editar':
@@ -1955,6 +2518,331 @@ async function abrirCambiarPlanEstudiante(
         'No fue posible preparar el cambio de plan',
       mensaje:
         error?.message
+    });
+  }
+}
+
+async function abrirExpedienteEstudiante(
+  id
+) {
+  const dialog =
+    document.getElementById(
+      'estudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'estudianteDialogContent'
+    );
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  try {
+    const [
+      resultadoEstudiante,
+      resultadoAcademico,
+      resultadoPlanes,
+      resultadoPeriodos
+    ] =
+      await Promise.all([
+        obtenerEstudiante(id),
+
+        obtenerHistorialAcademicoEstudiante(
+          id
+        ),
+
+        obtenerHistorialPlanesEstudiante(
+          id
+        ),
+
+        listarPeriodosAcademicos()
+      ]);
+
+    if (!resultadoEstudiante?.ok) {
+      throw new Error(
+        resultadoEstudiante?.message ||
+        'No fue posible consultar el estudiante.'
+      );
+    }
+
+    if (!resultadoAcademico?.ok) {
+      throw new Error(
+        resultadoAcademico?.message ||
+        'No fue posible consultar el historial académico.'
+      );
+    }
+
+    if (!resultadoPlanes?.ok) {
+      throw new Error(
+        resultadoPlanes?.message ||
+        'No fue posible consultar el historial de planes.'
+      );
+    }
+
+    if (!resultadoPeriodos?.ok) {
+      throw new Error(
+        resultadoPeriodos?.message ||
+        'No fue posible consultar los períodos académicos.'
+      );
+    }
+
+    const estudiante =
+      resultadoEstudiante.data;
+
+    const historialAcademico =
+      Array.isArray(
+        extraerData(
+          resultadoAcademico
+        )
+      )
+        ? extraerData(
+            resultadoAcademico
+          )
+        : [];
+
+    const historialPlanes =
+      Array.isArray(
+        extraerData(
+          resultadoPlanes
+        )
+      )
+        ? extraerData(
+            resultadoPlanes
+          )
+        : [];
+
+    const periodos =
+      Array.isArray(
+        resultadoPeriodos.periodos
+      )
+        ? resultadoPeriodos.periodos
+        : [];
+
+    content.innerHTML =
+      FormDialog({
+        formId:
+          'expedienteEstudianteForm',
+
+        title:
+          'Expediente académico',
+
+        description:
+          `${obtenerNombreCompleto(
+            estudiante
+          )} · ${estudiante.cedula}`,
+
+        layout:
+          'custom',
+
+        cancelButtonId:
+          'cerrarExpedienteEstudiante',
+
+        cancelText:
+          'Cerrar',
+
+        showFooter:
+          true,
+
+        body: `
+          <div class="sgpa-form-wide">
+
+            <label>
+              <span>
+                Período de referencia
+              </span>
+
+              <select
+                id="expedientePeriodoReferencia"
+              >
+                <option
+                  value=""
+                  selected
+                >
+                  Seleccione un período para calcular el progreso...
+                </option>
+
+                ${periodos
+                  .map(
+                    (periodo) => `
+                      <option
+                        value="${periodo.id}"
+                      >
+                        ${escapeHtml(
+                          obtenerTextoPeriodo(
+                            periodo
+                          )
+                        )}
+                      </option>
+                    `
+                  )
+                  .join('')}
+              </select>
+
+              <small class="sgpa-field-help">
+                El rezago y las asignaturas habilitadas se calculan respecto a este período.
+              </small>
+            </label>
+
+          </div>
+
+
+          <div class="sgpa-form-wide">
+            <h3>
+              Progreso académico
+            </h3>
+
+            <div
+              id="expedienteProgreso"
+            >
+              <div
+                class="sgpa-table-empty"
+              >
+                Seleccione un período de referencia para calcular el progreso.
+              </div>
+            </div>
+          </div>
+
+
+          <div class="sgpa-form-wide">
+            <h3>
+              Historial académico
+            </h3>
+
+            <div
+              id="expedienteHistorialAcademico"
+            ></div>
+          </div>
+
+
+          <div class="sgpa-form-wide">
+            <h3>
+              Historial de planes
+            </h3>
+
+            <div
+              id="expedienteHistorialPlanes"
+            ></div>
+          </div>
+        `
+      });
+
+    renderizarIconos();
+
+    dialog.showModal();
+
+    habilitarCierreExterior(
+      dialog
+    );
+
+    renderizarHistorialAcademico(
+      historialAcademico
+    );
+
+    renderizarHistorialPlanes(
+      historialPlanes
+    );
+
+    document
+      .getElementById(
+        'cerrarExpedienteEstudiante'
+      )
+      ?.addEventListener(
+        'click',
+        () => dialog.close()
+      );
+
+    document
+      .getElementById(
+        'expedientePeriodoReferencia'
+      )
+      ?.addEventListener(
+        'change',
+        async (event) => {
+          const periodoReferenciaId =
+            Number(
+              event.target.value
+            );
+
+          if (!periodoReferenciaId) {
+            return;
+          }
+
+          await cargarProgresoExpediente(
+            id,
+            periodoReferenciaId
+          );
+        }
+      );
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible abrir el expediente',
+
+      mensaje:
+        error?.message ||
+        'Ocurrió un error al consultar la información académica.'
+    });
+  }
+}
+
+async function cargarProgresoExpediente(
+  estudianteId,
+  periodoReferenciaId
+) {
+  const contenedor =
+    document.getElementById(
+      'expedienteProgreso'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  contenedor.innerHTML = `
+    <div
+      class="sgpa-table-empty"
+      role="status"
+    >
+      Calculando progreso académico...
+    </div>
+  `;
+
+  try {
+    const resultado =
+      await obtenerProgresoEstudiante(
+        estudianteId,
+        periodoReferenciaId
+      );
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible calcular el progreso.'
+      );
+    }
+
+    renderizarProgresoEstudiante(
+      extraerData(resultado)
+    );
+  } catch (error) {
+    contenedor.innerHTML = `
+      <div class="sgpa-table-empty">
+        ${escapeHtml(
+          error?.message ||
+          'No fue posible calcular el progreso para este período.'
+        )}
+      </div>
+    `;
+
+    mostrarError({
+      titulo:
+        'No fue posible calcular el progreso',
+
+      mensaje:
+        error?.message ||
+        'Revise el período de referencia seleccionado.'
     });
   }
 }

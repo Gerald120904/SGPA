@@ -1863,6 +1863,39 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'estudiantes:historial-academico',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}/historial-academico`
+    );
+  }
+);
+
+ipcMain.handle(
+  'estudiantes:historial-planes',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}/historial-planes`
+    );
+  }
+);
+
+ipcMain.handle(
+  'estudiantes:progreso',
+  async (_event, id, periodoReferenciaId) => {
+    const params =
+      new URLSearchParams({
+        periodoReferenciaId:
+          String(periodoReferenciaId)
+      });
+
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}/progreso?${params.toString()}`
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

@@ -79,3 +79,44 @@ export async function cambiarPlanEstudiante(
       datos
     );
 }
+
+export async function obtenerHistorialAcademicoEstudiante(
+  id
+) {
+  validarApi(
+    'obtenerHistorialAcademicoEstudiante'
+  );
+
+  return window.sgpa
+    .obtenerHistorialAcademicoEstudiante(
+      id
+    );
+}
+
+export async function obtenerHistorialPlanesEstudiante(
+  id
+) {
+  validarApi(
+    'obtenerHistorialPlanesEstudiante'
+  );
+
+  return window.sgpa
+    .obtenerHistorialPlanesEstudiante(
+      id
+    );
+}
+
+export async function obtenerProgresoEstudiante(
+  id,
+  periodoReferenciaId
+) {
+  validarApi(
+    'obtenerProgresoEstudiante'
+  );
+
+  return window.sgpa
+    .obtenerProgresoEstudiante(
+      id,
+      periodoReferenciaId
+    );
+}

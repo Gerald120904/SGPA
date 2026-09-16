@@ -440,4 +440,26 @@ contextBridge.exposeInMainWorld("sgpa", {
       id,
       datos
     ),
+
+  obtenerHistorialAcademicoEstudiante: (id) =>
+    ipcRenderer.invoke(
+      'estudiantes:historial-academico',
+      id
+    ),
+
+  obtenerHistorialPlanesEstudiante: (id) =>
+    ipcRenderer.invoke(
+      'estudiantes:historial-planes',
+      id
+    ),
+
+  obtenerProgresoEstudiante: (
+    id,
+    periodoReferenciaId
+  ) =>
+    ipcRenderer.invoke(
+      'estudiantes:progreso',
+      id,
+      periodoReferenciaId
+    ),
 });
