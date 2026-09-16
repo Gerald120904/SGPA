@@ -22,3 +22,23 @@ export async function listarEstudiantes(
       filtros
     );
 }
+
+export async function obtenerEstudiante(id) {
+  validarApi('obtenerEstudiante');
+
+  return window.sgpa
+    .obtenerEstudiante(id);
+}
+
+export async function actualizarEstudiante(
+  id,
+  datos
+) {
+  validarApi('actualizarEstudiante');
+
+  return window.sgpa
+    .actualizarEstudiante(
+      id,
+      datos
+    );
+}

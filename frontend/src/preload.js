@@ -407,4 +407,17 @@ contextBridge.exposeInMainWorld("sgpa", {
       'estudiantes:listar',
       filtros
     ),
+
+  obtenerEstudiante: (id) =>
+    ipcRenderer.invoke(
+      'estudiantes:obtener',
+      id
+    ),
+
+  actualizarEstudiante: (id, datos) =>
+    ipcRenderer.invoke(
+      'estudiantes:actualizar',
+      id,
+      datos
+    ),
 });

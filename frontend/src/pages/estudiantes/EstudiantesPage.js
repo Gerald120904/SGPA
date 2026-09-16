@@ -3,11 +3,23 @@ import {
 } from '../../components/DataTable.js';
 
 import {
-  mostrarError
+  FormDialog,
+  habilitarCierreExterior
+} from '../../components/FormDialog.js';
+
+import {
+  mostrarError,
+  mostrarExito
 } from '../../components/AlertModal.js';
 
 import {
-  listarEstudiantes
+  usuarioTienePermiso
+} from '../../app/session.js';
+
+import {
+  listarEstudiantes,
+  obtenerEstudiante,
+  actualizarEstudiante
 } from '../../services/estudiantes.service.js';
 
 import {
@@ -25,6 +37,11 @@ let catalogoEstudiantes = [];
 let instanciaActual = 0;
 
 let timerBusqueda = null;
+
+const PERMISOS = {
+  GESTIONAR:
+    'ESTUDIANTES_GESTIONAR'
+};
 
 const ESTADOS = [
   {
@@ -139,6 +156,13 @@ export function EstudiantesPage() {
         id="estudiantesContent"
         aria-live="polite"
       ></div>
+
+      <dialog
+        id="estudianteDialog"
+        class="sgpa-form-dialog sgpa-form-dialog-md"
+      >
+        <div id="estudianteDialogContent"></div>
+      </dialog>
     </section>
   `;
 }
@@ -177,6 +201,11 @@ function renderizarEstudiantes() {
   if (!contenedor) {
     return;
   }
+
+  const puedeGestionar =
+    usuarioTienePermiso(
+      PERMISOS.GESTIONAR
+    );
 
   const rows =
     estudiantes
@@ -238,6 +267,45 @@ function renderizarEstudiantes() {
                 )
               )}
             </td>
+
+            <td>
+              <div
+                class="table-actions"
+                style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;"
+              >
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-action="ver"
+                  data-id="${estudiante.id}"
+                  title="Ver estudiante"
+                >
+                  <i
+                    data-lucide="eye"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+
+                ${
+                  puedeGestionar
+                    ? `
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-action="editar"
+                        data-id="${estudiante.id}"
+                        title="Editar estudiante"
+                      >
+                        <i
+                          data-lucide="pencil"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+                    `
+                    : ''
+                }
+              </div>
+            </td>
           </tr>
         `
       )
@@ -252,7 +320,8 @@ function renderizarEstudiantes() {
         'Carrera',
         'Plan',
         'Ingreso',
-        'Estado'
+        'Estado',
+        'Acciones'
       ],
 
       rows,
@@ -525,6 +594,464 @@ async function cargarEstudiantes(
   }
 }
 
+async function manejarAccionEstudiante(
+  event
+) {
+  const button =
+    event.target.closest(
+      '[data-action][data-id]'
+    );
+
+  if (!button) return;
+
+  const id =
+    Number(button.dataset.id);
+
+  if (!id) return;
+
+  switch (button.dataset.action) {
+    case 'ver':
+      await abrirDetalleEstudiante(id);
+      break;
+
+    case 'editar':
+      await abrirEditarEstudiante(id);
+      break;
+  }
+}
+
+async function abrirDetalleEstudiante(
+  id
+) {
+  try {
+    const resultado =
+      await obtenerEstudiante(id);
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible consultar el estudiante.'
+      );
+    }
+
+    const estudiante =
+      resultado.data;
+
+    const dialog =
+      document.getElementById(
+        'estudianteDialog'
+      );
+
+    const content =
+      document.getElementById(
+        'estudianteDialogContent'
+      );
+
+    if (!dialog || !content) return;
+
+    content.innerHTML =
+      FormDialog({
+        formId:
+          'detalleEstudianteForm',
+
+        title:
+          'Detalle del estudiante',
+
+        description:
+          obtenerNombreCompleto(
+            estudiante
+          ),
+
+        layout: 'grid',
+
+        body: `
+          <label>
+            <span>Cédula</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                estudiante.cedula
+              )}"
+              readonly
+            >
+          </label>
+
+          <label>
+            <span>Correo institucional</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                estudiante.correoInstitucional
+              )}"
+              readonly
+            >
+          </label>
+
+          <label>
+            <span>Teléfono</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                estudiante.telefono || '—'
+              )}"
+              readonly
+            >
+          </label>
+
+          <label>
+            <span>Estado</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                formatearEstado(
+                  estudiante.estado
+                )
+              )}"
+              readonly
+            >
+          </label>
+
+          <label>
+            <span>Carrera</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                estudiante.carrera
+                  ? `${estudiante.carrera.codigo} - ${estudiante.carrera.nombre}`
+                  : '—'
+              )}"
+              readonly
+            >
+          </label>
+
+          <label>
+            <span>Plan de estudio</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                estudiante.planEstudio
+                  ? `${estudiante.planEstudio.codigo} - ${estudiante.planEstudio.nombre}`
+                  : '—'
+              )}"
+              readonly
+            >
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>Período de ingreso</span>
+            <input
+              type="text"
+              value="${escapeHtml(
+                estudiante.periodoIngreso?.codigo ||
+                estudiante.periodoIngreso?.nombre ||
+                '—'
+              )}"
+              readonly
+            >
+          </label>
+        `,
+
+        cancelButtonId:
+          'cerrarDetalleEstudiante',
+
+        cancelText: 'Cerrar',
+
+        showFooter: true
+      });
+
+    renderizarIconos();
+
+    dialog.showModal();
+
+    habilitarCierreExterior(
+      dialog
+    );
+
+    document
+      .getElementById(
+        'cerrarDetalleEstudiante'
+      )
+      ?.addEventListener(
+        'click',
+        () => dialog.close()
+      );
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible abrir el estudiante',
+      mensaje:
+        error?.message ||
+        'Ocurrió un error al consultar la información.'
+    });
+  }
+}
+
+async function abrirEditarEstudiante(
+  id
+) {
+  try {
+    const resultado =
+      await obtenerEstudiante(id);
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible consultar el estudiante.'
+      );
+    }
+
+    const estudiante =
+      resultado.data;
+
+    const dialog =
+      document.getElementById(
+        'estudianteDialog'
+      );
+
+    const content =
+      document.getElementById(
+        'estudianteDialogContent'
+      );
+
+    if (!dialog || !content) return;
+
+    content.innerHTML =
+      FormDialog({
+        formId:
+          'editarEstudianteForm',
+
+        title:
+          'Editar estudiante',
+
+        description:
+          'Actualice la información personal del estudiante.',
+
+        errorId:
+          'editarEstudianteError',
+
+        cancelButtonId:
+          'cancelarEditarEstudiante',
+
+        submitButtonId:
+          'guardarEstudianteButton',
+
+        submitText:
+          'Guardar cambios',
+
+        body: `
+          <label>
+            <span>Cédula</span>
+            <input
+              id="editarCedula"
+              type="text"
+              maxlength="30"
+              value="${escapeHtml(
+                estudiante.cedula
+              )}"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Nombres</span>
+            <input
+              id="editarNombres"
+              type="text"
+              maxlength="100"
+              value="${escapeHtml(
+                estudiante.nombres
+              )}"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Primer apellido</span>
+            <input
+              id="editarApellido1"
+              type="text"
+              maxlength="100"
+              value="${escapeHtml(
+                estudiante.apellido1
+              )}"
+              required
+            >
+          </label>
+
+          <label>
+            <span>Segundo apellido</span>
+            <input
+              id="editarApellido2"
+              type="text"
+              maxlength="100"
+              value="${escapeHtml(
+                estudiante.apellido2 || ''
+              )}"
+            >
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>Correo institucional</span>
+            <input
+              id="editarCorreo"
+              type="email"
+              maxlength="150"
+              value="${escapeHtml(
+                estudiante.correoInstitucional
+              )}"
+              required
+            >
+          </label>
+
+          <label class="sgpa-form-wide">
+            <span>Teléfono</span>
+            <input
+              id="editarTelefono"
+              type="text"
+              maxlength="30"
+              value="${escapeHtml(
+                estudiante.telefono || ''
+              )}"
+            >
+          </label>
+        `
+      });
+
+    renderizarIconos();
+
+    dialog.showModal();
+
+    habilitarCierreExterior(
+      dialog
+    );
+
+    document
+      .getElementById(
+        'cancelarEditarEstudiante'
+      )
+      ?.addEventListener(
+        'click',
+        () => dialog.close()
+      );
+
+    document
+      .getElementById(
+        'editarEstudianteForm'
+      )
+      ?.addEventListener(
+        'submit',
+        async (event) => {
+          event.preventDefault();
+
+          const button =
+            document.getElementById(
+              'guardarEstudianteButton'
+            );
+
+          if (button) {
+            button.disabled = true;
+          }
+
+          try {
+            const respuesta =
+              await actualizarEstudiante(
+                estudiante.id,
+                {
+                  cedula:
+                    document
+                      .getElementById(
+                        'editarCedula'
+                      )
+                      .value
+                      .trim(),
+
+                  nombres:
+                    document
+                      .getElementById(
+                        'editarNombres'
+                      )
+                      .value
+                      .trim(),
+
+                  apellido1:
+                    document
+                      .getElementById(
+                        'editarApellido1'
+                      )
+                      .value
+                      .trim(),
+
+                  apellido2:
+                    document
+                      .getElementById(
+                        'editarApellido2'
+                      )
+                      .value
+                      .trim() || null,
+
+                  correoInstitucional:
+                    document
+                      .getElementById(
+                        'editarCorreo'
+                      )
+                      .value
+                      .trim(),
+
+                  telefono:
+                    document
+                      .getElementById(
+                        'editarTelefono'
+                      )
+                      .value
+                      .trim() || null
+                }
+              );
+
+            if (!respuesta?.ok) {
+              throw new Error(
+                respuesta?.message ||
+                'No fue posible actualizar el estudiante.'
+              );
+            }
+
+            dialog.close();
+
+            mostrarExito({
+              titulo:
+                'Estudiante actualizado',
+              mensaje:
+                'La información se actualizó correctamente.'
+            });
+
+            await cargarEstudiantes(
+              instanciaActual
+            );
+          } catch (error) {
+            mostrarError({
+              titulo:
+                'No fue posible actualizar',
+              mensaje:
+                error?.message ||
+                'Ocurrió un error al guardar los cambios.'
+            });
+          } finally {
+            if (button) {
+              button.disabled = false;
+            }
+          }
+        }
+      );
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible editar el estudiante',
+      mensaje:
+        error?.message ||
+        'Ocurrió un error al consultar la información.'
+    });
+  }
+}
+
 export function iniciarEstudiantesPage() {
   instanciaActual += 1;
 
@@ -558,6 +1085,11 @@ export function iniciarEstudiantesPage() {
   const estado =
     document.getElementById(
       'estudiantesEstado'
+    );
+
+  const contenedor =
+    document.getElementById(
+      'estudiantesContent'
     );
 
   buscar?.addEventListener(
@@ -617,6 +1149,11 @@ export function iniciarEstudiantesPage() {
         instancia
       );
     }
+  );
+
+  contenedor?.addEventListener(
+    'click',
+    manejarAccionEstudiante
   );
 
   renderizarIconos();

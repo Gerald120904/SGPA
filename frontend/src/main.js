@@ -1802,6 +1802,28 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  'estudiantes:obtener',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}`
+    );
+  }
+);
+
+ipcMain.handle(
+  'estudiantes:actualizar',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/${id}`,
+      {
+        method: 'PATCH',
+        body: datos
+      }
+    );
+  }
+);
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,
