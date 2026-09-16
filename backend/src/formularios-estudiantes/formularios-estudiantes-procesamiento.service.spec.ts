@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +14,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
   };
   let respuestaRepo: {
     find: jest.Mock;
+    findOne: jest.Mock;
     save: jest.Mock;
   };
   let periodoRepo: {
@@ -26,15 +28,18 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
   };
   let estructuraAcademicaService: {
     tieneAlcanceSobreCarrera: jest.Mock;
+    obtenerCarreraIdsConAlcance: jest.Mock;
   };
 
   const usuarioId = 10;
-  const formularioId = 1;
+  const respuestaId = 1;
 
   const mockFormulario = {
     id: 1,
     carreraId: 2,
     planEstudioId: 3,
+    carrera: { id: 2, nombre: 'Ingeniería en Sistemas' },
+    planEstudio: { id: 3, nombre: 'Plan 2026' },
   };
 
   const mockPeriodo = {
@@ -53,6 +58,37 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     },
   };
 
+  const mockRespuestaBase = {
+    id: respuestaId,
+    formularioId: 1,
+    formulario: { ...mockFormulario },
+    estado: EstadoRespuestaFormulario.PENDIENTE,
+    procesadoAt: null,
+    revisadoPorUsuarioId: null,
+    revisadoAt: null,
+    motivoRechazo: null,
+    detalleError: null,
+    datosNormalizadosJson: {
+      primerNombre: 'Ana',
+      segundoNombre: 'Sofía',
+      primerApellido: 'Vargas',
+      segundoApellido: 'Mora',
+      identificacion: '401110222',
+      correoEstudiantil: 'ana@est.una.ac.cr',
+      contacto: '88889999',
+      periodoIngresoId: 20,
+      asignaturasAprobadas: [
+        {
+          planAsignaturaId: 101,
+          cursoId: 201,
+          codigo: 'EIF201',
+        },
+      ],
+      optativasNoDisciplinarias: null,
+      requiereRevisionOptativas: false,
+    },
+  };
+
   beforeEach(() => {
     formularioRepo = {
       findOne: jest.fn().mockResolvedValue({ ...mockFormulario }),
@@ -60,6 +96,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
 
     respuestaRepo = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue({ ...mockRespuestaBase }),
       save: jest.fn(async (r) => r),
     };
 
@@ -84,6 +121,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
 
     estructuraAcademicaService = {
       tieneAlcanceSobreCarrera: jest.fn().mockResolvedValue(true),
+      obtenerCarreraIdsConAlcance: jest.fn().mockResolvedValue([2]),
     };
 
     service = new FormulariosEstudiantesProcesamientoService(
@@ -100,392 +138,240 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     jest.clearAllMocks();
   });
 
-  it('falla con NotFoundException si el formulario no existe', async () => {
-    formularioRepo.findOne.mockResolvedValue(null);
-
-    await expect(service.procesar(formularioId, usuarioId)).rejects.toThrow(
-      NotFoundException,
-    );
-  });
-
-  it('falla con ForbiddenException si el usuario no tiene alcance sobre la carrera', async () => {
-    estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(false);
-
-    await expect(service.procesar(formularioId, usuarioId)).rejects.toThrow(
-      ForbiddenException,
-    );
-  });
-
-  it('procesa respuesta PENDIENTE combinando primer y segundo nombre y resolviendo IDs', async () => {
-    const mockRespuesta = {
-      id: 1,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Ana',
-        segundoNombre: 'Sofía',
-        primerApellido: 'Vargas',
-        segundoApellido: 'Mora',
-        identificacion: '401110222',
-        correoEstudiantil: 'ana@est.una.ac.cr',
-        contacto: '88889999',
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [
-          {
-            planAsignaturaId: 101,
-            cursoId: 201,
-            codigo: 'EIF201',
-          },
-        ],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
-
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
-
-    const res = await service.procesar(formularioId, usuarioId);
-
-    expect(res).toEqual({
-      candidatas: 1,
-      procesadas: 1,
-      omitidasYaProcesadas: 0,
-      requierenRevision: 0,
-      errores: 0,
-      estudiantesCreados: 1,
-      estudiantesActualizados: 0,
-      aprobacionesNuevas: 1,
-    });
-
-    expect(
-      estudiantesImportacionService.ejecutarDesdeGoogleForms,
-    ).toHaveBeenCalledWith(usuarioId, {
-      carreraId: 2,
-      planEstudioId: 3,
-      estudiantes: [
+  describe('listarSolicitudes', () => {
+    it('retorna solicitudes pendientes/revisión en carreras con alcance', async () => {
+      const solicitudes = [
+        { ...mockRespuestaBase, id: 1 },
         {
-          fila: 2,
-          cedula: '401110222',
-          nombres: 'Ana Sofía',
-          apellido1: 'Vargas',
-          apellido2: 'Mora',
-          correoInstitucional: 'ana@est.una.ac.cr',
-          telefono: '88889999',
-          periodoIngresoCodigo: '2026-C1',
-          asignaturasAprobadas: ['EIF201'],
+          ...mockRespuestaBase,
+          id: 2,
+          estado: EstadoRespuestaFormulario.REQUIERE_REVISION,
         },
-      ],
-    });
+      ];
+      respuestaRepo.find.mockResolvedValue(solicitudes);
 
-    expect(mockRespuesta.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
-    expect(mockRespuesta.procesadoAt).toBeInstanceOf(Date);
-    expect(mockRespuesta.detalleError).toBeNull();
-  });
+      const res = await service.listarSolicitudes(usuarioId);
 
-  it('procesa correctamente una respuesta con cero asignaturas aprobadas', async () => {
-    const mockRespuesta = {
-      id: 2,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Carlos',
-        segundoNombre: null,
-        primerApellido: 'Pérez',
-        segundoApellido: null,
-        identificacion: '501110222',
-        correoEstudiantil: 'carlos@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
-
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
-    estudiantesImportacionService.ejecutarDesdeGoogleForms.mockResolvedValue({
-      creados: 1,
-      actualizados: 0,
-      aprobacionesNuevas: 0,
-      sinCambios: 0,
-      errores: 0,
-      filas: [{ fila: 2, accion: 'CREAR', errores: [] }],
-    });
-
-    const res = await service.procesar(formularioId, usuarioId);
-
-    expect(res.estudiantesCreados).toBe(1);
-    expect(res.aprobacionesNuevas).toBe(0);
-    expect(mockRespuesta.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
-  });
-
-  it('respuesta con optativa real: importa formalmente, conserva REQUIERE_REVISION y llena procesadoAt', async () => {
-    const mockRespuesta = {
-      id: 3,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.REQUIERE_REVISION,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'María',
-        segundoNombre: null,
-        primerApellido: 'Castro',
-        segundoApellido: null,
-        identificacion: '601110222',
-        correoEstudiantil: 'maria@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [
-          {
-            planAsignaturaId: 101,
-            cursoId: 201,
-            codigo: 'EIF201',
+      expect(estructuraAcademicaService.obtenerCarreraIdsConAlcance).toHaveBeenCalledWith(usuarioId);
+      expect(respuestaRepo.find).toHaveBeenCalledWith({
+        where: {
+          estado: expect.anything(),
+          formulario: {
+            carreraId: expect.anything(),
           },
-        ],
-        optativasNoDisciplinarias: 'Teatro y Sociedad',
-        requiereRevisionOptativas: true,
-      },
-    };
-
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
-
-    const res = await service.procesar(formularioId, usuarioId);
-
-    expect(res.procesadas).toBe(1);
-    expect(res.requierenRevision).toBe(1);
-    expect(res.estudiantesCreados).toBe(1);
-    expect(mockRespuesta.estado).toBe(
-      EstadoRespuestaFormulario.REQUIERE_REVISION,
-    );
-    expect(mockRespuesta.procesadoAt).toBeInstanceOf(Date);
-  });
-
-  it('si el importador devuelve accion ERROR (conflicto de datos), marca REQUIERE_REVISION y procesadoAt nulo', async () => {
-    const mockRespuesta = {
-      id: 4,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Pedro',
-        segundoNombre: null,
-        primerApellido: 'Rojas',
-        segundoApellido: null,
-        identificacion: '701110222',
-        correoEstudiantil: 'pedro@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
-
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
-    estudiantesImportacionService.ejecutarDesdeGoogleForms.mockResolvedValue({
-      creados: 0,
-      actualizados: 0,
-      aprobacionesNuevas: 0,
-      sinCambios: 0,
-      errores: 1,
-      filas: [
-        {
-          fila: 2,
-          accion: 'ERROR',
-          errores: ['El correo institucional pertenece a otra cédula.'],
         },
-      ],
+        relations: {
+          formulario: {
+            carrera: true,
+            planEstudio: true,
+          },
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+      expect(res).toEqual(solicitudes);
     });
 
-    const res = await service.procesar(formularioId, usuarioId);
+    it('retorna array vacío si el usuario no tiene carreras con alcance', async () => {
+      estructuraAcademicaService.obtenerCarreraIdsConAlcance.mockResolvedValue([]);
 
-    expect(res.requierenRevision).toBe(1);
-    expect(res.procesadas).toBe(0);
-    expect(mockRespuesta.estado).toBe(
-      EstadoRespuestaFormulario.REQUIERE_REVISION,
-    );
-    expect(mockRespuesta.detalleError).toBe(
-      'El correo institucional pertenece a otra cédula.',
-    );
-    expect(mockRespuesta.procesadoAt).toBeNull();
+      const res = await service.listarSolicitudes(usuarioId);
+
+      expect(res).toEqual([]);
+      expect(respuestaRepo.find).not.toHaveBeenCalled();
+    });
   });
 
-  it('si el período de ingreso ya no existe en la BD, marca REQUIERE_REVISION', async () => {
-    const mockRespuesta = {
-      id: 5,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Luis',
-        segundoNombre: null,
-        primerApellido: 'Mora',
-        segundoApellido: null,
-        identificacion: '801110222',
-        correoEstudiantil: 'luis@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 999, // Inexistente
-        asignaturasAprobadas: [],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
+  describe('aprobarRespuesta', () => {
+    it('PENDIENTE + aceptar: crea/actualiza estudiante y marca PROCESADO', async () => {
+      const mockRespuesta = { ...mockRespuestaBase };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
 
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
-    periodoRepo.findOne.mockResolvedValue(null);
+      const res = await service.aprobarRespuesta(respuestaId, usuarioId);
 
-    const res = await service.procesar(formularioId, usuarioId);
-
-    expect(res.requierenRevision).toBe(1);
-    expect(mockRespuesta.estado).toBe(
-      EstadoRespuestaFormulario.REQUIERE_REVISION,
-    );
-    expect(mockRespuesta.detalleError).toBe(
-      'El período de ingreso asociado a la respuesta ya no existe.',
-    );
-  });
-
-  it('si una asignatura cambió de plan o fue eliminada, marca REQUIERE_REVISION', async () => {
-    const mockRespuesta = {
-      id: 6,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Elena',
-        segundoNombre: null,
-        primerApellido: 'Jiménez',
-        segundoApellido: null,
-        identificacion: '901110222',
-        correoEstudiantil: 'elena@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [
-          {
-            planAsignaturaId: 101,
-            cursoId: 201,
-            codigo: 'EIF201',
-          },
-        ],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
-
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
-    // Asignatura pertenece a otro plan
-    planAsignaturaRepo.find.mockResolvedValue([
-      {
-        ...mockPlanAsignatura,
-        planEstudioId: 99, // Distinto al plan del formulario (3)
-      },
-    ]);
-
-    const res = await service.procesar(formularioId, usuarioId);
-
-    expect(res.requierenRevision).toBe(1);
-    expect(mockRespuesta.estado).toBe(
-      EstadoRespuestaFormulario.REQUIERE_REVISION,
-    );
-    expect(mockRespuesta.detalleError).toContain(
-      'ya no pertenece al plan del formulario',
-    );
-  });
-
-  it('si ocurre una excepción inesperada, guarda estado ERROR y no detiene las demás', async () => {
-    const mockRespuesta1 = {
-      id: 7,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Error',
-        segundoNombre: null,
-        primerApellido: 'Test',
-        segundoApellido: null,
-        identificacion: '111111111',
-        correoEstudiantil: 'err@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
-
-    const mockRespuesta2 = {
-      id: 8,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Valido',
-        segundoNombre: null,
-        primerApellido: 'Test',
-        segundoApellido: null,
-        identificacion: '222222222',
-        correoEstudiantil: 'val@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
-
-    respuestaRepo.find.mockResolvedValue([mockRespuesta1, mockRespuesta2]);
-
-    estudiantesImportacionService.ejecutarDesdeGoogleForms
-      .mockRejectedValueOnce(new Error('Fallo crítico de base de datos'))
-      .mockResolvedValueOnce({
+      expect(res).toEqual({
+        respuestaId: 1,
+        estado: EstadoRespuestaFormulario.PROCESADO,
         creados: 1,
+        actualizados: 0,
+        aprobacionesNuevas: 1,
+      });
+
+      expect(
+        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+      ).toHaveBeenCalledWith(usuarioId, {
+        carreraId: 2,
+        planEstudioId: 3,
+        estudiantes: [
+          {
+            fila: 2,
+            cedula: '401110222',
+            nombres: 'Ana Sofía',
+            apellido1: 'Vargas',
+            apellido2: 'Mora',
+            correoInstitucional: 'ana@est.una.ac.cr',
+            telefono: '88889999',
+            periodoIngresoCodigo: '2026-C1',
+            asignaturasAprobadas: ['EIF201'],
+          },
+        ],
+      });
+
+      expect(mockRespuesta.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
+      expect(mockRespuesta.revisadoPorUsuarioId).toBe(usuarioId);
+      expect(mockRespuesta.revisadoAt).toBeInstanceOf(Date);
+      expect(mockRespuesta.procesadoAt).toBeInstanceOf(Date);
+      expect(mockRespuesta.motivoRechazo).toBeNull();
+      expect(mockRespuesta.detalleError).toBeNull();
+    });
+
+    it('REQUIERE_REVISION + aceptar: queda PROCESADO tras la revisión humana', async () => {
+      const mockRespuesta = {
+        ...mockRespuestaBase,
+        estado: EstadoRespuestaFormulario.REQUIERE_REVISION,
+      };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+
+      const res = await service.aprobarRespuesta(respuestaId, usuarioId);
+
+      expect(res.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
+      expect(mockRespuesta.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
+      expect(mockRespuesta.revisadoPorUsuarioId).toBe(usuarioId);
+    });
+
+    it('PROCESADO + aceptar nuevamente: lanza ConflictException', async () => {
+      const mockRespuesta = {
+        ...mockRespuestaBase,
+        estado: EstadoRespuestaFormulario.PROCESADO,
+      };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+
+      await expect(
+        service.aprobarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(ConflictException);
+
+      expect(
+        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('RECHAZADO + aceptar: lanza ConflictException', async () => {
+      const mockRespuesta = {
+        ...mockRespuestaBase,
+        estado: EstadoRespuestaFormulario.RECHAZADO,
+      };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+
+      await expect(
+        service.aprobarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(ConflictException);
+
+      expect(
+        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('estudiante con error de validación/conflicto: marca REQUIERE_REVISION y lanza ConflictException', async () => {
+      const mockRespuesta = { ...mockRespuestaBase };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+
+      estudiantesImportacionService.ejecutarDesdeGoogleForms.mockResolvedValue({
+        creados: 0,
         actualizados: 0,
         aprobacionesNuevas: 0,
         sinCambios: 0,
-        errores: 0,
-        filas: [{ fila: 2, accion: 'CREAR', errores: [] }],
+        errores: 1,
+        filas: [
+          {
+            fila: 2,
+            accion: 'ERROR',
+            errores: ['El estudiante pertenece a otra carrera o plan.'],
+          },
+        ],
       });
 
-    const res = await service.procesar(formularioId, usuarioId);
+      await expect(
+        service.aprobarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(ConflictException);
 
-    expect(res.errores).toBe(1);
-    expect(res.procesadas).toBe(1);
-    expect(mockRespuesta1.estado).toBe(EstadoRespuestaFormulario.ERROR);
-    expect(mockRespuesta1.detalleError).toBe(
-      'Fallo crítico de base de datos',
-    );
-    expect(mockRespuesta2.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
+      expect(mockRespuesta.estado).toBe(
+        EstadoRespuestaFormulario.REQUIERE_REVISION,
+      );
+      expect(mockRespuesta.detalleError).toBe(
+        'El estudiante pertenece a otra carrera o plan.',
+      );
+    });
+
+    it('usuario fuera del alcance: lanza ForbiddenException', async () => {
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(false);
+
+      await expect(
+        service.aprobarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(
+        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('solicitud no existente: lanza NotFoundException', async () => {
+      respuestaRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.aprobarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
-  it('procesamiento académico sigue registrando al usuario B como quien ejecutó el proceso', async () => {
-    const usuarioBId = 88;
-    const mockRespuesta = {
-      id: 1,
-      formularioId: 1,
-      estado: EstadoRespuestaFormulario.PENDIENTE,
-      procesadoAt: null,
-      datosNormalizadosJson: {
-        primerNombre: 'Ana',
-        segundoNombre: null,
-        primerApellido: 'Vargas',
-        segundoApellido: null,
-        identificacion: '401110222',
-        correoEstudiantil: 'ana@est.una.ac.cr',
-        contacto: null,
-        periodoIngresoId: 20,
-        asignaturasAprobadas: [],
-        optativasNoDisciplinarias: null,
-        requiereRevisionOptativas: false,
-      },
-    };
+  describe('rechazarRespuesta', () => {
+    it('PENDIENTE + rechazar: marca RECHAZADO y no llama a EstudiantesImportacionService', async () => {
+      const mockRespuesta = { ...mockRespuestaBase };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
 
-    respuestaRepo.find.mockResolvedValue([mockRespuesta]);
+      const res = await service.rechazarRespuesta(
+        respuestaId,
+        usuarioId,
+        'Información inconsistente',
+      );
 
-    await service.procesar(formularioId, usuarioBId);
+      expect(res.estado).toBe(EstadoRespuestaFormulario.RECHAZADO);
+      expect(mockRespuesta.estado).toBe(EstadoRespuestaFormulario.RECHAZADO);
+      expect(mockRespuesta.revisadoPorUsuarioId).toBe(usuarioId);
+      expect(mockRespuesta.revisadoAt).toBeInstanceOf(Date);
+      expect(mockRespuesta.motivoRechazo).toBe('Información inconsistente');
+      expect(mockRespuesta.procesadoAt).toBeNull();
+      expect(
+        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+      ).not.toHaveBeenCalled();
+    });
 
-    expect(
-      estudiantesImportacionService.ejecutarDesdeGoogleForms,
-    ).toHaveBeenCalledWith(usuarioBId, expect.any(Object));
+    it('PROCESADO + rechazar: lanza ConflictException', async () => {
+      const mockRespuesta = {
+        ...mockRespuestaBase,
+        estado: EstadoRespuestaFormulario.PROCESADO,
+      };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+
+      await expect(
+        service.rechazarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('usuario fuera de alcance al rechazar: lanza ForbiddenException', async () => {
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(false);
+
+      await expect(
+        service.rechazarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('solicitud inexistente al rechazar: lanza NotFoundException', async () => {
+      respuestaRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.rechazarRespuesta(respuestaId, usuarioId),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 });

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { EstadoRespuestaFormulario } from '../constants/estado-respuesta-formulario.constant';
 import { DatosNormalizadosFormulario } from '../types/datos-normalizados-formulario.type';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { FormularioEstudiante } from './formulario-estudiante.entity';
 
 @Entity({ name: 'respuestas_formularios_estudiantes' })
@@ -77,6 +78,37 @@ export class RespuestaFormularioEstudiante {
     nullable: true,
   })
   procesadoAt!: Date | null;
+
+  @Column({
+    name: 'revisado_por_usuario_id',
+    type: 'int',
+    unsigned: true,
+    nullable: true,
+  })
+  revisadoPorUsuarioId!: number | null;
+
+  @Column({
+    name: 'revisado_at',
+    type: 'datetime',
+    nullable: true,
+  })
+  revisadoAt!: Date | null;
+
+  @Column({
+    name: 'motivo_rechazo',
+    type: 'text',
+    nullable: true,
+  })
+  motivoRechazo!: string | null;
+
+  @ManyToOne(() => Usuario, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'revisado_por_usuario_id',
+  })
+  revisadoPor!: Usuario | null;
 
   @ManyToOne(
     () => FormularioEstudiante,

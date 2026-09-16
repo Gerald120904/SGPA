@@ -51,6 +51,7 @@ describe('FormulariosEstudiantesService', () => {
   const usuarioId = 10;
   const dto: CrearFormularioEstudianteDto = {
     titulo: 'Formulario Admisión 2026',
+    descripcion: 'Indique sus datos personales y asignaturas aprobadas.',
     carreraId: 1,
     planEstudioId: 2,
   };
@@ -177,6 +178,7 @@ describe('FormulariosEstudiantesService', () => {
       }),
       actualizarFormulario: jest.fn().mockResolvedValue({
         replies: [
+          {}, // updateFormInfo
           { createItem: { itemId: 'item-0', questionId: ['q-0'] } },
           { createItem: { itemId: 'item-1', questionId: ['q-1'] } },
           { createItem: { itemId: 'item-2', questionId: ['q-2'] } },
@@ -299,6 +301,7 @@ describe('FormulariosEstudiantesService', () => {
 
       expect(formularioRepo.create).toHaveBeenCalledWith({
         titulo: dto.titulo,
+        descripcion: dto.descripcion,
         carreraId: 1,
         planEstudioId: 2,
         googleFormId: null,
@@ -320,116 +323,126 @@ describe('FormulariosEstudiantesService', () => {
       );
     });
 
-    it('construye las 10 preguntas en orden exacto y con sus tipos/requerimientos correspondientes', async () => {
+    it('construye la descripción y las 10 preguntas en orden exacto y con sus tipos/requerimientos correspondientes', async () => {
       await service.crear(usuarioId, dto);
 
       expect(googleFormsClient.actualizarFormulario).toHaveBeenCalledTimes(1);
       const [, , requests] =
         googleFormsClient.actualizarFormulario.mock.calls[0];
 
-      expect(requests).toHaveLength(10);
+      expect(requests).toHaveLength(11);
 
-      // 0: Primer nombre (requerida, texto corto)
-      expect(requests[0].createItem.item.title).toBe('Primer nombre');
-      expect(
-        requests[0].createItem.item.questionItem.question.required,
-      ).toBe(true);
-      expect(
-        requests[0].createItem.item.questionItem.question.textQuestion.paragraph,
-      ).toBe(false);
-      expect(requests[0].createItem.location.index).toBe(0);
+      // 0: updateFormInfo con descripción
+      expect(requests[0]).toEqual({
+        updateFormInfo: {
+          info: {
+            description: dto.descripcion,
+          },
+          updateMask: 'description',
+        },
+      });
 
-      // 1: Segundo nombre (opcional, texto corto)
-      expect(requests[1].createItem.item.title).toBe('Segundo nombre');
+      // 1: Primer nombre (requerida, texto corto)
+      expect(requests[1].createItem.item.title).toBe('Primer nombre');
       expect(
         requests[1].createItem.item.questionItem.question.required,
+      ).toBe(true);
+      expect(
+        requests[1].createItem.item.questionItem.question.textQuestion.paragraph,
       ).toBe(false);
-      expect(requests[1].createItem.location.index).toBe(1);
+      expect(requests[1].createItem.location.index).toBe(0);
 
-      // 2: Primer apellido (requerida)
-      expect(requests[2].createItem.item.title).toBe('Primer apellido');
+      // 2: Segundo nombre (opcional, texto corto)
+      expect(requests[2].createItem.item.title).toBe('Segundo nombre');
       expect(
         requests[2].createItem.item.questionItem.question.required,
-      ).toBe(true);
-      expect(requests[2].createItem.location.index).toBe(2);
+      ).toBe(false);
+      expect(requests[2].createItem.location.index).toBe(1);
 
-      // 3: Segundo apellido (opcional)
-      expect(requests[3].createItem.item.title).toBe('Segundo apellido');
+      // 3: Primer apellido (requerida)
+      expect(requests[3].createItem.item.title).toBe('Primer apellido');
       expect(
         requests[3].createItem.item.questionItem.question.required,
-      ).toBe(false);
-      expect(requests[3].createItem.location.index).toBe(3);
+      ).toBe(true);
+      expect(requests[3].createItem.location.index).toBe(2);
 
-      // 4: Número de identificación (requerida)
-      expect(requests[4].createItem.item.title).toBe(
+      // 4: Segundo apellido (opcional)
+      expect(requests[4].createItem.item.title).toBe('Segundo apellido');
+      expect(
+        requests[4].createItem.item.questionItem.question.required,
+      ).toBe(false);
+      expect(requests[4].createItem.location.index).toBe(3);
+
+      // 5: Número de identificación (requerida)
+      expect(requests[5].createItem.item.title).toBe(
         'Número de identificación',
       );
       expect(
-        requests[4].createItem.item.questionItem.question.required,
-      ).toBe(true);
-      expect(requests[4].createItem.location.index).toBe(4);
-
-      // 5: Correo estudiantil (requerida)
-      expect(requests[5].createItem.item.title).toBe('Correo estudiantil');
-      expect(
         requests[5].createItem.item.questionItem.question.required,
       ).toBe(true);
-      expect(requests[5].createItem.location.index).toBe(5);
+      expect(requests[5].createItem.location.index).toBe(4);
 
-      // 6: Número de contacto (opcional)
-      expect(requests[6].createItem.item.title).toBe('Número de contacto');
+      // 6: Correo estudiantil (requerida)
+      expect(requests[6].createItem.item.title).toBe('Correo estudiantil');
       expect(
         requests[6].createItem.item.questionItem.question.required,
-      ).toBe(false);
-      expect(requests[6].createItem.location.index).toBe(6);
+      ).toBe(true);
+      expect(requests[6].createItem.location.index).toBe(5);
 
-      // 7: Período de ingreso (requerida, DROP_DOWN con períodos)
-      expect(requests[7].createItem.item.title).toBe('Período de ingreso');
+      // 7: Número de contacto (opcional)
+      expect(requests[7].createItem.item.title).toBe('Número de contacto');
       expect(
         requests[7].createItem.item.questionItem.question.required,
+      ).toBe(false);
+      expect(requests[7].createItem.location.index).toBe(6);
+
+      // 8: Período de ingreso (requerida, DROP_DOWN con períodos)
+      expect(requests[8].createItem.item.title).toBe('Período de ingreso');
+      expect(
+        requests[8].createItem.item.questionItem.question.required,
       ).toBe(true);
       expect(
-        requests[7].createItem.item.questionItem.question.choiceQuestion.type,
+        requests[8].createItem.item.questionItem.question.choiceQuestion.type,
       ).toBe('DROP_DOWN');
       expect(
-        requests[7].createItem.item.questionItem.question.choiceQuestion
+        requests[8].createItem.item.questionItem.question.choiceQuestion
           .options,
       ).toEqual([
         { value: 'I-2026 - I Ciclo 2026' },
         { value: 'II-2025 - II Ciclo 2025' },
       ]);
-      expect(requests[7].createItem.location.index).toBe(7);
+      expect(requests[8].createItem.location.index).toBe(7);
 
-      // 8: Asignaturas aprobadas (NO requerida, CHECKBOX, solo cursos concretos)
-      expect(requests[8].createItem.item.title).toBe(
-        '¿Cuáles asignaturas ha aprobado?',
-      );
-      expect(
-        requests[8].createItem.item.questionItem.question.required,
-      ).toBe(false);
-      expect(
-        requests[8].createItem.item.questionItem.question.choiceQuestion.type,
-      ).toBe('CHECKBOX');
-      expect(
-        requests[8].createItem.item.questionItem.question.choiceQuestion
-          .options,
-      ).toEqual([
-        { value: 'EIF201 - Programación I' },
-        { value: 'MAT001 - Cálculo I' },
-      ]);
-      expect(requests[8].createItem.location.index).toBe(8);
-
-      // 9: Optativas no disciplinarias (opcional, párrafo)
+      // 9: Asignaturas aprobadas (NO requerida, CHECKBOX, solo cursos concretos)
       expect(requests[9].createItem.item.title).toBe(
-        '¿Cuál o cuáles optativas no disciplinarias ha llevado?',
+        '¿Cuáles asignaturas ha aprobado?',
       );
       expect(
         requests[9].createItem.item.questionItem.question.required,
       ).toBe(false);
       expect(
-        requests[9].createItem.item.questionItem.question.textQuestion.paragraph,
+        requests[9].createItem.item.questionItem.question.choiceQuestion.type,
+      ).toBe('CHECKBOX');
+      expect(
+        requests[9].createItem.item.questionItem.question.choiceQuestion
+          .options,
+      ).toEqual([
+        { value: 'EIF201 - Programación I' },
+        { value: 'MAT001 - Cálculo I' },
+      ]);
+      expect(requests[9].createItem.location.index).toBe(8);
+
+      // 10: Optativas no disciplinarias (opcional, párrafo)
+      expect(requests[10].createItem.item.title).toBe(
+        '¿Cuál o cuáles optativas no disciplinarias ha llevado?',
+      );
+      expect(
+        requests[10].createItem.item.questionItem.question.required,
+      ).toBe(false);
+      expect(
+        requests[10].createItem.item.questionItem.question.textQuestion.paragraph,
       ).toBe(true);
-      expect(requests[9].createItem.location.index).toBe(9);
+      expect(requests[10].createItem.location.index).toBe(9);
     });
 
     it('construye mapaPreguntas con los questionIds y opciones mapeadas a IDs de base de datos', async () => {
@@ -532,6 +545,7 @@ describe('FormulariosEstudiantesService', () => {
     it('falla con InternalServerErrorException si Google no devuelve questionId para alguna pregunta', async () => {
       googleFormsClient.actualizarFormulario.mockResolvedValue({
         replies: [
+          {}, // updateFormInfo
           { createItem: { itemId: 'item-0', questionId: ['q-0'] } },
           { createItem: { itemId: 'item-1', questionId: [] } }, // Sin questionId
           { createItem: { itemId: 'item-2', questionId: ['q-2'] } },

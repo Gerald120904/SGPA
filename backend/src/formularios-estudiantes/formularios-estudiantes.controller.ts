@@ -14,6 +14,7 @@ import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
+import { RechazarRespuestaFormularioDto } from './dto/rechazar-respuesta-formulario.dto';
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
@@ -31,6 +32,12 @@ export class FormulariosEstudiantesController {
   @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER)
   listar(@Req() req: Request) {
     return this.formulariosService.listar(req.user!.sub);
+  }
+
+  @Get('solicitudes')
+  @Permisos(PermisoSistema.ESTUDIANTES_VER)
+  listarSolicitudes(@Req() req: Request) {
+    return this.procesamientoService.listarSolicitudes(req.user!.sub);
   }
 
   @Get(':id')
@@ -69,18 +76,6 @@ export class FormulariosEstudiantesController {
     );
   }
 
-  @Post(':id/procesar')
-  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
-  procesar(
-    @Req() req: Request,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    return this.procesamientoService.procesar(
-      id,
-      req.user!.sub,
-    );
-  }
-
   @Post(':id/cerrar')
   @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
   cerrar(
@@ -102,6 +97,35 @@ export class FormulariosEstudiantesController {
     return this.syncService.listarRespuestas(
       id,
       req.user!.sub,
+    );
+  }
+
+  @Post('respuestas/:respuestaId/aceptar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  aceptarRespuesta(
+    @Req() req: Request,
+    @Param('respuestaId', ParseIntPipe)
+    respuestaId: number,
+  ) {
+    return this.procesamientoService.aprobarRespuesta(
+      respuestaId,
+      req.user!.sub,
+    );
+  }
+
+  @Post('respuestas/:respuestaId/rechazar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  rechazarRespuesta(
+    @Req() req: Request,
+    @Param('respuestaId', ParseIntPipe)
+    respuestaId: number,
+    @Body()
+    dto: RechazarRespuestaFormularioDto,
+  ) {
+    return this.procesamientoService.rechazarRespuesta(
+      respuestaId,
+      req.user!.sub,
+      dto.motivo,
     );
   }
 }

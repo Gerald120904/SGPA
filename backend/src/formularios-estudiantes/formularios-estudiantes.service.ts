@@ -346,6 +346,7 @@ export class FormulariosEstudiantesService {
 
     let formulario = this.formularioRepo.create({
       titulo: dto.titulo,
+      descripcion: dto.descripcion,
       carreraId: carrera.id,
       planEstudioId: plan.id,
       googleFormId: null,
@@ -389,6 +390,15 @@ export class FormulariosEstudiantesService {
     }
 
     const requests: forms_v1.Schema$Request[] = [
+      {
+        updateFormInfo: {
+          info: {
+            description: dto.descripcion,
+          },
+          updateMask: 'description',
+        },
+      },
+
       this.crearPreguntaTexto(
         'Primer nombre',
         true,
@@ -459,6 +469,7 @@ export class FormulariosEstudiantesService {
       const googleForm = await this.googleFormsClient.crearFormulario(
         usuarioId,
         dto.titulo,
+        dto.descripcion,
       );
 
       const googleFormId = googleForm.formId!;
@@ -482,7 +493,7 @@ export class FormulariosEstudiantesService {
 
       const obtenerQuestionId = (indice: number): string => {
         const questionId =
-          replies[indice]?.createItem?.questionId?.[0];
+          replies[indice + 1]?.createItem?.questionId?.[0];
 
         if (!questionId) {
           throw new InternalServerErrorException(

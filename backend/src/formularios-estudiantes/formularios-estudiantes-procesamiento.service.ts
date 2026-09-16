@@ -1,10 +1,11 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
 import { EstudiantesImportacionService } from '../estudiantes/estudiantes-importacion.service';
 import { ImportarEstudiantesDto } from '../estudiantes/dto/importar-estudiantes.dto';
@@ -13,9 +14,14 @@ import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entit
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
-import { ResultadoProcesamientoFormulario } from './types/resultado-procesamiento-formulario.type';
 
-export type { ResultadoProcesamientoFormulario };
+export interface ResultadoAprobacionRespuesta {
+  respuestaId: number;
+  estado: EstadoRespuestaFormulario;
+  creados: number;
+  actualizados: number;
+  aprobacionesNuevas: number;
+}
 
 @Injectable()
 export class FormulariosEstudiantesProcesamientoService {
@@ -36,24 +42,68 @@ export class FormulariosEstudiantesProcesamientoService {
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
   ) {}
 
-  async procesar(
-    formularioId: number,
-    usuarioId: number,
-  ): Promise<ResultadoProcesamientoFormulario> {
-    const formulario = await this.formularioRepo.findOne({
+  async listarSolicitudes(usuarioId: number): Promise<RespuestaFormularioEstudiante[]> {
+    const carrerasPermitidas =
+      await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(
+        usuarioId,
+      );
+
+    if (carrerasPermitidas.length === 0) {
+      return [];
+    }
+
+    return await this.respuestaRepo.find({
       where: {
-        id: formularioId,
+        estado: In([
+          EstadoRespuestaFormulario.PENDIENTE,
+          EstadoRespuestaFormulario.REQUIERE_REVISION,
+        ]),
+        formulario: {
+          carreraId: In(carrerasPermitidas),
+        },
+      },
+      relations: {
+        formulario: {
+          carrera: true,
+          planEstudio: true,
+        },
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async aprobarRespuesta(
+    respuestaId: number,
+    usuarioId: number,
+  ): Promise<ResultadoAprobacionRespuesta> {
+    const respuesta = await this.respuestaRepo.findOne({
+      where: {
+        id: respuestaId,
+      },
+      relations: {
+        formulario: true,
       },
     });
 
-    if (!formulario) {
-      throw new NotFoundException('El formulario indicado no existe');
+    if (!respuesta) {
+      throw new NotFoundException('La solicitud indicada no existe.');
+    }
+
+    if (
+      ![
+        EstadoRespuestaFormulario.PENDIENTE,
+        EstadoRespuestaFormulario.REQUIERE_REVISION,
+      ].includes(respuesta.estado)
+    ) {
+      throw new ConflictException('Esta solicitud ya fue revisada.');
     }
 
     const tieneAlcance =
       await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
         usuarioId,
-        formulario.carreraId,
+        respuesta.formulario.carreraId,
       );
 
     if (!tieneAlcance) {
@@ -62,200 +112,193 @@ export class FormulariosEstudiantesProcesamientoService {
       );
     }
 
-    const respuestas = await this.respuestaRepo.find({
-      where: [
-        {
-          formularioId: formulario.id,
-          estado: EstadoRespuestaFormulario.PENDIENTE,
-          procesadoAt: IsNull(),
-        },
-        {
-          formularioId: formulario.id,
-          estado: EstadoRespuestaFormulario.REQUIERE_REVISION,
-          procesadoAt: IsNull(),
-        },
-      ],
-      order: {
-        createdAt: 'ASC',
+    const datos = respuesta.datosNormalizadosJson;
+
+    if (!datos) {
+      respuesta.estado = EstadoRespuestaFormulario.ERROR;
+      respuesta.detalleError = 'La respuesta no posee datos normalizados.';
+      await this.respuestaRepo.save(respuesta);
+      throw new ConflictException(respuesta.detalleError);
+    }
+
+    const periodo = await this.periodoRepo.findOne({
+      where: {
+        id: datos.periodoIngresoId,
       },
     });
 
-    let procesadas = 0;
-    const omitidasYaProcesadas = 0;
-    let requierenRevision = 0;
-    let errores = 0;
-    let estudiantesCreados = 0;
-    let estudiantesActualizados = 0;
-    let aprobacionesNuevas = 0;
-
-    for (const respuesta of respuestas) {
-      try {
-        const datos = respuesta.datosNormalizadosJson;
-
-        if (!datos) {
-          respuesta.estado = EstadoRespuestaFormulario.ERROR;
-          respuesta.detalleError = 'La respuesta no posee datos normalizados.';
-          await this.respuestaRepo.save(respuesta);
-          errores++;
-          continue;
-        }
-
-        const periodo = await this.periodoRepo.findOne({
-          where: {
-            id: datos.periodoIngresoId,
-          },
-        });
-
-        if (!periodo) {
-          respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-          respuesta.detalleError =
-            'El período de ingreso asociado a la respuesta ya no existe.';
-          await this.respuestaRepo.save(respuesta);
-          requierenRevision++;
-          continue;
-        }
-
-        const idsAsignaturas = datos.asignaturasAprobadas.map(
-          (item) => item.planAsignaturaId,
-        );
-
-        const asignaturas = idsAsignaturas.length
-          ? await this.planAsignaturaRepo.find({
-              where: {
-                id: In(idsAsignaturas),
-              },
-              relations: {
-                curso: true,
-              },
-            })
-          : [];
-
-        const codigosCursos: string[] = [];
-        const erroresAsignaturas: string[] = [];
-
-        for (const aprobada of datos.asignaturasAprobadas) {
-          const actual = asignaturas.find(
-            (item) => item.id === aprobada.planAsignaturaId,
-          );
-
-          if (!actual) {
-            erroresAsignaturas.push(
-              `La asignatura ${aprobada.codigo} ya no existe.`,
-            );
-            continue;
-          }
-
-          if (actual.planEstudioId !== formulario.planEstudioId) {
-            erroresAsignaturas.push(
-              `La asignatura ${aprobada.codigo} ya no pertenece al plan del formulario.`,
-            );
-            continue;
-          }
-
-          if (actual.cursoId === null || actual.curso === null) {
-            erroresAsignaturas.push(
-              `La asignatura ${aprobada.codigo} ya no posee un curso asociado.`,
-            );
-            continue;
-          }
-
-          if (actual.cursoId !== aprobada.cursoId) {
-            erroresAsignaturas.push(
-              `La asignatura ${aprobada.codigo} cambió su curso asociado.`,
-            );
-            continue;
-          }
-
-          codigosCursos.push(actual.curso.codigo);
-        }
-
-        if (erroresAsignaturas.length > 0) {
-          respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-          respuesta.detalleError = erroresAsignaturas.join(' ');
-          await this.respuestaRepo.save(respuesta);
-          requierenRevision++;
-          continue;
-        }
-
-        const nombres = [datos.primerNombre, datos.segundoNombre]
-          .filter((valor): valor is string => Boolean(valor?.trim()))
-          .join(' ');
-
-        const dto: ImportarEstudiantesDto = {
-          carreraId: formulario.carreraId,
-          planEstudioId: formulario.planEstudioId,
-          estudiantes: [
-            {
-              fila: 2,
-              cedula: datos.identificacion,
-              nombres,
-              apellido1: datos.primerApellido,
-              apellido2: datos.segundoApellido,
-              correoInstitucional: datos.correoEstudiantil,
-              telefono: datos.contacto,
-              periodoIngresoCodigo: periodo.codigo,
-              asignaturasAprobadas: codigosCursos,
-            },
-          ],
-        };
-
-        const resultado =
-          await this.estudiantesImportacionService.ejecutarDesdeGoogleForms(
-            usuarioId,
-            dto,
-          );
-
-        const fila = resultado.filas[0];
-
-        if (!fila || fila.accion === 'ERROR') {
-          respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-          respuesta.detalleError =
-            fila?.errores.join(' ') || 'La respuesta requiere revisión manual.';
-          respuesta.procesadoAt = null;
-          await this.respuestaRepo.save(respuesta);
-          requierenRevision++;
-          continue;
-        }
-
-        if (datos.requiereRevisionOptativas) {
-          respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-        } else {
-          respuesta.estado = EstadoRespuestaFormulario.PROCESADO;
-        }
-
-        respuesta.procesadoAt = new Date();
-        respuesta.detalleError = null;
-        await this.respuestaRepo.save(respuesta);
-
-        procesadas++;
-        estudiantesCreados += resultado.creados;
-        estudiantesActualizados += resultado.actualizados;
-        aprobacionesNuevas += resultado.aprobacionesNuevas;
-
-        if (datos.requiereRevisionOptativas) {
-          requierenRevision++;
-        }
-      } catch (error) {
-        respuesta.estado = EstadoRespuestaFormulario.ERROR;
-        respuesta.detalleError =
-          error instanceof Error
-            ? error.message
-            : 'Error desconocido al procesar la respuesta';
-        respuesta.procesadoAt = null;
-        await this.respuestaRepo.save(respuesta);
-        errores++;
-      }
+    if (!periodo) {
+      respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
+      respuesta.detalleError =
+        'El período de ingreso asociado a la respuesta ya no existe.';
+      await this.respuestaRepo.save(respuesta);
+      throw new ConflictException(respuesta.detalleError);
     }
 
-    return {
-      candidatas: respuestas.length,
-      procesadas,
-      omitidasYaProcesadas,
-      requierenRevision,
-      errores,
-      estudiantesCreados,
-      estudiantesActualizados,
-      aprobacionesNuevas,
+    const idsAsignaturas = datos.asignaturasAprobadas.map(
+      (item) => item.planAsignaturaId,
+    );
+
+    const asignaturas = idsAsignaturas.length
+      ? await this.planAsignaturaRepo.find({
+          where: {
+            id: In(idsAsignaturas),
+          },
+          relations: {
+            curso: true,
+          },
+        })
+      : [];
+
+    const codigosCursos: string[] = [];
+    const erroresAsignaturas: string[] = [];
+
+    for (const aprobada of datos.asignaturasAprobadas) {
+      const actual = asignaturas.find(
+        (item) => item.id === aprobada.planAsignaturaId,
+      );
+
+      if (!actual) {
+        erroresAsignaturas.push(
+          `La asignatura ${aprobada.codigo} ya no existe.`,
+        );
+        continue;
+      }
+
+      if (actual.planEstudioId !== respuesta.formulario.planEstudioId) {
+        erroresAsignaturas.push(
+          `La asignatura ${aprobada.codigo} ya no pertenece al plan del formulario.`,
+        );
+        continue;
+      }
+
+      if (actual.cursoId === null || actual.curso === null) {
+        erroresAsignaturas.push(
+          `La asignatura ${aprobada.codigo} ya no posee un curso asociado.`,
+        );
+        continue;
+      }
+
+      if (actual.cursoId !== aprobada.cursoId) {
+        erroresAsignaturas.push(
+          `La asignatura ${aprobada.codigo} cambió su curso asociado.`,
+        );
+        continue;
+      }
+
+      codigosCursos.push(actual.curso.codigo);
+    }
+
+    if (erroresAsignaturas.length > 0) {
+      respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
+      respuesta.detalleError = erroresAsignaturas.join(' ');
+      await this.respuestaRepo.save(respuesta);
+      throw new ConflictException(respuesta.detalleError);
+    }
+
+    const nombres = [datos.primerNombre, datos.segundoNombre]
+      .filter((valor): valor is string => Boolean(valor?.trim()))
+      .join(' ');
+
+    const dto: ImportarEstudiantesDto = {
+      carreraId: respuesta.formulario.carreraId,
+      planEstudioId: respuesta.formulario.planEstudioId,
+      estudiantes: [
+        {
+          fila: 2,
+          cedula: datos.identificacion,
+          nombres,
+          apellido1: datos.primerApellido,
+          apellido2: datos.segundoApellido,
+          correoInstitucional: datos.correoEstudiantil,
+          telefono: datos.contacto,
+          periodoIngresoCodigo: periodo.codigo,
+          asignaturasAprobadas: codigosCursos,
+        },
+      ],
     };
+
+    const resultado =
+      await this.estudiantesImportacionService.ejecutarDesdeGoogleForms(
+        usuarioId,
+        dto,
+      );
+
+    const fila = resultado.filas[0];
+
+    if (!fila || fila.accion === 'ERROR') {
+      respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
+      respuesta.detalleError =
+        fila?.errores.join(' ') || 'La respuesta requiere revisión manual.';
+      await this.respuestaRepo.save(respuesta);
+      throw new ConflictException(respuesta.detalleError);
+    }
+
+    respuesta.estado = EstadoRespuestaFormulario.PROCESADO;
+    respuesta.revisadoPorUsuarioId = usuarioId;
+    respuesta.revisadoAt = new Date();
+    respuesta.procesadoAt = new Date();
+    respuesta.motivoRechazo = null;
+    respuesta.detalleError = null;
+
+    await this.respuestaRepo.save(respuesta);
+
+    return {
+      respuestaId: respuesta.id,
+      estado: respuesta.estado,
+      creados: resultado.creados,
+      actualizados: resultado.actualizados,
+      aprobacionesNuevas: resultado.aprobacionesNuevas,
+    };
+  }
+
+  async rechazarRespuesta(
+    respuestaId: number,
+    usuarioId: number,
+    motivo?: string,
+  ): Promise<RespuestaFormularioEstudiante> {
+    const respuesta = await this.respuestaRepo.findOne({
+      where: {
+        id: respuestaId,
+      },
+      relations: {
+        formulario: true,
+      },
+    });
+
+    if (!respuesta) {
+      throw new NotFoundException('La solicitud indicada no existe.');
+    }
+
+    if (
+      ![
+        EstadoRespuestaFormulario.PENDIENTE,
+        EstadoRespuestaFormulario.REQUIERE_REVISION,
+      ].includes(respuesta.estado)
+    ) {
+      throw new ConflictException('Esta solicitud ya fue revisada.');
+    }
+
+    const tieneAlcance =
+      await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+        usuarioId,
+        respuesta.formulario.carreraId,
+      );
+
+    if (!tieneAlcance) {
+      throw new ForbiddenException(
+        'No posee alcance académico sobre la carrera indicada.',
+      );
+    }
+
+    respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
+    respuesta.revisadoPorUsuarioId = usuarioId;
+    respuesta.revisadoAt = new Date();
+    respuesta.motivoRechazo = motivo?.trim() || null;
+    respuesta.procesadoAt = null;
+
+    await this.respuestaRepo.save(respuesta);
+
+    return respuesta;
   }
 }

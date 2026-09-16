@@ -32,6 +32,11 @@ export class FormularioEstudiante {
   titulo!: string;
 
   @Column({
+    type: 'text',
+  })
+  descripcion!: string;
+
+  @Column({
     name: 'carrera_id',
     type: 'int',
     unsigned: true,

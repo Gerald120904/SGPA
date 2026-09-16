@@ -16,6 +16,14 @@ export class CrearFormularioEstudianteDto {
   @MaxLength(255)
   titulo!: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(1000)
+  descripcion!: string;
+
   @IsInt()
   @IsPositive()
   carreraId!: number;
