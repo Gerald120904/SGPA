@@ -16,6 +16,7 @@ import {
 } from 'typeorm';
 import { EstadoPeriodoAcademico } from '../periodos-academicos/constants/estado-periodo-academico.constant';
 import { PeriodosAcademicosService } from '../periodos-academicos/periodos-academicos.service';
+import { OrigenAula } from './constants/origen-aula.constant';
 import { FiltrarAulasDto } from './dto/filtrar-aulas.dto';
 import { ActualizarAulaDto } from './dto/actualizar-aula.dto';
 import { ActualizarDisponibilidadAulaDto } from './dto/actualizar-disponibilidad-aula.dto';
@@ -77,6 +78,30 @@ export class AulasService {
 
     if (existente && existente.id !== excluirId) {
       throw new ConflictException('El código del aula ya está registrado.');
+    }
+  }
+
+  private async validarLimiteOrigen(origen: OrigenAula): Promise<void> {
+    const limites: Partial<Record<OrigenAula, number>> = {
+      [OrigenAula.UNA]: 25,
+      [OrigenAula.UNED]: 3,
+    };
+
+    const limite = limites[origen];
+
+    // Por el momento, OTRO no tiene un límite definido.
+    if (limite === undefined) {
+      return;
+    }
+
+    const cantidadRegistrada = await this.aulaRepository.count({
+      where: { origen },
+    });
+
+    if (cantidadRegistrada >= limite) {
+      throw new ConflictException(
+        `Se alcanzó el límite de ${limite} espacios registrados para ${origen}.`,
+      );
     }
   }
 
@@ -607,6 +632,7 @@ export class AulasService {
     }
 
     await this.validarCodigoDuplicado(codigo);
+    await this.validarLimiteOrigen(dto.origen);
 
     const aula = this.aulaRepository.create({
       codigo,
@@ -724,6 +750,10 @@ export class AulasService {
     }
 
     if (dto.origen !== undefined) {
+      if (dto.origen !== aula.origen) {
+        await this.validarLimiteOrigen(dto.origen);
+      }
+
       aula.origen = dto.origen;
     }
 
