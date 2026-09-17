@@ -1730,6 +1730,17 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+  'formularios-estudiantes:conteos-solicitudes',
+  async (_event, carreraId) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/solicitudes/conteos?carreraId=${encodeURIComponent(
+        carreraId
+      )}`
+    );
+  }
+);
+
+ipcMain.handle(
   'formularios-estudiantes:aceptar-solicitud',
   async (_event, respuestaId) => {
     return ejecutarPeticionAutenticada(
@@ -1794,6 +1805,26 @@ ipcMain.handle(
 /* =========================================================
    ESTUDIANTES
    ========================================================= */
+
+ipcMain.handle(
+  'estudiantes:conteos-carreras',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/estudiantes/conteos/carreras'
+    );
+  }
+);
+
+ipcMain.handle(
+  'estudiantes:conteos-planes',
+  async (_event, carreraId) => {
+    return ejecutarPeticionAutenticada(
+      `/estudiantes/conteos/planes?carreraId=${encodeURIComponent(
+        carreraId
+      )}`
+    );
+  }
+);
 
 ipcMain.handle(
   'estudiantes:listar',

@@ -54,4 +54,24 @@ export class GoogleDriveClientService {
         permiso.view === 'published',
     );
   }
+
+  async renombrarArchivo(
+    usuarioId: number,
+    fileId: string,
+    nombre: string,
+  ) {
+    const client =
+      await this.getClient(usuarioId);
+
+    const { data } =
+      await client.files.update({
+        fileId,
+        requestBody: {
+          name: nombre,
+        },
+        fields: 'id,name',
+      });
+
+    return data;
+  }
 }

@@ -477,6 +477,12 @@ export class FormulariosEstudiantesService {
       formulario.googleFormId = googleFormId;
       formulario = await this.formularioRepo.save(formulario);
 
+      await this.googleDriveClient.renombrarArchivo(
+        usuarioId,
+        googleFormId,
+        dto.titulo,
+      );
+
       const actualizacion = await this.googleFormsClient.actualizarFormulario(
         usuarioId,
         googleFormId,

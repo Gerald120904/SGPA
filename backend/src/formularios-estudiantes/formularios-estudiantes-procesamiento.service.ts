@@ -82,6 +82,45 @@ export class FormulariosEstudiantesProcesamientoService {
     });
   }
 
+  async contarSolicitudesPorPlan(
+    usuarioId: number,
+    carreraId: number,
+  ) {
+    const tieneAlcance =
+      await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+        usuarioId,
+        carreraId,
+      );
+
+    if (!tieneAlcance) {
+      throw new ForbiddenException(
+        'No posee alcance académico sobre la carrera indicada.',
+      );
+    }
+
+    const filas = await this.respuestaRepo
+      .createQueryBuilder('respuesta')
+      .innerJoin('respuesta.formulario', 'formulario')
+      .select('formulario.planEstudioId', 'planEstudioId')
+      .addSelect('COUNT(respuesta.id)', 'total')
+      .where('formulario.carreraId = :carreraId', {
+        carreraId,
+      })
+      .andWhere('respuesta.estado IN (:...estados)', {
+        estados: [
+          EstadoRespuestaFormulario.PENDIENTE,
+          EstadoRespuestaFormulario.REQUIERE_REVISION,
+        ],
+      })
+      .groupBy('formulario.planEstudioId')
+      .getRawMany();
+
+    return filas.map((fila) => ({
+      planEstudioId: Number(fila.planEstudioId),
+      total: Number(fila.total),
+    }));
+  }
+
   async aprobarRespuesta(
     respuestaId: number,
     usuarioId: number,

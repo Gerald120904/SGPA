@@ -98,6 +98,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue({ ...mockRespuestaBase }),
       save: jest.fn(async (r) => r),
+      createQueryBuilder: jest.fn(),
     };
 
     periodoRepo = {
@@ -398,6 +399,58 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       await expect(
         service.rechazarRespuesta(respuestaId, usuarioId),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('contarSolicitudesPorPlan', () => {
+    it('retorna conteos de solicitudes agrupados por plan para una carrera con alcance', async () => {
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(true);
+      const mockQb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { planEstudioId: '3', total: '5' },
+          { planEstudioId: '4', total: '2' },
+        ]),
+      };
+      respuestaRepo.createQueryBuilder.mockReturnValue(mockQb);
+
+      const res = await service.contarSolicitudesPorPlan(usuarioId, 2);
+
+      expect(res).toEqual([
+        { planEstudioId: 3, total: 5 },
+        { planEstudioId: 4, total: 2 },
+      ]);
+      expect(mockQb.innerJoin).toHaveBeenCalledWith(
+        'respuesta.formulario',
+        'formulario',
+      );
+      expect(mockQb.where).toHaveBeenCalledWith(
+        'formulario.carreraId = :carreraId',
+        { carreraId: 2 },
+      );
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        'respuesta.estado IN (:...estados)',
+        {
+          estados: [
+            EstadoRespuestaFormulario.PENDIENTE,
+            EstadoRespuestaFormulario.REQUIERE_REVISION,
+          ],
+        },
+      );
+    });
+
+    it('usuario fuera de alcance: lanza ForbiddenException', async () => {
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(false);
+
+      await expect(
+        service.contarSolicitudesPorPlan(usuarioId, 99),
+      ).rejects.toThrow(ForbiddenException);
+      expect(respuestaRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
   });
 });

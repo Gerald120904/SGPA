@@ -16,7 +16,11 @@ export class GoogleFormsClientService {
     });
   }
 
-  async crearFormulario(usuarioId: number, titulo: string) {
+  async crearFormulario(
+    usuarioId: number,
+    titulo: string,
+    _descripcion?: string,
+  ) {
     const client = await this.getClient(usuarioId);
 
     const { data } = await client.forms.create({

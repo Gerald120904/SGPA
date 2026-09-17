@@ -45,6 +45,7 @@ describe('FormulariosEstudiantesController', () => {
       listarSolicitudes: jest.fn(),
       aprobarRespuesta: jest.fn(),
       rechazarRespuesta: jest.fn(),
+      contarSolicitudesPorPlan: jest.fn(),
     };
 
     controller = new FormulariosEstudiantesController(
@@ -337,6 +338,37 @@ describe('FormulariosEstudiantesController', () => {
         FormulariosEstudiantesController.prototype.rechazarRespuesta,
       );
       expect(permisos).toEqual([PermisoSistema.ESTUDIANTES_GESTIONAR]);
+    });
+  });
+
+  describe('contarSolicitudesPorPlan', () => {
+    it('delega al procesamientoService con usuarioId y carreraId', async () => {
+      const mockReq = {
+        user: {
+          sub: 42,
+        },
+      } as any;
+
+      const resultadoEsperado = [{ planEstudioId: 3, total: 5 }];
+      procesamientoService.contarSolicitudesPorPlan.mockResolvedValue(
+        resultadoEsperado,
+      );
+
+      const res = await controller.contarSolicitudesPorPlan(mockReq, 2);
+
+      expect(procesamientoService.contarSolicitudesPorPlan).toHaveBeenCalledWith(
+        42,
+        2,
+      );
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('tiene configurado el decorador de permisos para ESTUDIANTES_VER', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.contarSolicitudesPorPlan,
+      );
+      expect(permisos).toEqual([PermisoSistema.ESTUDIANTES_VER]);
     });
   });
 });

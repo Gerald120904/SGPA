@@ -49,6 +49,18 @@ export class FormulariosEstudiantesController {
     );
   }
 
+  @Get('solicitudes/conteos')
+  @Permisos(PermisoSistema.ESTUDIANTES_VER)
+  contarSolicitudesPorPlan(
+    @Req() req: Request,
+    @Query('carreraId', ParseIntPipe) carreraId: number,
+  ) {
+    return this.procesamientoService.contarSolicitudesPorPlan(
+      req.user!.sub,
+      carreraId,
+    );
+  }
+
   @Get(':id')
   @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER)
   obtenerPorId(

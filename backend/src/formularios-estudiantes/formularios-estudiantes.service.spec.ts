@@ -42,6 +42,7 @@ describe('FormulariosEstudiantesService', () => {
   };
   let googleDriveClient: {
     permitirCualquieraConEnlaceResponder: jest.Mock;
+    renombrarArchivo: jest.Mock;
   };
   let estructuraAcademicaService: {
     tieneAlcanceSobreCarrera: jest.Mock;
@@ -201,6 +202,10 @@ describe('FormulariosEstudiantesService', () => {
 
     googleDriveClient = {
       permitirCualquieraConEnlaceResponder: jest.fn().mockResolvedValue({}),
+      renombrarArchivo: jest.fn().mockResolvedValue({
+        id: 'google-form-123',
+        name: dto.titulo,
+      }),
     };
 
     estructuraAcademicaService = {
@@ -484,6 +489,12 @@ describe('FormulariosEstudiantesService', () => {
 
     it('configura permisos en Drive, publica el formulario y guarda responderUri en estado PUBLICADO', async () => {
       const resultado = await service.crear(usuarioId, dto);
+
+      expect(googleDriveClient.renombrarArchivo).toHaveBeenCalledWith(
+        usuarioId,
+        'google-form-123',
+        dto.titulo,
+      );
 
       expect(
         googleDriveClient.permitirCualquieraConEnlaceResponder,

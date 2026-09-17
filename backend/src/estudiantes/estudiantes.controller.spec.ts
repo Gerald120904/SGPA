@@ -23,6 +23,8 @@ describe('EstudiantesController', () => {
     listarHistorialPlanes: jest.fn(),
     cambiarPlan: jest.fn(),
     obtenerProgreso: jest.fn(),
+    contarPorCarrera: jest.fn(),
+    contarPorPlan: jest.fn(),
   };
   const permisosService = { usuarioTienePermisos: jest.fn() };
   let app: INestApplication<App>;
@@ -190,5 +192,25 @@ describe('EstudiantesController', () => {
       .set('Authorization', `Bearer ${await token()}`)
       .expect(200);
     expect(service.obtenerProgreso).toHaveBeenCalledWith(3, 7, 4);
+  });
+
+  it('obtiene conteos de estudiantes por carrera', async () => {
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+    service.contarPorCarrera.mockResolvedValue([{ carreraId: 1, total: 20 }]);
+    await request(app.getHttpServer())
+      .get('/estudiantes/conteos/carreras')
+      .set('Authorization', `Bearer ${await token()}`)
+      .expect(200, [{ carreraId: 1, total: 20 }]);
+    expect(service.contarPorCarrera).toHaveBeenCalledWith(3);
+  });
+
+  it('obtiene conteos de estudiantes por plan', async () => {
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+    service.contarPorPlan.mockResolvedValue([{ planEstudioId: 10, total: 8 }]);
+    await request(app.getHttpServer())
+      .get('/estudiantes/conteos/planes?carreraId=1')
+      .set('Authorization', `Bearer ${await token()}`)
+      .expect(200, [{ planEstudioId: 10, total: 8 }]);
+    expect(service.contarPorPlan).toHaveBeenCalledWith(3, 1);
   });
 });

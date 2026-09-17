@@ -14,6 +14,9 @@ describe('GoogleDriveClientService', () => {
     obtenerClienteAutorizado: jest.Mock;
   };
   let driveClient: {
+    files: {
+      update: jest.Mock;
+    };
     permissions: {
       create: jest.Mock;
       list: jest.Mock;
@@ -25,6 +28,9 @@ describe('GoogleDriveClientService', () => {
       obtenerClienteAutorizado: jest.fn().mockResolvedValue('oauth-client'),
     };
     driveClient = {
+      files: {
+        update: jest.fn(),
+      },
       permissions: {
         create: jest.fn(),
         list: jest.fn(),
@@ -102,5 +108,33 @@ describe('GoogleDriveClientService', () => {
     await expect(service.permiteCualquieraConEnlace(7, 'form-1')).resolves.toBe(
       false,
     );
+  });
+
+  it('renombra el archivo del formulario en Google Drive', async () => {
+    driveClient.files.update.mockResolvedValue({
+      data: {
+        id: 'form-1',
+        name: 'Admisión 2026',
+      },
+    });
+
+    const resultado = await service.renombrarArchivo(
+      7,
+      'form-1',
+      'Admisión 2026',
+    );
+
+    expect(googleOauthService.obtenerClienteAutorizado).toHaveBeenCalledWith(7);
+    expect(driveClient.files.update).toHaveBeenCalledWith({
+      fileId: 'form-1',
+      requestBody: {
+        name: 'Admisión 2026',
+      },
+      fields: 'id,name',
+    });
+    expect(resultado).toEqual({
+      id: 'form-1',
+      name: 'Admisión 2026',
+    });
   });
 });

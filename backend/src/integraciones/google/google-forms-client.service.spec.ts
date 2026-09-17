@@ -51,9 +51,14 @@ describe('GoogleFormsClientService', () => {
     jest.clearAllMocks();
   });
 
-  it('crearFormulario manda únicamente el título', async () => {
+  it('crearFormulario manda el título del formulario', async () => {
     formsClient.forms.create.mockResolvedValue({
-      data: { formId: 'form-1', info: { title: 'Admisión' } },
+      data: {
+        formId: 'form-1',
+        info: {
+          title: 'Admisión',
+        },
+      },
     });
 
     const resultado = await service.crearFormulario(7, 'Admisión');

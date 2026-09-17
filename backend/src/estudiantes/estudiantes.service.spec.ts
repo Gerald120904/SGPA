@@ -26,6 +26,7 @@ describe('EstudiantesService', () => {
     create: jest.fn((datos) => datos),
     save: jest.fn(async (datos) => datos),
     update: jest.fn(),
+    createQueryBuilder: jest.fn(),
   });
   let estudiantes: ReturnType<typeof repo>;
   let historialAcademico: ReturnType<typeof repo>;
@@ -460,5 +461,79 @@ describe('EstudiantesService', () => {
       service.cambiarPlan(3, 7, { planNuevoId: 11, periodoCambioId: 4 }),
     ).rejects.toThrow('rollback');
     expect(estudiantes.findOne).toHaveBeenCalledTimes(1);
+  });
+
+  describe('contarPorCarrera', () => {
+    it('retorna conteos de estudiantes agrupados por carrera permitida', async () => {
+      alcance.obtenerCarreraIdsConAlcance.mockResolvedValue([1, 2]);
+      const mockQb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { carreraId: '1', total: '15' },
+          { carreraId: '2', total: '30' },
+        ]),
+      };
+      estudiantes.createQueryBuilder.mockReturnValue(mockQb);
+
+      const resultado = await service.contarPorCarrera(3);
+
+      expect(resultado).toEqual([
+        { carreraId: 1, total: 15 },
+        { carreraId: 2, total: 30 },
+      ]);
+      expect(mockQb.where).toHaveBeenCalledWith(
+        'estudiante.carreraId IN (:...carreraIds)',
+        { carreraIds: [1, 2] },
+      );
+    });
+
+    it('retorna arreglo vacío si no hay carreras en alcance', async () => {
+      alcance.obtenerCarreraIdsConAlcance.mockResolvedValue([]);
+
+      const resultado = await service.contarPorCarrera(3);
+
+      expect(resultado).toEqual([]);
+      expect(estudiantes.createQueryBuilder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('contarPorPlan', () => {
+    it('retorna conteos de estudiantes agrupados por plan para una carrera con alcance', async () => {
+      alcance.tieneAlcanceSobreCarrera.mockResolvedValue(true);
+      const mockQb = {
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([
+          { planEstudioId: '10', total: '8' },
+          { planEstudioId: '11', total: '12' },
+        ]),
+      };
+      estudiantes.createQueryBuilder.mockReturnValue(mockQb);
+
+      const resultado = await service.contarPorPlan(3, 1);
+
+      expect(resultado).toEqual([
+        { planEstudioId: 10, total: 8 },
+        { planEstudioId: 11, total: 12 },
+      ]);
+      expect(mockQb.where).toHaveBeenCalledWith(
+        'estudiante.carreraId = :carreraId',
+        { carreraId: 1 },
+      );
+    });
+
+    it('lanza ForbiddenException si el usuario no tiene alcance sobre la carrera', async () => {
+      alcance.tieneAlcanceSobreCarrera.mockResolvedValue(false);
+
+      await expect(service.contarPorPlan(3, 99)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(estudiantes.createQueryBuilder).not.toHaveBeenCalled();
+    });
   });
 });

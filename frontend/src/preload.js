@@ -424,6 +424,27 @@ contextBridge.exposeInMainWorld("sgpa", {
       url
     ),
 
+  contarSolicitudesPorPlan: (
+    carreraId
+  ) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:conteos-solicitudes',
+      carreraId
+    ),
+
+  contarEstudiantesPorCarrera: () =>
+    ipcRenderer.invoke(
+      'estudiantes:conteos-carreras'
+    ),
+
+  contarEstudiantesPorPlan: (
+    carreraId
+  ) =>
+    ipcRenderer.invoke(
+      'estudiantes:conteos-planes',
+      carreraId
+    ),
+
   listarEstudiantes: (filtros = {}) =>
     ipcRenderer.invoke(
       'estudiantes:listar',

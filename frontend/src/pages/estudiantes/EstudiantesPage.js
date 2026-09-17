@@ -26,7 +26,9 @@ import {
   obtenerHistorialAcademicoEstudiante,
   obtenerHistorialPlanesEstudiante,
   obtenerProgresoEstudiante,
-  registrarResultadoAcademicoEstudiante
+  registrarResultadoAcademicoEstudiante,
+  contarEstudiantesPorCarrera,
+  contarEstudiantesPorPlan
 } from '../../services/estudiantes.service.js';
 
 import {
@@ -55,7 +57,8 @@ import {
 import {
   listarSolicitudesFormularios,
   aceptarSolicitudFormulario,
-  rechazarSolicitudFormulario
+  rechazarSolicitudFormulario,
+  contarSolicitudesPorPlan
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -1008,22 +1011,54 @@ async function mostrarCarreras() {
   `;
 
   try {
-    const resultado =
-      await listarCarreras();
+    const [
+      resultadoCarreras,
+      resultadoPlanes,
+      resultadoConteos
+    ] = await Promise.all([
+      listarCarreras(),
+      listarPlanesEstudio(),
+      contarEstudiantesPorCarrera()
+    ]);
 
-    if (!resultado?.ok) {
+    if (!resultadoCarreras?.ok) {
       throw new Error(
-        resultado?.message ||
+        resultadoCarreras?.message ||
         'No fue posible consultar las carreras.'
       );
     }
 
     const lista =
       Array.isArray(
-        resultado.carreras
+        resultadoCarreras.carreras
       )
-        ? resultado.carreras
-        : (Array.isArray(resultado.data) ? resultado.data : []);
+        ? resultadoCarreras.carreras
+        : (Array.isArray(resultadoCarreras.data) ? resultadoCarreras.data : []);
+
+    const todosPlanes =
+      Array.isArray(resultadoPlanes?.planes)
+        ? resultadoPlanes.planes
+        : (Array.isArray(resultadoPlanes?.data) ? resultadoPlanes.data : []);
+
+    const conteos =
+      Array.isArray(resultadoConteos)
+        ? resultadoConteos
+        : (Array.isArray(resultadoConteos?.data) ? resultadoConteos.data : []);
+
+    const estudiantesPorCarrera = new Map(
+      conteos.map((item) => [
+        Number(item.carreraId),
+        Number(item.total)
+      ])
+    );
+
+    const planesPorCarrera = new Map();
+    for (const plan of todosPlanes) {
+      const cId = Number(plan.carreraId || plan.carrera?.id);
+      if (cId) {
+        planesPorCarrera.set(cId, (planesPorCarrera.get(cId) || 0) + 1);
+      }
+    }
 
     carrerasDisponibles = lista;
 
@@ -1054,7 +1089,11 @@ async function mostrarCarreras() {
       <div class="modules-dashboard-grid">
         ${lista
           .map(
-            (carrera) => `
+            (carrera) => {
+              const numPlanes = planesPorCarrera.get(Number(carrera.id)) ?? 0;
+              const numEstudiantes = estudiantesPorCarrera.get(Number(carrera.id)) ?? 0;
+
+              return `
               <button
                 type="button"
                 class="module-card"
@@ -1080,11 +1119,9 @@ async function mostrarCarreras() {
                     ${escapeHtml(carrera.nombre)}
                   </strong>
 
-                  ${
-                    carrera.codigo
-                      ? `<p style="font-size: 0.85rem; color: var(--color-muted, #64748b); margin-top: 0.25rem;">Código: ${escapeHtml(carrera.codigo)}</p>`
-                      : ''
-                  }
+                  <p style="font-size: 0.85rem; color: var(--color-muted, #64748b); margin-top: 0.25rem;">
+                    ${numPlanes} ${numPlanes === 1 ? 'plan' : 'planes'} &middot; ${numEstudiantes} ${numEstudiantes === 1 ? 'estudiante' : 'estudiantes'}
+                  </p>
                   ${
                     carrera.descripcion
                       ? `<p>${escapeHtml(carrera.descripcion)}</p>`
@@ -1105,7 +1142,8 @@ async function mostrarCarreras() {
                   aria-hidden="true"
                 ></span>
               </button>
-            `
+            `;
+            }
           )
           .join('')}
       </div>
@@ -1176,23 +1214,54 @@ async function mostrarPlanesCarrera(carrera) {
   renderizarIconos();
 
   try {
-    const resultado =
-      await listarPlanesEstudio();
+    const [
+      resultadoPlanes,
+      resultadoEstudiantes,
+      resultadoSolicitudes
+    ] = await Promise.all([
+      listarPlanesEstudio(),
+      contarEstudiantesPorPlan(carrera.id),
+      contarSolicitudesPorPlan(carrera.id)
+    ]);
 
-    if (!resultado?.ok) {
+    if (!resultadoPlanes?.ok) {
       throw new Error(
-        resultado?.message ||
+        resultadoPlanes?.message ||
         'No fue posible consultar los planes de estudio.'
       );
     }
 
     const todosPlanes =
-      Array.isArray(resultado.planes)
-        ? resultado.planes
-        : (Array.isArray(resultado.data) ? resultado.data : []);
+      Array.isArray(resultadoPlanes.planes)
+        ? resultadoPlanes.planes
+        : (Array.isArray(resultadoPlanes.data) ? resultadoPlanes.data : []);
 
     const planesDeCarrera = todosPlanes.filter(
       (p) => p.carreraId === carrera.id || p.carrera?.id === carrera.id
+    );
+
+    const conteosEstudiantes =
+      Array.isArray(resultadoEstudiantes)
+        ? resultadoEstudiantes
+        : (Array.isArray(resultadoEstudiantes?.data) ? resultadoEstudiantes.data : []);
+
+    const conteosSolicitudes =
+      Array.isArray(resultadoSolicitudes)
+        ? resultadoSolicitudes
+        : (Array.isArray(resultadoSolicitudes?.data) ? resultadoSolicitudes.data : []);
+
+    const estudiantesPorPlan = new Map(
+      conteosEstudiantes.map((item) => [
+        Number(item.planEstudioId),
+        Number(item.total)
+      ])
+    );
+
+    const solicitudesPorPlan = new Map(
+      conteosSolicitudes.map((item) => [
+        Number(item.planEstudioId),
+        Number(item.total)
+      ])
     );
 
     planesDisponibles = planesDeCarrera;
@@ -1250,7 +1319,11 @@ async function mostrarPlanesCarrera(carrera) {
       <div class="modules-dashboard-grid">
         ${planesDeCarrera
           .map(
-            (plan) => `
+            (plan) => {
+              const numEst = estudiantesPorPlan.get(Number(plan.id)) ?? 0;
+              const numSol = solicitudesPorPlan.get(Number(plan.id)) ?? 0;
+
+              return `
               <button
                 type="button"
                 class="module-card"
@@ -1277,7 +1350,8 @@ async function mostrarPlanesCarrera(carrera) {
                   </strong>
 
                   <p>
-                    ${plan.codigo && plan.nombre ? `${escapeHtml(plan.codigo)} &middot; ` : ''}
+                    ${numEst} ${numEst === 1 ? 'estudiante' : 'estudiantes'} &middot; ${numSol} ${numSol === 1 ? 'solicitud' : 'solicitudes'}${numSol === 1 ? ' pendiente' : ' pendientes'}
+                    &middot;
                     ${
                       plan.activo === false
                         ? '<span style="color: var(--color-danger, #ef4444); font-weight: 600;">Inactivo</span>'
@@ -1299,7 +1373,8 @@ async function mostrarPlanesCarrera(carrera) {
                   aria-hidden="true"
                 ></span>
               </button>
-            `
+            `;
+            }
           )
           .join('')}
       </div>
@@ -4890,6 +4965,7 @@ async function cargarSolicitudesFormularios(
         : [];
 
     renderizarSolicitudesFormularios();
+  } catch (error) {
     if (mostrarErrores) {
       mostrarError({
         titulo:

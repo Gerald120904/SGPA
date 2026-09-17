@@ -67,6 +67,19 @@ export async function sincronizarFormularioEstudiantes(id) {
     .sincronizarFormularioEstudiantes(id);
 }
 
+export async function contarSolicitudesPorPlan(
+  carreraId
+) {
+  validarApi(
+    'contarSolicitudesPorPlan'
+  );
+
+  return window.sgpa
+    .contarSolicitudesPorPlan(
+      carreraId
+    );
+}
+
 export async function listarSolicitudesFormularios(
   filtros = {}
 ) {

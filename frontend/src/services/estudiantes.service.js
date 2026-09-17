@@ -10,6 +10,28 @@ function validarApi(metodo) {
   }
 }
 
+export async function contarEstudiantesPorCarrera() {
+  validarApi(
+    'contarEstudiantesPorCarrera'
+  );
+
+  return window.sgpa
+    .contarEstudiantesPorCarrera();
+}
+
+export async function contarEstudiantesPorPlan(
+  carreraId
+) {
+  validarApi(
+    'contarEstudiantesPorPlan'
+  );
+
+  return window.sgpa
+    .contarEstudiantesPorPlan(
+      carreraId
+    );
+}
+
 export async function listarEstudiantes(
   filtros = {}
 ) {

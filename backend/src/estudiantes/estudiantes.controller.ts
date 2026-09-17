@@ -37,6 +37,21 @@ export class EstudiantesController {
     return this.estudiantesService.listar(usuarioId, filtros);
   }
 
+  @Get('conteos/carreras')
+  @Permisos(PermisoSistema.ESTUDIANTES_VER)
+  contarPorCarrera(@UsuarioActualId() usuarioId: number) {
+    return this.estudiantesService.contarPorCarrera(usuarioId);
+  }
+
+  @Get('conteos/planes')
+  @Permisos(PermisoSistema.ESTUDIANTES_VER)
+  contarPorPlan(
+    @UsuarioActualId() usuarioId: number,
+    @Query('carreraId', ParseIntPipe) carreraId: number,
+  ) {
+    return this.estudiantesService.contarPorPlan(usuarioId, carreraId);
+  }
+
   @Get(':id')
   @Permisos(PermisoSistema.ESTUDIANTES_VER)
   obtenerPorId(

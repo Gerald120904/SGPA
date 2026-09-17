@@ -92,6 +92,51 @@ export class EstudiantesService {
     });
   }
 
+  async contarPorCarrera(usuarioId: number) {
+    const carreraIdsPermitidas =
+      await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(
+        usuarioId,
+      );
+
+    if (!carreraIdsPermitidas.length) {
+      return [];
+    }
+
+    const filas = await this.estudianteRepository
+      .createQueryBuilder('estudiante')
+      .select('estudiante.carreraId', 'carreraId')
+      .addSelect('COUNT(estudiante.id)', 'total')
+      .where('estudiante.carreraId IN (:...carreraIds)', {
+        carreraIds: carreraIdsPermitidas,
+      })
+      .groupBy('estudiante.carreraId')
+      .getRawMany();
+
+    return filas.map((fila) => ({
+      carreraId: Number(fila.carreraId),
+      total: Number(fila.total),
+    }));
+  }
+
+  async contarPorPlan(usuarioId: number, carreraId: number) {
+    await this.validarAlcance(usuarioId, carreraId);
+
+    const filas = await this.estudianteRepository
+      .createQueryBuilder('estudiante')
+      .select('estudiante.planEstudioId', 'planEstudioId')
+      .addSelect('COUNT(estudiante.id)', 'total')
+      .where('estudiante.carreraId = :carreraId', {
+        carreraId,
+      })
+      .groupBy('estudiante.planEstudioId')
+      .getRawMany();
+
+    return filas.map((fila) => ({
+      planEstudioId: Number(fila.planEstudioId),
+      total: Number(fila.total),
+    }));
+  }
+
   async obtenerPorId(usuarioId: number, id: number) {
     const estudiante = await this.obtenerEntidad(id);
     await this.validarAlcance(usuarioId, estudiante.carreraId);
