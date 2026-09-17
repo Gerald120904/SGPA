@@ -5,9 +5,9 @@ import {
   desconectarGoogleFormularios,
   crearFormularioEstudiantes,
   sincronizarFormularioEstudiantes,
-  procesarFormularioEstudiantes,
   cerrarFormularioEstudiantes,
-  listarRespuestasFormularioEstudiantes
+  listarRespuestasFormularioEstudiantes,
+  abrirEnlaceFormularioEstudiantes
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -105,9 +105,10 @@ export function FormulariosEstudiantesPage() {
           columns: [
             'Título',
             'Carrera',
-            'Plan de estudio',
+            'Plan',
             'Estado',
             'Respuestas',
+            'Enlace',
             'Acciones'
           ],
           rows: '',
@@ -334,6 +335,29 @@ function renderizarFilaFormulario(
       </td>
 
       <td>
+        ${
+          formulario.responderUri
+            ? `
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                data-action="copiar-enlace"
+                data-id="${formulario.id}"
+                title="Copiar enlace para responder"
+              >
+                <i
+                  data-lucide="copy"
+                  aria-hidden="true"
+                ></i>
+
+                Copiar link
+              </button>
+            `
+            : '—'
+        }
+      </td>
+
+      <td>
         <div class="table-actions" style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
           ${
             formulario.responderUri
@@ -341,12 +365,12 @@ function renderizarFilaFormulario(
                 <button
                   type="button"
                   class="btn btn-secondary btn-sm"
-                  data-action="copiar-enlace"
+                  data-action="abrir-enlace"
                   data-id="${formulario.id}"
-                  title="Copiar enlace del formulario"
+                  title="Abrir formulario en Google Forms"
                 >
                   <i
-                    data-lucide="copy"
+                    data-lucide="external-link"
                     aria-hidden="true"
                   ></i>
                 </button>
@@ -385,19 +409,6 @@ function renderizarFilaFormulario(
                 >
                   <i
                     data-lucide="refresh-cw"
-                    aria-hidden="true"
-                  ></i>
-                </button>
-
-                <button
-                  type="button"
-                  class="btn btn-secondary btn-sm"
-                  data-action="procesar"
-                  data-id="${formulario.id}"
-                  title="Procesar respuestas pendientes"
-                >
-                  <i
-                    data-lucide="play"
                     aria-hidden="true"
                   ></i>
                 </button>
@@ -448,6 +459,7 @@ function renderizarTabla() {
       'Plan de estudio',
       'Estado',
       'Respuestas',
+      'Enlace',
       'Acciones'
     ],
     rows,
@@ -550,6 +562,14 @@ async function manejarAccionFormulario(event) {
       );
       break;
 
+    case 'abrir-enlace':
+      if (formulario.responderUri) {
+        await abrirEnlaceFormularioEstudiantes(
+          formulario.responderUri
+        );
+      }
+      break;
+
     case 'ver-respuestas':
       await verRespuestasFormulario(
         formulario
@@ -558,13 +578,6 @@ async function manejarAccionFormulario(event) {
 
     case 'sincronizar':
       await sincronizarFormulario(
-        formulario,
-        button
-      );
-      break;
-
-    case 'procesar':
-      await procesarFormulario(
         formulario,
         button
       );
@@ -916,51 +929,6 @@ async function sincronizarFormulario(
   }
 }
 
-async function procesarFormulario(
-  formulario,
-  button
-) {
-  button.disabled = true;
-
-  try {
-    const res =
-      await procesarFormularioEstudiantes(
-        formulario.id
-      );
-
-    if (res && res.ok === false) {
-      throw new Error(
-        res.message || 'No fue posible procesar las respuestas.'
-      );
-    }
-
-    const resultado = res?.data ?? res;
-
-    mostrarExito({
-      titulo:
-        'Respuestas procesadas',
-
-      mensaje:
-        `${resultado.procesadas ?? 0} procesadas. ` +
-        `${resultado.estudiantesCreados ?? 0} estudiantes creados, ` +
-        `${resultado.estudiantesActualizados ?? 0} actualizados y ` +
-        `${resultado.aprobacionesNuevas ?? 0} aprobaciones nuevas.`
-    });
-
-    await cargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo:
-        'No fue posible procesar las respuestas',
-      mensaje:
-        error?.message ||
-        'Ocurrió un error durante el procesamiento.'
-    });
-  } finally {
-    button.disabled = false;
-  }
-}
-
 async function cerrarFormulario(
   formulario,
   button
@@ -1220,6 +1188,25 @@ async function abrirNuevoFormulario() {
 
     <label class="sgpa-form-wide">
       <span>
+        Descripción
+      </span>
+
+      <textarea
+        id="formularioDescripcion"
+        name="descripcion"
+        rows="3"
+        maxlength="1000"
+        placeholder="Ej. Complete este formulario con sus datos y las asignaturas aprobadas hasta el período actual."
+        required
+      ></textarea>
+
+      <small class="sgpa-field-help">
+        Esta descripción aparecerá debajo del título en Google Forms.
+      </small>
+    </label>
+
+    <label class="sgpa-form-wide">
+      <span>
         Carrera
       </span>
 
@@ -1457,6 +1444,11 @@ async function abrirNuevoFormulario() {
             'formularioTitulo'
           );
 
+        const descripcionInput =
+          document.getElementById(
+            'formularioDescripcion'
+          );
+
         const errorBox =
           document.getElementById(
             'nuevoFormularioEstudianteError'
@@ -1469,6 +1461,7 @@ async function abrirNuevoFormulario() {
 
         if (
           !tituloInput ||
+          !descripcionInput ||
           !carreraInput ||
           !planInput ||
           !crearButton
@@ -1478,6 +1471,9 @@ async function abrirNuevoFormulario() {
 
         const titulo =
           tituloInput.value.trim();
+
+        const descripcion =
+          descripcionInput.value.trim();
 
         const carreraId =
           Number(
@@ -1491,12 +1487,13 @@ async function abrirNuevoFormulario() {
 
         if (
           !titulo ||
+          !descripcion ||
           !carreraId ||
           !planEstudioId
         ) {
           if (errorBox) {
             errorBox.textContent =
-              'Complete el título, la carrera y el plan de estudio.';
+              'Complete el título, la descripción, la carrera y el plan de estudio.';
 
             errorBox.classList.remove(
               'hidden'
@@ -1526,6 +1523,7 @@ async function abrirNuevoFormulario() {
           const res =
             await crearFormularioEstudiantes({
               titulo,
+              descripcion,
               carreraId,
               planEstudioId
             });

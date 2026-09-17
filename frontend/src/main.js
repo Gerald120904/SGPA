@@ -1699,12 +1699,37 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  'formularios-estudiantes:procesar',
-  async (_event, id) => {
+  'formularios-estudiantes:solicitudes',
+  async () => {
     return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/${id}/procesar`,
+      '/formularios-estudiantes/solicitudes'
+    );
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:aceptar-solicitud',
+  async (_event, respuestaId) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/respuestas/${respuestaId}/aceptar`,
       {
         method: 'POST'
+      }
+    );
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:rechazar-solicitud',
+  async (_event, respuestaId, motivo) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/respuestas/${respuestaId}/rechazar`,
+      {
+        method: 'POST',
+        body: {
+          motivo:
+            motivo?.trim() || undefined
+        }
       }
     );
   }
@@ -1728,6 +1753,19 @@ ipcMain.handle(
     return ejecutarPeticionAutenticada(
       `/formularios-estudiantes/${id}/respuestas`
     );
+  }
+);
+
+ipcMain.handle(
+  'formularios-estudiantes:abrir-enlace',
+  async (_event, url) => {
+    if (url) {
+      await shell.openExternal(url);
+    }
+
+    return {
+      ok: true
+    };
   }
 );
 

@@ -67,13 +67,41 @@ export async function sincronizarFormularioEstudiantes(id) {
     .sincronizarFormularioEstudiantes(id);
 }
 
-export async function procesarFormularioEstudiantes(id) {
+export async function listarSolicitudesFormularios() {
   validarApi(
-    'procesarFormularioEstudiantes'
+    'listarSolicitudesFormularios'
   );
 
   return window.sgpa
-    .procesarFormularioEstudiantes(id);
+    .listarSolicitudesFormularios();
+}
+
+export async function aceptarSolicitudFormulario(
+  respuestaId
+) {
+  validarApi(
+    'aceptarSolicitudFormulario'
+  );
+
+  return window.sgpa
+    .aceptarSolicitudFormulario(
+      respuestaId
+    );
+}
+
+export async function rechazarSolicitudFormulario(
+  respuestaId,
+  motivo
+) {
+  validarApi(
+    'rechazarSolicitudFormulario'
+  );
+
+  return window.sgpa
+    .rechazarSolicitudFormulario(
+      respuestaId,
+      motivo
+    );
 }
 
 export async function cerrarFormularioEstudiantes(id) {
@@ -95,5 +123,18 @@ export async function listarRespuestasFormularioEstudiantes(
   return window.sgpa
     .listarRespuestasFormularioEstudiantes(
       id
+    );
+}
+
+export async function abrirEnlaceFormularioEstudiantes(
+  url
+) {
+  validarApi(
+    'abrirEnlaceFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .abrirEnlaceFormularioEstudiantes(
+      url
     );
 }

@@ -53,6 +53,12 @@ import {
 } from '../../services/periodos.service.js';
 
 import {
+  listarSolicitudesFormularios,
+  aceptarSolicitudFormulario,
+  rechazarSolicitudFormulario
+} from '../../services/formularios-estudiantes.service.js';
+
+import {
   confirmarAccion
 } from '../../utils/confirm.js';
 
@@ -67,6 +73,10 @@ import {
 let estudiantes = [];
 
 let catalogoEstudiantes = [];
+
+let solicitudesFormularios = [];
+
+let intervaloSolicitudes = null;
 
 let instanciaActual = 0;
 
@@ -254,6 +264,29 @@ export function EstudiantesPage() {
 
       <div
         id="estudiantesContent"
+        aria-live="polite"
+      ></div>
+
+      <div class="planes-toolbar">
+        <div>
+          <h2>
+            Solicitudes de formularios
+          </h2>
+
+          <p>
+            Respuestas recibidas que requieren revisión antes de ingresar al padrón de estudiantes.
+          </p>
+        </div>
+
+        <div>
+          <strong id="solicitudesFormulariosContador">
+            0 pendientes
+          </strong>
+        </div>
+      </div>
+
+      <div
+        id="solicitudesFormulariosContent"
         aria-live="polite"
       ></div>
 
@@ -4318,10 +4351,817 @@ export function iniciarEstudiantesPage() {
     abrirImportacionEstudiantes
   );
 
+  const solicitudesContenedor =
+    document.getElementById(
+      'solicitudesFormulariosContent'
+    );
+
+  solicitudesContenedor?.addEventListener(
+    'click',
+    manejarAccionSolicitud
+  );
+
   renderizarIconos();
 
   cargarEstudiantes(
     instancia,
     true
   );
+
+  cargarSolicitudesFormularios(
+    instancia
+  );
+
+  if (intervaloSolicitudes) {
+    window.clearInterval(
+      intervaloSolicitudes
+    );
+  }
+
+  intervaloSolicitudes =
+    window.setInterval(
+      () => {
+        const pagina =
+          document.getElementById(
+            'estudiantesPage'
+          );
+
+        if (!pagina) {
+          window.clearInterval(
+            intervaloSolicitudes
+          );
+
+          intervaloSolicitudes =
+            null;
+
+          return;
+        }
+
+        cargarSolicitudesFormularios(
+          instancia,
+          false
+        );
+      },
+      15_000
+    );
+}
+
+function obtenerDatosSolicitud(
+  solicitud
+) {
+  return (
+    solicitud.datosNormalizadosJson ??
+    {}
+  );
+}
+
+function obtenerNombreSolicitud(
+  solicitud
+) {
+  const datos =
+    obtenerDatosSolicitud(
+      solicitud
+    );
+
+  return (
+    [
+      datos.primerNombre,
+      datos.segundoNombre,
+      datos.primerApellido,
+      datos.segundoApellido
+    ]
+      .filter(Boolean)
+      .join(' ') ||
+    'Sin nombre'
+  );
+}
+
+function renderizarSolicitudesFormularios() {
+  const contenedor =
+    document.getElementById(
+      'solicitudesFormulariosContent'
+    );
+
+  const contador =
+    document.getElementById(
+      'solicitudesFormulariosContador'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  if (contador) {
+    contador.textContent =
+      `${solicitudesFormularios.length} pendiente${
+        solicitudesFormularios.length === 1
+          ? ''
+          : 's'
+      }`;
+  }
+
+  const puedeGestionar =
+    usuarioTienePermiso(
+      PERMISOS.GESTIONAR
+    );
+
+  const rows =
+    solicitudesFormularios
+      .map((solicitud) => {
+        const datos =
+          obtenerDatosSolicitud(
+            solicitud
+          );
+
+        const formulario =
+          solicitud.formulario ?? {};
+
+        return `
+          <tr>
+            <td>
+              ${escapeHtml(
+                obtenerNombreSolicitud(
+                  solicitud
+                )
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                datos.identificacion ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                datos.correoEstudiantil ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formulario.titulo ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formulario.carrera?.codigo ||
+                formulario.carrera?.nombre ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${escapeHtml(
+                formulario.planEstudio?.codigo ||
+                formulario.planEstudio?.nombre ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              ${
+                Array.isArray(
+                  datos.asignaturasAprobadas
+                )
+                  ? datos.asignaturasAprobadas.length
+                  : 0
+              }
+            </td>
+
+            <td>
+              ${escapeHtml(
+                solicitud.estado ||
+                '—'
+              )}
+            </td>
+
+            <td>
+              <div
+                class="table-actions"
+                style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;"
+              >
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-solicitud-action="ver"
+                  data-id="${solicitud.id}"
+                  title="Ver solicitud"
+                >
+                  <i
+                    data-lucide="eye"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+
+                ${
+                  puedeGestionar
+                    ? `
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-solicitud-action="aceptar"
+                        data-id="${solicitud.id}"
+                        title="Aceptar solicitud"
+                      >
+                        <i
+                          data-lucide="check"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-solicitud-action="rechazar"
+                        data-id="${solicitud.id}"
+                        title="Rechazar solicitud"
+                      >
+                        <i
+                          data-lucide="x"
+                          aria-hidden="true"
+                        ></i>
+                      </button>
+                    `
+                    : ''
+                }
+              </div>
+            </td>
+          </tr>
+        `;
+      })
+      .join('');
+
+  contenedor.innerHTML =
+    DataTable({
+      columns: [
+        'Estudiante',
+        'Cédula',
+        'Correo',
+        'Formulario',
+        'Carrera',
+        'Plan',
+        'Aprobadas',
+        'Estado',
+        'Acciones'
+      ],
+
+      rows,
+
+      emptyMessage:
+        'No existen solicitudes pendientes de formularios.',
+
+      ariaLabel:
+        'Solicitudes de estudiantes provenientes de formularios'
+    });
+
+  renderizarIconos();
+}
+
+async function cargarSolicitudesFormularios(
+  instancia,
+  mostrarErrores = true
+) {
+  try {
+    const resultado =
+      await listarSolicitudesFormularios();
+
+    if (
+      instancia !==
+      instanciaActual
+    ) {
+      return;
+    }
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible consultar las solicitudes.'
+      );
+    }
+
+    const datos =
+      extraerData(resultado);
+
+    solicitudesFormularios =
+      Array.isArray(datos)
+        ? datos
+        : [];
+
+    renderizarSolicitudesFormularios();
+  } catch (error) {
+    if (mostrarErrores) {
+      mostrarError({
+        titulo:
+          'No fue posible cargar las solicitudes',
+        mensaje:
+          error?.message ||
+          'Ocurrió un error al consultar las respuestas de formularios.'
+      });
+    } else {
+      console.error(
+        'Error actualizando solicitudes:',
+        error
+      );
+    }
+  }
+}
+
+async function manejarAccionSolicitud(
+  event
+) {
+  const button =
+    event.target.closest(
+      '[data-solicitud-action][data-id]'
+    );
+
+  if (!button) {
+    return;
+  }
+
+  const id =
+    Number(button.dataset.id);
+
+  if (!id) {
+    return;
+  }
+
+  const solicitud =
+    solicitudesFormularios.find(
+      (item) =>
+        item.id === id
+    );
+
+  if (!solicitud) {
+    return;
+  }
+
+  switch (
+    button.dataset.solicitudAction
+  ) {
+    case 'ver':
+      abrirDetalleSolicitud(
+        solicitud
+      );
+      break;
+
+    case 'aceptar':
+      await aceptarSolicitud(
+        solicitud
+      );
+      break;
+
+    case 'rechazar':
+      abrirRechazarSolicitud(
+        solicitud
+      );
+      break;
+  }
+}
+
+async function aceptarSolicitud(
+  solicitud
+) {
+  const confirmado =
+    await confirmarAccion({
+      titulo:
+        'Aceptar solicitud',
+
+      mensaje:
+        `Se incorporará a ${obtenerNombreSolicitud(
+          solicitud
+        )} al padrón de estudiantes utilizando la carrera y el plan asociados al formulario.`,
+
+      textoConfirmar:
+        'Aceptar solicitud',
+
+      peligro:
+        false
+    });
+
+  if (!confirmado) {
+    return;
+  }
+
+  try {
+    const resultado =
+      await aceptarSolicitudFormulario(
+        solicitud.id
+      );
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible aceptar la solicitud.'
+      );
+    }
+
+    mostrarExito({
+      titulo:
+        'Solicitud aceptada',
+
+      mensaje:
+        'La información fue incorporada correctamente al módulo de estudiantes.'
+    });
+
+    await Promise.all([
+      cargarSolicitudesFormularios(
+        instanciaActual,
+        false
+      ),
+
+      cargarEstudiantes(
+        instanciaActual,
+        true
+      )
+    ]);
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No fue posible aceptar la solicitud',
+
+      mensaje:
+        error?.message ||
+        'La solicitud requiere revisión antes de poder incorporarse.'
+    });
+
+    await cargarSolicitudesFormularios(
+      instanciaActual,
+      false
+    );
+  }
+}
+
+function abrirRechazarSolicitud(
+  solicitud
+) {
+  const dialog =
+    document.getElementById(
+      'estudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'estudianteDialogContent'
+    );
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  content.innerHTML =
+    FormDialog({
+      formId:
+        'rechazarSolicitudFormularioForm',
+
+      title:
+        'Rechazar solicitud',
+
+      description:
+        obtenerNombreSolicitud(
+          solicitud
+        ),
+
+      cancelButtonId:
+        'cancelarRechazoSolicitud',
+
+      submitButtonId:
+        'confirmarRechazoSolicitud',
+
+      submitText:
+        'Rechazar',
+
+      body: `
+        <label class="sgpa-form-wide">
+          <span>
+            Motivo
+          </span>
+
+          <textarea
+            id="motivoRechazoSolicitud"
+            maxlength="500"
+            rows="3"
+            placeholder="Opcional"
+          ></textarea>
+        </label>
+      `
+    });
+
+  renderizarIconos();
+
+  dialog.showModal();
+
+  habilitarCierreExterior(
+    dialog
+  );
+
+  document
+    .getElementById(
+      'cancelarRechazoSolicitud'
+    )
+    ?.addEventListener(
+      'click',
+      () => dialog.close()
+    );
+
+  document
+    .getElementById(
+      'rechazarSolicitudFormularioForm'
+    )
+    ?.addEventListener(
+      'submit',
+      async (event) => {
+        event.preventDefault();
+
+        const motivo =
+          document
+            .getElementById(
+              'motivoRechazoSolicitud'
+            )
+            .value
+            .trim();
+
+        try {
+          const resultado =
+            await rechazarSolicitudFormulario(
+              solicitud.id,
+              motivo
+            );
+
+          if (!resultado?.ok) {
+            throw new Error(
+              resultado?.message ||
+              'No fue posible rechazar la solicitud.'
+            );
+          }
+
+          dialog.close();
+
+          mostrarExito({
+            titulo:
+              'Solicitud rechazada',
+
+            mensaje:
+              'La respuesta fue descartada del proceso de ingreso.'
+          });
+
+          await cargarSolicitudesFormularios(
+            instanciaActual,
+            false
+          );
+        } catch (error) {
+          mostrarError({
+            titulo:
+              'No fue posible rechazar la solicitud',
+
+            mensaje:
+              error?.message ||
+              'Ocurrió un error durante la revisión.'
+          });
+        }
+      }
+    );
+}
+
+function abrirDetalleSolicitud(
+  solicitud
+) {
+  const dialog =
+    document.getElementById(
+      'estudianteDialog'
+    );
+
+  const content =
+    document.getElementById(
+      'estudianteDialogContent'
+    );
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  const datos =
+    obtenerDatosSolicitud(
+      solicitud
+    );
+
+  const formulario =
+    solicitud.formulario ?? {};
+
+  const carreraTexto =
+    formulario.carrera
+      ? `${formulario.carrera.codigo || ''} - ${formulario.carrera.nombre || ''}`
+      : '—';
+
+  const planTexto =
+    formulario.planEstudio
+      ? `${formulario.planEstudio.codigo || ''} - ${formulario.planEstudio.nombre || ''}`
+      : '—';
+
+  const asignaturasTexto =
+    Array.isArray(
+      datos.asignaturasAprobadas
+    ) &&
+    datos.asignaturasAprobadas.length > 0
+      ? datos.asignaturasAprobadas
+          .map(
+            (a) =>
+              a.codigo ||
+              a.planAsignaturaId
+          )
+          .join(', ')
+      : 'Ninguna reportada';
+
+  content.innerHTML =
+    FormDialog({
+      formId:
+        'detalleSolicitudForm',
+
+      title:
+        'Detalle de la solicitud',
+
+      description:
+        obtenerNombreSolicitud(
+          solicitud
+        ),
+
+      cancelButtonId:
+        'cerrarDetalleSolicitud',
+
+      cancelText:
+        'Cerrar',
+
+      layout: 'grid',
+
+      body: `
+        <label>
+          <span>Nombre completo</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              obtenerNombreSolicitud(
+                solicitud
+              )
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Cédula</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              datos.identificacion ||
+              '—'
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Correo estudiantil</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              datos.correoEstudiantil ||
+              '—'
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Teléfono / Contacto</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              datos.contacto ||
+              '—'
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Formulario de origen</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              formulario.titulo ||
+              '—'
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Carrera (del formulario)</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              carreraTexto
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Plan de estudio (del formulario)</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              planTexto
+            )}"
+            readonly
+          >
+        </label>
+
+        <label>
+          <span>Estado de la solicitud</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              solicitud.estado ||
+              '—'
+            )}"
+            readonly
+          >
+        </label>
+
+        <label class="sgpa-form-wide">
+          <span>Asignaturas aprobadas reportadas (${
+            Array.isArray(
+              datos.asignaturasAprobadas
+            )
+              ? datos.asignaturasAprobadas.length
+              : 0
+          })</span>
+          <input
+            type="text"
+            value="${escapeHtml(
+              asignaturasTexto
+            )}"
+            readonly
+          >
+        </label>
+
+        ${
+          datos.optativasNoDisciplinarias ||
+          solicitud.optativasNoDisciplinarias
+            ? `
+              <label class="sgpa-form-wide">
+                <span>Optativas no disciplinarias</span>
+                <input
+                  type="text"
+                  value="${escapeHtml(
+                    datos.optativasNoDisciplinarias ||
+                    solicitud.optativasNoDisciplinarias
+                  )}"
+                  readonly
+                >
+              </label>
+            `
+            : ''
+        }
+
+        ${
+          solicitud.detalleError
+            ? `
+              <label class="sgpa-form-wide">
+                <span>Detalle de revisión / error</span>
+                <textarea
+                  rows="2"
+                  readonly
+                  style="color: var(--color-danger, #dc2626);"
+                >${escapeHtml(
+                  solicitud.detalleError
+                )}</textarea>
+              </label>
+            `
+            : ''
+        }
+      `
+    });
+
+  renderizarIconos();
+
+  dialog.showModal();
+
+  habilitarCierreExterior(
+    dialog
+  );
+
+  document
+    .getElementById(
+      'cerrarDetalleSolicitud'
+    )
+    ?.addEventListener(
+      'click',
+      () => dialog.close()
+    );
 }

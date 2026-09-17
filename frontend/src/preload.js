@@ -384,10 +384,25 @@ contextBridge.exposeInMainWorld("sgpa", {
       id
     ),
 
-  procesarFormularioEstudiantes: (id) =>
+  listarSolicitudesFormularios: () =>
     ipcRenderer.invoke(
-      'formularios-estudiantes:procesar',
-      id
+      'formularios-estudiantes:solicitudes'
+    ),
+
+  aceptarSolicitudFormulario: (respuestaId) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:aceptar-solicitud',
+      respuestaId
+    ),
+
+  rechazarSolicitudFormulario: (
+    respuestaId,
+    motivo
+  ) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:rechazar-solicitud',
+      respuestaId,
+      motivo
     ),
 
   cerrarFormularioEstudiantes: (id) =>
@@ -400,6 +415,12 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke(
       'formularios-estudiantes:respuestas',
       id
+    ),
+
+  abrirEnlaceFormularioEstudiantes: (url) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:abrir-enlace',
+      url
     ),
 
   listarEstudiantes: (filtros = {}) =>
