@@ -105,7 +105,7 @@ describe('PlanReglasOptativasController', () => {
 
     const response = await request(app.getHttpServer())
       .get('/planes-estudio/1/regla-optativas')
-      .set('Authorization', `Bearer ${generarToken('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${generarToken('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200);
 
     expect(response.body).toEqual(data);
@@ -116,7 +116,7 @@ describe('PlanReglasOptativasController', () => {
     permisosAsignados.clear();
     await request(app.getHttpServer())
       .get('/planes-estudio/1/regla-optativas')
-      .set('Authorization', `Bearer ${generarToken('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${generarToken('ASISTENTE_ESTUDIANTIL')}`)
       .expect(403);
   });
 

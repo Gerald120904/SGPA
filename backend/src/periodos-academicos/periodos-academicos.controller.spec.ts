@@ -117,7 +117,7 @@ describe('PeriodosAcademicosController', () => {
   });
 
   it('permite listar periodos a un usuario con PERIODOS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     permisosService.usuarioTienePermisos.mockResolvedValue(true);
 
     await request(app.getHttpServer())
@@ -133,7 +133,7 @@ describe('PeriodosAcademicosController', () => {
   });
 
   it('responde 403 cuando el usuario no posee PERIODOS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     permisosService.usuarioTienePermisos.mockResolvedValue(false);
 
     await request(app.getHttpServer())
@@ -145,7 +145,7 @@ describe('PeriodosAcademicosController', () => {
   });
 
   it('responde 403 al intentar crear periodo sin PERIODOS_GESTIONAR', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     permisosService.usuarioTienePermisos.mockResolvedValue(false);
 
     await request(app.getHttpServer())

@@ -333,224 +333,63 @@ describe('ProfesoresService', () => {
     );
   });
 
-  it('rechaza carreras inexistentes o inactivas', async () => {
+  it('devuelve lista vacía de perfiles disponibles si el profesor no tiene carreras asignadas', async () => {
     usuarioRepository.findOne.mockResolvedValue(crearProfesor());
-
-    carreraRepository.find.mockResolvedValue([carrera]);
-
-    await expect(
-      service.actualizarCarrerasMiPerfil(10, {
-        carreraIds: [1, 2],
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(profesorCarreraRepository.delete).not.toHaveBeenCalled();
-  });
-
-  it('reemplaza las carreras del perfil', async () => {
-    usuarioRepository.findOne.mockResolvedValue(crearProfesor());
-
-    carreraRepository.find.mockResolvedValue([carrera]);
-
     profesorCarreraRepository.find.mockResolvedValue([]);
 
-    profesorCarreraRepository.delete.mockResolvedValue({
-      affected: 1,
-    });
+    const resultado = await service.listarPerfilesDisponiblesMiPerfil(10);
 
-    profesorCarreraRepository.save.mockResolvedValue([
-      {
-        profesorUsuarioId: 10,
-        carreraId: 1,
-      },
-    ]);
-
-    jest.spyOn(service, 'obtenerMiPerfil').mockResolvedValue({
-      id: 10,
-      carreras: [
-        {
-          id: 1,
-          codigo: 'EIF',
-          nombre: 'Ingeniería en Sistemas',
-          activo: true,
-        },
-      ],
-      perfilesAcademicos: [],
-      cursosHabilitados: [],
-    } as any);
-
-    await service.actualizarCarrerasMiPerfil(10, {
-      carreraIds: [1],
-    });
-
-    expect(profesorCarreraRepository.delete).toHaveBeenCalledWith({
-      profesorUsuarioId: 10,
-    });
-
-    expect(profesorCarreraRepository.create).toHaveBeenCalledWith({
-      profesorUsuarioId: 10,
-      carreraId: 1,
-    });
-
-    expect(profesorCarreraRepository.save).toHaveBeenCalled();
-
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(resultado).toEqual([]);
+    expect(perfilRepository.find).not.toHaveBeenCalled();
   });
 
-  it('permite dejar vacías las carreras del perfil', async () => {
+  it('lista perfiles académicos activos asociados a las carreras asignadas al profesor', async () => {
     usuarioRepository.findOne.mockResolvedValue(crearProfesor());
-
-    profesorCarreraRepository.find.mockResolvedValue([]);
-
-    profesorCarreraRepository.delete.mockResolvedValue({
-      affected: 1,
-    });
-
-    jest.spyOn(service, 'obtenerMiPerfil').mockResolvedValue({
-      id: 10,
-      carreras: [],
-      perfilesAcademicos: [],
-      cursosHabilitados: [],
-    } as any);
-
-    await service.actualizarCarrerasMiPerfil(10, {
-      carreraIds: [],
-    });
-
-    expect(carreraRepository.find).not.toHaveBeenCalled();
-
-    expect(profesorCarreraRepository.delete).toHaveBeenCalledWith({
-      profesorUsuarioId: 10,
-    });
-
-    expect(profesorCarreraRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('permite actualizar carreras como adscripción sin restringir por cursos', async () => {
-    usuarioRepository.findOne.mockResolvedValue(crearProfesor());
-
-    carreraRepository.find.mockResolvedValue([carrera]);
-
-    profesorCarreraRepository.find.mockResolvedValue([]);
-    profesorCarreraRepository.delete.mockResolvedValue({ affected: 0 });
-    profesorCarreraRepository.save.mockResolvedValue([]);
-
-    jest.spyOn(service, 'obtenerMiPerfil').mockResolvedValue({
-      id: 10,
-      carreras: [
-        {
-          id: 1,
-          codigo: 'EIF',
-          nombre: 'Ingeniería en Sistemas',
-          activo: true,
-        },
-      ],
-      perfilesAcademicos: [],
-      cursosHabilitados: [],
-    } as any);
-
-    const resultado = await service.actualizarCarrerasMiPerfil(10, {
-      carreraIds: [1],
-    });
-
-    expect(profesorCarreraRepository.delete).toHaveBeenCalledWith({
-      profesorUsuarioId: 10,
-    });
-    expect(resultado).toBeDefined();
-  });
-
-  it('registra historial cuando cambian las carreras del perfil', async () => {
-    usuarioRepository.findOne.mockResolvedValue(crearProfesor());
-
-    carreraRepository.find.mockResolvedValue([carrera]);
-
-    profesorCarreraRepository.find.mockResolvedValueOnce([
-      {
-        profesorUsuarioId: 10,
-        carreraId: 2,
-        carrera: {
-          id: 2,
-          codigo: 'ADM',
-          nombre: 'Administración',
-          activo: true,
-        },
-      },
-    ]);
-
-    profesorCarreraRepository.delete.mockResolvedValue({
-      affected: 1,
-    });
-
-    profesorCarreraRepository.save.mockResolvedValue([
-      {
-        profesorUsuarioId: 10,
-        carreraId: 1,
-      },
-    ]);
-
-    jest.spyOn(service, 'obtenerMiPerfil').mockResolvedValue({
-      id: 10,
-      carreras: [],
-    } as any);
-
-    await service.actualizarCarrerasMiPerfil(10, {
-      carreraIds: [1],
-    });
-
-    expect(historialPerfilRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        profesorUsuarioId: 10,
-        usuarioAccionId: 10,
-        tipo: TipoHistorialPerfilProfesor.CARRERAS,
-        accion: AccionHistorialPerfilProfesor.ACTUALIZAR_CARRERAS,
-
-        datosAnteriores: {
-          carreraIds: [2],
-        },
-
-        datosNuevos: {
-          carreraIds: [1],
-        },
-      }),
-    );
-
-    expect(historialPerfilRepository.save).toHaveBeenCalled();
-  });
-
-  it('no crea historial cuando las carreras no cambian', async () => {
-    usuarioRepository.findOne.mockResolvedValue(crearProfesor());
-
-    carreraRepository.find.mockResolvedValue([carrera]);
-
     profesorCarreraRepository.find.mockResolvedValue([
       {
         profesorUsuarioId: 10,
         carreraId: 1,
-        carrera,
       },
-    ]);
-
-    profesorCarreraRepository.delete.mockResolvedValue({
-      affected: 1,
-    });
-
-    profesorCarreraRepository.save.mockResolvedValue([
       {
         profesorUsuarioId: 10,
-        carreraId: 1,
+        carreraId: 2,
       },
     ]);
 
-    jest.spyOn(service, 'obtenerMiPerfil').mockResolvedValue({
-      id: 10,
-    } as any);
+    perfilRepository.find.mockResolvedValue([
+      {
+        id: 100,
+        carreraId: 1,
+        codigo: 'PERF-01',
+        nombre: 'Desarrollo de Software',
+        descripcion: 'Perfil de software',
+        activo: true,
+        carrera: {
+          id: 1,
+          codigo: 'EIF',
+          nombre: 'Ingeniería en Sistemas',
+          activo: true,
+        },
+      },
+    ]);
 
-    await service.actualizarCarrerasMiPerfil(10, {
-      carreraIds: [1],
-    });
 
-    expect(historialPerfilRepository.create).not.toHaveBeenCalled();
+    const resultado = await service.listarPerfilesDisponiblesMiPerfil(10);
+
+    expect(resultado).toEqual([
+      {
+        id: 100,
+        carreraId: 1,
+        carreraCodigo: 'EIF',
+        carreraNombre: 'Ingeniería en Sistemas',
+        codigo: 'PERF-01',
+        nombre: 'Desarrollo de Software',
+        descripcion: 'Perfil de software',
+        activo: true,
+      },
+    ]);
   });
+
 
   it('filtra profesores por nombre', async () => {
     const p1 = crearProfesor({ id: 1, nombres: 'Carlos', apellido1: 'Gómez' });

@@ -51,6 +51,7 @@ import {
   LineChart,
 
   ClipboardList,
+  FileText,
 
   /* =======================================================
      PLANES DE ESTUDIO
@@ -199,6 +200,7 @@ export function renderizarIconos() {
       LineChart,
 
       ClipboardList,
+      FileText,
 
 
       /* ===================================================

@@ -21,7 +21,6 @@ import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { ActualizarAtestadoProfesorDto } from './dto/actualizar-atestado-profesor.dto';
-import { ActualizarCarrerasPerfilDto } from './dto/actualizar-carreras-perfil.dto';
 import { ActualizarProyectoProfesorDto } from './dto/actualizar-proyecto-profesor.dto';
 import { CambiarEstadoProyectoProfesorDto } from './dto/cambiar-estado-proyecto-profesor.dto';
 import { CrearAtestadoProfesorDto } from './dto/crear-atestado-profesor.dto';
@@ -58,19 +57,16 @@ export class ProfesoresController {
     );
   }
 
-  @Put('mi-perfil/carreras')
+  // --- Perfiles Académicos (Nuevo Modelo) ---
+
+  @Get('mi-perfil/perfiles-disponibles')
   @Roles(RolSistema.PROFESOR)
-  actualizarCarrerasMiPerfil(
-    @Req() request: Request,
-    @Body() dto: ActualizarCarrerasPerfilDto,
-  ) {
-    return this.profesoresService.actualizarCarrerasMiPerfil(
+  listarPerfilesDisponiblesMiPerfil(@Req() request: Request) {
+    return this.profesoresService.listarPerfilesDisponiblesMiPerfil(
       this.obtenerUsuarioId(request),
-      dto,
     );
   }
 
-  // --- Perfiles Académicos (Nuevo Modelo) ---
 
   @Get('mi-perfil/perfiles')
   @Roles(RolSistema.PROFESOR)

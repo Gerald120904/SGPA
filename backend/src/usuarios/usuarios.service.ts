@@ -15,6 +15,8 @@ import { UsuarioRol } from './entities/usuario-rol.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
 import { obtenerPermisosPredeterminadosPorRoles } from '../permisos/constants/plantillas-permisos.constant';
+import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
+import { Carrera } from '../carreras/entities/carrera.entity';
 
 @Injectable()
 export class UsuariosService {
@@ -25,6 +27,10 @@ export class UsuariosService {
     private readonly usuarioRolRepository: Repository<UsuarioRol>,
     @InjectRepository(Rol)
     private readonly rolRepository: Repository<Rol>,
+    @InjectRepository(ProfesorCarrera)
+    private readonly profesorCarreraRepository: Repository<ProfesorCarrera>,
+    @InjectRepository(Carrera)
+    private readonly carreraRepository: Repository<Carrera>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -38,6 +44,15 @@ export class UsuariosService {
       }))
       .sort((a, b) => a.id - b.id);
 
+    const carreras = (usuario.profesorCarreras ?? [])
+      .filter((relacion) => relacion.carrera?.activo !== false)
+      .map((relacion) => ({
+        id: relacion.carrera?.id ?? relacion.carreraId,
+        codigo: relacion.carrera?.codigo,
+        nombre: relacion.carrera?.nombre,
+      }))
+      .sort((a, b) => a.id - b.id);
+
     return {
       id: usuario.id,
       cedula: usuario.cedula,
@@ -48,6 +63,7 @@ export class UsuariosService {
       activo: usuario.activo,
       ultimoAcceso: usuario.ultimoAcceso,
       roles,
+      carreras,
       createdAt: usuario.createdAt,
       updatedAt: usuario.updatedAt,
     };
@@ -111,33 +127,12 @@ export class UsuariosService {
 
   async listar() {
     const usuarios = await this.usuarioRepository.find({
-      select: {
-        id: true,
-        cedula: true,
-        nombres: true,
-        apellido1: true,
-        apellido2: true,
-        correo: true,
-        activo: true,
-        ultimoAcceso: true,
-        createdAt: true,
-        updatedAt: true,
-        usuarioRoles: {
-          usuarioId: true,
-          rolId: true,
-          createdAt: true,
-          rol: {
-            id: true,
-            nombre: true,
-            descripcion: true,
-            activo: true,
-            createdAt: true,
-          },
-        },
-      },
       relations: {
         usuarioRoles: {
           rol: true,
+        },
+        profesorCarreras: {
+          carrera: true,
         },
       },
       order: {
@@ -164,6 +159,22 @@ export class UsuariosService {
       ? []
       : (dto.permisos ?? obtenerPermisosPredeterminadosPorRoles(dto.roles));
 
+    let carrerasValidadas: Carrera[] = [];
+    if (dto.carreraIds && dto.carreraIds.length > 0) {
+      carrerasValidadas = await this.carreraRepository.find({
+        where: {
+          id: In(dto.carreraIds),
+          activo: true,
+        },
+      });
+
+      if (carrerasValidadas.length !== new Set(dto.carreraIds).size) {
+        throw new BadRequestException(
+          'Una o más carreras no existen o están inactivas.',
+        );
+      }
+    }
+
     let usuarioId: number;
 
     try {
@@ -172,6 +183,8 @@ export class UsuariosService {
         const relaciones = manager.getRepository(UsuarioRol);
         const rolesRepository = manager.getRepository(Rol);
         const permisosRepository = manager.getRepository(UsuarioPermiso);
+        const profesorCarrerasRepository =
+          manager.getRepository(ProfesorCarrera);
 
         const roles = await rolesRepository.find({
           where: {
@@ -222,6 +235,17 @@ export class UsuariosService {
           );
         }
 
+        if (carrerasValidadas.length > 0) {
+          await profesorCarrerasRepository.save(
+            carrerasValidadas.map((carrera) =>
+              profesorCarrerasRepository.create({
+                profesorUsuarioId: guardado.id,
+                carreraId: carrera.id,
+              }),
+            ),
+          );
+        }
+
         return guardado.id;
       });
     } catch (error) {
@@ -257,8 +281,44 @@ export class UsuariosService {
       }
     }
 
+    if (dto.carreraIds !== undefined) {
+      let carrerasValidadas: Carrera[] = [];
+      if (dto.carreraIds.length > 0) {
+        carrerasValidadas = await this.carreraRepository.find({
+          where: {
+            id: In(dto.carreraIds),
+            activo: true,
+          },
+        });
+
+        if (carrerasValidadas.length !== new Set(dto.carreraIds).size) {
+          throw new BadRequestException(
+            'Una o más carreras no existen o están inactivas.',
+          );
+        }
+      }
+
+      await this.dataSource.transaction(async (manager) => {
+        const profesorCarrerasRepository =
+          manager.getRepository(ProfesorCarrera);
+        await profesorCarrerasRepository.delete({ profesorUsuarioId: id });
+
+        if (carrerasValidadas.length > 0) {
+          await profesorCarrerasRepository.save(
+            carrerasValidadas.map((carrera) =>
+              profesorCarrerasRepository.create({
+                profesorUsuarioId: id,
+                carreraId: carrera.id,
+              }),
+            ),
+          );
+        }
+      });
+    }
+
     return this.obtenerPorId(id);
   }
+
 
   async cambiarEstado(id: number, activo: boolean, usuarioActualId: number) {
     await this.obtenerEntidadPorId(id);

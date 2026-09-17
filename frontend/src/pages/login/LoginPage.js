@@ -175,14 +175,14 @@ export function LoginPage() {
               novalidate
             >
 
-              <div class="form-group">
+              <div class="form-group saved-accounts-group">
 
                 <label for="correo">
                   Usuario
                 </label>
 
 
-                <div class="input-container">
+                <div class="input-container account-input-container">
 
                   <i
                     data-lucide="user"
@@ -196,15 +196,35 @@ export function LoginPage() {
                     name="correo"
                     type="text"
                     autocomplete="username"
-                    list="cuentasRecordadasLista"
                     placeholder="Ingrese su usuario"
                     spellcheck="false"
+                    aria-autocomplete="list"
+                    aria-controls="cuentasRecordadasMenu"
+                    aria-expanded="false"
                     required
                   />
 
-                  <datalist
-                    id="cuentasRecordadasLista"
-                  ></datalist>
+                  <button
+                    id="cuentasRecordadasToggle"
+                    type="button"
+                    class="saved-accounts-toggle"
+                    aria-label="Mostrar cuentas guardadas"
+                    title="Mostrar cuentas guardadas"
+                    aria-controls="cuentasRecordadasMenu"
+                    aria-expanded="false"
+                  >
+                    <i
+                      data-lucide="chevron-down"
+                      aria-hidden="true"
+                    ></i>
+                  </button>
+
+                  <div
+                    id="cuentasRecordadasMenu"
+                    class="saved-accounts-menu hidden"
+                    role="listbox"
+                    aria-label="Cuentas guardadas"
+                  ></div>
 
                 </div>
 
@@ -696,39 +716,155 @@ export function iniciarLoginPage({
     );
 
 
-  const cuentasRecordadasLista =
-    document.getElementById(
-      'cuentasRecordadasLista'
-    );
+  const cuentasRecordadasToggle = document.getElementById(
+    "cuentasRecordadasToggle",
+  );
 
+  const cuentasRecordadasMenu = document.getElementById(
+    "cuentasRecordadasMenu",
+  );
 
-  let cuentasRecordadas =
-    obtenerCuentasRecordadas();
+  const accountInputContainer = correoInput.closest(".account-input-container");
 
+  const loginView = document.getElementById("loginView");
+
+  let cuentasRecordadas = obtenerCuentasRecordadas();
 
   function renderizarCuentasRecordadas() {
+    cuentasRecordadasMenu.replaceChildren();
 
-    cuentasRecordadasLista.replaceChildren();
-
+    cuentasRecordadasToggle.classList.toggle(
+      "hidden",
+      cuentasRecordadas.length === 0,
+    );
 
     for (const correo of cuentasRecordadas) {
+      const opcion = document.createElement("button");
 
-      const opcion =
-        document.createElement(
-          'option'
-        );
+      opcion.type = "button";
+      opcion.className = "saved-account-option";
+      opcion.setAttribute("role", "option");
+      opcion.setAttribute("aria-label", `Usar la cuenta ${correo}`);
 
-      opcion.value = correo;
+      const icono = document.createElement("span");
 
-      cuentasRecordadasLista.appendChild(
-        opcion
-      );
+      icono.className = "saved-account-icon";
+      icono.innerHTML = '<i data-lucide="mail" aria-hidden="true"></i>';
 
+      const textos = document.createElement("span");
+
+      textos.className = "saved-account-copy";
+
+      const correoTexto = document.createElement("strong");
+
+      correoTexto.textContent = correo;
+
+      const detalle = document.createElement("small");
+
+      detalle.textContent = "Cuenta guardada";
+
+      textos.append(correoTexto, detalle);
+
+      const indicador = document.createElement("span");
+
+      indicador.className = "saved-account-indicator";
+      indicador.innerHTML =
+        '<i data-lucide="chevron-right" aria-hidden="true"></i>';
+
+      opcion.append(icono, textos, indicador);
+
+      opcion.addEventListener("click", () => {
+        correoInput.value = correo;
+
+        ocultarCuentasRecordadas();
+
+        passwordInput.focus();
+      });
+
+      cuentasRecordadasMenu.appendChild(opcion);
     }
 
+    renderizarIconos();
+  }
+
+  function mostrarCuentasRecordadas() {
+    if (cuentasRecordadas.length === 0) {
+      return;
+    }
+
+    cuentasRecordadasMenu.classList.remove("hidden");
+
+    cuentasRecordadasToggle.classList.add("is-open");
+
+    cuentasRecordadasToggle.setAttribute("aria-expanded", "true");
+
+    correoInput.setAttribute("aria-expanded", "true");
+  }
+
+  function ocultarCuentasRecordadas() {
+    cuentasRecordadasMenu.classList.add("hidden");
+
+    cuentasRecordadasToggle.classList.remove("is-open");
+
+    cuentasRecordadasToggle.setAttribute("aria-expanded", "false");
+
+    correoInput.setAttribute("aria-expanded", "false");
   }
 
   renderizarCuentasRecordadas();
+
+  cuentasRecordadasToggle.addEventListener("click", () => {
+    if (cuentasRecordadasMenu.classList.contains("hidden")) {
+      mostrarCuentasRecordadas();
+    } else {
+      ocultarCuentasRecordadas();
+    }
+  });
+
+  correoInput.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" && cuentasRecordadas.length > 0) {
+      event.preventDefault();
+
+      mostrarCuentasRecordadas();
+
+      cuentasRecordadasMenu.querySelector(".saved-account-option")?.focus();
+    }
+
+    if (event.key === "Escape") {
+      ocultarCuentasRecordadas();
+    }
+  });
+
+  cuentasRecordadasMenu.addEventListener("keydown", (event) => {
+    const opciones = [
+      ...cuentasRecordadasMenu.querySelectorAll(".saved-account-option"),
+    ];
+
+    const indiceActual = opciones.indexOf(document.activeElement);
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+
+      const desplazamiento = event.key === "ArrowDown" ? 1 : -1;
+
+      const siguienteIndice =
+        (indiceActual + desplazamiento + opciones.length) % opciones.length;
+
+      opciones[siguienteIndice]?.focus();
+    }
+
+    if (event.key === "Escape") {
+      ocultarCuentasRecordadas();
+
+      correoInput.focus();
+    }
+  });
+
+  loginView.addEventListener("click", (event) => {
+    if (!accountInputContainer.contains(event.target)) {
+      ocultarCuentasRecordadas();
+    }
+  });
 
   function ocultarError() {
 
@@ -921,11 +1057,11 @@ export function iniciarLoginPage({
   );
 
 
-  correoInput.addEventListener(
-    'input',
-    ocultarError
-  );
+  correoInput.addEventListener("input", () => {
+    ocultarError();
 
+    ocultarCuentasRecordadas();
+  });
 
   passwordInput.addEventListener(
     'input',

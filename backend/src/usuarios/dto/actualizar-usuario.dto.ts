@@ -1,8 +1,12 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsEmail,
+  IsInt,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -34,4 +38,16 @@ export class ActualizarUsuarioDto {
   @IsEmail()
   @MaxLength(150)
   correo?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({
+    each: true,
+  })
+  @Min(1, {
+    each: true,
+  })
+  carreraIds?: number[];
 }
+

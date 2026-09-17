@@ -113,7 +113,7 @@ describe('PlanAsignaturasController', () => {
   });
 
   it('permite listar asignaturas con PLANES_ESTUDIO_VER', async () => {
-    const tokenEstudiante = await token('ESTUDIANTE');
+    const tokenEstudiante = await token('ASISTENTE_ESTUDIANTIL');
     await request(app.getHttpServer())
       .get('/planes-estudio/1/asignaturas')
       .set('Authorization', `Bearer ${tokenEstudiante}`)
@@ -126,7 +126,7 @@ describe('PlanAsignaturasController', () => {
     permisosAsignados.clear();
     await request(app.getHttpServer())
       .get('/planes-estudio/1/asignaturas')
-      .set('Authorization', `Bearer ${await token('ESTUDIANTE')}`)
+      .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(403);
 
     expect(service.listar).not.toHaveBeenCalled();

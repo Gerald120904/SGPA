@@ -1,0 +1,8 @@
+export enum OrigenAcademico {
+  CURSADO = 'CURSADO',
+  RECONOCIMIENTO = 'RECONOCIMIENTO',
+  EQUIVALENCIA = 'EQUIVALENCIA',
+  NO_ESPECIFICADO = 'NO_ESPECIFICADO',
+}
+
+export const ORIGENES_ACADEMICOS = Object.values(OrigenAcademico);

@@ -7,6 +7,15 @@ export enum PermisoSistema {
   ESTUDIANTES_GESTIONAR = 'ESTUDIANTES_GESTIONAR',
 
   /* =======================================================
+     FORMULARIOS DE ESTUDIANTES
+     ======================================================= */
+
+  FORMULARIOS_ESTUDIANTES_VER = 'FORMULARIOS_ESTUDIANTES_VER',
+  FORMULARIOS_ESTUDIANTES_CREAR = 'FORMULARIOS_ESTUDIANTES_CREAR',
+  FORMULARIOS_ESTUDIANTES_GESTIONAR = 'FORMULARIOS_ESTUDIANTES_GESTIONAR',
+  FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS = 'FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS',
+
+  /* =======================================================
      CARRERAS
      ======================================================= */
 

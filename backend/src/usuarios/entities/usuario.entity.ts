@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { UsuarioRol } from './usuario-rol.entity';
+import { ProfesorCarrera } from '../../profesores/entities/profesor-carrera.entity';
 
 @Entity({ name: 'usuarios' })
 export class Usuario {
@@ -98,4 +99,8 @@ export class Usuario {
 
   @OneToMany(() => UsuarioRol, (usuarioRol) => usuarioRol.usuario)
   usuarioRoles!: UsuarioRol[];
+
+  @OneToMany(() => ProfesorCarrera, (pc) => pc.profesor)
+  profesorCarreras!: ProfesorCarrera[];
 }
+

@@ -22,11 +22,11 @@ async function seedAdmin() {
 
   try {
     const [roles] = await conn.query(
-      "SELECT id, nombre FROM roles WHERE nombre IN ('ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR', 'ESTUDIANTE') ORDER BY id",
+      "SELECT id, nombre FROM roles WHERE nombre = 'ADMIN_GLOBAL' LIMIT 1",
     );
 
     if (!roles.length) {
-      throw new Error('No existen roles base en la tabla roles.');
+      throw new Error('No existe el rol ADMIN_GLOBAL.');
     }
 
     const [existingUsers] = await conn.query(

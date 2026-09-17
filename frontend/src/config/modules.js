@@ -42,6 +42,17 @@ export const MODULES = [
   },
 
   {
+    id: 'formularios-estudiantes',
+    title: 'Formularios de estudiantes',
+    navLabel: 'Formularios',
+    route: '/formularios-estudiantes',
+    icon: 'file-text',
+    section: 'Gestión académica',
+    description:
+      'Creación y gestión de formularios para estudiantes'
+  },
+
+  {
     id: 'carreras',
     title: 'Carreras',
     route: '/carreras',

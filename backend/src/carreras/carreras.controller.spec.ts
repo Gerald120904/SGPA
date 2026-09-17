@@ -123,10 +123,10 @@ describe('CarrerasController', () => {
     expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
-  it('permite consultar carreras a un ESTUDIANTE con CARRERAS_VER', async () => {
+  it('permite consultar carreras a un ASISTENTE_ESTUDIANTIL con CARRERAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.CARRERAS_VER);
 
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/carreras')
@@ -137,7 +137,7 @@ describe('CarrerasController', () => {
   });
 
   it('rechaza consultar carreras sin CARRERAS_VER', async () => {
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .get('/carreras')
@@ -150,7 +150,7 @@ describe('CarrerasController', () => {
   it('no permite crear con solo CARRERAS_VER', async () => {
     permisosAsignados.add(PermisoSistema.CARRERAS_VER);
 
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     await request(app.getHttpServer())
       .post('/carreras')
@@ -167,7 +167,7 @@ describe('CarrerasController', () => {
   it('permite crear con CARRERAS_GESTIONAR', async () => {
     permisosAsignados.add(PermisoSistema.CARRERAS_GESTIONAR);
 
-    const token = await crearToken('ESTUDIANTE');
+    const token = await crearToken('ASISTENTE_ESTUDIANTIL');
 
     const dto = {
       codigo: 'EIF',

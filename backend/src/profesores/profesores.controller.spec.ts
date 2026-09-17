@@ -35,7 +35,7 @@ describe('ProfesoresController', () => {
     listar: jest.fn(),
     obtenerPorId: jest.fn(),
     obtenerMiPerfil: jest.fn(),
-    actualizarCarrerasMiPerfil: jest.fn(),
+    listarPerfilesDisponiblesMiPerfil: jest.fn(),
     listarPerfilesMiPerfil: jest.fn(),
     solicitarPerfilMiPerfil: jest.fn(),
     revisarPerfilProfesor: jest.fn(),
@@ -113,9 +113,7 @@ describe('ProfesoresController', () => {
       id: 10,
     });
 
-    profesoresService.actualizarCarrerasMiPerfil.mockResolvedValue({
-      id: 10,
-    });
+    profesoresService.listarPerfilesDisponiblesMiPerfil.mockResolvedValue([]);
 
     profesoresService.listarPerfilesMiPerfil.mockResolvedValue([]);
     profesoresService.solicitarPerfilMiPerfil.mockResolvedValue({ id: 100 });
@@ -171,9 +169,9 @@ describe('ProfesoresController', () => {
     expect(profesoresService.listar).toHaveBeenCalledTimes(1);
   });
 
-  it('permite listar a ESTUDIANTE con PROFESORES_VER', async () => {
+  it('permite listar a ASISTENTE_ESTUDIANTIL con PROFESORES_VER', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores')
@@ -184,7 +182,7 @@ describe('ProfesoresController', () => {
   });
 
   it('impide listar profesores a usuario sin PROFESORES_VER', async () => {
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores')
@@ -208,7 +206,7 @@ describe('ProfesoresController', () => {
   });
 
   it('permite usuario con roles múltiples incluyendo PROFESOR usar su perfil', async () => {
-    const token = await crearToken(['ESTUDIANTE', 'PROFESOR']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL', 'PROFESOR']);
 
     await request(app.getHttpServer())
       .get('/profesores/mi-perfil')
@@ -220,7 +218,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza acceder a mi-perfil sin rol PROFESOR', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/mi-perfil')
@@ -228,44 +226,23 @@ describe('ProfesoresController', () => {
       .expect(403);
   });
 
-  it('actualiza carreras del propio perfil', async () => {
-    const token = await crearToken(['PROFESOR']);
-
-    const dto = {
-      carreraIds: [1, 2],
-    };
-
-    await request(app.getHttpServer())
-      .put('/profesores/mi-perfil/carreras')
-      .set('Authorization', `Bearer ${token}`)
-      .send(dto)
-      .expect(200, {
-        id: 10,
-      });
-
-    expect(profesoresService.actualizarCarrerasMiPerfil).toHaveBeenCalledWith(
-      10,
-      dto,
-    );
-  });
-
-  it('rechaza carreras duplicadas', async () => {
+  it('permite al PROFESOR listar los perfiles académicos disponibles', async () => {
     const token = await crearToken(['PROFESOR']);
 
     await request(app.getHttpServer())
-      .put('/profesores/mi-perfil/carreras')
+      .get('/profesores/mi-perfil/perfiles-disponibles')
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        carreraIds: [1, 1],
-      })
-      .expect(400);
+      .expect(200, []);
 
-    expect(profesoresService.actualizarCarrerasMiPerfil).not.toHaveBeenCalled();
+    expect(
+      profesoresService.listarPerfilesDisponiblesMiPerfil,
+    ).toHaveBeenCalledWith(10);
   });
+
 
   it('consulta un profesor por id con PROFESORES_VER', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/10')
@@ -279,7 +256,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza id inválido', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/no-es-id')
@@ -289,7 +266,7 @@ describe('ProfesoresController', () => {
 
   it('transforma correctamente los filtros recibidos por query', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get(
@@ -311,7 +288,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza activo inválido', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores?activo=talvez')
@@ -323,7 +300,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza hora con formato inválido', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores?periodoAcademicoId=2&dia=LUNES&hora=10:00AM')
@@ -335,7 +312,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza día inválido en filtros', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores?periodoAcademicoId=2&dia=FUNDAY&hora=10:00')
@@ -345,7 +322,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza filtros desconocidos', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores?campoInventado=123')
@@ -368,7 +345,7 @@ describe('ProfesoresController', () => {
 
   it('permite a usuario con PROFESORES_VER consultar el historial del perfil de un profesor', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/10/historial-perfil')
@@ -391,7 +368,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza profesorId inválido al consultar historial administrativo', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores/no-es-id/historial-perfil')
@@ -443,7 +420,7 @@ describe('ProfesoresController', () => {
 
   it('rechaza revisar perfil docente sin PERFILES_DOCENTES_VALIDAR', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/revision')
@@ -456,7 +433,7 @@ describe('ProfesoresController', () => {
 
   it('permite revisar perfil docente con PERFILES_DOCENTES_VALIDAR', async () => {
     permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/revision')
@@ -482,7 +459,7 @@ describe('ProfesoresController', () => {
         'No posee autoridad académica sobre la carrera asociada a este perfil.',
       ),
     );
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/revision')
@@ -493,7 +470,7 @@ describe('ProfesoresController', () => {
 
   it('permite a usuario con PERFILES_DOCENTES_VALIDAR inactivar perfil docente', async () => {
     permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/inactivar')
@@ -510,7 +487,7 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza inactivar perfil docente sin PERFILES_DOCENTES_VALIDAR', async () => {
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     await request(app.getHttpServer())
       .patch('/profesores/10/perfiles/1/inactivar')
@@ -540,7 +517,7 @@ describe('ProfesoresController', () => {
 
   it('permite filtrar profesores por perfilAcademicoId con PROFESORES_VER', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
-    const token = await crearToken(['ESTUDIANTE']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL']);
 
     await request(app.getHttpServer())
       .get('/profesores?perfilAcademicoId=1')
@@ -626,7 +603,7 @@ describe('ProfesoresController', () => {
 
   it('permite a usuario con ATESTADOS_VALIDAR revisar un atestado', async () => {
     permisosAsignados.add(PermisoSistema.ATESTADOS_VALIDAR);
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     const dto = {
       estado: EstadoAtestadoProfesor.APROBADO,
@@ -648,7 +625,7 @@ describe('ProfesoresController', () => {
   });
 
   it('rechaza revisar un atestado sin ATESTADOS_VALIDAR', async () => {
-    const token = await crearToken(['ESTUDIANTE'], 2);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
 
     const dto = {
       estado: EstadoAtestadoProfesor.APROBADO,

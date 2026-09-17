@@ -146,7 +146,7 @@ describe('AuthService', () => {
         { rol: { nombre: 'PROFESOR', activo: true } },
         { rol: { nombre: 'COORDINADOR', activo: true } },
         { rol: { nombre: 'PROFESOR', activo: true } },
-        { rol: { nombre: 'ESTUDIANTE', activo: false } },
+        { rol: { nombre: 'ASISTENTE_ESTUDIANTIL', activo: false } },
         { rol: { nombre: 'ROL_INVENTADO', activo: true } },
       ],
     });
