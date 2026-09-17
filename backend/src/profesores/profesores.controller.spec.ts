@@ -35,7 +35,7 @@ describe('ProfesoresController', () => {
     listar: jest.fn(),
     obtenerPorId: jest.fn(),
     obtenerMiPerfil: jest.fn(),
-    actualizarCarrerasMiPerfil: jest.fn(),
+    listarPerfilesDisponiblesMiPerfil: jest.fn(),
     listarPerfilesMiPerfil: jest.fn(),
     solicitarPerfilMiPerfil: jest.fn(),
     revisarPerfilProfesor: jest.fn(),
@@ -113,9 +113,7 @@ describe('ProfesoresController', () => {
       id: 10,
     });
 
-    profesoresService.actualizarCarrerasMiPerfil.mockResolvedValue({
-      id: 10,
-    });
+    profesoresService.listarPerfilesDisponiblesMiPerfil.mockResolvedValue([]);
 
     profesoresService.listarPerfilesMiPerfil.mockResolvedValue([]);
     profesoresService.solicitarPerfilMiPerfil.mockResolvedValue({ id: 100 });
@@ -228,40 +226,19 @@ describe('ProfesoresController', () => {
       .expect(403);
   });
 
-  it('actualiza carreras del propio perfil', async () => {
-    const token = await crearToken(['PROFESOR']);
-
-    const dto = {
-      carreraIds: [1, 2],
-    };
-
-    await request(app.getHttpServer())
-      .put('/profesores/mi-perfil/carreras')
-      .set('Authorization', `Bearer ${token}`)
-      .send(dto)
-      .expect(200, {
-        id: 10,
-      });
-
-    expect(profesoresService.actualizarCarrerasMiPerfil).toHaveBeenCalledWith(
-      10,
-      dto,
-    );
-  });
-
-  it('rechaza carreras duplicadas', async () => {
+  it('permite al PROFESOR listar los perfiles académicos disponibles', async () => {
     const token = await crearToken(['PROFESOR']);
 
     await request(app.getHttpServer())
-      .put('/profesores/mi-perfil/carreras')
+      .get('/profesores/mi-perfil/perfiles-disponibles')
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        carreraIds: [1, 1],
-      })
-      .expect(400);
+      .expect(200, []);
 
-    expect(profesoresService.actualizarCarrerasMiPerfil).not.toHaveBeenCalled();
+    expect(
+      profesoresService.listarPerfilesDisponiblesMiPerfil,
+    ).toHaveBeenCalledWith(10);
   });
+
 
   it('consulta un profesor por id con PROFESORES_VER', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);

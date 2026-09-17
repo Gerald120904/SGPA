@@ -4,9 +4,11 @@ import {
   IsArray,
   IsEmail,
   IsEnum,
+  IsInt,
   IsOptional,
   IsString,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { RolSistema } from '../../auth/constants/roles.constants';
@@ -57,4 +59,17 @@ export class CrearUsuarioDto {
     each: true,
   })
   permisos?: PermisoSistema[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({
+    each: true,
+  })
+  @Min(1, {
+    each: true,
+  })
+  carreraIds?: number[];
 }
+
+

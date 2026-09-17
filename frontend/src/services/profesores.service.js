@@ -107,29 +107,8 @@ export function obtenerMiPerfilProfesor() {
     .obtenerMiPerfilProfesor();
 }
 
-export function listarCarrerasDisponiblesProfesor() {
-  validarApi(
-    'listarCarrerasDisponiblesProfesor',
-  );
-
-  return window.sgpa
-    .listarCarrerasDisponiblesProfesor();
-}
-
-export function actualizarMisCarrerasProfesor(
-  carreraIds,
-) {
-  validarApi(
-    'actualizarMisCarrerasProfesor',
-  );
-
-  return window.sgpa
-    .actualizarMisCarrerasProfesor(
-      carreraIds,
-    );
-}
-
 export function listarMisPerfilesProfesor() {
+
   validarApi(
     'listarMisPerfilesProfesor',
   );

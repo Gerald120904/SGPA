@@ -1059,27 +1059,10 @@ ipcMain.handle("profesores:mi-perfil", async () => {
   return ejecutarPeticionAutenticada("/profesores/mi-perfil");
 });
 
-ipcMain.handle("profesores:mis-carreras-disponibles", async () => {
-  return ejecutarPeticionAutenticada(
-    "/profesores/mi-perfil/carreras-disponibles",
-  );
-});
-
-ipcMain.handle(
-  "profesores:actualizar-mis-carreras",
-  async (_event, carreraIds) => {
-    return ejecutarPeticionAutenticada("/profesores/mi-perfil/carreras", {
-      method: "PUT",
-      body: {
-        carreraIds,
-      },
-    });
-  },
-);
-
 ipcMain.handle("profesores:mis-perfiles", async () => {
   return ejecutarPeticionAutenticada("/profesores/mi-perfil/perfiles");
 });
+
 
 ipcMain.handle("profesores:perfiles-disponibles", async () => {
   return ejecutarPeticionAutenticada(

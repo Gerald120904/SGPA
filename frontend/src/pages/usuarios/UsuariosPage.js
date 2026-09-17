@@ -14,7 +14,11 @@ import {
   listarPermisosUsuario,
   reemplazarPermisosUsuario,
 } from '../../services/permisos.service.js';
+import {
+  listarCarreras,
+} from '../../services/carreras.service.js';
 import { ROLES } from '../../config/permissions.js';
+
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 import { confirmarAccion } from '../../utils/confirm.js';
@@ -294,6 +298,7 @@ export async function iniciarUsuariosPage() {
   const estado = {
     usuarios: [],
     roles: [],
+    carreras: [],
     permisosCatalogo: [],
     plantillasPermisos: {},
     filtro: '',
@@ -308,6 +313,45 @@ export async function iniciarUsuariosPage() {
   const feedback = pagina.querySelector('#usuariosFeedback');
   const dialogo = pagina.querySelector('#usuarioDialog');
   const dialogoContenido = pagina.querySelector('#usuarioDialogContent');
+
+  function renderizarOpcionesCarreras(
+    seleccionados = new Set(),
+  ) {
+    if (!estado.carreras.length) {
+      return '<p class="usuarios-muted">No hay carreras registradas o activas.</p>';
+    }
+
+    return estado.carreras
+      .map(
+        (carrera) => `
+          <label
+            class="usuario-carrera-option"
+          >
+            <input
+              type="checkbox"
+              name="carreras"
+              value="${carrera.id}"
+              ${
+                seleccionados.has(
+                  carrera.id,
+                )
+                  ? 'checked'
+                  : ''
+              }
+            >
+            <span>
+              <strong>${escapeHtml(
+                carrera.codigo,
+              )}</strong>
+              <small>${escapeHtml(
+                carrera.nombre,
+              )}</small>
+            </span>
+          </label>
+        `,
+      )
+      .join('');
+  }
 
   function renderizarOpcionesPermisos(
     seleccionados = new Set(),
@@ -399,6 +443,26 @@ export async function iniciarUsuariosPage() {
           input.value,
       );
 
+    const seccionCarreras =
+      dialogoContenido.querySelector(
+        '#carrerasCreacionSection',
+      );
+    if (seccionCarreras) {
+      if (
+        roles.includes(
+          ROLES.PROFESOR,
+        )
+      ) {
+        seccionCarreras.classList.remove(
+          'hidden',
+        );
+      } else {
+        seccionCarreras.classList.add(
+          'hidden',
+        );
+      }
+    }
+
     const sugeridos =
       obtenerPermisosSugeridosRoles(
         roles,
@@ -417,6 +481,7 @@ export async function iniciarUsuariosPage() {
         },
       );
   }
+
 
   function mostrarFeedback(mensaje, tipo = 'success') {
     if (!feedback) return;
@@ -568,6 +633,22 @@ export async function iniciarUsuariosPage() {
     if (!sigueActiva()) return;
     estado.roles = Array.isArray(resultado.data) ? resultado.data : [];
   }
+
+  async function cargarCarreras() {
+    const resultado = mensajeResultado(
+      await listarCarreras(),
+      'No fue posible consultar las carreras.',
+    );
+
+    if (!sigueActiva()) return;
+    estado.carreras = Array.isArray(resultado.carreras)
+      ? resultado.carreras.filter((c) => c.activo)
+      : Array.isArray(resultado.data)
+        ? resultado.data.filter((c) => c.activo)
+        : [];
+  }
+
+
 
   async function cargarPermisosCatalogo() {
     const resultado =
@@ -816,6 +897,22 @@ export async function iniciarUsuariosPage() {
         </fieldset>
 
         <section
+          id="carrerasCreacionSection"
+          class="usuario-role-manager hidden"
+        >
+          <div class="usuario-permission-header">
+            <div>
+              <h4>Carreras asignadas (Profesor)</h4>
+              <p>Seleccione las carreras a las que pertenece el docente.</p>
+            </div>
+          </div>
+
+          <div class="usuario-carreras-grid">
+            ${renderizarOpcionesCarreras()}
+          </div>
+        </section>
+
+        <section
           class="usuario-permission-manager"
         >
           <div
@@ -863,13 +960,17 @@ export async function iniciarUsuariosPage() {
     const rolesDisponibles = estado.roles.filter(
       (rol) => !nombresAsignados.has(rol.nombre),
     );
+    const esProfesor = rolesUsuario.some((rol) => rol.nombre === ROLES.PROFESOR);
+    const carrerasAsignadas = new Set(
+      (usuario.carreras || []).map((c) => c.id),
+    );
 
     dialogoContenido.innerHTML = `
       <form id="usuarioForm" class="usuario-form" data-user-id="${usuario.id}">
         <div class="usuario-dialog-header">
           <div>
             <h3>Editar usuario</h3>
-            <p>Actualice sus datos administrativos, roles y permisos.</p>
+            <p>Actualice sus datos administrativos, roles, carreras y permisos.</p>
           </div>
           <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
             <i data-lucide="x" aria-hidden="true"></i>
@@ -921,10 +1022,26 @@ export async function iniciarUsuariosPage() {
           </div>
         </section>
 
+        ${esProfesor ? `
+          <section class="usuario-role-manager">
+            <div class="usuario-permission-header">
+              <div>
+                <h4>Carreras asignadas (Profesor)</h4>
+                <p>Carreras asociadas al perfil docente de este usuario.</p>
+              </div>
+            </div>
+
+            <div class="usuario-carreras-grid">
+              ${renderizarOpcionesCarreras(carrerasAsignadas)}
+            </div>
+          </section>
+        ` : ''}
+
         ${renderizarGestorPermisos(
           usuario,
           permisosUsuario,
         )}
+
 
         <div class="usuario-dialog-actions">
           <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
@@ -1072,8 +1189,18 @@ export async function iniciarUsuariosPage() {
       boton.disabled = true;
 
       if (id) {
+        const tieneSelectorCarreras = formulario.querySelector(
+          'input[name="carreras"]',
+        );
+        const carreraIds = tieneSelectorCarreras
+          ? datos.getAll('carreras').map(Number)
+          : undefined;
+
         mensajeResultado(
-          await actualizarUsuario(id, usuario),
+          await actualizarUsuario(id, {
+            ...usuario,
+            ...(carreraIds !== undefined ? { carreraIds } : {}),
+          }),
           'No fue posible actualizar el usuario.',
         );
         mostrarFeedback('Usuario actualizado correctamente.');
@@ -1084,6 +1211,9 @@ export async function iniciarUsuariosPage() {
         }
 
         const permisos = datos.getAll('permisos');
+        const carreraIds = roles.includes(ROLES.PROFESOR)
+          ? datos.getAll('carreras').map(Number)
+          : [];
 
         mensajeResultado(
           await crearUsuario({
@@ -1093,11 +1223,13 @@ export async function iniciarUsuariosPage() {
             permisos: roles.includes(ROLES.ADMIN_GLOBAL)
               ? []
               : permisos,
+            carreraIds,
           }),
           'No fue posible crear el usuario.',
         );
         mostrarFeedback('Usuario creado correctamente.');
       }
+
 
       dialogo.close();
       await cargarUsuarios(false);
@@ -1277,10 +1409,12 @@ export async function iniciarUsuariosPage() {
   try {
     await Promise.all([
       cargarRoles(),
+      cargarCarreras(),
       cargarPermisosCatalogo(),
       cargarPlantillasPermisos(),
       cargarUsuarios(),
     ]);
+
   } catch (error) {
     console.error('Error cargando el módulo de usuarios:', error);
     if (!sigueActiva()) return;

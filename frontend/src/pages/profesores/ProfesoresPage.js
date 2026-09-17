@@ -7,10 +7,9 @@ import {
   revisarAtestadoProfesor,
 
   obtenerMiPerfilProfesor,
-  listarCarrerasDisponiblesProfesor,
-  actualizarMisCarrerasProfesor,
   listarPerfilesDisponiblesProfesor,
   solicitarPerfilProfesor,
+
 
   listarMisAtestadosProfesor,
   crearAtestadoProfesor,
@@ -2733,29 +2732,17 @@ async function iniciarMiPerfilDocente() {
 
     const [
       resultadoPerfil,
-      resultadoCarreras,
       resultadoPerfilesDisponibles,
       resultadoPeriodosDisponibilidad,
     ] = await Promise.all([
-
       obtenerMiPerfilProfesor(),
-
-      listarCarrerasDisponiblesProfesor(),
-
       listarPerfilesDisponiblesProfesor(),
-
       listarPeriodosMiDisponibilidadProfesor(),
-
     ]);
 
-
-    if (
-      instancia !==
-      instanciaActual
-    ) {
+    if (instancia !== instanciaActual) {
       return;
     }
-
 
     if (!resultadoPerfil?.ok) {
       throw new Error(
@@ -2764,69 +2751,34 @@ async function iniciarMiPerfilDocente() {
       );
     }
 
-
-    if (!resultadoCarreras?.ok) {
+    if (!resultadoPerfilesDisponibles?.ok) {
       throw new Error(
-        resultadoCarreras?.message ||
-          'No fue posible consultar las carreras disponibles.',
-      );
-    }
-
-
-    if (
-      !resultadoPerfilesDisponibles
-        ?.ok
-    ) {
-      throw new Error(
-        resultadoPerfilesDisponibles
-          ?.message ||
+        resultadoPerfilesDisponibles?.message ||
           'No fue posible consultar los perfiles académicos disponibles.',
       );
     }
 
-
-    if (
-      !resultadoPeriodosDisponibilidad
-        ?.ok
-    ) {
+    if (!resultadoPeriodosDisponibilidad?.ok) {
       throw new Error(
-        resultadoPeriodosDisponibilidad
-          ?.message ||
+        resultadoPeriodosDisponibilidad?.message ||
           'No fue posible consultar los periodos de disponibilidad.',
       );
     }
 
+    miPerfilDocenteActual = resultadoPerfil.data;
 
-    miPerfilDocenteActual =
-      resultadoPerfil.data;
+    perfilesDisponiblesProfesor = Array.isArray(
+      resultadoPerfilesDisponibles.data,
+    )
+      ? resultadoPerfilesDisponibles.data
+      : [];
 
+    periodosMiDisponibilidad = Array.isArray(
+      resultadoPeriodosDisponibilidad.data,
+    )
+      ? resultadoPeriodosDisponibilidad.data
+      : [];
 
-    carrerasDisponiblesProfesor =
-      Array.isArray(
-        resultadoCarreras.data,
-      )
-        ? resultadoCarreras.data
-        : [];
-
-
-    perfilesDisponiblesProfesor =
-      Array.isArray(
-        resultadoPerfilesDisponibles
-          .data,
-      )
-        ? resultadoPerfilesDisponibles
-            .data
-        : [];
-
-
-    periodosMiDisponibilidad =
-      Array.isArray(
-        resultadoPeriodosDisponibilidad
-          .data,
-      )
-        ? resultadoPeriodosDisponibilidad
-            .data
-        : [];
 
 
     renderizarMiPerfilDocente();
@@ -3059,35 +3011,15 @@ function renderizarMiPerfilDocente() {
       >
 
         <div>
-
           <h3>
-            Mis carreras
+            Carreras asociadas
           </h3>
-
           <p>
-            Carreras en las que
-            participa como docente.
+            Carreras en las que participa como docente.
           </p>
-
         </div>
-
-
-        <button
-          id="editarMisCarrerasButton"
-          type="button"
-          class="profesores-action-button"
-        >
-
-          <i
-            data-lucide="pencil"
-            aria-hidden="true"
-          ></i>
-
-          Editar carreras
-
-        </button>
-
       </div>
+
 
 
       ${
@@ -4080,214 +4012,6 @@ function renderizarMisProyectos(
 
     </div>
   `;
-}
-
-
-function abrirFormularioMisCarreras() {
-  const dialog =
-    document.getElementById(
-      'profesorRevisionDialog',
-    );
-
-  const content =
-    document.getElementById(
-      'profesorRevisionDialogContent',
-    );
-
-
-  if (
-    !dialog ||
-    !content ||
-    !miPerfilDocenteActual
-  ) {
-    return;
-  }
-
-
-  const actuales =
-    new Set(
-      (
-        miPerfilDocenteActual
-          .carreras || []
-      ).map(
-        (carrera) =>
-          carrera.id,
-      ),
-    );
-
-
-  content.innerHTML =
-    FormDialog({
-
-      formId:
-        'misCarrerasForm',
-
-      title:
-        'Mis carreras',
-
-      description:
-        'Seleccione las carreras con las que mantiene relación docente.',
-
-      body: `
-        <div
-          class="
-            sgpa-form-wide
-            profesores-checkbox-list
-          "
-        >
-
-          ${carrerasDisponiblesProfesor
-            .map(
-              (carrera) => `
-                <label
-                  class="profesores-checkbox-item"
-                >
-
-                  <input
-                    type="checkbox"
-                    name="carreraProfesor"
-                    value="${carrera.id}"
-                    ${
-                      actuales.has(
-                        carrera.id,
-                      )
-                        ? 'checked'
-                        : ''
-                    }
-                  >
-
-                  <span>
-
-                    <strong>
-                      ${escapeHtml(
-                        carrera.codigo,
-                      )}
-                    </strong>
-
-                    ${escapeHtml(
-                      carrera.nombre,
-                    )}
-
-                  </span>
-
-                </label>
-              `,
-            )
-            .join('')}
-
-        </div>
-      `,
-
-      errorId:
-        'misCarrerasError',
-
-      cancelButtonId:
-        'cancelarMisCarreras',
-
-      submitButtonId:
-        'guardarMisCarreras',
-
-      submitText:
-        'Guardar carreras',
-
-    });
-
-
-  dialog.showModal();
-
-
-  habilitarCierreExterior(
-    dialog,
-  );
-
-
-  document
-    .getElementById(
-      'cancelarMisCarreras',
-    )
-    ?.addEventListener(
-      'click',
-      () => dialog.close(),
-    );
-
-
-  document
-    .getElementById(
-      'misCarrerasForm',
-    )
-    ?.addEventListener(
-      'submit',
-      async (event) => {
-
-        event.preventDefault();
-
-
-        const carreraIds =
-          [
-            ...document
-              .querySelectorAll(
-                'input[name="carreraProfesor"]:checked',
-              ),
-          ].map(
-            (input) =>
-              Number(
-                input.value,
-              ),
-          );
-
-
-        try {
-
-          const resultado =
-            await actualizarMisCarrerasProfesor(
-              carreraIds,
-            );
-
-
-          if (!resultado?.ok) {
-            throw new Error(
-              resultado?.message ||
-                'No fue posible actualizar sus carreras.',
-            );
-          }
-
-
-          dialog.close();
-
-
-          mostrarExito({
-
-            titulo:
-              'Carreras actualizadas',
-
-            mensaje:
-              'Sus carreras fueron actualizadas correctamente.',
-
-          });
-
-
-          await iniciarMiPerfilDocente();
-
-        } catch (error) {
-
-          mostrarError({
-
-            titulo:
-              'No se pudieron actualizar las carreras',
-
-            mensaje:
-              error?.message ||
-              'No fue posible guardar los cambios.',
-
-          });
-
-        }
-
-      },
-    );
-
-
-  renderizarIconos();
 }
 
 

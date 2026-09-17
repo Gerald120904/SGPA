@@ -12,6 +12,8 @@ import { Usuario } from './entities/usuario.entity';
 import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { UsuariosService } from './usuarios.service';
+import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
+import { Carrera } from '../carreras/entities/carrera.entity';
 
 describe('UsuariosService', () => {
   const rolAdmin = {
@@ -57,6 +59,7 @@ describe('UsuariosService', () => {
           rol: rolAdmin,
         } as UsuarioRol,
       ],
+      profesorCarreras: [],
       ...cambios,
     }) as Usuario;
 
@@ -73,6 +76,17 @@ describe('UsuariosService', () => {
     delete: jest.Mock;
   };
   let rolRepository: {
+    findOne: jest.Mock;
+  };
+  let profesorCarreraRepository: {
+    find: jest.Mock;
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+  };
+  let carreraRepository: {
+    find: jest.Mock;
     findOne: jest.Mock;
   };
   let dataSource: {
@@ -93,6 +107,11 @@ describe('UsuariosService', () => {
   let txRolRepository: {
     find: jest.Mock;
   };
+  let txProfesorCarreraRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+    delete: jest.Mock;
+  };
 
   beforeEach(() => {
     usuarioRepository = {
@@ -107,6 +126,17 @@ describe('UsuariosService', () => {
       delete: jest.fn(),
     };
     rolRepository = {
+      findOne: jest.fn(),
+    };
+    profesorCarreraRepository = {
+      find: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn((datos) => datos),
+      save: jest.fn(),
+      delete: jest.fn(),
+    };
+    carreraRepository = {
+      find: jest.fn(),
       findOne: jest.fn(),
     };
     txUsuarioRepository = {
@@ -124,6 +154,11 @@ describe('UsuariosService', () => {
     txRolRepository = {
       find: jest.fn(),
     };
+    txProfesorCarreraRepository = {
+      create: jest.fn((datos) => datos),
+      save: jest.fn(),
+      delete: jest.fn(),
+    };
 
     const manager = {
       getRepository: jest.fn((entidad) => {
@@ -131,6 +166,7 @@ describe('UsuariosService', () => {
         if (entidad === UsuarioRol) return txUsuarioRolRepository;
         if (entidad === UsuarioPermiso) return txUsuarioPermisoRepository;
         if (entidad === Rol) return txRolRepository;
+        if (entidad === ProfesorCarrera) return txProfesorCarreraRepository;
         throw new Error('Repositorio inesperado');
       }),
     };
@@ -143,9 +179,12 @@ describe('UsuariosService', () => {
       usuarioRepository as unknown as Repository<Usuario>,
       usuarioRolRepository as unknown as Repository<UsuarioRol>,
       rolRepository as unknown as Repository<Rol>,
+      profesorCarreraRepository as unknown as Repository<ProfesorCarrera>,
+      carreraRepository as unknown as Repository<Carrera>,
       dataSource as unknown as DataSource,
     );
   });
+
 
   it('lista usuarios con roles identificables y sin campos sensibles', async () => {
     usuarioRepository.find.mockResolvedValue([
@@ -361,6 +400,31 @@ describe('UsuariosService', () => {
       correo: 'nuevo@sgpa.local',
     });
   });
+
+  it('actualiza las carreras asociadas a un usuario profesor', async () => {
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(crearUsuario())
+      .mockResolvedValueOnce(crearUsuario());
+    carreraRepository.find.mockResolvedValue([
+      { id: 10, activo: true },
+      { id: 20, activo: true },
+    ]);
+
+    await service.actualizar(1, {
+      carreraIds: [10, 20],
+    });
+
+    expect(carreraRepository.find).toHaveBeenCalled();
+    expect(dataSource.transaction).toHaveBeenCalled();
+    expect(txProfesorCarreraRepository.delete).toHaveBeenCalledWith({
+      profesorUsuarioId: 1,
+    });
+    expect(txProfesorCarreraRepository.save).toHaveBeenCalledWith([
+      expect.objectContaining({ profesorUsuarioId: 1, carreraId: 10 }),
+      expect.objectContaining({ profesorUsuarioId: 1, carreraId: 20 }),
+    ]);
+  });
+
 
   it('impide que el administrador desactive su propia cuenta', async () => {
     usuarioRepository.findOne.mockResolvedValue(crearUsuario());

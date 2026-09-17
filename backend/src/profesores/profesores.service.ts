@@ -24,7 +24,6 @@ import {
   TipoHistorialPerfilProfesor,
 } from './constants/historial-perfil-profesor.constant';
 import { ActualizarAtestadoProfesorDto } from './dto/actualizar-atestado-profesor.dto';
-import { ActualizarCarrerasPerfilDto } from './dto/actualizar-carreras-perfil.dto';
 import { ActualizarProyectoProfesorDto } from './dto/actualizar-proyecto-profesor.dto';
 import { CambiarEstadoProyectoProfesorDto } from './dto/cambiar-estado-proyecto-profesor.dto';
 import { CrearAtestadoProfesorDto } from './dto/crear-atestado-profesor.dto';
@@ -672,89 +671,46 @@ export class ProfesoresService {
     return this.obtenerPorId(usuarioId);
   }
 
-  async actualizarCarrerasMiPerfil(
-    usuarioId: number,
-    dto: ActualizarCarrerasPerfilDto,
-  ) {
+  async listarPerfilesDisponiblesMiPerfil(usuarioId: number) {
     await this.validarProfesorParaAutogestion(usuarioId);
 
-    const carreraIds = dto.carreraIds;
-
-    let carreras: Carrera[] = [];
-
-    if (carreraIds.length > 0) {
-      carreras = await this.carreraRepository.find({
-        where: {
-          id: In(carreraIds),
-          activo: true,
-        },
-      });
-
-      if (carreras.length !== carreraIds.length) {
-        throw new BadRequestException(
-          'Una o más carreras no existen o se encuentran inactivas.',
-        );
-      }
-    }
-
-    const carrerasAnteriores = await this.profesorCarreraRepository.find({
+    const profesorCarreras = await this.profesorCarreraRepository.find({
       where: {
         profesorUsuarioId: usuarioId,
+      },
+    });
+
+    const carreraIds = profesorCarreras.map((item) => item.carreraId);
+
+    if (!carreraIds.length) {
+      return [];
+    }
+
+    const perfiles = await this.perfilAcademicoRepository.find({
+      where: {
+        carreraId: In(carreraIds),
+        activo: true,
       },
       relations: {
         carrera: true,
       },
+      order: {
+        nombre: 'ASC',
+      },
     });
 
-    const idsAnteriores = carrerasAnteriores
-      .map((item) => item.carreraId)
-      .sort((a, b) => a - b);
-
-    const idsNuevos = [...carreraIds].sort((a, b) => a - b);
-
-    const huboCambios =
-      JSON.stringify(idsAnteriores) !== JSON.stringify(idsNuevos);
-
-    await this.dataSource.transaction(async (manager) => {
-      const profesorCarreraRepo = manager.getRepository(ProfesorCarrera);
-      const historialRepo = manager.getRepository(HistorialPerfilProfesor);
-
-      await profesorCarreraRepo.delete({
-        profesorUsuarioId: usuarioId,
-      });
-
-      if (carreras.length > 0) {
-        const relaciones = carreras.map((carrera) =>
-          profesorCarreraRepo.create({
-            profesorUsuarioId: usuarioId,
-            carreraId: carrera.id,
-          }),
-        );
-
-        await profesorCarreraRepo.save(relaciones);
-      }
-
-      if (huboCambios) {
-        await this.registrarHistorialPerfil(
-          usuarioId,
-          usuarioId,
-          TipoHistorialPerfilProfesor.CARRERAS,
-          AccionHistorialPerfilProfesor.ACTUALIZAR_CARRERAS,
-          {
-            carreraIds: idsAnteriores,
-          },
-          {
-            carreraIds: idsNuevos,
-          },
-          null,
-          null,
-          historialRepo,
-        );
-      }
-    });
-
-    return this.obtenerMiPerfil(usuarioId);
+    return perfiles.map((perfil) => ({
+      id: perfil.id,
+      carreraId: perfil.carreraId,
+      carreraCodigo: perfil.carrera?.codigo ?? null,
+      carreraNombre: perfil.carrera?.nombre ?? null,
+      codigo: perfil.codigo,
+      nombre: perfil.nombre,
+      descripcion: perfil.descripcion,
+      activo: perfil.activo,
+    }));
   }
+
 
   // --- Cursos Habilitados ---
 

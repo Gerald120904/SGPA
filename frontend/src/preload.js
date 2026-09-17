@@ -185,14 +185,9 @@ contextBridge.exposeInMainWorld("sgpa", {
 
   obtenerMiPerfilProfesor: () => ipcRenderer.invoke("profesores:mi-perfil"),
 
-  listarCarrerasDisponiblesProfesor: () =>
-    ipcRenderer.invoke("profesores:mis-carreras-disponibles"),
-
-  actualizarMisCarrerasProfesor: (carreraIds) =>
-    ipcRenderer.invoke("profesores:actualizar-mis-carreras", carreraIds),
-
   listarMisPerfilesProfesor: () =>
     ipcRenderer.invoke("profesores:mis-perfiles"),
+
 
   listarPerfilesDisponiblesProfesor: () =>
     ipcRenderer.invoke("profesores:perfiles-disponibles"),
