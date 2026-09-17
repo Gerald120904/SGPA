@@ -5,6 +5,7 @@ import {
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
+import { FiltrarSolicitudesFormulariosDto } from './dto/filtrar-solicitudes-formularios.dto';
 import { RechazarRespuestaFormularioDto } from './dto/rechazar-respuesta-formulario.dto';
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
@@ -36,8 +38,15 @@ export class FormulariosEstudiantesController {
 
   @Get('solicitudes')
   @Permisos(PermisoSistema.ESTUDIANTES_VER)
-  listarSolicitudes(@Req() req: Request) {
-    return this.procesamientoService.listarSolicitudes(req.user!.sub);
+  listarSolicitudes(
+    @Req() req: Request,
+    @Query() filtros: FiltrarSolicitudesFormulariosDto,
+  ) {
+    return this.procesamientoService.listarSolicitudes(
+      req.user!.sub,
+      filtros.carreraId,
+      filtros.planEstudioId,
+    );
   }
 
   @Get(':id')

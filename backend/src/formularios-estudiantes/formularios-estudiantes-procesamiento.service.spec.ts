@@ -181,6 +181,32 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       expect(res).toEqual([]);
       expect(respuestaRepo.find).not.toHaveBeenCalled();
     });
+
+    it('aplica filtros de carreraId y planEstudioId si son provistos', async () => {
+      estructuraAcademicaService.obtenerCarreraIdsConAlcance.mockResolvedValue([1, 2]);
+      respuestaRepo.find.mockResolvedValue([]);
+
+      await service.listarSolicitudes(usuarioId, 1, 10);
+
+      expect(respuestaRepo.find).toHaveBeenCalledWith({
+        where: {
+          estado: expect.anything(),
+          formulario: {
+            carreraId: 1,
+            planEstudioId: 10,
+          },
+        },
+        relations: {
+          formulario: {
+            carrera: true,
+            planEstudio: true,
+          },
+        },
+        order: {
+          createdAt: 'DESC',
+        },
+      });
+    });
   });
 
   describe('aprobarRespuesta', () => {

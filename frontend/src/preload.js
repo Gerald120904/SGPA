@@ -384,9 +384,10 @@ contextBridge.exposeInMainWorld("sgpa", {
       id
     ),
 
-  listarSolicitudesFormularios: () =>
+  listarSolicitudesFormularios: (filtros) =>
     ipcRenderer.invoke(
-      'formularios-estudiantes:solicitudes'
+      'formularios-estudiantes:solicitudes',
+      filtros
     ),
 
   aceptarSolicitudFormulario: (respuestaId) =>

@@ -42,13 +42,20 @@ export class FormulariosEstudiantesProcesamientoService {
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
   ) {}
 
-  async listarSolicitudes(usuarioId: number): Promise<RespuestaFormularioEstudiante[]> {
+  async listarSolicitudes(
+    usuarioId: number,
+    carreraId?: number,
+    planEstudioId?: number,
+  ): Promise<RespuestaFormularioEstudiante[]> {
     const carrerasPermitidas =
       await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(
         usuarioId,
       );
 
-    if (carrerasPermitidas.length === 0) {
+    if (
+      carrerasPermitidas.length === 0 ||
+      (carreraId && !carrerasPermitidas.includes(carreraId))
+    ) {
       return [];
     }
 
@@ -59,7 +66,8 @@ export class FormulariosEstudiantesProcesamientoService {
           EstadoRespuestaFormulario.REQUIERE_REVISION,
         ]),
         formulario: {
-          carreraId: In(carrerasPermitidas),
+          carreraId: carreraId ?? In(carrerasPermitidas),
+          ...(planEstudioId && { planEstudioId }),
         },
       },
       relations: {

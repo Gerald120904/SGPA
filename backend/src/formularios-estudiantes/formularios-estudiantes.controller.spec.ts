@@ -95,7 +95,7 @@ describe('FormulariosEstudiantesController', () => {
   });
 
   describe('listarSolicitudes', () => {
-    it('delega al procesamientoService con usuarioId extraído de req.user.sub', async () => {
+    it('delega al procesamientoService con usuarioId extraído de req.user.sub y filtros', async () => {
       const mockReq = {
         user: {
           sub: 42,
@@ -105,9 +105,9 @@ describe('FormulariosEstudiantesController', () => {
       const resultadoEsperado = [{ id: 10, estado: 'PENDIENTE' }];
       procesamientoService.listarSolicitudes.mockResolvedValue(resultadoEsperado);
 
-      const res = await controller.listarSolicitudes(mockReq);
+      const res = await controller.listarSolicitudes(mockReq, { carreraId: 5, planEstudioId: 10 });
 
-      expect(procesamientoService.listarSolicitudes).toHaveBeenCalledWith(42);
+      expect(procesamientoService.listarSolicitudes).toHaveBeenCalledWith(42, 5, 10);
       expect(res).toBe(resultadoEsperado);
     });
 

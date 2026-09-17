@@ -67,13 +67,17 @@ export async function sincronizarFormularioEstudiantes(id) {
     .sincronizarFormularioEstudiantes(id);
 }
 
-export async function listarSolicitudesFormularios() {
+export async function listarSolicitudesFormularios(
+  filtros = {}
+) {
   validarApi(
     'listarSolicitudesFormularios'
   );
 
   return window.sgpa
-    .listarSolicitudesFormularios();
+    .listarSolicitudesFormularios(
+      filtros
+    );
 }
 
 export async function aceptarSolicitudFormulario(

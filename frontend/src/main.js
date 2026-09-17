@@ -1700,9 +1700,31 @@ ipcMain.handle(
 
 ipcMain.handle(
   'formularios-estudiantes:solicitudes',
-  async () => {
+  async (_event, filtros = {}) => {
+    const params =
+      new URLSearchParams();
+
+    if (filtros.carreraId) {
+      params.set(
+        'carreraId',
+        String(filtros.carreraId)
+      );
+    }
+
+    if (filtros.planEstudioId) {
+      params.set(
+        'planEstudioId',
+        String(filtros.planEstudioId)
+      );
+    }
+
+    const query =
+      params.toString();
+
     return ejecutarPeticionAutenticada(
-      '/formularios-estudiantes/solicitudes'
+      `/formularios-estudiantes/solicitudes${
+        query ? `?${query}` : ''
+      }`
     );
   }
 );

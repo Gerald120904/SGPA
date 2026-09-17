@@ -70,6 +70,16 @@ import {
   renderizarIconos
 } from '../../utils/icons.js';
 
+let carreraSeleccionada = null;
+
+let planSeleccionado = null;
+
+let vistaActual = 'CARRERAS';
+
+let carrerasDisponibles = [];
+
+let planesDisponibles = [];
+
 let estudiantes = [];
 
 let catalogoEstudiantes = [];
@@ -142,153 +152,28 @@ export function EstudiantesPage() {
       id="estudiantesPage"
       class="module-view"
     >
-      <div class="planes-toolbar">
+      <div class="planes-toolbar" style="margin-bottom: 1.25rem;">
         <div>
+          <nav
+            aria-label="Ruta de navegación"
+            style="font-size: 0.9rem; color: var(--color-muted, #64748b); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;"
+          >
+            <span id="estudiantesBreadcrumb">
+              Estudiantes
+            </span>
+          </nav>
+
           <h2>
             Estudiantes
           </h2>
 
           <p>
-            Gestión de estudiantes
-            y seguimiento académico.
+            Gestión de estudiantes y seguimiento académico.
           </p>
         </div>
-
-        ${
-          usuarioTienePermiso(
-            PERMISOS.GESTIONAR
-          )
-            ? `
-              <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                <button
-                  id="importarEstudiantesExcelButton"
-                  type="button"
-                  class="btn btn-secondary"
-                >
-                  <i
-                    data-lucide="file-spreadsheet"
-                    aria-hidden="true"
-                  ></i>
-
-                  Importar Excel
-                </button>
-
-                <button
-                  id="nuevoEstudianteButton"
-                  type="button"
-                  class="btn btn-primary"
-                >
-                  <i
-                    data-lucide="user-plus"
-                    aria-hidden="true"
-                  ></i>
-
-                  Nuevo estudiante
-                </button>
-              </div>
-            `
-            : ''
-        }
       </div>
 
-      <div class="planes-filters">
-
-        <label
-          class="planes-search"
-          for="estudiantesBuscar"
-        >
-          <i
-            data-lucide="search"
-            aria-hidden="true"
-          ></i>
-
-          <input
-            id="estudiantesBuscar"
-            type="search"
-            placeholder="Buscar por cédula, nombre o correo..."
-            autocomplete="off"
-          >
-        </label>
-
-        <select
-          id="estudiantesCarrera"
-          class="planes-select"
-          aria-label="Filtrar por carrera"
-        >
-          <option value="">
-            Todas las carreras
-          </option>
-        </select>
-
-        <select
-          id="estudiantesPlan"
-          class="planes-select"
-          aria-label="Filtrar por plan"
-        >
-          <option value="">
-            Todos los planes
-          </option>
-        </select>
-
-        <select
-          id="estudiantesPeriodo"
-          class="planes-select"
-          aria-label="Filtrar por período de ingreso"
-        >
-          <option value="">
-            Todos los períodos
-          </option>
-        </select>
-
-        <select
-          id="estudiantesEstado"
-          class="planes-select"
-          aria-label="Filtrar por estado"
-        >
-          <option value="">
-            Todos los estados
-          </option>
-
-          ${ESTADOS.map(
-            (estado) => `
-              <option
-                value="${estado.value}"
-              >
-                ${estado.label}
-              </option>
-            `
-          ).join('')}
-        </select>
-
-      </div>
-
-      <div
-        id="estudiantesContent"
-        aria-live="polite"
-      ></div>
-
-      <div class="planes-toolbar">
-        <div>
-          <h2>
-            Solicitudes de formularios
-          </h2>
-
-          <p>
-            Respuestas recibidas que requieren revisión antes de ingresar al padrón de estudiantes.
-          </p>
-        </div>
-
-        <div>
-          <strong id="solicitudesFormulariosContador">
-            0 pendientes
-          </strong>
-        </div>
-      </div>
-
-      <div
-        id="solicitudesFormulariosContent"
-        aria-live="polite"
-      ></div>
+      <div id="estudiantesNavegacion"></div>
 
       <dialog
         id="estudianteDialog"
@@ -1051,6 +936,687 @@ function renderizarProgresoEstudiante(
   renderizarIconos();
 }
 
+function renderizarRuta() {
+  if (!carreraSeleccionada) {
+    return 'Estudiantes';
+  }
+
+  if (!planSeleccionado) {
+    return `
+      Estudiantes
+      › ${escapeHtml(carreraSeleccionada.nombre)}
+    `;
+  }
+
+  return `
+    Estudiantes
+    › ${escapeHtml(carreraSeleccionada.nombre)}
+    › ${escapeHtml(planSeleccionado.nombre || planSeleccionado.codigo)}
+  `;
+}
+
+function detenerPollingSolicitudes() {
+  if (!intervaloSolicitudes) {
+    return;
+  }
+
+  window.clearInterval(
+    intervaloSolicitudes
+  );
+
+  intervaloSolicitudes = null;
+}
+
+function actualizarEncabezadoYRuta() {
+  const breadcrumb =
+    document.getElementById(
+      'estudiantesBreadcrumb'
+    );
+
+  if (breadcrumb) {
+    breadcrumb.innerHTML =
+      renderizarRuta();
+  }
+}
+
+async function mostrarCarreras() {
+  detenerPollingSolicitudes();
+  vistaActual = 'CARRERAS';
+  carreraSeleccionada = null;
+  planSeleccionado = null;
+  estudiantes = [];
+
+  const contenedor =
+    document.getElementById(
+      'estudiantesNavegacion'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  actualizarEncabezadoYRuta();
+
+  contenedor.innerHTML = `
+    <div class="planes-toolbar">
+      <div>
+        <h3>Seleccione una carrera</h3>
+        <p>Elija una carrera para ver sus planes de estudio y estudiantes asociados.</p>
+      </div>
+    </div>
+    <div class="carreras-message">Cargando carreras...</div>
+  `;
+
+  try {
+    const resultado =
+      await listarCarreras();
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible consultar las carreras.'
+      );
+    }
+
+    const lista =
+      Array.isArray(
+        resultado.carreras
+      )
+        ? resultado.carreras
+        : (Array.isArray(resultado.data) ? resultado.data : []);
+
+    carrerasDisponibles = lista;
+
+    if (lista.length === 0) {
+      contenedor.innerHTML = `
+        <div class="planes-toolbar">
+          <div>
+            <h3>Seleccione una carrera</h3>
+            <p>Elija una carrera para ver sus planes de estudio y estudiantes asociados.</p>
+          </div>
+        </div>
+        <div class="carreras-message" style="text-align: center; padding: 2rem;">
+          No tiene carreras asignadas o disponibles.
+        </div>
+      `;
+      renderizarIconos();
+      return;
+    }
+
+    contenedor.innerHTML = `
+      <div class="planes-toolbar">
+        <div>
+          <h3>Seleccione una carrera</h3>
+          <p>Elija una carrera para ver sus planes de estudio y estudiantes asociados.</p>
+        </div>
+      </div>
+
+      <div class="modules-dashboard-grid">
+        ${lista
+          .map(
+            (carrera) => `
+              <button
+                type="button"
+                class="module-card"
+                data-carrera-id="${carrera.id}"
+                aria-label="Seleccionar ${escapeHtml(carrera.nombre)}"
+              >
+                <span
+                  class="module-card-decoration"
+                  aria-hidden="true"
+                ></span>
+
+                <div class="module-card-top">
+                  <div class="module-card-icon">
+                    <i
+                      data-lucide="graduation-cap"
+                      aria-hidden="true"
+                    ></i>
+                  </div>
+                </div>
+
+                <div class="module-card-content">
+                  <strong>
+                    ${escapeHtml(carrera.nombre)}
+                  </strong>
+
+                  ${
+                    carrera.codigo
+                      ? `<p style="font-size: 0.85rem; color: var(--color-muted, #64748b); margin-top: 0.25rem;">Código: ${escapeHtml(carrera.codigo)}</p>`
+                      : ''
+                  }
+                  ${
+                    carrera.descripcion
+                      ? `<p>${escapeHtml(carrera.descripcion)}</p>`
+                      : ''
+                  }
+                </div>
+
+                <div class="module-card-action">
+                  <span>Ver planes</span>
+                  <i
+                    data-lucide="chevron-right"
+                    aria-hidden="true"
+                  ></i>
+                </div>
+
+                <span
+                  class="module-card-hover-line"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            `
+          )
+          .join('')}
+      </div>
+    `;
+
+    renderizarIconos();
+  } catch (error) {
+    console.error(
+      'Error cargando carreras:',
+      error
+    );
+
+    contenedor.innerHTML = `
+      <div class="planes-toolbar">
+        <div>
+          <h3>Seleccione una carrera</h3>
+        </div>
+      </div>
+      <div class="carreras-message carreras-error" role="alert">
+        <h3>No fue posible cargar las carreras</h3>
+        <p>${escapeHtml(error?.message || 'Error de conexión.')}</p>
+      </div>
+    `;
+    renderizarIconos();
+  }
+}
+
+async function mostrarPlanesCarrera(carrera) {
+  detenerPollingSolicitudes();
+  vistaActual = 'PLANES';
+  carreraSeleccionada = carrera;
+  planSeleccionado = null;
+  estudiantes = [];
+
+  const contenedor =
+    document.getElementById(
+      'estudiantesNavegacion'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  actualizarEncabezadoYRuta();
+
+  contenedor.innerHTML = `
+    <div class="planes-toolbar">
+      <div>
+        <button
+          type="button"
+          id="volverACarrerasBtn"
+          class="btn btn-secondary btn-sm"
+          style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+        >
+          <i
+            data-lucide="arrow-left"
+            aria-hidden="true"
+          ></i>
+          Volver a carreras
+        </button>
+
+        <h3>Seleccione un plan de estudio</h3>
+        <p>Planes de estudio de <strong>${escapeHtml(carrera.nombre)}</strong></p>
+      </div>
+    </div>
+    <div class="carreras-message">Cargando planes de estudio...</div>
+  `;
+  renderizarIconos();
+
+  try {
+    const resultado =
+      await listarPlanesEstudio();
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible consultar los planes de estudio.'
+      );
+    }
+
+    const todosPlanes =
+      Array.isArray(resultado.planes)
+        ? resultado.planes
+        : (Array.isArray(resultado.data) ? resultado.data : []);
+
+    const planesDeCarrera = todosPlanes.filter(
+      (p) => p.carreraId === carrera.id || p.carrera?.id === carrera.id
+    );
+
+    planesDisponibles = planesDeCarrera;
+
+    if (planesDeCarrera.length === 0) {
+      contenedor.innerHTML = `
+        <div class="planes-toolbar">
+          <div>
+            <button
+              type="button"
+              id="volverACarrerasBtn"
+              class="btn btn-secondary btn-sm"
+              style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+            >
+              <i
+                data-lucide="arrow-left"
+                aria-hidden="true"
+              ></i>
+              Volver a carreras
+            </button>
+
+            <h3>Seleccione un plan de estudio</h3>
+            <p>Planes de estudio de <strong>${escapeHtml(carrera.nombre)}</strong></p>
+          </div>
+        </div>
+        <div class="carreras-message" style="text-align: center; padding: 2rem;">
+          Esta carrera no tiene planes de estudio registrados.
+        </div>
+      `;
+      renderizarIconos();
+      return;
+    }
+
+    contenedor.innerHTML = `
+      <div class="planes-toolbar">
+        <div>
+          <button
+            type="button"
+            id="volverACarrerasBtn"
+            class="btn btn-secondary btn-sm"
+            style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+          >
+            <i
+              data-lucide="arrow-left"
+              aria-hidden="true"
+            ></i>
+            Volver a carreras
+          </button>
+
+          <h3>Seleccione un plan de estudio</h3>
+          <p>Planes de estudio de <strong>${escapeHtml(carrera.nombre)}</strong></p>
+        </div>
+      </div>
+
+      <div class="modules-dashboard-grid">
+        ${planesDeCarrera
+          .map(
+            (plan) => `
+              <button
+                type="button"
+                class="module-card"
+                data-plan-id="${plan.id}"
+                aria-label="Seleccionar ${escapeHtml(plan.nombre || plan.codigo)}"
+              >
+                <span
+                  class="module-card-decoration"
+                  aria-hidden="true"
+                ></span>
+
+                <div class="module-card-top">
+                  <div class="module-card-icon">
+                    <i
+                      data-lucide="book-open"
+                      aria-hidden="true"
+                    ></i>
+                  </div>
+                </div>
+
+                <div class="module-card-content">
+                  <strong>
+                    ${escapeHtml(plan.nombre || plan.codigo)}
+                  </strong>
+
+                  <p>
+                    ${plan.codigo && plan.nombre ? `${escapeHtml(plan.codigo)} &middot; ` : ''}
+                    ${
+                      plan.activo === false
+                        ? '<span style="color: var(--color-danger, #ef4444); font-weight: 600;">Inactivo</span>'
+                        : '<span style="color: var(--color-success, #10b981); font-weight: 600;">Activo</span>'
+                    }
+                  </p>
+                </div>
+
+                <div class="module-card-action">
+                  <span>Ver estudiantes</span>
+                  <i
+                    data-lucide="chevron-right"
+                    aria-hidden="true"
+                  ></i>
+                </div>
+
+                <span
+                  class="module-card-hover-line"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            `
+          )
+          .join('')}
+      </div>
+    `;
+
+    renderizarIconos();
+  } catch (error) {
+    console.error(
+      'Error cargando planes de estudio:',
+      error
+    );
+
+    contenedor.innerHTML = `
+      <div class="planes-toolbar">
+        <div>
+          <button
+            type="button"
+            id="volverACarrerasBtn"
+            class="btn btn-secondary btn-sm"
+            style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+          >
+            <i
+              data-lucide="arrow-left"
+              aria-hidden="true"
+            ></i>
+            Volver a carreras
+          </button>
+
+          <h3>Seleccione un plan de estudio</h3>
+        </div>
+      </div>
+      <div class="carreras-message carreras-error" role="alert">
+        <h3>No fue posible cargar los planes de estudio</h3>
+        <p>${escapeHtml(error?.message || 'Error de conexión.')}</p>
+      </div>
+    `;
+    renderizarIconos();
+  }
+}
+
+async function mostrarEstudiantesPlan() {
+  vistaActual = 'ESTUDIANTES';
+
+  const contenedor =
+    document.getElementById(
+      'estudiantesNavegacion'
+    );
+
+  if (!contenedor) {
+    return;
+  }
+
+  actualizarEncabezadoYRuta();
+
+  const puedeGestionar =
+    usuarioTienePermiso(
+      PERMISOS.GESTIONAR
+    );
+
+  contenedor.innerHTML = `
+    <div class="planes-toolbar">
+      <div>
+        <button
+          type="button"
+          id="volverAPlanesBtn"
+          class="btn btn-secondary btn-sm"
+          style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+        >
+          <i
+            data-lucide="arrow-left"
+            aria-hidden="true"
+          ></i>
+          Volver a planes
+        </button>
+
+        <h3>Estudiantes de este plan</h3>
+        <p>
+          <strong>${escapeHtml(carreraSeleccionada.nombre)}</strong> › <strong>${escapeHtml(planSeleccionado.nombre || planSeleccionado.codigo)}</strong>
+        </p>
+      </div>
+
+      ${
+        puedeGestionar
+          ? `
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+              <button
+                id="importarEstudiantesExcelButton"
+                type="button"
+                class="btn btn-secondary"
+              >
+                <i
+                  data-lucide="file-spreadsheet"
+                  aria-hidden="true"
+                ></i>
+
+                Importar Excel
+              </button>
+
+              <button
+                id="nuevoEstudianteButton"
+                type="button"
+                class="btn btn-primary"
+              >
+                <i
+                  data-lucide="user-plus"
+                  aria-hidden="true"
+                ></i>
+
+                Nuevo estudiante
+              </button>
+            </div>
+          `
+          : ''
+      }
+    </div>
+
+    <div class="planes-filters">
+      <label
+        class="planes-search"
+        for="estudiantesBuscar"
+      >
+        <i
+          data-lucide="search"
+          aria-hidden="true"
+        ></i>
+
+        <input
+          id="estudiantesBuscar"
+          type="search"
+          placeholder="Buscar por cédula, nombre o correo..."
+          autocomplete="off"
+        >
+      </label>
+
+      <select
+        id="estudiantesPeriodo"
+        class="planes-select"
+        aria-label="Filtrar por período de ingreso"
+      >
+        <option value="">
+          Todos los períodos
+        </option>
+      </select>
+
+      <select
+        id="estudiantesEstado"
+        class="planes-select"
+        aria-label="Filtrar por estado"
+      >
+        <option value="">
+          Todos los estados
+        </option>
+
+        ${ESTADOS.map(
+          (estado) => `
+            <option
+              value="${estado.value}"
+            >
+              ${estado.label}
+            </option>
+          `
+        ).join('')}
+      </select>
+    </div>
+
+    <div
+      id="estudiantesContent"
+      aria-live="polite"
+    >
+      <div class="carreras-message">Cargando estudiantes...</div>
+    </div>
+
+    <div class="planes-toolbar" style="margin-top: 2rem;">
+      <div>
+        <h2>
+          Solicitudes de formularios
+        </h2>
+
+        <p>
+          Respuestas recibidas que requieren revisión antes de ingresar al padrón de estudiantes.
+        </p>
+      </div>
+
+      <div>
+        <strong id="solicitudesFormulariosContador">
+          0 pendientes
+        </strong>
+      </div>
+    </div>
+
+    <div
+      id="solicitudesFormulariosContent"
+      aria-live="polite"
+    ></div>
+  `;
+
+  renderizarIconos();
+
+  vincularEventosVistaEstudiantes();
+
+  await cargarEstudiantes(
+    instanciaActual,
+    true
+  );
+
+  await cargarSolicitudesFormularios(
+    instanciaActual,
+    false
+  );
+
+  detenerPollingSolicitudes();
+
+  intervaloSolicitudes =
+    window.setInterval(
+      () => {
+        const pagina =
+          document.getElementById(
+            'estudiantesPage'
+          );
+
+        if (
+          !pagina ||
+          vistaActual !== 'ESTUDIANTES' ||
+          !carreraSeleccionada ||
+          !planSeleccionado
+        ) {
+          detenerPollingSolicitudes();
+          return;
+        }
+
+        cargarSolicitudesFormularios(
+          instanciaActual,
+          false
+        );
+      },
+      15_000
+    );
+}
+
+function vincularEventosVistaEstudiantes() {
+  const instancia = instanciaActual;
+
+  const buscar =
+    document.getElementById(
+      'estudiantesBuscar'
+    );
+
+  const periodo =
+    document.getElementById(
+      'estudiantesPeriodo'
+    );
+
+  const estado =
+    document.getElementById(
+      'estudiantesEstado'
+    );
+
+  const nuevoBtn =
+    document.getElementById(
+      'nuevoEstudianteButton'
+    );
+
+  const importarBtn =
+    document.getElementById(
+      'importarEstudiantesExcelButton'
+    );
+
+  buscar?.addEventListener(
+    'input',
+    () => {
+      if (timerBusqueda) {
+        window.clearTimeout(
+          timerBusqueda
+        );
+      }
+
+      timerBusqueda =
+        window.setTimeout(
+          () => {
+            cargarEstudiantes(
+              instancia
+            );
+          },
+          250
+        );
+    }
+  );
+
+  periodo?.addEventListener(
+    'change',
+    () => {
+      cargarEstudiantes(
+        instancia
+      );
+    }
+  );
+
+  estado?.addEventListener(
+    'change',
+    () => {
+      cargarEstudiantes(
+        instancia
+      );
+    }
+  );
+
+  nuevoBtn?.addEventListener(
+    'click',
+    abrirNuevoEstudiante
+  );
+
+  importarBtn?.addEventListener(
+    'click',
+    abrirImportacionEstudiantes
+  );
+}
+
 function obtenerFiltros() {
   const texto =
     document
@@ -1061,18 +1627,22 @@ function obtenerFiltros() {
       ?.trim() || '';
 
   const carreraId =
+    carreraSeleccionada?.id ||
     Number(
       document.getElementById(
         'estudiantesCarrera'
       )?.value
-    ) || undefined;
+    ) ||
+    undefined;
 
   const planEstudioId =
+    planSeleccionado?.id ||
     Number(
       document.getElementById(
         'estudiantesPlan'
       )?.value
-    ) || undefined;
+    ) ||
+    undefined;
 
   const periodoIngresoId =
     Number(
@@ -1098,25 +1668,14 @@ function obtenerFiltros() {
 }
 
 function llenarFiltrosAcademicos() {
-  const carreraSelect =
-    document.getElementById(
-      'estudiantesCarrera'
-    );
-
   const periodoSelect =
     document.getElementById(
       'estudiantesPeriodo'
     );
 
-  if (
-    !carreraSelect ||
-    !periodoSelect
-  ) {
+  if (!periodoSelect) {
     return;
   }
-
-  const carreras =
-    new Map();
 
   const periodos =
     new Map();
@@ -1125,13 +1684,6 @@ function llenarFiltrosAcademicos() {
     const estudiante
     of catalogoEstudiantes
   ) {
-    if (estudiante.carrera) {
-      carreras.set(
-        estudiante.carrera.id,
-        estudiante.carrera
-      );
-    }
-
     if (estudiante.periodoIngreso) {
       periodos.set(
         estudiante.periodoIngreso.id,
@@ -1139,28 +1691,6 @@ function llenarFiltrosAcademicos() {
       );
     }
   }
-
-  carreraSelect.innerHTML = `
-    <option value="">
-      Todas las carreras
-    </option>
-
-    ${[...carreras.values()]
-      .map(
-        (carrera) => `
-          <option value="${carrera.id}">
-            ${escapeHtml(
-              carrera.codigo
-            )}
-            -
-            ${escapeHtml(
-              carrera.nombre
-            )}
-          </option>
-        `
-      )
-      .join('')}
-  `;
 
   periodoSelect.innerHTML = `
     <option value="">
@@ -1172,84 +1702,17 @@ function llenarFiltrosAcademicos() {
         (periodo) => `
           <option value="${periodo.id}">
             ${escapeHtml(
-              periodo.codigo
+              periodo.codigo || periodo.nombre
             )}
           </option>
         `
       )
       .join('')}
   `;
-
-  actualizarPlanesFiltro();
 }
 
 function actualizarPlanesFiltro() {
-  const carreraSelect =
-    document.getElementById(
-      'estudiantesCarrera'
-    );
-
-  const planSelect =
-    document.getElementById(
-      'estudiantesPlan'
-    );
-
-  if (
-    !carreraSelect ||
-    !planSelect
-  ) {
-    return;
-  }
-
-  const carreraId =
-    Number(
-      carreraSelect.value
-    ) || null;
-
-  const planes =
-    new Map();
-
-  for (
-    const estudiante
-    of catalogoEstudiantes
-  ) {
-    if (
-      carreraId &&
-      estudiante.carreraId !==
-        carreraId
-    ) {
-      continue;
-    }
-
-    if (estudiante.planEstudio) {
-      planes.set(
-        estudiante.planEstudio.id,
-        estudiante.planEstudio
-      );
-    }
-  }
-
-  planSelect.innerHTML = `
-    <option value="">
-      Todos los planes
-    </option>
-
-    ${[...planes.values()]
-      .map(
-        (plan) => `
-          <option value="${plan.id}">
-            ${escapeHtml(
-              plan.codigo
-            )}
-            -
-            ${escapeHtml(
-              plan.nombre
-            )}
-          </option>
-        `
-      )
-      .join('')}
-  `;
+  // Mantenido por compatibilidad
 }
 
 async function cargarEstudiantes(
@@ -1257,9 +1720,22 @@ async function cargarEstudiantes(
   actualizarCatalogo = false
 ) {
   try {
+    const filtros =
+      obtenerFiltros();
+
+    if (carreraSeleccionada) {
+      filtros.carreraId =
+        carreraSeleccionada.id;
+    }
+
+    if (planSeleccionado) {
+      filtros.planEstudioId =
+        planSeleccionado.id;
+    }
+
     const resultado =
       await listarEstudiantes(
-        obtenerFiltros()
+        filtros
       );
 
     if (
@@ -1826,6 +2302,15 @@ async function obtenerCatalogosEstudiante() {
 }
 
 async function abrirNuevoEstudiante() {
+  if (!carreraSeleccionada || !planSeleccionado) {
+    mostrarError({
+      titulo: 'Seleccione un plan',
+      mensaje:
+        'Debe seleccionar una carrera y un plan de estudio antes de registrar estudiantes.'
+    });
+    return;
+  }
+
   const dialog =
     document.getElementById(
       'estudianteDialog'
@@ -1839,25 +2324,18 @@ async function abrirNuevoEstudiante() {
   if (!dialog || !content) return;
 
   try {
-    const {
-      carreras,
-      planes,
-      periodos
-    } =
-      await obtenerCatalogosEstudiante();
+    const resultadoPeriodos =
+      await listarPeriodosAcademicos();
 
-    const opcionesCarreras =
-      carreras
-        .map(
-          (item) => `
-            <option value="${item.id}">
-              ${escapeHtml(item.codigo)}
-              -
-              ${escapeHtml(item.nombre)}
-            </option>
-          `
-        )
-        .join('');
+    if (!resultadoPeriodos?.ok) {
+      throw new Error(
+        resultadoPeriodos?.message ||
+        'No fue posible consultar los períodos.'
+      );
+    }
+
+    const periodos =
+      resultadoPeriodos.periodos ?? [];
 
     const opcionesPeriodos =
       periodos
@@ -1897,6 +2375,24 @@ async function abrirNuevoEstudiante() {
           'Crear estudiante',
 
         body: `
+          <label>
+            <span>Carrera</span>
+            <input
+              type="text"
+              value="${escapeHtml(carreraSeleccionada.nombre)}"
+              readonly
+            >
+          </label>
+
+          <label>
+            <span>Plan de estudio</span>
+            <input
+              type="text"
+              value="${escapeHtml(planSeleccionado.nombre || planSeleccionado.codigo)}"
+              readonly
+            >
+          </label>
+
           <label>
             <span>Cédula</span>
             <input
@@ -1950,37 +2446,6 @@ async function abrirNuevoEstudiante() {
             >
           </label>
 
-          <label>
-            <span>Carrera</span>
-            <select
-              id="nuevoCarrera"
-              required
-            >
-              <option
-                value=""
-                selected
-                disabled
-              >
-                Seleccione...
-              </option>
-
-              ${opcionesCarreras}
-            </select>
-          </label>
-
-          <label>
-            <span>Plan de estudio</span>
-            <select
-              id="nuevoPlan"
-              disabled
-              required
-            >
-              <option value="">
-                Seleccione primero una carrera...
-              </option>
-            </select>
-          </label>
-
           <label class="sgpa-form-wide">
             <span>Período de ingreso</span>
             <select
@@ -2006,55 +2471,6 @@ async function abrirNuevoEstudiante() {
     dialog.showModal();
 
     habilitarCierreExterior(dialog);
-
-    const carreraInput =
-      document.getElementById(
-        'nuevoCarrera'
-      );
-
-    const planInput =
-      document.getElementById(
-        'nuevoPlan'
-      );
-
-    carreraInput?.addEventListener(
-      'change',
-      () => {
-        const carreraId =
-          Number(carreraInput.value);
-
-        const disponibles =
-          planes.filter(
-            (plan) =>
-              plan.carreraId === carreraId
-          );
-
-        planInput.innerHTML = `
-          <option
-            value=""
-            selected
-            disabled
-          >
-            Seleccione...
-          </option>
-
-          ${disponibles
-            .map(
-              (plan) => `
-                <option value="${plan.id}">
-                  ${escapeHtml(plan.codigo)}
-                  -
-                  ${escapeHtml(plan.nombre)}
-                </option>
-              `
-            )
-            .join('')}
-        `;
-
-        planInput.disabled =
-          disponibles.length === 0;
-      }
-    );
 
     document
       .getElementById(
@@ -2115,14 +2531,10 @@ async function abrirNuevoEstudiante() {
                     .value.trim() || null,
 
                 carreraId:
-                  Number(
-                    carreraInput.value
-                  ),
+                  carreraSeleccionada.id,
 
                 planEstudioId:
-                  Number(
-                    planInput.value
-                  ),
+                  planSeleccionado.id,
 
                 periodoIngresoId:
                   Number(
@@ -3736,6 +4148,15 @@ function renderizarPreviewImportacionEstudiantes(
 }
 
 async function abrirImportacionEstudiantes() {
+  if (!carreraSeleccionada || !planSeleccionado) {
+    mostrarError({
+      titulo: 'Seleccione un plan',
+      mensaje:
+        'Debe seleccionar una carrera y un plan de estudio antes de importar estudiantes.'
+    });
+    return;
+  }
+
   const dialog =
     document.getElementById(
       'estudianteDialog'
@@ -3751,12 +4172,6 @@ async function abrirImportacionEstudiantes() {
   }
 
   try {
-    const {
-      carreras,
-      planes
-    } =
-      await obtenerCatalogosEstudiante();
-
     let datosExcel = null;
     let nombreArchivo = null;
     let previewActual = null;
@@ -3770,7 +4185,7 @@ async function abrirImportacionEstudiantes() {
           'Importar estudiantes desde Excel',
 
         description:
-          'Seleccione la carrera y el plan de estudio, cargue el archivo y revise la previsualización antes de importar.',
+          'Cargue el archivo Excel con los estudiantes del plan y revise la previsualización antes de importar.',
 
         layout:
           'custom',
@@ -3785,67 +4200,27 @@ async function abrirImportacionEstudiantes() {
           true,
 
         body: `
-          <div class="sgpa-form-wide">
-
+          <div class="sgpa-form-wide" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
             <label>
-              <span>
-                Carrera
-              </span>
-
-              <select
-                id="importacionEstudiantesCarrera"
-                required
+              <span>Carrera</span>
+              <input
+                type="text"
+                value="${escapeHtml(carreraSeleccionada.nombre)}"
+                readonly
               >
-                <option
-                  value=""
-                  selected
-                  disabled
-                >
-                  Seleccione una carrera...
-                </option>
-
-                ${carreras
-                  .map(
-                    (carrera) => `
-                      <option
-                        value="${carrera.id}"
-                      >
-                        ${escapeHtml(
-                          carrera.codigo
-                        )}
-                        -
-                        ${escapeHtml(
-                          carrera.nombre
-                        )}
-                      </option>
-                    `
-                  )
-                  .join('')}
-              </select>
             </label>
 
-
             <label>
-              <span>
-                Plan de estudio
-              </span>
-
-              <select
-                id="importacionEstudiantesPlan"
-                disabled
-                required
+              <span>Plan de estudio</span>
+              <input
+                type="text"
+                value="${escapeHtml(planSeleccionado.nombre || planSeleccionado.codigo)}"
+                readonly
               >
-                <option value="">
-                  Seleccione primero una carrera...
-                </option>
-              </select>
             </label>
-
           </div>
 
-
           <div class="sgpa-form-wide" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-
             <button
               id="descargarPlantillaEstudiantesButton"
               type="button"
@@ -3878,12 +4253,9 @@ async function abrirImportacionEstudiantes() {
             >
               Ningún archivo seleccionado.
             </span>
-
           </div>
 
-
           <div class="sgpa-form-wide">
-
             <button
               id="previsualizarImportacionEstudiantesButton"
               type="button"
@@ -3897,9 +4269,7 @@ async function abrirImportacionEstudiantes() {
 
               Previsualizar importación
             </button>
-
           </div>
-
 
           <div
             id="previewImportacionEstudiantes"
@@ -3915,16 +4285,6 @@ async function abrirImportacionEstudiantes() {
     habilitarCierreExterior(
       dialog
     );
-
-    const carreraInput =
-      document.getElementById(
-        'importacionEstudiantesCarrera'
-      );
-
-    const planInput =
-      document.getElementById(
-        'importacionEstudiantesPlan'
-      );
 
     const previewButton =
       document.getElementById(
@@ -3946,10 +4306,7 @@ async function abrirImportacionEstudiantes() {
         return;
       }
 
-      previewButton.disabled =
-        !datosExcel ||
-        !Number(carreraInput?.value) ||
-        !Number(planInput?.value);
+      previewButton.disabled = !datosExcel;
     };
 
     const limpiarPreview = () => {
@@ -3959,66 +4316,6 @@ async function abrirImportacionEstudiantes() {
         previewContainer.innerHTML = '';
       }
     };
-
-    carreraInput?.addEventListener(
-      'change',
-      () => {
-        const carreraId =
-          Number(
-            carreraInput.value
-          );
-
-        const disponibles =
-          planes.filter(
-            (plan) =>
-              plan.activo &&
-              plan.carreraId ===
-                carreraId
-          );
-
-        planInput.innerHTML = `
-          <option
-            value=""
-            selected
-            disabled
-          >
-            Seleccione un plan...
-          </option>
-
-          ${disponibles
-            .map(
-              (plan) => `
-                <option
-                  value="${plan.id}"
-                >
-                  ${escapeHtml(
-                    plan.codigo
-                  )}
-                  -
-                  ${escapeHtml(
-                    plan.nombre
-                  )}
-                </option>
-              `
-            )
-            .join('')}
-        `;
-
-        planInput.disabled =
-          disponibles.length === 0;
-
-        limpiarPreview();
-        actualizarEstadoPreview();
-      }
-    );
-
-    planInput?.addEventListener(
-      'change',
-      () => {
-        limpiarPreview();
-        actualizarEstadoPreview();
-      }
-    );
 
     document
       .getElementById(
@@ -4136,21 +4433,14 @@ async function abrirImportacionEstudiantes() {
     previewButton?.addEventListener(
       'click',
       async () => {
-        const carreraId =
-          Number(
-            carreraInput?.value
-          );
+        const contexto = {
+          carreraId:
+            carreraSeleccionada.id,
+          planEstudioId:
+            planSeleccionado.id
+        };
 
-        const planEstudioId =
-          Number(
-            planInput?.value
-          );
-
-        if (
-          !datosExcel ||
-          !carreraId ||
-          !planEstudioId
-        ) {
+        if (!datosExcel) {
           return;
         }
 
@@ -4159,10 +4449,7 @@ async function abrirImportacionEstudiantes() {
         try {
           const resultado =
             await validarImportacionEstudiantes(
-              {
-                carreraId,
-                planEstudioId
-              },
+              contexto,
               datosExcel
             );
 
@@ -4181,8 +4468,10 @@ async function abrirImportacionEstudiantes() {
           renderizarPreviewImportacionEstudiantes(
             previewActual,
             {
-              carreraId,
-              planEstudioId,
+              carreraId:
+                contexto.carreraId,
+              planEstudioId:
+                contexto.planEstudioId,
               datosExcel
             }
           );
@@ -4222,7 +4511,7 @@ async function abrirImportacionEstudiantes() {
 
       mensaje:
         error?.message ||
-        'No se pudieron consultar las carreras y planes.'
+        'Ocurrió un error al preparar la importación.'
     });
   }
 }
@@ -4234,176 +4523,109 @@ export function iniciarEstudiantesPage() {
     instanciaActual;
 
   estudiantes = [];
-
   catalogoEstudiantes = [];
+  carreraSeleccionada = null;
+  planSeleccionado = null;
+  vistaActual = 'CARRERAS';
 
-  const buscar =
+  const contenedorNavegacion =
     document.getElementById(
-      'estudiantesBuscar'
+      'estudiantesNavegacion'
     );
 
-  const carrera =
-    document.getElementById(
-      'estudiantesCarrera'
-    );
-
-  const plan =
-    document.getElementById(
-      'estudiantesPlan'
-    );
-
-  const periodo =
-    document.getElementById(
-      'estudiantesPeriodo'
-    );
-
-  const estado =
-    document.getElementById(
-      'estudiantesEstado'
-    );
-
-  const contenedor =
-    document.getElementById(
-      'estudiantesContent'
-    );
-
-  const nuevoBtn =
-    document.getElementById(
-      'nuevoEstudianteButton'
-    );
-
-  const importarBtn =
-    document.getElementById(
-      'importarEstudiantesExcelButton'
-    );
-
-  buscar?.addEventListener(
-    'input',
-    () => {
-      if (timerBusqueda) {
-        window.clearTimeout(
-          timerBusqueda
+  contenedorNavegacion?.addEventListener(
+    'click',
+    async (event) => {
+      const volverCarreras =
+        event.target.closest(
+          '#volverACarrerasBtn'
         );
+      if (volverCarreras) {
+        await mostrarCarreras();
+        return;
       }
 
-      timerBusqueda =
-        window.setTimeout(
-          () => {
-            cargarEstudiantes(
-              instancia
-            );
-          },
-          250
+      const volverPlanes =
+        event.target.closest(
+          '#volverAPlanesBtn'
         );
+      if (volverPlanes) {
+        if (carreraSeleccionada) {
+          await mostrarPlanesCarrera(
+            carreraSeleccionada
+          );
+        } else {
+          await mostrarCarreras();
+        }
+        return;
+      }
+
+      const carreraBtn =
+        event.target.closest(
+          '[data-carrera-id]'
+        );
+      if (carreraBtn) {
+        const carreraId =
+          Number(
+            carreraBtn.dataset.carreraId
+          );
+        const carrera =
+          carrerasDisponibles.find(
+            (c) => c.id === carreraId
+          );
+        if (carrera) {
+          carreraSeleccionada = carrera;
+          await mostrarPlanesCarrera(
+            carrera
+          );
+        }
+        return;
+      }
+
+      const planBtn =
+        event.target.closest(
+          '[data-plan-id]'
+        );
+      if (planBtn) {
+        const planId =
+          Number(
+            planBtn.dataset.planId
+          );
+        const plan =
+          planesDisponibles.find(
+            (p) => p.id === planId
+          );
+        if (plan) {
+          planSeleccionado = plan;
+          await mostrarEstudiantesPlan();
+        }
+        return;
+      }
+
+      const accionEstudiante =
+        event.target.closest(
+          '[data-action][data-id]'
+        );
+      if (accionEstudiante) {
+        manejarAccionEstudiante(event);
+        return;
+      }
+
+      const accionSolicitud =
+        event.target.closest(
+          '[data-solicitud-action][data-id]'
+        );
+      if (accionSolicitud) {
+        manejarAccionSolicitud(event);
+        return;
+      }
     }
-  );
-
-  carrera?.addEventListener(
-    'change',
-    () => {
-      actualizarPlanesFiltro();
-
-      cargarEstudiantes(
-        instancia
-      );
-    }
-  );
-
-  plan?.addEventListener(
-    'change',
-    () => {
-      cargarEstudiantes(
-        instancia
-      );
-    }
-  );
-
-  periodo?.addEventListener(
-    'change',
-    () => {
-      cargarEstudiantes(
-        instancia
-      );
-    }
-  );
-
-  estado?.addEventListener(
-    'change',
-    () => {
-      cargarEstudiantes(
-        instancia
-      );
-    }
-  );
-
-  contenedor?.addEventListener(
-    'click',
-    manejarAccionEstudiante
-  );
-
-  nuevoBtn?.addEventListener(
-    'click',
-    abrirNuevoEstudiante
-  );
-
-  importarBtn?.addEventListener(
-    'click',
-    abrirImportacionEstudiantes
-  );
-
-  const solicitudesContenedor =
-    document.getElementById(
-      'solicitudesFormulariosContent'
-    );
-
-  solicitudesContenedor?.addEventListener(
-    'click',
-    manejarAccionSolicitud
   );
 
   renderizarIconos();
 
-  cargarEstudiantes(
-    instancia,
-    true
-  );
-
-  cargarSolicitudesFormularios(
-    instancia
-  );
-
-  if (intervaloSolicitudes) {
-    window.clearInterval(
-      intervaloSolicitudes
-    );
-  }
-
-  intervaloSolicitudes =
-    window.setInterval(
-      () => {
-        const pagina =
-          document.getElementById(
-            'estudiantesPage'
-          );
-
-        if (!pagina) {
-          window.clearInterval(
-            intervaloSolicitudes
-          );
-
-          intervaloSolicitudes =
-            null;
-
-          return;
-        }
-
-        cargarSolicitudesFormularios(
-          instancia,
-          false
-        );
-      },
-      15_000
-    );
+  // Entrar a Estudiantes -> NO cargar estudiantes -> cargar carreras
+  mostrarCarreras();
 }
 
 function obtenerDatosSolicitud(
@@ -4626,9 +4848,24 @@ async function cargarSolicitudesFormularios(
   instancia,
   mostrarErrores = true
 ) {
+  if (
+    vistaActual !== 'ESTUDIANTES' ||
+    !carreraSeleccionada ||
+    !planSeleccionado
+  ) {
+    solicitudesFormularios = [];
+    renderizarSolicitudesFormularios();
+    return;
+  }
+
   try {
     const resultado =
-      await listarSolicitudesFormularios();
+      await listarSolicitudesFormularios({
+        carreraId:
+          carreraSeleccionada.id,
+        planEstudioId:
+          planSeleccionado.id
+      });
 
     if (
       instancia !==
@@ -4653,7 +4890,6 @@ async function cargarSolicitudesFormularios(
         : [];
 
     renderizarSolicitudesFormularios();
-  } catch (error) {
     if (mostrarErrores) {
       mostrarError({
         titulo:
