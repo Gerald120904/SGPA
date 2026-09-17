@@ -1396,13 +1396,13 @@
 }
 
 .aulas-sector-map-principal {
-  grid-template-columns: 78px 1fr 1fr 78px;
-  grid-template-rows: 58px 88px 88px 58px;
+  grid-template-columns: 108px 1fr 1fr 108px;
+  grid-template-rows: 64px 96px 96px 64px;
   grid-template-areas:
-    "aula-7 aula-6 aula-5 aula-4"
+    "corner-tl aula-6 aula-5 corner-tr"
+    "aula-7 center center aula-4"
     "aula-8 center center aula-3"
-    "aula-8 center center aula-3"
-    "aula-1 aula-1 aula-2 aula-2";
+    "corner-bl aula-1 aula-2 corner-br";
 }
 
 .aulas-campus-core {
@@ -1429,6 +1429,39 @@
   color: #7a8493;
   font-size: 10px;
   line-height: 1.35;
+}
+
+
+.aulas-campus-corner {
+  align-self: stretch;
+  justify-self: stretch;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: #f4f6f8;
+  box-shadow: inset 0 0 0 1px #cfd5df;
+  pointer-events: none;
+  user-select: none;
+}
+
+.aulas-campus-corner-top-left {
+  grid-area: corner-tl;
+  clip-path: polygon(0 100%, 100% 100%, 100% 0);
+}
+
+.aulas-campus-corner-top-right {
+  grid-area: corner-tr;
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+
+.aulas-campus-corner-bottom-left {
+  grid-area: corner-bl;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+
+.aulas-campus-corner-bottom-right {
+  grid-area: corner-br;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
 }
 
 
@@ -2102,4 +2135,455 @@
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+/* =========================================================
+   TANDA 06 - ESPACIOS ADMINISTRATIVOS / DISPONIBILIDAD
+   ========================================================= */
+
+.aulas-plan-space.is-administrative {
+  border: 1px dashed #cfd5df;
+  background: #f4f6f8;
+  color: #667085;
+}
+
+.aulas-plan-space.is-administrative strong {
+  color: #667085;
+  font-size: 10.5px;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.aulas-plan-space.is-administrative span {
+  color: #98a2b3;
+  font-size: 9px;
+}
+
+.aulas-plan-space.is-administrative:hover:not(:disabled) {
+  border-color: rgba(181, 18, 27, 0.5);
+  background: #fff8f8;
+  box-shadow: 0 5px 14px rgba(16, 24, 40, 0.07);
+}
+
+.aulas-plan-space.is-administrative:hover:not(:disabled) strong {
+  color: #9d1119;
+}
+
+.aulas-plan-space.is-disabled-academic {
+  opacity: 1;
+}
+
+.aulas-plan-action-notice {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e3e7ed;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #667085;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.aulas-plan-action-availability {
+  grid-column: 1 / -1;
+}
+
+.aulas-plan-action-availability.is-disable {
+  border: 1px solid rgba(181, 18, 27, 0.3);
+  background: #fff7f7;
+  color: #b5121b;
+}
+
+.aulas-plan-action-availability.is-disable:hover {
+  border-color: #b5121b;
+  background: #fff0f0;
+}
+
+.aulas-plan-action-availability.is-enable {
+  border: 1px solid rgba(18, 122, 91, 0.26);
+  background: #effbf5;
+  color: #067647;
+}
+
+.aulas-plan-action-availability.is-enable:hover {
+  border-color: rgba(18, 122, 91, 0.48);
+  background: #e5f8ef;
+}
+
+/* Piso 3: aulas potenciales 9-14 alrededor del núcleo central. */
+.aulas-sector-map-edificio2-piso3 {
+  grid-template-columns: 72px 1fr 1fr 72px;
+  grid-template-rows: 58px 76px 76px 60px;
+  grid-template-areas:
+    ". top-left top-right ."
+    "left-top center center right-top"
+    "left-bottom center center right-bottom"
+    "auditorio auditorio auditorio auditorio";
+}
+
+@media (max-width: 700px) {
+  .aulas-plan-action-availability {
+    grid-column: 1;
+  }
+}
+
+/* =========================================================
+   TANDA 07 - CORRECCIÓN VISUAL ADMINISTRATIVOS + PISO 2
+   ========================================================= */
+
+/* Evita que la palabra Administrativo se salga de los bloques. */
+.aulas-plan-space.is-administrative {
+  overflow: hidden;
+  padding: 6px;
+  text-align: center;
+}
+
+.aulas-plan-space.is-administrative strong {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  color: #667085;
+  font-size: 9.2px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.aulas-plan-space.is-administrative span {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 3px;
+  overflow: hidden;
+  color: #98a2b3;
+  font-size: 8.3px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Laterales angostos: mismo tratamiento visual del Piso 2. */
+.aulas-plan-space.is-administrative.is-admin-vertical {
+  padding: 5px 3px;
+}
+
+.aulas-plan-space.is-administrative.is-admin-vertical strong {
+  width: auto;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.aulas-plan-space.is-administrative.is-admin-vertical span {
+  display: none;
+}
+
+/* En el Piso 2 los espacios administrativos ahora son botones habilitables. */
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative {
+  border: 1px dashed #cfd5df;
+  background: #f4f6f8;
+  color: #667085;
+  cursor: pointer;
+}
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative:hover:not(:disabled) {
+  border-color: rgba(181, 18, 27, 0.5);
+  background: #fff8f8;
+  box-shadow: 0 5px 14px rgba(16, 24, 40, 0.07);
+}
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative:hover:not(:disabled) strong {
+  color: #9d1119;
+}
+
+/* Topes superiores del Piso 3: texto compacto, igual al Piso 2. */
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative:not(.is-admin-vertical) strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative:not(.is-admin-vertical) strong {
+  font-size: 9.4px;
+}
+
+@media (max-width: 700px) {
+  .aulas-plan-space.is-administrative.is-admin-vertical strong {
+    writing-mode: horizontal-tb;
+    transform: none;
+    white-space: normal;
+  }
+
+  .aulas-plan-space.is-administrative.is-admin-vertical span {
+    display: block;
+  }
+}
+
+/* =========================================================
+   TANDA 08 - TEXTO ADMINISTRATIVO ADAPTATIVO
+   ========================================================= */
+
+/*
+  Los bloques laterales del Edificio 2 son demasiado angostos
+  para mostrar "Administrativo" horizontalmente. Se fuerza una
+  presentación vertical centrada en esos espacios, mientras los
+  bloques superiores/inferiores conservan una lectura horizontal.
+*/
+
+/* Base estable para todos los espacios administrativos. */
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* =========================================================
+   LATERALES ANGOSTOS -> TEXTO VERTICAL
+   Se seleccionan también por grid-area para no depender de que
+   la clase is-admin-vertical llegue correctamente al DOM.
+   ========================================================= */
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: left-top"],
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: left-bottom"],
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: right-top"],
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: right-bottom"],
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: left-top"],
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: left-bottom"],
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: right-top"],
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: right-bottom"] {
+  padding: 4px 2px !important;
+}
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: left-top"] strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: left-bottom"] strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: right-top"] strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: right-bottom"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: left-top"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: left-bottom"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: right-top"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: right-bottom"] strong {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: max-content !important;
+  max-width: none !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  transform: translate(-50%, -50%) rotate(-90deg) !important;
+  writing-mode: horizontal-tb !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+  overflow-wrap: normal !important;
+  color: #667085 !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+}
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: left-top"] span,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: left-bottom"] span,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: right-top"] span,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: right-bottom"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: left-top"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: left-bottom"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: right-top"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: right-bottom"] span {
+  display: none !important;
+}
+
+/* =========================================================
+   BLOQUES ANCHOS -> TEXTO HORIZONTAL
+   ========================================================= */
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: top-left"] strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: top-right"] strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: bottom-left"] strong,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: bottom-right"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: top-left"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: top-right"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: bottom-left"] strong,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: bottom-right"] strong {
+  position: static !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  transform: none !important;
+  writing-mode: horizontal-tb !important;
+  white-space: normal !important;
+  overflow: hidden !important;
+  color: #667085 !important;
+  font-size: 9.2px !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+  text-transform: none !important;
+  text-overflow: ellipsis !important;
+  overflow-wrap: anywhere !important;
+}
+
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: top-left"] span,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: top-right"] span,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: bottom-left"] span,
+.aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative[style*="grid-area: bottom-right"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: top-left"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: top-right"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: bottom-left"] span,
+.aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative[style*="grid-area: bottom-right"] span {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-top: 4px !important;
+  overflow: hidden !important;
+  color: #98a2b3 !important;
+  font-size: 8.1px !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* En pantallas pequeñas se prioriza legibilidad horizontal. */
+@media (max-width: 700px) {
+  .aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative strong,
+  .aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative strong {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    transform: none !important;
+    writing-mode: horizontal-tb !important;
+    white-space: normal !important;
+    overflow: hidden !important;
+    font-size: 8.8px !important;
+    line-height: 1.15 !important;
+    text-align: center !important;
+  }
+
+  .aulas-sector-map-edificio2-piso2 .aulas-plan-space.is-administrative span,
+  .aulas-sector-map-edificio2-piso3 .aulas-plan-space.is-administrative span {
+    display: block !important;
+  }
+}
+
+
+/* =========================================================
+   TANDA 10 - GEOMETRÍA DEFINITIVA DE ESQUINAS
+   ========================================================= */
+
+/*
+  Las cuatro esquinas son únicamente remates arquitectónicos.
+  Usan el mismo tono de los espacios administrativos, no tienen
+  interacción y replican la silueta dibujada del campus.
+*/
+
+.aulas-sector-map-principal {
+  grid-template-columns: 108px 1fr 1fr 108px !important;
+  grid-template-rows: 64px 96px 96px 64px !important;
+  grid-template-areas:
+    "corner-tl aula-6 aula-5 corner-tr"
+    "aula-7 center center aula-4"
+    "aula-8 center center aula-3"
+    "corner-bl aula-1 aula-2 corner-br" !important;
+}
+
+.aulas-sector-map-edificio2-piso3 {
+  grid-template-columns: 82px 1fr 1fr 82px !important;
+  grid-template-rows: 58px 78px 78px 62px !important;
+  grid-template-areas:
+    "corner-tl top-left top-right corner-tr"
+    "left-top center center right-top"
+    "left-bottom center center right-bottom"
+    "corner-bl auditorio auditorio corner-br" !important;
+}
+
+.aulas-sector-map-edificio2-piso2 {
+  grid-template-columns: 82px 1fr 1fr 82px !important;
+  grid-template-rows: 58px 78px 78px 62px !important;
+  grid-template-areas:
+    "corner-tl top-left top-right corner-tr"
+    "left-top center center right-top"
+    "aula-19 center center right-bottom"
+    "corner-bl aula-18 bottom-right corner-br" !important;
+}
+
+.aulas-sector-map-principal .aulas-campus-corner,
+.aulas-sector-map-edificio2-piso3 .aulas-campus-corner,
+.aulas-sector-map-edificio2-piso2 .aulas-campus-corner {
+  display: block !important;
+  background: #f4f6f8 !important;
+  box-shadow: inset 0 0 0 1px #cfd5df !important;
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+.aulas-sector-map-principal .aulas-campus-corner-top-left,
+.aulas-sector-map-edificio2-piso3 .aulas-campus-corner-top-left,
+.aulas-sector-map-edificio2-piso2 .aulas-campus-corner-top-left {
+  grid-area: corner-tl !important;
+  clip-path: polygon(0 100%, 100% 100%, 100% 0) !important;
+}
+
+.aulas-sector-map-principal .aulas-campus-corner-top-right,
+.aulas-sector-map-edificio2-piso3 .aulas-campus-corner-top-right,
+.aulas-sector-map-edificio2-piso2 .aulas-campus-corner-top-right {
+  grid-area: corner-tr !important;
+  clip-path: polygon(0 0, 0 100%, 100% 100%) !important;
+}
+
+.aulas-sector-map-principal .aulas-campus-corner-bottom-left,
+.aulas-sector-map-edificio2-piso3 .aulas-campus-corner-bottom-left,
+.aulas-sector-map-edificio2-piso2 .aulas-campus-corner-bottom-left {
+  grid-area: corner-bl !important;
+  clip-path: polygon(0 0, 100% 0, 100% 100%) !important;
+}
+
+.aulas-sector-map-principal .aulas-campus-corner-bottom-right,
+.aulas-sector-map-edificio2-piso3 .aulas-campus-corner-bottom-right,
+.aulas-sector-map-edificio2-piso2 .aulas-campus-corner-bottom-right {
+  grid-area: corner-br !important;
+  clip-path: polygon(0 0, 100% 0, 0 100%) !important;
+}
+
+@media (max-width: 650px) {
+  .aulas-sector-map-principal .aulas-campus-corner,
+  .aulas-sector-map-edificio2-piso3 .aulas-campus-corner,
+  .aulas-sector-map-edificio2-piso2 .aulas-campus-corner {
+    display: none !important;
+  }
+}
+
+/* =========================================================
+   VALIDACIONES EN LÍNEA - REGISTRO DE AULAS
+   ========================================================= */
+
+#aulaNumero.is-invalid,
+#aulaOrigen.is-invalid {
+  border-color: #d92d20 !important;
+  box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.08) !important;
+}
+
+.aulas-field-validation,
+.aulas-origin-availability {
+  display: block;
+  margin-top: 5px;
+  color: #667085;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.aulas-field-validation:empty {
+  display: none;
+}
+
+.aulas-field-validation.is-error,
+.aulas-origin-availability.is-error {
+  color: #b42318;
+  font-weight: 600;
 }

@@ -254,6 +254,66 @@ const PLANO_SECTOR_BIBLIOTECA = [
 
 const PLANO_EDIFICIO2_PISO3 = [
   {
+    key: 'edificio2-p3-aula-9',
+    numero: 9,
+    area: 'right-bottom',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+  },
+  {
+    key: 'edificio2-p3-aula-10',
+    numero: 10,
+    area: 'right-top',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+  },
+  {
+    key: 'edificio2-p3-aula-11',
+    numero: 11,
+    area: 'top-right',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+  },
+  {
+    key: 'edificio2-p3-aula-12',
+    numero: 12,
+    area: 'top-left',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+  },
+  {
+    key: 'edificio2-p3-aula-13',
+    numero: 13,
+    area: 'left-top',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+  },
+  {
+    key: 'edificio2-p3-aula-14',
+    numero: 14,
+    area: 'left-bottom',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+  },
+  {
     key: 'edificio2-p3-auditorio-tempisque',
     numero: 15,
     area: 'auditorio',
@@ -267,6 +327,66 @@ const PLANO_EDIFICIO2_PISO3 = [
 
 
 const PLANO_EDIFICIO2_PISO2 = [
+  {
+    key: 'edificio2-p2-admin-superior-izquierda',
+    area: 'top-left',
+    ubicacion: 'Edificio 2, piso 2 · sector superior izquierdo',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+    matchUbicacion: true,
+  },
+  {
+    key: 'edificio2-p2-admin-superior-derecha',
+    area: 'top-right',
+    ubicacion: 'Edificio 2, piso 2 · sector superior derecho',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+    matchUbicacion: true,
+  },
+  {
+    key: 'edificio2-p2-admin-lateral-izquierdo',
+    area: 'left-top',
+    ubicacion: 'Edificio 2, piso 2 · lateral izquierdo superior',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+    matchUbicacion: true,
+  },
+  {
+    key: 'edificio2-p2-admin-lateral-derecho-superior',
+    area: 'right-top',
+    ubicacion: 'Edificio 2, piso 2 · lateral derecho superior',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+    matchUbicacion: true,
+  },
+  {
+    key: 'edificio2-p2-admin-lateral-derecho-inferior',
+    area: 'right-bottom',
+    ubicacion: 'Edificio 2, piso 2 · lateral derecho inferior',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+    matchUbicacion: true,
+  },
+  {
+    key: 'edificio2-p2-admin-inferior-derecha',
+    area: 'bottom-right',
+    ubicacion: 'Edificio 2, piso 2 · sector inferior derecho',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+    administrativo: true,
+    matchUbicacion: true,
+  },
   {
     key: 'edificio2-p2-stem',
     numero: 18,
@@ -354,6 +474,12 @@ const ORIGENES_AULA = {
 
   OTRO:
     'Otro',
+};
+
+
+const LIMITES_AULAS_POR_ORIGEN = {
+  UNA: 25,
+  UNED: 3,
 };
 
 
@@ -519,6 +645,87 @@ function nombreOrigen(
     origen ||
     '—'
   );
+}
+
+
+function contarAulasPorOrigen(
+  origen,
+) {
+  return aulas.filter(
+    (aula) =>
+      aula.origen === origen,
+  ).length;
+}
+
+
+function obtenerLimiteOrigen(
+  origen,
+) {
+  return (
+    LIMITES_AULAS_POR_ORIGEN[
+      origen
+    ] ?? null
+  );
+}
+
+
+function origenTieneCupo(
+  origen,
+  aulaEditada = null,
+) {
+  const limite =
+    obtenerLimiteOrigen(
+      origen,
+    );
+
+  if (limite === null) {
+    return true;
+  }
+
+  if (
+    aulaEditada &&
+    aulaEditada.origen === origen
+  ) {
+    return true;
+  }
+
+  return (
+    contarAulasPorOrigen(
+      origen,
+    ) < limite
+  );
+}
+
+
+function buscarEspacioDuplicado(
+  numero,
+  tipo,
+  excluirId = null,
+  codigoSugerido = '',
+) {
+  if (
+    !Number.isInteger(numero) ||
+    numero < 1
+  ) {
+    return null;
+  }
+
+  const codigo =
+    construirCodigoEspacio(
+      numero,
+      tipo,
+      codigoSugerido,
+    )
+      .trim()
+      .toUpperCase();
+
+  return aulas.find(
+    (item) =>
+      item.id !== excluirId &&
+      String(item.codigo || '')
+        .trim()
+        .toUpperCase() === codigo,
+  ) || null;
 }
 
 
@@ -693,6 +900,21 @@ function aulaCoincideConSlot(
     return codigoAula === codigoSlot;
   }
 
+  if (slot.matchUbicacion) {
+    const ubicacionAula =
+      String(aula.ubicacion ?? '')
+        .trim()
+        .toLowerCase();
+
+    const ubicacionSlot =
+      String(slot.ubicacion ?? '')
+        .trim()
+        .toLowerCase();
+
+    return Boolean(ubicacionSlot) &&
+      ubicacionAula === ubicacionSlot;
+  }
+
   if (
     codigoAula.startsWith('SALA-')
   ) {
@@ -780,7 +1002,14 @@ function etiquetaPrincipalSlot(
     slot?.tipo ||
     'AULA';
 
-  return `${prefijoVisibleEspacio(tipo)} ${slot.numero}`;
+  const numero =
+    obtenerNumeroAula(aula) ??
+    slot?.numero ??
+    '';
+
+  return numero
+    ? `${prefijoVisibleEspacio(tipo)} ${numero}`
+    : prefijoVisibleEspacio(tipo);
 }
 
 
@@ -806,6 +1035,20 @@ function renderizarSlotPlanoRegistrable(
     aula.id ===
       aulaPlanoSeleccionadaId;
 
+  const deshabilitada =
+    aula &&
+    aula.activo === false;
+
+  const administrativo =
+    Boolean(
+      slot.administrativo,
+    ) &&
+    !aula;
+
+  const mostrarComoAdministrativo =
+    administrativo ||
+    deshabilitada;
+
   const especial =
     aula
       ? obtenerNombreEspecialAula(
@@ -813,28 +1056,69 @@ function renderizarSlotPlanoRegistrable(
         )
       : slot.nombreEspecial || '';
 
+  const numeroAdministrativo =
+    obtenerNumeroAula(aula) ??
+    slot.numero ??
+    null;
+
+  const administrativoVertical =
+    mostrarComoAdministrativo &&
+    [
+      'left-top',
+      'left-bottom',
+      'right-top',
+      'right-bottom',
+    ].includes(slot.area);
+
   const etiqueta =
-    etiquetaPrincipalSlot(
-      slot,
-      aula,
-    );
+    mostrarComoAdministrativo
+      ? administrativoVertical
+        ? 'Administrativo'
+        : 'Área administrativa'
+      : etiquetaPrincipalSlot(
+          slot,
+          aula,
+        );
+
+  const subtitulo =
+    mostrarComoAdministrativo
+      ? numeroAdministrativo
+        ? `Aula ${numeroAdministrativo} potencial`
+        : 'Disponible para habilitar'
+      : aula
+        ? especial ||
+            nombreTipoAula(
+              aula.tipo,
+            )
+        : especial ||
+            'Disponible para registrar';
+
+  const claseTipo =
+    mostrarComoAdministrativo
+      ? 'is-administrative'
+      : claseTipoPlano(
+          aula?.tipo || slot.tipo,
+        );
 
   return `
     <button
       type="button"
       class="
         aulas-plan-space
-        ${claseTipoPlano(
-          aula?.tipo || slot.tipo,
-        )}
+        ${claseTipo}
+        ${
+          administrativoVertical
+            ? 'is-admin-vertical'
+            : ''
+        }
         ${
           aula
             ? 'is-registered'
             : 'is-pending'
         }
         ${
-          aula && !aula.activo
-            ? 'is-inactive'
+          deshabilitada
+            ? 'is-disabled-academic'
             : ''
         }
         ${
@@ -861,7 +1145,11 @@ function renderizarSlotPlanoRegistrable(
       aria-label="${escapeHtml(
         aula
           ? nombreVisibleAula(aula)
-          : `Registrar ${etiqueta}`,
+          : mostrarComoAdministrativo
+            ? numeroAdministrativo
+              ? `Área administrativa correspondiente al Aula ${numeroAdministrativo}`
+              : 'Área administrativa disponible para habilitar como aula'
+            : `Registrar ${etiqueta}`,
       )}"
     >
       <strong>
@@ -869,15 +1157,7 @@ function renderizarSlotPlanoRegistrable(
       </strong>
 
       <span>
-        ${escapeHtml(
-          aula
-            ? especial ||
-                nombreTipoAula(
-                  aula.tipo,
-                )
-            : especial ||
-                'Disponible para registrar',
-        )}
+        ${escapeHtml(subtitulo)}
       </span>
     </button>
   `;
@@ -2250,7 +2530,7 @@ function renderizarPlanoAulas(
           data-edificio2-floor="3"
         >
           <strong>Piso 3</strong>
-          <span>Auditorio Tempisque y distribución parcial</span>
+          <span>Aulas 9 a 15 y espacios administrativos</span>
         </button>
 
         <button
@@ -2269,28 +2549,40 @@ function renderizarPlanoAulas(
     </div>
   `;
 
+  const esquinasDecorativasEdificio = `
+    <div
+      class="aulas-campus-corner aulas-campus-corner-top-left"
+      aria-hidden="true"
+    ></div>
+
+    <div
+      class="aulas-campus-corner aulas-campus-corner-top-right"
+      aria-hidden="true"
+    ></div>
+
+    <div
+      class="aulas-campus-corner aulas-campus-corner-bottom-left"
+      aria-hidden="true"
+    ></div>
+
+    <div
+      class="aulas-campus-corner aulas-campus-corner-bottom-right"
+      aria-hidden="true"
+    ></div>
+  `;
+
   const mapaEdificio2 =
     pisoEdificio2Actual === 2
       ? `
           <div class="aulas-sector-map aulas-sector-map-edificio2-piso2">
-            <div class="aulas-plan-support-block is-muted" style="grid-area: top-left;">Área administrativa</div>
-            <div class="aulas-plan-support-block is-muted" style="grid-area: top-right;">Área administrativa</div>
-            <div class="aulas-plan-support-block is-muted is-vertical" style="grid-area: left-top;">Administrativo</div>
+            ${esquinasDecorativasEdificio}
             ${slotsEdificio2}
-            <div class="aulas-plan-support-block is-muted is-vertical" style="grid-area: right-top;">Administrativo</div>
-            <div class="aulas-plan-support-block is-muted is-vertical" style="grid-area: right-bottom;">Administrativo</div>
-            <div class="aulas-plan-support-block is-muted" style="grid-area: bottom-right;">Área administrativa</div>
             ${selectorPiso}
           </div>
         `
       : `
           <div class="aulas-sector-map aulas-sector-map-edificio2-piso3">
-            <div class="aulas-plan-support-block is-outline" style="grid-area: top-left;">Aula</div>
-            <div class="aulas-plan-support-block is-outline" style="grid-area: top-right;">Aula</div>
-            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: left-top;">Aula</div>
-            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: left-bottom;">Aula</div>
-            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: right-top;">Aula</div>
-            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: right-bottom;">Aula</div>
+            ${esquinasDecorativasEdificio}
             ${slotsEdificio2}
             ${selectorPiso}
           </div>
@@ -2405,6 +2697,7 @@ function renderizarPlanoAulas(
             </div>
 
             <div class="aulas-sector-map aulas-sector-map-principal">
+              ${esquinasDecorativasEdificio}
               ${principalSlots}
               <div class="aulas-campus-core is-principal" style="grid-area: center;">
                 <strong>Piso 2</strong>
@@ -2758,6 +3051,13 @@ function abrirAccionesAulaPlano(
   const puedeEditar =
     puedeGestionarAulas();
 
+  const permiteCambioDisponibilidad =
+    puedeEditar &&
+    aula.tipo === 'AULA';
+
+  const aulaHabilitada =
+    aula.activo === true;
+
   dialog.innerHTML = `
     <div
       class="sgpa-confirm-card aulas-plan-action-card"
@@ -2773,7 +3073,11 @@ function abrirAccionesAulaPlano(
         class="aulas-plan-action-content"
       >
         <span>
-          Aula seleccionada
+          ${
+            aulaHabilitada
+              ? 'Aula seleccionada'
+              : 'Espacio administrativo'
+          }
         </span>
 
         <h3>
@@ -2790,6 +3094,17 @@ function abrirAccionesAulaPlano(
               'Sin ubicación especificada',
           )}
         </p>
+
+        ${
+          !aulaHabilitada
+            ? `
+                <div class="aulas-plan-action-notice">
+                  Este espacio está deshabilitado para asignaciones académicas
+                  y se representa como área administrativa en el plano.
+                </div>
+              `
+            : ''
+        }
       </div>
 
       <div
@@ -2820,6 +3135,36 @@ function abrirAccionesAulaPlano(
                     aria-hidden="true"
                   ></i>
                   Editar aula
+                </button>
+              `
+            : ''
+        }
+
+        ${
+          permiteCambioDisponibilidad
+            ? `
+                <button
+                  type="button"
+                  id="aulasPlanoCambiarDisponibilidad"
+                  class="aulas-plan-action-availability ${
+                    aulaHabilitada
+                      ? 'is-disable'
+                      : 'is-enable'
+                  }"
+                >
+                  <i
+                    data-lucide="${
+                      aulaHabilitada
+                        ? 'circle-pause'
+                        : 'circle-check'
+                    }"
+                    aria-hidden="true"
+                  ></i>
+                  ${
+                    aulaHabilitada
+                      ? 'Deshabilitar aula'
+                      : 'Habilitar aula'
+                  }
                 </button>
               `
             : ''
@@ -2887,6 +3232,21 @@ function abrirAccionesAulaPlano(
       },
     );
 
+  dialog
+    .querySelector(
+      '#aulasPlanoCambiarDisponibilidad',
+    )
+    ?.addEventListener(
+      'click',
+      async () => {
+        cerrar();
+
+        await cambiarDisponibilidadAcademicaAulaPlano(
+          aula,
+        );
+      },
+    );
+
   dialog.addEventListener(
     'cancel',
     (event) => {
@@ -2907,6 +3267,133 @@ function abrirAccionesAulaPlano(
   dialog.showModal();
 
   renderizarIconos();
+}
+
+
+/* =========================================================
+   HABILITACIÓN DE ESPACIOS ADMINISTRATIVOS
+   ========================================================= */
+
+async function solicitarHabilitacionSlotAdministrativo(
+  slot,
+) {
+  if (!slot) {
+    return;
+  }
+
+  const tieneNumero =
+    Number.isInteger(
+      Number(slot.numero),
+    ) &&
+    Number(slot.numero) > 0;
+
+  const confirmado =
+    await confirmarAccion({
+      titulo:
+        tieneNumero
+          ? `Habilitar Aula ${slot.numero}`
+          : 'Habilitar espacio administrativo',
+
+      mensaje:
+        tieneNumero
+          ? `El espacio correspondiente al Aula ${slot.numero} está siendo utilizado actualmente como área administrativa. ¿Desea iniciar su habilitación como aula académica? Al continuar se abrirá el formulario para completar sus datos antes de registrarla.`
+          : 'Este espacio del Edificio 2 está siendo utilizado actualmente como área administrativa. ¿Desea habilitarlo como aula académica? Al continuar podrá asignarle el número de aula y completar sus datos antes de registrarlo.',
+
+      textoConfirmar:
+        'Habilitar aula',
+
+      peligro:
+        false,
+    });
+
+  if (!confirmado) {
+    return;
+  }
+
+  abrirFormularioAula(
+    null,
+    construirSugerenciaDesdeSlot(
+      slot,
+    ),
+  );
+}
+
+
+async function cambiarDisponibilidadAcademicaAulaPlano(
+  aula,
+) {
+  if (
+    !aula ||
+    !validarGestionAulas()
+  ) {
+    return;
+  }
+
+  const habilitar =
+    aula.activo === false;
+
+  const confirmado =
+    await confirmarAccion({
+      titulo:
+        habilitar
+          ? 'Habilitar aula'
+          : 'Deshabilitar aula',
+
+      mensaje:
+        habilitar
+          ? `¿Desea habilitar nuevamente "${nombreVisibleAula(aula)}" como espacio académico? El aula volverá a estar disponible para asignaciones.`
+          : `¿Desea deshabilitar "${nombreVisibleAula(aula)}" como espacio académico? En el plano se mostrará como área administrativa y dejará de estar disponible para asignaciones mientras permanezca deshabilitada.`,
+
+      textoConfirmar:
+        habilitar
+          ? 'Habilitar'
+          : 'Deshabilitar',
+
+      peligro:
+        !habilitar,
+    });
+
+  if (!confirmado) {
+    return;
+  }
+
+  try {
+    const resultado =
+      await cambiarEstadoAula(
+        aula.id,
+        habilitar,
+      );
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+          'No fue posible actualizar la disponibilidad académica del aula.',
+      );
+    }
+
+    mostrarExito({
+      titulo:
+        habilitar
+          ? 'Aula habilitada'
+          : 'Aula deshabilitada',
+
+      mensaje:
+        habilitar
+          ? 'El aula volvió a quedar disponible como espacio académico.'
+          : 'El aula quedó deshabilitada y se mostrará como espacio administrativo en el plano.',
+    });
+
+    await iniciarAulasPage();
+  } catch (error) {
+    mostrarError({
+      titulo:
+        'No se pudo actualizar el aula',
+
+      mensaje:
+        error?.message ||
+        'No fue posible actualizar la disponibilidad académica del aula.',
+    });
+  }
 }
 
 
@@ -2968,12 +3455,18 @@ async function manejarAccionTabla(
       );
 
     if (slot) {
-      abrirFormularioAula(
-        null,
-        construirSugerenciaDesdeSlot(
+      if (slot.administrativo) {
+        await solicitarHabilitacionSlotAdministrativo(
           slot,
-        ),
-      );
+        );
+      } else {
+        abrirFormularioAula(
+          null,
+          construirSugerenciaDesdeSlot(
+            slot,
+          ),
+        );
+      }
     }
 
     return;
@@ -6920,6 +7413,31 @@ function abrirFormularioAula(
   const editando =
     Boolean(aula);
 
+  if (
+    !editando &&
+    sugerencia?.origen &&
+    !origenTieneCupo(
+      sugerencia.origen,
+    )
+  ) {
+    const limite =
+      obtenerLimiteOrigen(
+        sugerencia.origen,
+      );
+
+    mostrarError({
+      titulo:
+        'Límite de espacios alcanzado',
+
+      mensaje:
+        sugerencia.origen === 'UNA'
+          ? `La UNA ya tiene los ${limite} espacios permitidos registrados. No es posible habilitar otro espacio dentro de la UNA.`
+          : `La UNED ya tiene los ${limite} espacios configurados registrados. No es posible registrar otro espacio de la UNED.`,
+    });
+
+    return;
+  }
+
   const numeroActual =
     aula
       ? obtenerNumeroAula(aula) ?? ''
@@ -6931,6 +7449,17 @@ function abrirFormularioAula(
           aula,
         )
       : sugerencia?.nombreEspecial || '';
+
+  const origenPreferido =
+    aula?.origen ||
+    sugerencia?.origen ||
+    (
+      origenTieneCupo('UNA')
+        ? 'UNA'
+        : origenTieneCupo('UNED')
+          ? 'UNED'
+          : 'OTRO'
+    );
 
   content.innerHTML =
     FormDialog({
@@ -6979,6 +7508,12 @@ function abrirFormularioAula(
           >
             Ingrese únicamente el número. El nombre final se adapta al tipo de espacio seleccionado.
           </small>
+
+          <small
+            id="aulaNumeroValidation"
+            class="aulas-field-validation"
+            aria-live="polite"
+          ></small>
 
         </label>
 
@@ -7160,26 +7695,45 @@ function abrirFormularioAula(
               ORIGENES_AULA,
             )
               .map(
-                ([valor, nombre]) => `
-                  <option
-                    value="${valor}"
-                    ${
-                      (
-                        aula?.origen ||
-                        sugerencia?.origen ||
-                        'UNA'
-                      ) === valor
-                        ? 'selected'
-                        : ''
-                    }
-                  >
-                    ${nombre}
-                  </option>
-                `,
+                ([valor, nombre]) => {
+                  const bloqueado =
+                    !origenTieneCupo(
+                      valor,
+                      aula,
+                    );
+
+                  return `
+                    <option
+                      value="${valor}"
+                      ${
+                        origenPreferido === valor
+                          ? 'selected'
+                          : ''
+                      }
+                      ${
+                        bloqueado
+                          ? 'disabled'
+                          : ''
+                      }
+                    >
+                      ${nombre}${
+                        bloqueado
+                          ? ' · límite alcanzado'
+                          : ''
+                      }
+                    </option>
+                  `;
+                },
               )
               .join('')}
 
           </select>
+
+          <small
+            id="aulaOrigenDisponibilidad"
+            class="aulas-origin-availability"
+            aria-live="polite"
+          ></small>
 
         </label>
 
@@ -7206,6 +7760,133 @@ function abrirFormularioAula(
   habilitarCierreExterior(
     dialog,
   );
+
+  const validarFormularioEnLinea =
+    () => {
+      const numeroInput =
+        document.getElementById(
+          'aulaNumero',
+        );
+
+      const tipoInput =
+        document.getElementById(
+          'aulaTipo',
+        );
+
+      const origenInput =
+        document.getElementById(
+          'aulaOrigen',
+        );
+
+      const numeroMensaje =
+        document.getElementById(
+          'aulaNumeroValidation',
+        );
+
+      const origenMensaje =
+        document.getElementById(
+          'aulaOrigenDisponibilidad',
+        );
+
+      const numero =
+        Number(
+          numeroInput?.value,
+        );
+
+      const tipo =
+        tipoInput?.value || 'AULA';
+
+      const origen =
+        origenInput?.value || 'UNA';
+
+      const duplicada =
+        buscarEspacioDuplicado(
+          numero,
+          tipo,
+          aula?.id ?? null,
+          sugerencia?.codigo || '',
+        );
+
+      if (numeroInput) {
+        numeroInput.classList.toggle(
+          'is-invalid',
+          Boolean(duplicada),
+        );
+      }
+
+      if (numeroMensaje) {
+        if (duplicada) {
+          numeroMensaje.textContent =
+            `Esta aula ya está asignada como ${nombreVisibleAula(duplicada)}.`;
+          numeroMensaje.classList.add(
+            'is-error',
+          );
+        } else {
+          numeroMensaje.textContent = '';
+          numeroMensaje.classList.remove(
+            'is-error',
+          );
+        }
+      }
+
+      const limite =
+        obtenerLimiteOrigen(
+          origen,
+        );
+
+      const cantidad =
+        contarAulasPorOrigen(
+          origen,
+        );
+
+      const mismoOrigen =
+        editando &&
+        aula?.origen === origen;
+
+      const limiteAlcanzado =
+        limite !== null &&
+        cantidad >= limite &&
+        !mismoOrigen;
+
+      if (origenInput) {
+        origenInput.classList.toggle(
+          'is-invalid',
+          limiteAlcanzado,
+        );
+      }
+
+      if (origenMensaje) {
+        if (limite !== null) {
+          const disponibles =
+            Math.max(
+              limite - cantidad,
+              0,
+            );
+
+          origenMensaje.textContent =
+            limiteAlcanzado
+              ? `${nombreOrigen(origen)} alcanzó el límite de ${limite} espacios registrados.`
+              : `${nombreOrigen(origen)}: ${cantidad}/${limite} espacios registrados · ${disponibles} disponibles.`;
+
+          origenMensaje.classList.toggle(
+            'is-error',
+            limiteAlcanzado,
+          );
+        } else {
+          origenMensaje.textContent =
+            'Este origen no tiene un límite institucional configurado.';
+          origenMensaje.classList.remove(
+            'is-error',
+          );
+        }
+      }
+
+      return {
+        duplicada,
+        limiteAlcanzado,
+      };
+    };
+
 
   const actualizarPreview =
     () => {
@@ -7255,6 +7936,7 @@ function abrirFormularioAula(
           </strong>
         `;
 
+        validarFormularioEnLinea();
         return;
       }
 
@@ -7272,6 +7954,8 @@ function abrirFormularioAula(
           )}
         </strong>
       `;
+
+      validarFormularioEnLinea();
     };
 
   document
@@ -7301,7 +7985,17 @@ function abrirFormularioAula(
       actualizarPreview,
     );
 
+  document
+    .getElementById(
+      'aulaOrigen',
+    )
+    ?.addEventListener(
+      'change',
+      validarFormularioEnLinea,
+    );
+
   actualizarPreview();
+  validarFormularioEnLinea();
 
   document
     .getElementById(
@@ -7345,6 +8039,37 @@ function abrirFormularioAula(
               'aulaTipo',
             )
             ?.value || 'AULA';
+
+        const validacionEnLinea =
+          validarFormularioEnLinea();
+
+        if (
+          validacionEnLinea.duplicada
+        ) {
+          mostrarError({
+            titulo:
+              'Aula ya asignada',
+
+            mensaje:
+              `El número indicado ya corresponde a ${nombreVisibleAula(validacionEnLinea.duplicada)}. Utilice otro número de espacio.`,
+          });
+
+          return;
+        }
+
+        if (
+          validacionEnLinea.limiteAlcanzado
+        ) {
+          mostrarError({
+            titulo:
+              'Límite de espacios alcanzado',
+
+            mensaje:
+              'El origen seleccionado ya alcanzó la cantidad máxima de espacios configurados.',
+          });
+
+          return;
+        }
 
         if (
           !Number.isInteger(numero) ||
