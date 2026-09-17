@@ -867,3 +867,1239 @@
     flex-direction: column;
   }
 }
+
+/* =========================================================
+   ESTANDARIZACIÓN VISUAL FINAL - AULAS
+   ========================================================= */
+
+.aulas-toolbar {
+  margin-bottom: 22px;
+}
+
+.aulas-toolbar h2,
+.aulas-detail-header h2 {
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.aulas-toolbar p,
+.aulas-detail-header p {
+  line-height: 1.5;
+}
+
+.aulas-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.aulas-page .aulas-primary-button,
+.aulas-page .aulas-secondary-button,
+.aulas-page .aulas-back-button {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.aulas-page .aulas-primary-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid #b5121b;
+  border-radius: 9px;
+  background: #b5121b;
+  color: #ffffff;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.aulas-page .aulas-primary-button:hover:not(:disabled) {
+  border-color: #951019;
+  background: #951019;
+  box-shadow: 0 4px 11px rgba(181, 18, 27, 0.16);
+  transform: translateY(-1px);
+}
+
+.aulas-page .aulas-primary-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.aulas-page .aulas-primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.aulas-toolbar .aulas-secondary-button,
+.aulas-toolbar .aulas-primary-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: inherit;
+}
+
+.aulas-toolbar .aulas-secondary-button {
+  border: 1px solid #d9dee7;
+  background: #ffffff;
+  color: #344054;
+}
+
+.aulas-toolbar .aulas-secondary-button:hover:not(:disabled) {
+  border-color: #cfd5df;
+  background: #f8fafc;
+}
+
+.aulas-toolbar .aulas-primary-button svg,
+.aulas-toolbar .aulas-secondary-button svg,
+.aulas-page .aulas-primary-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+#volverBusquedaAulasButton,
+#volverCatalogoAulas {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid #b5121b;
+  border-radius: 9px;
+  background: #b5121b;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+#volverBusquedaAulasButton:hover,
+#volverCatalogoAulas:hover {
+  border-color: #951019;
+  background: #951019;
+  box-shadow: 0 4px 11px rgba(181, 18, 27, 0.16);
+  transform: translateY(-1px);
+}
+
+.aulas-filters {
+  grid-template-columns: minmax(260px, 1fr) 200px 160px;
+  gap: 12px;
+}
+
+.aulas-search,
+.aulas-select {
+  min-height: 44px;
+  border-radius: 10px;
+}
+
+.aulas-search {
+  gap: 10px;
+  padding: 0 14px;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.aulas-search:focus-within,
+.aulas-select:focus {
+  border-color: rgba(207, 32, 41, 0.45);
+  box-shadow: 0 0 0 3px rgba(207, 32, 41, 0.06);
+  outline: 0;
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] th:last-child,
+.sgpa-data-table[aria-label="Listado de aulas"] td:last-child,
+.sgpa-data-table[aria-label="Catálogo de equipamientos"] th:last-child,
+.sgpa-data-table[aria-label="Catálogo de equipamientos"] td:last-child {
+  text-align: center;
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] td:last-child .aulas-actions,
+.sgpa-data-table[aria-label="Catálogo de equipamientos"] td:last-child .aulas-actions {
+  justify-content: center;
+}
+
+
+/* =========================================================
+   VISTA LISTA / PLANO
+   ========================================================= */
+
+.aulas-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: -2px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #e5e9ef;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.aulas-view-bar > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aulas-view-bar strong {
+  color: #344054;
+  font-size: 12px;
+}
+
+.aulas-view-bar span {
+  color: #7a8493;
+  font-size: 11.5px;
+}
+
+.aulas-view-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid #e1e5eb;
+  border-radius: 9px;
+  background: #f7f8fa;
+}
+
+.aulas-view-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #667085;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.aulas-view-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.aulas-view-button.is-active {
+  background: #ffffff;
+  color: #b5121b;
+  box-shadow: 0 1px 4px rgba(16, 24, 40, 0.08);
+}
+
+
+/* =========================================================
+   SELECTOR VISUAL DE AULAS
+   ========================================================= */
+
+.aulas-plan-shell {
+  width: 100%;
+}
+
+.aulas-plan-main {
+  width: 100%;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #e4e8ee;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.aulas-plan-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 18px;
+}
+
+.aulas-plan-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #b5121b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.aulas-plan-header h3 {
+  margin: 0;
+  color: #253247;
+  font-size: 17px;
+}
+
+.aulas-plan-header p {
+  max-width: 720px;
+  margin: 5px 0 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.aulas-plan-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  max-width: 420px;
+  color: #667085;
+  font-size: 10.5px;
+}
+
+.aulas-plan-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.aulas-plan-legend i {
+  width: 9px;
+  height: 9px;
+  border: 1px solid #cfd5df;
+  border-radius: 3px;
+  background: #ffffff;
+}
+
+.aulas-plan-legend i.is-available {
+  border-color: rgba(181, 18, 27, 0.28);
+  background: rgba(181, 18, 27, 0.07);
+}
+
+.aulas-plan-legend i.is-empty {
+  border-style: dashed;
+  border-color: rgba(181, 18, 27, 0.36);
+  background: #fffafa;
+}
+
+.aulas-plan-legend i.is-support {
+  border-color: rgba(71, 84, 103, 0.22);
+  background: #eef2f6;
+}
+
+
+/* =========================================================
+   DISTRIBUCIÓN GENERAL DEL CAMPUS
+   ========================================================= */
+
+.aulas-campus-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(330px, 1.02fr)
+    minmax(330px, 0.98fr)
+    minmax(180px, 0.42fr);
+  grid-template-areas:
+    "edificio2 biblioteca humanistico"
+    "principal principal humanistico";
+  gap: 14px;
+  align-items: stretch;
+}
+
+.aulas-sector-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+  background: #fcfcfd;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.025);
+  overflow: visible;
+}
+
+.aulas-sector-card-edificio2 {
+  grid-area: edificio2;
+}
+
+.aulas-sector-card-biblioteca {
+  grid-area: biblioteca;
+}
+
+.aulas-sector-card-humanistico {
+  grid-area: humanistico;
+}
+
+.aulas-sector-card-principal {
+  grid-area: principal;
+}
+
+.aulas-sector-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 11px;
+}
+
+.aulas-sector-heading strong {
+  color: #253247;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.aulas-sector-heading span {
+  color: #667085;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   BLOQUES REGISTRABLES DEL PLANO
+   ========================================================= */
+
+.aulas-plan-space {
+  min-width: 0;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #d7dde7;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #344054;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.aulas-plan-space strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aulas-plan-space span {
+  max-width: 100%;
+  overflow: hidden;
+  color: #667085;
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aulas-plan-space.is-aula.is-registered {
+  border-color: rgba(181, 18, 27, 0.24);
+  background: rgba(181, 18, 27, 0.05);
+}
+
+.aulas-plan-space.is-aula.is-pending {
+  border: 1px dashed rgba(181, 18, 27, 0.42);
+  background: rgba(181, 18, 27, 0.025);
+  color: #9d1119;
+}
+
+.aulas-plan-space.is-sala.is-registered,
+.aulas-plan-space.is-sala.is-pending {
+  border-color: rgba(39, 70, 144, 0.24);
+  background: #eff4ff;
+  color: #274690;
+}
+
+.aulas-plan-space.is-sala.is-pending {
+  border-style: dashed;
+}
+
+.aulas-plan-space.is-auditorio.is-registered,
+.aulas-plan-space.is-auditorio.is-pending {
+  border-color: rgba(217, 153, 17, 0.4);
+  background: #faf3d5;
+  color: #8a5a00;
+}
+
+.aulas-plan-space.is-auditorio.is-pending {
+  border-style: dashed;
+}
+
+.aulas-plan-space.is-laboratorio.is-registered,
+.aulas-plan-space.is-laboratorio.is-pending {
+  border-color: rgba(18, 122, 91, 0.3);
+  background: #ecfdf3;
+  color: #0f766e;
+}
+
+.aulas-plan-space.is-laboratorio.is-pending {
+  border-style: dashed;
+}
+
+.aulas-plan-space:hover:not(:disabled) {
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
+  transform: translateY(-1px);
+}
+
+.aulas-plan-space.is-aula:hover:not(:disabled) {
+  border-color: rgba(181, 18, 27, 0.64);
+  background: rgba(181, 18, 27, 0.07);
+}
+
+.aulas-plan-space.is-sala:hover:not(:disabled) {
+  border-color: rgba(39, 70, 144, 0.5);
+  background: #e8f0ff;
+}
+
+.aulas-plan-space.is-auditorio:hover:not(:disabled) {
+  border-color: rgba(217, 153, 17, 0.62);
+  background: #f8edc5;
+}
+
+.aulas-plan-space.is-laboratorio:hover:not(:disabled) {
+  border-color: rgba(18, 122, 91, 0.5);
+  background: #ddf8e9;
+}
+
+.aulas-plan-space.is-filtered-out {
+  opacity: 0.42;
+}
+
+.aulas-plan-space.is-inactive {
+  opacity: 0.58;
+}
+
+
+/* =========================================================
+   EDIFICIO PRINCIPAL - PISO 2
+   ========================================================= */
+
+.aulas-sector-map {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.aulas-sector-map-principal {
+  grid-template-columns: 78px 1fr 1fr 78px;
+  grid-template-rows: 58px 88px 88px 58px;
+  grid-template-areas:
+    "aula-7 aula-6 aula-5 aula-4"
+    "aula-8 center center aula-3"
+    "aula-8 center center aula-3"
+    "aula-1 aula-1 aula-2 aula-2";
+}
+
+.aulas-campus-core {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfd 100%);
+  text-align: center;
+}
+
+.aulas-campus-core strong {
+  color: #253247;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.aulas-campus-core span {
+  color: #7a8493;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+
+/* =========================================================
+   EDIFICIO 2 - PISOS 2 Y 3
+   ========================================================= */
+
+.aulas-sector-map-edificio2-piso3,
+.aulas-sector-map-edificio2-piso2 {
+  grid-template-columns: 68px 1fr 1fr 68px;
+  grid-template-rows: 54px 82px 82px 60px;
+}
+
+.aulas-sector-map-edificio2-piso3 {
+  grid-template-areas:
+    "left-top top-left top-right right-top"
+    "left-top center center right-top"
+    "left-bottom center center right-bottom"
+    "auditorio auditorio auditorio auditorio";
+}
+
+.aulas-sector-map-edificio2-piso2 {
+  grid-template-areas:
+    "left-top top-left top-right right-top"
+    "left-top center center right-top"
+    "aula-19 center center right-bottom"
+    "aula-18 aula-18 bottom-right bottom-right";
+}
+
+.aulas-plan-support-block {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 1px solid #dde3ea;
+  border-radius: 9px;
+  background: #f8fafc;
+  color: #475467;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.aulas-plan-support-block.is-outline {
+  background: #ffffff;
+}
+
+.aulas-plan-support-block.is-muted {
+  border-color: #e5e7eb;
+  background: #f5f6f8;
+  color: #98a2b3;
+}
+
+.aulas-plan-support-block.is-biblioteca {
+  border-color: rgba(71, 84, 103, 0.16);
+  background: #eef2f6;
+}
+
+.aulas-plan-support-block.is-vertical {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+
+/* =========================================================
+   SELECTOR DE PISO DEL EDIFICIO 2
+   ========================================================= */
+
+.aulas-floor-selector {
+  position: relative;
+  z-index: 8;
+  min-width: 0;
+}
+
+.aulas-floor-selector-trigger {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 12px 38px 12px 14px;
+  border: 1px solid rgba(181, 18, 27, 0.18);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #fffafa 100%);
+  color: #344054;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.aulas-floor-selector-trigger:hover,
+.aulas-floor-selector.is-open .aulas-floor-selector-trigger {
+  border-color: rgba(181, 18, 27, 0.45);
+  box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.055);
+}
+
+.aulas-floor-selector-trigger span {
+  color: #8b95a5;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aulas-floor-selector-trigger strong {
+  color: #253247;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.aulas-floor-selector-trigger small {
+  color: #b5121b;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.aulas-floor-selector-trigger b {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  color: #b5121b;
+  font-size: 16px;
+  transform: translateY(-50%);
+}
+
+.aulas-floor-selector-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 30;
+  width: min(310px, calc(100vw - 56px));
+  padding: 6px;
+  border: 1px solid #e0e5ec;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.16);
+  transform: translateX(-50%);
+}
+
+.aulas-floor-selector-menu button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 11px;
+  border-radius: 8px;
+  background: transparent;
+  color: #344054;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.aulas-floor-selector-menu button:hover {
+  background: #f7f8fa;
+}
+
+.aulas-floor-selector-menu button.is-active {
+  background: #fff3f3;
+  color: #9d1119;
+}
+
+.aulas-floor-selector-menu strong {
+  font-size: 11.5px;
+}
+
+.aulas-floor-selector-menu span {
+  color: #7a8493;
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+
+/* =========================================================
+   BIBLIOTECA Y SALAS
+   ========================================================= */
+
+.aulas-biblioteca-grid {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  grid-template-columns: 84px 1fr 1fr 48px 48px;
+  grid-template-rows: 84px 70px 70px;
+  grid-template-areas:
+    "bib-left bib-top exdecanos sala-2 sala-1"
+    "bib-left bib-main bib-main bib-right bib-right"
+    ". bib-main bib-main bib-right bib-right";
+}
+
+.aulas-plan-support-block.is-library-main {
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   COLEGIO HUMANÍSTICO
+   ========================================================= */
+
+.aulas-humanistico-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  height: calc(100% - 53px);
+}
+
+.aulas-humanistico-stack .aulas-plan-space {
+  min-height: 150px;
+  height: 100%;
+}
+
+
+/* =========================================================
+   OTROS ESPACIOS REGISTRADOS
+   ========================================================= */
+
+.aulas-plan-other {
+  margin-top: 15px;
+  padding-top: 14px;
+  border-top: 1px solid #eceff3;
+}
+
+.aulas-plan-other > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.aulas-plan-other > div:first-child strong {
+  color: #344054;
+  font-size: 12px;
+}
+
+.aulas-plan-other > div:first-child span {
+  color: #7a8493;
+  font-size: 10.5px;
+}
+
+.aulas-plan-other-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.aulas-plan-other-item {
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px solid #e0e4ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #344054;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.aulas-plan-other-item strong {
+  font-size: 11px;
+}
+
+.aulas-plan-other-item span {
+  color: #7a8493;
+  font-size: 9.5px;
+}
+
+.aulas-plan-other-item:hover {
+  border-color: rgba(181, 18, 27, 0.38);
+  background: #fff8f8;
+}
+
+
+/* =========================================================
+   MODAL DE ACCIONES DESDE EL PLANO
+   ========================================================= */
+
+.aulas-plan-action-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(440px, calc(100vw - 36px));
+  max-width: 440px;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.aulas-plan-action-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.aulas-plan-action-card {
+  width: 100%;
+  padding: 24px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 20px 55px rgba(16, 24, 40, 0.22);
+}
+
+.aulas-plan-action-icon {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: rgba(181, 18, 27, 0.08);
+  color: #b5121b;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.aulas-plan-action-content > span {
+  display: block;
+  margin-bottom: 4px;
+  color: #b5121b;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aulas-plan-action-content h3 {
+  margin: 0;
+  color: #1d2939;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.aulas-plan-action-content p {
+  margin: 7px 0 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.aulas-plan-action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.aulas-plan-action-buttons button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aulas-plan-action-buttons button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.aulas-plan-action-view {
+  border: 1px solid #d8dee8;
+  background: #ffffff;
+  color: #344054;
+}
+
+.aulas-plan-action-view:hover {
+  background: #f8fafc;
+}
+
+.aulas-plan-action-edit {
+  border: 1px solid #b5121b;
+  background: #b5121b;
+  color: #ffffff;
+}
+
+.aulas-plan-action-edit:hover {
+  border-color: #951019;
+  background: #951019;
+}
+
+.aulas-plan-action-cancel {
+  grid-column: 1 / -1;
+  border: 0;
+  background: #f5f6f8;
+  color: #667085;
+}
+
+.aulas-plan-action-cancel:hover {
+  background: #eceff3;
+}
+
+
+/* =========================================================
+   RESPONSIVE DEL PLANO
+   ========================================================= */
+
+@media (max-width: 1280px) {
+  .aulas-campus-layout {
+    grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr);
+    grid-template-areas:
+      "principal principal"
+      "edificio2 biblioteca"
+      "humanistico humanistico";
+  }
+
+  .aulas-humanistico-stack {
+    grid-template-columns: 1fr 1fr;
+    height: auto;
+  }
+
+  .aulas-humanistico-stack .aulas-plan-space {
+    min-height: 88px;
+  }
+}
+
+@media (max-width: 920px) {
+  .aulas-plan-header {
+    flex-direction: column;
+  }
+
+  .aulas-plan-legend {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .aulas-campus-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "principal"
+      "edificio2"
+      "biblioteca"
+      "humanistico";
+  }
+}
+
+@media (max-width: 650px) {
+  .aulas-sector-map-principal,
+  .aulas-sector-map-edificio2-piso3,
+  .aulas-sector-map-edificio2-piso2,
+  .aulas-biblioteca-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-template-areas: none;
+  }
+
+  .aulas-sector-map-principal > *,
+  .aulas-sector-map-edificio2-piso3 > *,
+  .aulas-sector-map-edificio2-piso2 > *,
+  .aulas-biblioteca-grid > * {
+    grid-area: auto !important;
+    min-height: 70px;
+  }
+
+  .aulas-floor-selector-menu {
+    left: 0;
+    width: min(300px, calc(100vw - 64px));
+    transform: none;
+  }
+
+  .aulas-humanistico-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .aulas-plan-action-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .aulas-plan-action-cancel {
+    grid-column: auto;
+  }
+}
+
+
+/* =========================================================
+   FORMULARIO - NÚMERO Y NOMBRE ESPECIAL
+   ========================================================= */
+
+.aulas-form-help {
+  display: block;
+  margin-top: 5px;
+  color: #8b95a5;
+  font-size: 10.5px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.aulas-name-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(181, 18, 27, 0.12);
+  border-radius: 9px;
+  background: rgba(181, 18, 27, 0.035);
+}
+
+.aulas-name-preview span {
+  color: #7a8493;
+  font-size: 11px;
+}
+
+.aulas-name-preview strong {
+  color: #9d1119;
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   BÚSQUEDA DE AULAS - TOQUE INSTITUCIONAL
+   ========================================================= */
+
+.aulas-search-panel {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(181, 18, 27, 0.14);
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.035);
+}
+
+.aulas-search-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #b5121b;
+}
+
+.aulas-search-intro {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 13px 15px;
+  border: 1px solid rgba(181, 18, 27, 0.10);
+  border-radius: 10px;
+  background: rgba(181, 18, 27, 0.035);
+}
+
+.aulas-search-intro-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(181, 18, 27, 0.09);
+  color: #b5121b;
+}
+
+.aulas-search-intro-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.aulas-search-intro strong {
+  display: block;
+  color: #273447;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.aulas-search-intro p {
+  margin: 3px 0 0;
+  color: #667085;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.aulas-search-available-form {
+  gap: 16px;
+}
+
+.aulas-search-available-form label > span {
+  color: #344054;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.aulas-search-available-form input,
+.aulas-search-available-form select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #273447;
+  font-family: inherit;
+  outline: none;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.aulas-search-available-form input:focus,
+.aulas-search-available-form select:focus {
+  border-color: rgba(207, 32, 41, 0.65);
+  box-shadow: 0 0 0 3px rgba(207, 32, 41, 0.07);
+}
+
+.aulas-search-equipment {
+  margin-top: 4px;
+  padding: 16px;
+  border: 1px solid #edf0f4;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.aulas-search-submit {
+  margin-top: 2px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0f4;
+}
+
+.aulas-search-results-panel {
+  position: relative;
+  border-color: #e7eaf0;
+  background: #ffffff;
+  box-shadow: 0 3px 12px rgba(16, 24, 40, 0.025);
+}
+
+
+/* =========================================================
+   RESPONSIVE GENERAL DE AULAS
+   ========================================================= */
+
+@media (max-width: 850px) {
+  .aulas-view-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aulas-view-switch {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 650px) {
+  .aulas-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aulas-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .aulas-name-preview,
+  .aulas-search-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

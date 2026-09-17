@@ -269,27 +269,25 @@ function renderizarResumen(
         })}
 
 
-        ${renderizarResumenCard({
+     ${renderizarResumenCard({
+      icono:
+       "graduation-cap",
 
-          icono:
-            "square-arrow-right-exit",
+        valor:
+          salidasActivas,
 
-          valor:
-            salidasActivas,
+        titulo:
+          "Salidas",
 
-          titulo:
-            "Salidas",
-
-          detalle:
-            `${salidas.length} registradas`
-
-        })}
+        detalle:
+          `${salidas.length} registradas`
+      })}
 
 
         ${renderizarResumenCard({
 
           icono:
-            "shuffle",
+            "split",
 
           valor:
             cantidadEspaciosOptativos,
@@ -438,16 +436,16 @@ export function VerPlanPage({
         </div>
 
         <div class="ver-plan-tools-grid">
-          ${renderizarHerramienta({
-            id: "salidasAcademicasButton",
-            icono: "square-arrow-right-exit",
-            texto: "Salidas",
-            title: "Salidas académicas",
-          })}
+        ${renderizarHerramienta({
+          id: "salidasAcademicasButton",
+          icono: "graduation-cap",
+          texto: "Salidas",
+          title: "Salidas académicas",
+           })}
 
           ${renderizarHerramienta({
             id: "reglaOptativasButton",
-            icono: "shuffle",
+            icono: "split",
             texto: "Optativas",
             title: "Configurar regla de optativas del plan",
           })}

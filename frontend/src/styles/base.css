@@ -145,3 +145,36 @@ button {
   background: #b5121b;
   color: #ffffff;
 }
+
+
+/* =========================================================
+   CENTRADO GLOBAL DE MODALES DE CONFIRMACIÓN
+   ========================================================= */
+
+.sgpa-confirm-dialog {
+  position: fixed;
+
+  inset: 0;
+
+  width:
+    min(
+      430px,
+      calc(100vw - 40px)
+    );
+
+  max-height:
+    calc(100vh - 40px);
+
+  margin: auto;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 14px;
+
+  background: transparent;
+
+  box-shadow:
+    0 20px 55px
+    rgba(16, 24, 40, 0.25);
+}

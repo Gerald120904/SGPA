@@ -102,6 +102,7 @@ describe('CursosService', () => {
     horasDocente: null,
     observacionHoras: null,
     tipo: TipoPlanAsignatura.OBLIGATORIA,
+    tipoOptativa: null,
     codigoReferencia: 'EIF201',
     nombreReferencia: 'Programación I',
     activo: true,

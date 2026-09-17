@@ -2840,6 +2840,43 @@
   line-height: 1.5;
 }
 
+.plan-optative-current-status {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-optative-current-status > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.plan-optative-current-status > div.is-warning {
+  border-color: #fedf89;
+  background: #fffaeb;
+}
+
+.plan-optative-current-status span {
+  color: #667085;
+  font-size: 8.8px;
+  font-weight: 650;
+}
+
+.plan-optative-current-status strong {
+  color: #344054;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.plan-optative-current-status > div.is-warning strong {
+  color: #b54708;
+}
+
 .plan-optative-fields {
   padding: 13px;
   border: 1px solid #eaecf0;
@@ -2896,7 +2933,8 @@
 
 @media (max-width: 800px) {
   .plan-optative-overview,
-  .plan-optative-kind-grid {
+  .plan-optative-kind-grid,
+  .plan-optative-current-status {
     grid-template-columns: 1fr;
   }
 }

@@ -57,6 +57,10 @@ import {
      PLANES DE ESTUDIO
      ======================================================= */
 
+   Split,
+   Globe,
+   MapPinned,
+
   Blocks,
   Layers,
 
@@ -202,6 +206,10 @@ export function renderizarIconos() {
       /* ===================================================
          PLANES DE ESTUDIO
          =================================================== */
+
+      Split,
+      Globe,
+      MapPinned,
 
       Blocks,
       Layers,

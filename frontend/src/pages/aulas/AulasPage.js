@@ -109,6 +109,195 @@ let aulaDetalleActual = null;
 
 let instanciaActual = 0;
 
+let vistaAulasActual = 'LISTA';
+
+let aulaPlanoSeleccionadaId = null;
+
+let pisoEdificio2Actual = 3;
+
+let selectorPisoEdificio2Abierto = false;
+
+
+const PLANO_SECTOR_PRINCIPAL_P2 = [
+  {
+    key: 'principal-p2-aula-1',
+    numero: 1,
+    area: 'aula-1',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-2',
+    numero: 2,
+    area: 'aula-2',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-3',
+    numero: 3,
+    area: 'aula-3',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-4',
+    numero: 4,
+    area: 'aula-4',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-5',
+    numero: 5,
+    area: 'aula-5',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-6',
+    numero: 6,
+    area: 'aula-6',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-7',
+    numero: 7,
+    area: 'aula-7',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'principal-p2-aula-8',
+    numero: 8,
+    area: 'aula-8',
+    ubicacion: 'Edificio principal, piso 2',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+];
+
+
+const PLANO_SECTOR_HUMANISTICO = [
+  {
+    key: 'humanistico-aula-16',
+    numero: 16,
+    area: 'aula-16',
+    ubicacion: 'Sector Colegio Humanístico',
+    tipo: 'AULA',
+    tipoMobiliario: 'PUPITRE',
+    origen: 'UNA',
+  },
+  {
+    key: 'humanistico-aula-17',
+    numero: 17,
+    area: 'aula-17',
+    ubicacion: 'Sector Colegio Humanístico',
+    tipo: 'AULA',
+    tipoMobiliario: 'MESA_INDIVIDUAL',
+    origen: 'UNA',
+  },
+];
+
+
+const PLANO_SECTOR_BIBLIOTECA = [
+  {
+    key: 'biblioteca-sala-exdecanos',
+    numero: 3,
+    codigo: 'SALA-3',
+    area: 'exdecanos',
+    nombreEspecial: 'Sala de exdecanos',
+    ubicacion: 'Biblioteca, Campus Nicoya',
+    tipo: 'SALA',
+    tipoMobiliario: 'MESA_GRUPAL',
+    origen: 'UNA',
+  },
+  {
+    key: 'biblioteca-sala-2',
+    numero: 2,
+    codigo: 'SALA-2',
+    area: 'sala-2',
+    ubicacion: 'Biblioteca, Campus Nicoya',
+    tipo: 'SALA',
+    tipoMobiliario: 'MESA_GRUPAL',
+    origen: 'UNA',
+  },
+  {
+    key: 'biblioteca-sala-1',
+    numero: 1,
+    codigo: 'SALA-1',
+    area: 'sala-1',
+    nombreEspecial: 'Nyama',
+    ubicacion: 'Biblioteca, Campus Nicoya',
+    tipo: 'SALA',
+    tipoMobiliario: 'MESA_GRUPAL',
+    origen: 'UNA',
+  },
+];
+
+
+const PLANO_EDIFICIO2_PISO3 = [
+  {
+    key: 'edificio2-p3-auditorio-tempisque',
+    numero: 15,
+    area: 'auditorio',
+    nombreEspecial: 'Auditorio Tempisque',
+    ubicacion: 'Edificio 2, piso 3',
+    tipo: 'AUDITORIO',
+    tipoMobiliario: 'BUTACA',
+    origen: 'UNA',
+  },
+];
+
+
+const PLANO_EDIFICIO2_PISO2 = [
+  {
+    key: 'edificio2-p2-stem',
+    numero: 18,
+    area: 'aula-18',
+    nombreEspecial: 'S.T.E.M.',
+    ubicacion: 'Edificio 2, piso 2',
+    tipo: 'LABORATORIO',
+    tipoMobiliario: 'MESA_COMPUTADORA',
+    origen: 'UNA',
+  },
+  {
+    key: 'edificio2-p2-laboratorio-idiomas',
+    numero: 19,
+    area: 'aula-19',
+    nombreEspecial: 'Laboratorio de Idiomas',
+    ubicacion: 'Edificio 2, piso 2',
+    tipo: 'LABORATORIO',
+    tipoMobiliario: 'MESA_COMPUTADORA',
+    origen: 'UNA',
+  },
+];
+
+
+const TODAS_LAS_AREAS_REGISTRABLES = [
+  ...PLANO_SECTOR_PRINCIPAL_P2,
+  ...PLANO_SECTOR_HUMANISTICO,
+  ...PLANO_SECTOR_BIBLIOTECA,
+  ...PLANO_EDIFICIO2_PISO3,
+  ...PLANO_EDIFICIO2_PISO2,
+];
+
 
 /* =========================================================
    CONSTANTES
@@ -330,6 +519,402 @@ function nombreOrigen(
     origen ||
     '—'
   );
+}
+
+
+function obtenerNumeroAula(
+  aulaOCodigo,
+) {
+  const codigo =
+    typeof aulaOCodigo === 'object'
+      ? aulaOCodigo?.codigo
+      : aulaOCodigo;
+
+  const coincidencia =
+    String(codigo ?? '')
+      .match(/\d+/);
+
+  if (!coincidencia) {
+    return null;
+  }
+
+  const numero =
+    Number(coincidencia[0]);
+
+  return Number.isInteger(numero) &&
+    numero > 0
+      ? numero
+      : null;
+}
+
+
+function obtenerNombreEspecialAula(
+  aula,
+) {
+  const nombre =
+    String(aula?.nombre ?? '')
+      .trim();
+
+  const numero =
+    obtenerNumeroAula(aula);
+
+  if (!nombre) {
+    return '';
+  }
+
+  if (!numero) {
+    return nombre;
+  }
+
+  const patron =
+    new RegExp(
+      `^(?:Aula|Sala)\\s+${numero}(?:\\s*[·:\\-]\\s*|\\s+)?`,
+      'i',
+    );
+
+  if (patron.test(nombre)) {
+    return nombre
+      .replace(patron, '')
+      .trim();
+  }
+
+  return nombre;
+}
+
+
+function prefijoVisibleEspacio(
+  tipo,
+) {
+  return tipo === 'SALA'
+    ? 'Sala'
+    : 'Aula';
+}
+
+
+function construirNombreAula(
+  numero,
+  nombreEspecial = '',
+  tipo = 'AULA',
+) {
+  const especial =
+    String(nombreEspecial ?? '')
+      .trim();
+
+  const base =
+    `${prefijoVisibleEspacio(tipo)} ${numero}`;
+
+  return especial
+    ? `${base} · ${especial}`
+    : base;
+}
+
+
+function construirCodigoEspacio(
+  numero,
+  tipo = 'AULA',
+  codigoSugerido = '',
+) {
+  const sugerido =
+    String(codigoSugerido ?? '')
+      .trim();
+
+  if (sugerido) {
+    return sugerido.toUpperCase();
+  }
+
+  if (tipo === 'SALA') {
+    return `SALA-${numero}`;
+  }
+
+  return String(numero);
+}
+
+
+function nombreVisibleAula(
+  aula,
+) {
+  const numero =
+    obtenerNumeroAula(aula);
+
+  if (!numero) {
+    return aula?.nombre ||
+      aula?.codigo ||
+      'Aula';
+  }
+
+  const especial =
+    obtenerNombreEspecialAula(aula);
+
+  return construirNombreAula(
+    numero,
+    especial,
+    aula?.tipo || 'AULA',
+  );
+}
+
+
+function obtenerSlotRegistrablePorKey(
+  key,
+) {
+  return TODAS_LAS_AREAS_REGISTRABLES.find(
+    (item) => item.key === key,
+  ) || null;
+}
+
+
+function aulaCoincideConSlot(
+  aula,
+  slot,
+) {
+  if (!aula || !slot) {
+    return false;
+  }
+
+  if (
+    slot.origen &&
+    aula.origen !== slot.origen
+  ) {
+    return false;
+  }
+
+  const codigoAula =
+    String(aula.codigo ?? '')
+      .trim()
+      .toUpperCase();
+
+  const codigoSlot =
+    String(
+      slot.codigo ?? '',
+    )
+      .trim()
+      .toUpperCase();
+
+  if (codigoSlot) {
+    return codigoAula === codigoSlot;
+  }
+
+  if (
+    codigoAula.startsWith('SALA-')
+  ) {
+    return false;
+  }
+
+  return obtenerNumeroAula(aula) ===
+    slot.numero;
+}
+
+
+function obtenerAulaParaSlot(
+  slot,
+) {
+  return aulas.find(
+    (aula) =>
+      aulaCoincideConSlot(
+        aula,
+        slot,
+      ),
+  ) || null;
+}
+
+
+function construirSugerenciaDesdeSlot(
+  slot,
+) {
+  if (!slot) {
+    return null;
+  }
+
+  return {
+    numero:
+      slot.numero || '',
+
+    codigo:
+      slot.codigo || '',
+
+    nombreEspecial:
+      slot.nombreEspecial || '',
+
+    ubicacion:
+      slot.ubicacion || '',
+
+    tipo:
+      slot.tipo || 'AULA',
+
+    tipoMobiliario:
+      slot.tipoMobiliario || 'SIN_ESPECIFICAR',
+
+    origen:
+      slot.origen || 'UNA',
+
+    capacidad:
+      slot.capacidad || '',
+
+    referenciaPlano:
+      slot.referenciaPlano || '',
+  };
+}
+
+
+function claseTipoPlano(
+  tipo,
+) {
+  switch (tipo) {
+    case 'AUDITORIO':
+      return 'is-auditorio';
+    case 'LABORATORIO':
+      return 'is-laboratorio';
+    case 'SALA':
+      return 'is-sala';
+    default:
+      return 'is-aula';
+  }
+}
+
+
+function etiquetaPrincipalSlot(
+  slot,
+  aula = null,
+) {
+  const tipo =
+    aula?.tipo ||
+    slot?.tipo ||
+    'AULA';
+
+  return `${prefijoVisibleEspacio(tipo)} ${slot.numero}`;
+}
+
+
+function renderizarSlotPlanoRegistrable(
+  slot,
+  idsFiltradas,
+  incluirArea = true,
+) {
+  const aula =
+    obtenerAulaParaSlot(
+      slot,
+    );
+
+  const visible =
+    aula
+      ? idsFiltradas.has(
+          aula.id,
+        )
+      : true;
+
+  const seleccionada =
+    aula &&
+    aula.id ===
+      aulaPlanoSeleccionadaId;
+
+  const especial =
+    aula
+      ? obtenerNombreEspecialAula(
+          aula,
+        )
+      : slot.nombreEspecial || '';
+
+  const etiqueta =
+    etiquetaPrincipalSlot(
+      slot,
+      aula,
+    );
+
+  return `
+    <button
+      type="button"
+      class="
+        aulas-plan-space
+        ${claseTipoPlano(
+          aula?.tipo || slot.tipo,
+        )}
+        ${
+          aula
+            ? 'is-registered'
+            : 'is-pending'
+        }
+        ${
+          aula && !aula.activo
+            ? 'is-inactive'
+            : ''
+        }
+        ${
+          aula && !visible
+            ? 'is-filtered-out'
+            : ''
+        }
+        ${
+          seleccionada
+            ? 'is-selected'
+            : ''
+        }
+      "
+      ${
+        incluirArea
+          ? `style="grid-area: ${slot.area};"`
+          : ''
+      }
+      ${
+        aula
+          ? `data-plano-aula-id="${aula.id}"`
+          : `data-plano-slot-key="${slot.key}"`
+      }
+      aria-label="${escapeHtml(
+        aula
+          ? nombreVisibleAula(aula)
+          : `Registrar ${etiqueta}`,
+      )}"
+    >
+      <strong>
+        ${escapeHtml(etiqueta)}
+      </strong>
+
+      <span>
+        ${escapeHtml(
+          aula
+            ? especial ||
+                nombreTipoAula(
+                  aula.tipo,
+                )
+            : especial ||
+                'Disponible para registrar',
+        )}
+      </span>
+    </button>
+  `;
+}
+
+
+function compararAulasPorNumero(
+  a,
+  b,
+) {
+  const numeroA =
+    obtenerNumeroAula(a);
+
+  const numeroB =
+    obtenerNumeroAula(b);
+
+  if (
+    numeroA !== null &&
+    numeroB !== null
+  ) {
+    return numeroA - numeroB;
+  }
+
+  if (numeroA !== null) {
+    return -1;
+  }
+
+  if (numeroB !== null) {
+    return 1;
+  }
+
+  return nombreVisibleAula(a)
+    .localeCompare(
+      nombreVisibleAula(b),
+      'es',
+      { sensitivity: 'base' },
+    );
 }
 
 
@@ -786,11 +1371,9 @@ function renderizarVistaListado() {
       'aulasVista',
     );
 
-
   if (!vista) {
     return;
   }
-
 
   vista.innerHTML = `
 
@@ -812,7 +1395,7 @@ function renderizarVistaListado() {
       </div>
 
 
-      <div class="aulas-actions">
+      <div class="aulas-toolbar-actions">
 
         ${
           puedeBuscarAulasDisponibles()
@@ -872,9 +1455,7 @@ function renderizarVistaListado() {
     </div>
 
 
-    <div
-      class="aulas-filters"
-    >
+    <div class="aulas-filters">
 
       <label
         class="aulas-search"
@@ -889,7 +1470,7 @@ function renderizarVistaListado() {
         <input
           id="aulasBuscar"
           type="search"
-          placeholder="Buscar por código, nombre o ubicación..."
+          placeholder="Buscar por número, nombre o ubicación..."
           autocomplete="off"
         >
 
@@ -946,6 +1527,61 @@ function renderizarVistaListado() {
     </div>
 
 
+    <div class="aulas-view-bar">
+
+      <div>
+        <strong>
+          Visualización
+        </strong>
+
+        <span>
+          Consulte el catálogo en lista o seleccione un aula desde el croquis.
+        </span>
+      </div>
+
+      <div
+        class="aulas-view-switch"
+        role="group"
+        aria-label="Cambiar vista de aulas"
+      >
+
+        <button
+          type="button"
+          class="aulas-view-button ${
+            vistaAulasActual === 'LISTA'
+              ? 'is-active'
+              : ''
+          }"
+          data-aulas-view="LISTA"
+        >
+          <i
+            data-lucide="list"
+            aria-hidden="true"
+          ></i>
+          Lista
+        </button>
+
+        <button
+          type="button"
+          class="aulas-view-button ${
+            vistaAulasActual === 'PLANO'
+              ? 'is-active'
+              : ''
+          }"
+          data-aulas-view="PLANO"
+        >
+          <i
+            data-lucide="layout-dashboard"
+            aria-hidden="true"
+          ></i>
+          Plano
+        </button>
+
+      </div>
+
+    </div>
+
+
     <div
       id="aulasContent"
       aria-live="polite"
@@ -974,6 +1610,74 @@ function renderizarVistaListado() {
 
   document
     .getElementById(
+      'aulasBuscar',
+    )
+    ?.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key !== 'Enter') {
+          return;
+        }
+
+        const valor =
+          event.currentTarget
+            ?.value
+            ?.trim();
+
+        const numero =
+          Number(valor);
+
+        if (
+          !Number.isInteger(numero) ||
+          numero < 1
+        ) {
+          return;
+        }
+
+        const aula =
+          aulas.find(
+            (item) =>
+              obtenerNumeroAula(item) ===
+              numero,
+          );
+
+        if (!aula) {
+          return;
+        }
+
+        event.preventDefault();
+
+        aulaPlanoSeleccionadaId =
+          aula.id;
+
+        vistaAulasActual =
+          'PLANO';
+
+        document
+          .querySelectorAll(
+            '[data-aulas-view]',
+          )
+          .forEach(
+            (item) => {
+              item.classList.toggle(
+                'is-active',
+                item.dataset.aulasView ===
+                  'PLANO',
+              );
+            },
+          );
+
+        renderizarAulas();
+
+        abrirAccionesAulaPlano(
+          aula,
+        );
+      },
+    );
+
+
+  document
+    .getElementById(
       'aulasTipo',
     )
     ?.addEventListener(
@@ -989,6 +1693,42 @@ function renderizarVistaListado() {
     ?.addEventListener(
       'change',
       renderizarAulas,
+    );
+
+
+  document
+    .querySelectorAll(
+      '[data-aulas-view]',
+    )
+    .forEach(
+      (boton) => {
+        boton.addEventListener(
+          'click',
+          () => {
+            vistaAulasActual =
+              boton.dataset.aulasView ===
+              'PLANO'
+                ? 'PLANO'
+                : 'LISTA';
+
+            document
+              .querySelectorAll(
+                '[data-aulas-view]',
+              )
+              .forEach(
+                (item) => {
+                  item.classList.toggle(
+                    'is-active',
+                    item.dataset.aulasView ===
+                      vistaAulasActual,
+                  );
+                },
+              );
+
+            renderizarAulas();
+          },
+        );
+      },
     );
 
 
@@ -1134,19 +1874,41 @@ function renderizarAulas() {
       'aulasContent',
     );
 
-
   if (!contenido) {
     return;
   }
 
-
   const filtradas =
-    obtenerAulasFiltradas();
+    obtenerAulasFiltradas()
+      .slice()
+      .sort(
+        compararAulasPorNumero,
+      );
+
+  if (
+    vistaAulasActual === 'PLANO'
+  ) {
+    renderizarPlanoAulas(
+      contenido,
+      filtradas,
+    );
+
+    return;
+  }
+
+  renderizarListaAulas(
+    contenido,
+    filtradas,
+  );
+}
 
 
+function renderizarListaAulas(
+  contenido,
+  filtradas,
+) {
   const puedeGestionar =
     puedeGestionarAulas();
-
 
   const filas =
     filtradas
@@ -1159,7 +1921,8 @@ function renderizarAulas() {
                 class="aulas-code"
               >
                 ${escapeHtml(
-                  aula.codigo,
+                  obtenerNumeroAula(aula) ??
+                    aula.codigo,
                 )}
               </strong>
             </td>
@@ -1173,7 +1936,7 @@ function renderizarAulas() {
 
                 <strong>
                   ${escapeHtml(
-                    aula.nombre,
+                    nombreVisibleAula(aula),
                   )}
                 </strong>
 
@@ -1328,12 +2091,11 @@ function renderizarAulas() {
       )
       .join('');
 
-
   contenido.innerHTML =
     DataTable({
 
       columns: [
-        'Código',
+        'Número',
         'Aula',
         'Tipo',
         'Mobiliario',
@@ -1354,8 +2116,544 @@ function renderizarAulas() {
 
     });
 
+  renderizarIconos();
+}
+
+
+function renderizarPlanoAulas(
+  contenido,
+  filtradas,
+) {
+  const idsFiltradas =
+    new Set(
+      filtradas.map(
+        (aula) => aula.id,
+      ),
+    );
+
+  const otrasAulas =
+    filtradas.filter(
+      (aula) =>
+        !TODAS_LAS_AREAS_REGISTRABLES
+          .some(
+            (slot) =>
+              aulaCoincideConSlot(
+                aula,
+                slot,
+              ),
+          ),
+    );
+
+  const principalSlots =
+    PLANO_SECTOR_PRINCIPAL_P2
+      .map(
+        (slot) =>
+          renderizarSlotPlanoRegistrable(
+            slot,
+            idsFiltradas,
+            true,
+          ),
+      )
+      .join('');
+
+  const humanisticoSlots =
+    PLANO_SECTOR_HUMANISTICO
+      .map(
+        (slot) =>
+          renderizarSlotPlanoRegistrable(
+            slot,
+            idsFiltradas,
+            false,
+          ),
+      )
+      .join('');
+
+  const bibliotecaSlots =
+    PLANO_SECTOR_BIBLIOTECA
+      .map(
+        (slot) =>
+          renderizarSlotPlanoRegistrable(
+            slot,
+            idsFiltradas,
+            true,
+          ),
+      )
+      .join('');
+
+  const slotsEdificio2 =
+    (
+      pisoEdificio2Actual === 2
+        ? PLANO_EDIFICIO2_PISO2
+        : PLANO_EDIFICIO2_PISO3
+    )
+      .map(
+        (slot) =>
+          renderizarSlotPlanoRegistrable(
+            slot,
+            idsFiltradas,
+            true,
+          ),
+      )
+      .join('');
+
+  const selectorPiso = `
+    <div
+      class="aulas-floor-selector ${
+        selectorPisoEdificio2Abierto
+          ? 'is-open'
+          : ''
+      }"
+      style="grid-area: center;"
+    >
+      <button
+        type="button"
+        class="aulas-floor-selector-trigger"
+        data-edificio2-floor-toggle="true"
+        aria-expanded="${
+          selectorPisoEdificio2Abierto
+            ? 'true'
+            : 'false'
+        }"
+      >
+        <span>
+          Edificio 2
+        </span>
+
+        <strong>
+          Piso ${pisoEdificio2Actual}
+        </strong>
+
+        <small>
+          Cambiar piso
+        </small>
+
+        <b aria-hidden="true">
+          ▾
+        </b>
+      </button>
+
+      <div
+        class="aulas-floor-selector-menu"
+        ${
+          selectorPisoEdificio2Abierto
+            ? ''
+            : 'hidden'
+        }
+      >
+        <button
+          type="button"
+          class="${
+            pisoEdificio2Actual === 3
+              ? 'is-active'
+              : ''
+          }"
+          data-edificio2-floor="3"
+        >
+          <strong>Piso 3</strong>
+          <span>Auditorio Tempisque y distribución parcial</span>
+        </button>
+
+        <button
+          type="button"
+          class="${
+            pisoEdificio2Actual === 2
+              ? 'is-active'
+              : ''
+          }"
+          data-edificio2-floor="2"
+        >
+          <strong>Piso 2</strong>
+          <span>S.T.E.M. y Laboratorio de Idiomas</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  const mapaEdificio2 =
+    pisoEdificio2Actual === 2
+      ? `
+          <div class="aulas-sector-map aulas-sector-map-edificio2-piso2">
+            <div class="aulas-plan-support-block is-muted" style="grid-area: top-left;">Área administrativa</div>
+            <div class="aulas-plan-support-block is-muted" style="grid-area: top-right;">Área administrativa</div>
+            <div class="aulas-plan-support-block is-muted is-vertical" style="grid-area: left-top;">Administrativo</div>
+            ${slotsEdificio2}
+            <div class="aulas-plan-support-block is-muted is-vertical" style="grid-area: right-top;">Administrativo</div>
+            <div class="aulas-plan-support-block is-muted is-vertical" style="grid-area: right-bottom;">Administrativo</div>
+            <div class="aulas-plan-support-block is-muted" style="grid-area: bottom-right;">Área administrativa</div>
+            ${selectorPiso}
+          </div>
+        `
+      : `
+          <div class="aulas-sector-map aulas-sector-map-edificio2-piso3">
+            <div class="aulas-plan-support-block is-outline" style="grid-area: top-left;">Aula</div>
+            <div class="aulas-plan-support-block is-outline" style="grid-area: top-right;">Aula</div>
+            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: left-top;">Aula</div>
+            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: left-bottom;">Aula</div>
+            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: right-top;">Aula</div>
+            <div class="aulas-plan-support-block is-outline is-vertical" style="grid-area: right-bottom;">Aula</div>
+            ${slotsEdificio2}
+            ${selectorPiso}
+          </div>
+        `;
+
+  contenido.innerHTML = `
+    <section
+      class="aulas-plan-shell"
+    >
+
+      <div
+        class="aulas-plan-main"
+      >
+
+        <header
+          class="aulas-plan-header"
+        >
+          <div>
+            <span
+              class="aulas-plan-eyebrow"
+            >
+              Campus Nicoya · croquis referencial
+            </span>
+
+            <h3>
+              Selector visual de aulas
+            </h3>
+
+            <p>
+              Consulte el plano institucional del campus, registre espacios
+              directamente desde los bloques disponibles y acceda a las aulas
+              ya registradas desde el mismo croquis.
+            </p>
+          </div>
+
+          <div
+            class="aulas-plan-legend"
+            aria-label="Leyenda del plano"
+          >
+            <span>
+              <i class="is-available"></i>
+              Registrada
+            </span>
+
+            <span>
+              <i class="is-empty"></i>
+              Disponible para registrar
+            </span>
+
+            <span>
+              <i class="is-support"></i>
+              Espacio de referencia
+            </span>
+          </div>
+        </header>
+
+
+        <div class="aulas-campus-layout">
+
+          <section class="aulas-sector-card aulas-sector-card-edificio2">
+            <div class="aulas-sector-heading">
+              <strong>Edificio 2</strong>
+              <span>
+                Cambie de piso desde el selector central para consultar los espacios disponibles.
+              </span>
+            </div>
+
+            ${mapaEdificio2}
+          </section>
+
+
+          <section class="aulas-sector-card aulas-sector-card-biblioteca">
+            <div class="aulas-sector-heading">
+              <strong>Biblioteca y salas</strong>
+              <span>
+                Sector de apoyo académico con biblioteca y salas utilizadas para reuniones,
+                centros y actividades universitarias.
+              </span>
+            </div>
+
+            <div class="aulas-biblioteca-grid">
+              <div class="aulas-plan-support-block is-biblioteca is-vertical" style="grid-area: bib-left;">Biblioteca</div>
+              <div class="aulas-plan-support-block is-biblioteca is-vertical" style="grid-area: bib-top;">Biblioteca</div>
+              ${bibliotecaSlots}
+              <div class="aulas-plan-support-block is-biblioteca is-library-main" style="grid-area: bib-main;">Biblioteca</div>
+              <div class="aulas-plan-support-block is-biblioteca is-vertical" style="grid-area: bib-right;">Biblioteca</div>
+            </div>
+          </section>
+
+
+          <section class="aulas-sector-card aulas-sector-card-humanistico">
+            <div class="aulas-sector-heading">
+              <strong>Sector Colegio Humanístico</strong>
+              <span>
+                Aulas 16 y 17 disponibles para actividades universitarias.
+              </span>
+            </div>
+
+            <div class="aulas-humanistico-stack">
+              ${humanisticoSlots}
+            </div>
+          </section>
+
+
+          <section class="aulas-sector-card aulas-sector-card-principal">
+            <div class="aulas-sector-heading">
+              <strong>Edificio principal · Piso 2</strong>
+              <span>
+                Distribución de aulas 1 a 8. Haga clic sobre un bloque disponible
+                para registrarlo directamente desde el croquis.
+              </span>
+            </div>
+
+            <div class="aulas-sector-map aulas-sector-map-principal">
+              ${principalSlots}
+              <div class="aulas-campus-core is-principal" style="grid-area: center;">
+                <strong>Piso 2</strong>
+                <span>Edificio académico principal</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+
+        ${
+          otrasAulas.length
+            ? `
+              <div
+                class="aulas-plan-other"
+              >
+                <div>
+                  <strong>
+                    Otros espacios registrados
+                  </strong>
+
+                  <span>
+                    Registros que todavía no tienen una posición definida dentro del croquis principal.
+                  </span>
+                </div>
+
+                <div
+                  class="aulas-plan-other-list"
+                >
+                  ${otrasAulas
+                    .map(
+                      (aula) => `
+                        <button
+                          type="button"
+                          class="aulas-plan-other-item"
+                          data-plano-aula-id="${aula.id}"
+                        >
+                          <strong>
+                            ${escapeHtml(
+                              nombreVisibleAula(aula),
+                            )}
+                          </strong>
+
+                          <span>
+                            ${escapeHtml(
+                              aula.ubicacion ||
+                                nombreOrigen(
+                                  aula.origen,
+                                ),
+                            )}
+                          </span>
+                        </button>
+                      `,
+                    )
+                    .join('')}
+                </div>
+              </div>
+            `
+            : ''
+        }
+
+      </div>
+
+    </section>
+  `;
 
   renderizarIconos();
+}
+
+
+function renderizarFichaPlanoAula(
+  aula,
+) {
+  if (!aula) {
+    return `
+      <div
+        class="aulas-plan-empty-detail"
+      >
+        <div
+          class="aulas-plan-empty-icon"
+          aria-hidden="true"
+        >
+          <i
+            data-lucide="door-open"
+          ></i>
+        </div>
+
+        <strong>
+          Seleccione un aula
+        </strong>
+
+        <p>
+          Haga clic sobre un espacio registrado para consultar
+          sus datos, o seleccione un bloque disponible para
+          iniciar el registro del aula desde el plano.
+        </p>
+      </div>
+    `;
+  }
+
+  const puedeGestionar =
+    puedeGestionarAulas();
+
+  return `
+    <div
+      class="aulas-plan-detail-card"
+    >
+      <div
+        class="aulas-plan-detail-top"
+      >
+        <span>
+          Aula seleccionada
+        </span>
+
+        <span
+          class="
+            aulas-status
+            ${
+              aula.activo
+                ? 'is-active'
+                : 'is-inactive'
+            }
+          "
+        >
+          ${
+            aula.activo
+              ? 'Activa'
+              : 'Inactiva'
+          }
+        </span>
+      </div>
+
+      <h3>
+        ${escapeHtml(
+          nombreVisibleAula(aula),
+        )}
+      </h3>
+
+      <p>
+        ${escapeHtml(
+          aula.ubicacion ||
+            'Sin ubicación especificada',
+        )}
+      </p>
+
+      <div
+        class="aulas-plan-detail-grid"
+      >
+        <div>
+          <span>
+            Número
+          </span>
+          <strong>
+            ${escapeHtml(
+              obtenerNumeroAula(aula) ??
+                aula.codigo,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Tipo
+          </span>
+          <strong>
+            ${escapeHtml(
+              nombreTipoAula(
+                aula.tipo,
+              ),
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Capacidad
+          </span>
+          <strong>
+            ${escapeHtml(
+              aula.capacidad,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Mobiliario
+          </span>
+          <strong>
+            ${escapeHtml(
+              nombreMobiliario(
+                aula.tipoMobiliario,
+              ),
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            Origen
+          </span>
+          <strong>
+            ${escapeHtml(
+              nombreOrigen(
+                aula.origen,
+              ),
+            )}
+          </strong>
+        </div>
+      </div>
+
+      <div
+        class="aulas-plan-detail-actions"
+      >
+        <button
+          type="button"
+          class="aulas-secondary-button"
+          data-action="ver"
+          data-aula-id="${aula.id}"
+        >
+          <i
+            data-lucide="eye"
+            aria-hidden="true"
+          ></i>
+          Ver detalle
+        </button>
+
+        ${
+          puedeGestionar
+            ? `
+              <button
+                type="button"
+                class="aulas-primary-button"
+                data-action="editar"
+                data-aula-id="${aula.id}"
+              >
+                <i
+                  data-lucide="pencil"
+                  aria-hidden="true"
+                ></i>
+                Editar aula
+              </button>
+            `
+            : ''
+        }
+      </div>
+    </div>
+  `;
 }
 
 
@@ -1430,12 +2728,289 @@ async function cargarAulas(
 
 
 /* =========================================================
+   ACCIONES DESDE EL PLANO
+   ========================================================= */
+
+function abrirAccionesAulaPlano(
+  aula,
+) {
+  if (!aula) {
+    return;
+  }
+
+  document
+    .getElementById(
+      'aulasPlanoActionDialog',
+    )
+    ?.remove();
+
+  const dialog =
+    document.createElement(
+      'dialog',
+    );
+
+  dialog.id =
+    'aulasPlanoActionDialog';
+
+  dialog.className =
+    'sgpa-confirm-dialog aulas-plan-action-dialog';
+
+  const puedeEditar =
+    puedeGestionarAulas();
+
+  dialog.innerHTML = `
+    <div
+      class="sgpa-confirm-card aulas-plan-action-card"
+    >
+      <div
+        class="aulas-plan-action-icon"
+        aria-hidden="true"
+      >
+        ?
+      </div>
+
+      <div
+        class="aulas-plan-action-content"
+      >
+        <span>
+          Aula seleccionada
+        </span>
+
+        <h3>
+          ¿Qué desea hacer?
+        </h3>
+
+        <p>
+          ${escapeHtml(
+            nombreVisibleAula(aula),
+          )}
+          ·
+          ${escapeHtml(
+            aula.ubicacion ||
+              'Sin ubicación especificada',
+          )}
+        </p>
+      </div>
+
+      <div
+        class="aulas-plan-action-buttons"
+      >
+        <button
+          type="button"
+          id="aulasPlanoVerAula"
+          class="aulas-plan-action-view"
+        >
+          <i
+            data-lucide="eye"
+            aria-hidden="true"
+          ></i>
+          Ver aula
+        </button>
+
+        ${
+          puedeEditar
+            ? `
+                <button
+                  type="button"
+                  id="aulasPlanoEditarAula"
+                  class="aulas-plan-action-edit"
+                >
+                  <i
+                    data-lucide="pencil"
+                    aria-hidden="true"
+                  ></i>
+                  Editar aula
+                </button>
+              `
+            : ''
+        }
+
+        <button
+          type="button"
+          id="aulasPlanoCerrarAcciones"
+          class="aulas-plan-action-cancel"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(
+    dialog,
+  );
+
+  const cerrar = () => {
+    if (dialog.open) {
+      dialog.close();
+    }
+
+    dialog.remove();
+  };
+
+  dialog
+    .querySelector(
+      '#aulasPlanoCerrarAcciones',
+    )
+    ?.addEventListener(
+      'click',
+      cerrar,
+    );
+
+  dialog
+    .querySelector(
+      '#aulasPlanoVerAula',
+    )
+    ?.addEventListener(
+      'click',
+      async () => {
+        cerrar();
+
+        await abrirDetalleAula(
+          aula.id,
+        );
+      },
+    );
+
+  dialog
+    .querySelector(
+      '#aulasPlanoEditarAula',
+    )
+    ?.addEventListener(
+      'click',
+      () => {
+        cerrar();
+
+        abrirFormularioAula(
+          aula,
+        );
+      },
+    );
+
+  dialog.addEventListener(
+    'cancel',
+    (event) => {
+      event.preventDefault();
+      cerrar();
+    },
+  );
+
+  dialog.addEventListener(
+    'click',
+    (event) => {
+      if (event.target === dialog) {
+        cerrar();
+      }
+    },
+  );
+
+  dialog.showModal();
+
+  renderizarIconos();
+}
+
+
+/* =========================================================
    ACCIONES DE TABLA
    ========================================================= */
 
 async function manejarAccionTabla(
   event,
 ) {
+  const selectorPisoToggle =
+    event.target.closest(
+      '[data-edificio2-floor-toggle]',
+    );
+
+  if (selectorPisoToggle) {
+    selectorPisoEdificio2Abierto =
+      !selectorPisoEdificio2Abierto;
+
+    renderizarAulas();
+
+    return;
+  }
+
+  const opcionPiso =
+    event.target.closest(
+      '[data-edificio2-floor]',
+    );
+
+  if (opcionPiso) {
+    const piso =
+      Number(
+        opcionPiso.dataset
+          .edificio2Floor,
+      );
+
+    if (
+      piso === 2 ||
+      piso === 3
+    ) {
+      pisoEdificio2Actual = piso;
+      selectorPisoEdificio2Abierto = false;
+      renderizarAulas();
+    }
+
+    return;
+  }
+
+  const selectorPlanoPendiente =
+    event.target.closest(
+      '[data-plano-slot-key]',
+    );
+
+  if (selectorPlanoPendiente) {
+    const slot =
+      obtenerSlotRegistrablePorKey(
+        selectorPlanoPendiente.dataset
+          .planoSlotKey,
+      );
+
+    if (slot) {
+      abrirFormularioAula(
+        null,
+        construirSugerenciaDesdeSlot(
+          slot,
+        ),
+      );
+    }
+
+    return;
+  }
+
+  const selectorPlano =
+    event.target.closest(
+      '[data-plano-aula-id]',
+    );
+
+  if (selectorPlano) {
+    const aulaId =
+      Number(
+        selectorPlano.dataset
+          .planoAulaId,
+      );
+
+    if (aulaId) {
+      const aula =
+        aulas.find(
+          (item) =>
+            item.id === aulaId,
+        );
+
+      if (aula) {
+        aulaPlanoSeleccionadaId =
+          aulaId;
+
+        abrirAccionesAulaPlano(
+          aula,
+        );
+      }
+    }
+
+    return;
+  }
+
   const boton =
     event.target.closest(
       '[data-action]',
@@ -2345,11 +3920,7 @@ async function abrirDetalleAula(
 
           <h2>
             ${escapeHtml(
-              aula.codigo,
-            )}
-            —
-            ${escapeHtml(
-              aula.nombre,
+              nombreVisibleAula(aula),
             )}
           </h2>
 
@@ -2398,12 +3969,13 @@ async function abrirDetalleAula(
 
           <div>
             <span>
-              Código
+              Número de aula
             </span>
 
             <strong>
               ${escapeHtml(
-                aula.codigo,
+                obtenerNumeroAula(aula) ??
+                  aula.codigo,
               )}
             </strong>
           </div>
@@ -5320,6 +6892,7 @@ function renderizarOcupacionAula() {
 
 function abrirFormularioAula(
   aula = null,
+  sugerencia = null,
 ) {
   if (
     !validarGestionAulas()
@@ -5337,7 +6910,6 @@ function abrirFormularioAula(
       'aulaDialogContent',
     );
 
-
   if (
     !dialog ||
     !content
@@ -5345,10 +6917,20 @@ function abrirFormularioAula(
     return;
   }
 
-
   const editando =
     Boolean(aula);
 
+  const numeroActual =
+    aula
+      ? obtenerNumeroAula(aula) ?? ''
+      : sugerencia?.numero || '';
+
+  const nombreEspecialActual =
+    aula
+      ? obtenerNombreEspecialAula(
+          aula,
+        )
+      : sugerencia?.nombreEspecial || '';
 
   content.innerHTML =
     FormDialog({
@@ -5359,30 +6941,44 @@ function abrirFormularioAula(
       title:
         editando
           ? 'Editar aula'
-          : 'Nueva aula',
+          : sugerencia
+            ? 'Registrar aula desde el plano'
+            : 'Nueva aula',
 
       description:
         editando
           ? 'Actualice la información del espacio académico.'
-          : 'Registre un nuevo espacio académico.',
+          : sugerencia
+            ? 'Complete los datos del espacio seleccionado en el croquis institucional.'
+            : 'Registre un nuevo espacio académico del campus.',
 
       body: `
 
         <label>
 
           <span>
-            Código
+            Número del espacio
           </span>
 
           <input
-            id="aulaCodigo"
-            type="text"
-            maxlength="30"
+            id="aulaNumero"
+            type="number"
+            min="1"
+            max="9999"
+            step="1"
+            inputmode="numeric"
             value="${escapeHtml(
-              aula?.codigo || '',
+              numeroActual,
             )}"
+            placeholder="Ej. 17"
             required
           >
+
+          <small
+            class="aulas-form-help"
+          >
+            Ingrese únicamente el número. El nombre final se adapta al tipo de espacio seleccionado.
+          </small>
 
         </label>
 
@@ -5390,20 +6986,39 @@ function abrirFormularioAula(
         <label>
 
           <span>
-            Nombre
+            Nombre especial
+            <small>
+              (opcional)
+            </small>
           </span>
 
           <input
-            id="aulaNombre"
+            id="aulaNombreEspecial"
             type="text"
             maxlength="100"
             value="${escapeHtml(
-              aula?.nombre || '',
+              nombreEspecialActual,
             )}"
-            required
+            placeholder="Ej. Auditorio Tempisque"
           >
 
+          <small
+            class="aulas-form-help"
+          >
+            Úselo solo cuando el espacio tenga una denominación particular.
+          </small>
+
         </label>
+
+
+        <div
+          id="aulaNombrePreview"
+          class="
+            aulas-name-preview
+            sgpa-form-wide
+          "
+          aria-live="polite"
+        ></div>
 
 
         <label
@@ -5419,9 +7034,11 @@ function abrirFormularioAula(
             type="text"
             maxlength="150"
             value="${escapeHtml(
-              aula?.ubicacion || '',
+              aula?.ubicacion ||
+                sugerencia?.ubicacion ||
+                '',
             )}"
-            placeholder="Ej. Edificio principal, segundo piso"
+            placeholder="Ej. Edificio académico, segundo piso"
           >
 
         </label>
@@ -5439,7 +7056,9 @@ function abrirFormularioAula(
             min="1"
             max="65535"
             value="${escapeHtml(
-              aula?.capacidad || '',
+              aula?.capacidad ||
+                sugerencia?.capacidad ||
+                '',
             )}"
             required
           >
@@ -5468,6 +7087,7 @@ function abrirFormularioAula(
                     ${
                       (
                         aula?.tipo ||
+                        sugerencia?.tipo ||
                         'AULA'
                       ) === valor
                         ? 'selected'
@@ -5507,6 +7127,7 @@ function abrirFormularioAula(
                       (
                         aula
                           ?.tipoMobiliario ||
+                        sugerencia?.tipoMobiliario ||
                         'SIN_ESPECIFICAR'
                       ) === valor
                         ? 'selected'
@@ -5545,6 +7166,7 @@ function abrirFormularioAula(
                     ${
                       (
                         aula?.origen ||
+                        sugerencia?.origen ||
                         'UNA'
                       ) === valor
                         ? 'selected'
@@ -5579,14 +7201,107 @@ function abrirFormularioAula(
 
     });
 
-
   dialog.showModal();
-
 
   habilitarCierreExterior(
     dialog,
   );
 
+  const actualizarPreview =
+    () => {
+      const numero =
+        Number(
+          document
+            .getElementById(
+              'aulaNumero',
+            )
+            ?.value,
+        );
+
+      const especial =
+        document
+          .getElementById(
+            'aulaNombreEspecial',
+          )
+          ?.value
+          ?.trim() || '';
+
+      const tipo =
+        document
+          .getElementById(
+            'aulaTipo',
+          )
+          ?.value || 'AULA';
+
+      const preview =
+        document.getElementById(
+          'aulaNombrePreview',
+        );
+
+      if (!preview) {
+        return;
+      }
+
+      if (
+        !Number.isInteger(numero) ||
+        numero < 1
+      ) {
+        preview.innerHTML = `
+          <span>
+            Vista previa
+          </span>
+          <strong>
+            Ingrese el número del espacio
+          </strong>
+        `;
+
+        return;
+      }
+
+      preview.innerHTML = `
+        <span>
+          Se mostrará como
+        </span>
+        <strong>
+          ${escapeHtml(
+            construirNombreAula(
+              numero,
+              especial,
+              tipo,
+            ),
+          )}
+        </strong>
+      `;
+    };
+
+  document
+    .getElementById(
+      'aulaNumero',
+    )
+    ?.addEventListener(
+      'input',
+      actualizarPreview,
+    );
+
+  document
+    .getElementById(
+      'aulaNombreEspecial',
+    )
+    ?.addEventListener(
+      'input',
+      actualizarPreview,
+    );
+
+  document
+    .getElementById(
+      'aulaTipo',
+    )
+    ?.addEventListener(
+      'change',
+      actualizarPreview,
+    );
+
+  actualizarPreview();
 
   document
     .getElementById(
@@ -5596,7 +7311,6 @@ function abrirFormularioAula(
       'click',
       () => dialog.close(),
     );
-
 
   document
     .getElementById(
@@ -5608,24 +7322,59 @@ function abrirFormularioAula(
 
         event.preventDefault();
 
+        const numero =
+          Number(
+            document
+              .getElementById(
+                'aulaNumero',
+              )
+              ?.value,
+          );
+
+        const nombreEspecial =
+          document
+            .getElementById(
+              'aulaNombreEspecial',
+            )
+            ?.value
+            ?.trim() || '';
+
+        const tipo =
+          document
+            .getElementById(
+              'aulaTipo',
+            )
+            ?.value || 'AULA';
+
+        if (
+          !Number.isInteger(numero) ||
+          numero < 1
+        ) {
+          mostrarError({
+            titulo:
+              'Número de espacio inválido',
+
+            mensaje:
+              'Ingrese un número entero mayor a cero.',
+          });
+
+          return;
+        }
 
         const datos = {
 
           codigo:
-            document
-              .getElementById(
-                'aulaCodigo',
-              )
-              ?.value
-              ?.trim(),
+            construirCodigoEspacio(
+              numero,
+              tipo,
+            ),
 
           nombre:
-            document
-              .getElementById(
-                'aulaNombre',
-              )
-              ?.value
-              ?.trim(),
+            construirNombreAula(
+              numero,
+              nombreEspecial,
+              tipo,
+            ),
 
           ubicacion:
             document
@@ -5644,12 +7393,7 @@ function abrirFormularioAula(
                 ?.value,
             ),
 
-          tipo:
-            document
-              .getElementById(
-                'aulaTipo',
-              )
-              ?.value,
+          tipo,
 
           tipoMobiliario:
             document
@@ -5667,7 +7411,6 @@ function abrirFormularioAula(
 
         };
 
-
         if (
           !datos.capacidad ||
           datos.capacidad < 1
@@ -5682,7 +7425,6 @@ function abrirFormularioAula(
 
           return;
         }
-
 
         if (
           editando &&
@@ -5707,28 +7449,23 @@ function abrirFormularioAula(
 
             });
 
-
           if (!confirmado) {
             return;
           }
 
-
           datos.confirmarReduccionCapacidad =
             true;
         }
-
 
         const boton =
           document.getElementById(
             'guardarAula',
           );
 
-
         if (boton) {
           boton.disabled =
             true;
         }
-
 
         try {
 
@@ -5742,7 +7479,6 @@ function abrirFormularioAula(
                   datos,
                 );
 
-
           if (!resultado?.ok) {
             throw new Error(
               resultado?.message ||
@@ -5750,9 +7486,7 @@ function abrirFormularioAula(
             );
           }
 
-
           dialog.close();
-
 
           mostrarExito({
 
@@ -5767,7 +7501,6 @@ function abrirFormularioAula(
                 : 'El aula fue registrada correctamente.',
 
           });
-
 
           await iniciarAulasPage();
 
@@ -5795,7 +7528,6 @@ function abrirFormularioAula(
 
       },
     );
-
 
   renderizarIconos();
 }
@@ -6749,8 +8481,8 @@ async function cambiarEstadoAulaActual(
 
       mensaje:
         nuevoEstado
-          ? `¿Desea activar "${aula.nombre}"?`
-          : `¿Desea inactivar "${aula.nombre}"?`,
+          ? `¿Desea activar "${nombreVisibleAula(aula)}"?`
+          : `¿Desea inactivar "${nombreVisibleAula(aula)}"?`,
 
       textoConfirmar:
         nuevoEstado
@@ -7296,8 +9028,34 @@ function renderizarBusquedaAulasDisponibles() {
 
 
     <section
-      class="aulas-detail-card"
+      class="
+        aulas-detail-card
+        aulas-search-panel
+      "
     >
+
+      <div class="aulas-search-intro">
+
+        <div
+          class="aulas-search-intro-icon"
+          aria-hidden="true"
+        >
+          <i data-lucide="search"></i>
+        </div>
+
+        <div>
+          <strong>
+            Encuentre el espacio adecuado
+          </strong>
+
+          <p>
+            Defina el periodo, horario, capacidad
+            y recursos necesarios para localizar
+            aulas disponibles.
+          </p>
+        </div>
+
+      </div>
 
       <form
         id="buscarAulasForm"
@@ -7578,7 +9336,10 @@ function renderizarBusquedaAulasDisponibles() {
 
 
     <section
-      class="aulas-detail-card"
+      class="
+        aulas-detail-card
+        aulas-search-results-panel
+      "
     >
 
       <div
@@ -8177,11 +9938,7 @@ function renderizarResultadosBusquedaAulas() {
 
                   <strong>
                     ${escapeHtml(
-                      aula.codigo,
-                    )}
-                    —
-                    ${escapeHtml(
-                      aula.nombre,
+                      nombreVisibleAula(aula),
                     )}
                   </strong>
 

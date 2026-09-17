@@ -8,6 +8,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { PlanAsignaturasController } from './plan-asignaturas.controller';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
@@ -297,6 +298,7 @@ describe('PlanAsignaturasController', () => {
       orden: 3,
       creditos: 3,
       tipo: TipoPlanAsignatura.OPTATIVA,
+      tipoOptativa: TipoOptativa.DISCIPLINARIA,
       codigoReferencia: 'OPT-1',
       nombreReferencia: 'Optativa',
     };
@@ -308,6 +310,25 @@ describe('PlanAsignaturasController', () => {
       .expect(201, { id: 10 });
 
     expect(service.crear).toHaveBeenCalledWith(1, dto);
+  });
+
+
+  it('rechaza crear una OPTATIVA sin clasificación', async () => {
+    await request(app.getHttpServer())
+      .post('/planes-estudio/1/asignaturas')
+      .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
+      .send({
+        nivel: 4,
+        ciclo: 1,
+        orden: 3,
+        creditos: 3,
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        codigoReferencia: 'OPT-1',
+        nombreReferencia: 'Optativa',
+      })
+      .expect(400);
+
+    expect(service.crear).not.toHaveBeenCalled();
   });
 
   it('rechaza valores curriculares fuera de rango', async () => {
