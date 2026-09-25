@@ -38,6 +38,24 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("carreras:actualizar", id, datos),
   cambiarEstadoCarrera: (id, activo) =>
     ipcRenderer.invoke("carreras:cambiar-estado", id, activo),
+  listarPerfilesAcademicos: () =>
+    ipcRenderer.invoke("perfiles-academicos:listar"),
+  obtenerPerfilAcademico: (id) =>
+    ipcRenderer.invoke("perfiles-academicos:obtener", id),
+  actualizarPerfilAcademico: (id, datos) =>
+    ipcRenderer.invoke("perfiles-academicos:actualizar", id, datos),
+  listarAreasPerfil: (id) =>
+    ipcRenderer.invoke("perfiles-academicos:areas:listar", id),
+  guardarAreasPerfil: (id, areas) =>
+    ipcRenderer.invoke("perfiles-academicos:areas:guardar", id, areas),
+  listarRequisitosPerfil: (id) =>
+    ipcRenderer.invoke("perfiles-academicos:requisitos:listar", id),
+  guardarRequisitosPerfil: (id, requisitos) =>
+    ipcRenderer.invoke(
+      "perfiles-academicos:requisitos:guardar",
+      id,
+      requisitos,
+    ),
   listarCursos: () => ipcRenderer.invoke("cursos:listar"),
   listarAsignaturasDisponiblesCurso: (filtros) =>
     ipcRenderer.invoke("cursos:asignaturas-disponibles", filtros),
@@ -158,6 +176,50 @@ contextBridge.exposeInMainWorld("sgpa", {
 
   obtenerDisponibilidadProfesor: (profesorId, periodoId) =>
     ipcRenderer.invoke("profesores:disponibilidad", profesorId, periodoId),
+
+  obtenerExpedientePerfilProfesor: (
+    profesorId,
+    perfilId,
+  ) =>
+    ipcRenderer.invoke(
+      "profesores:expediente-perfil",
+      profesorId,
+      perfilId,
+    ),
+
+  revisarRequisitoPerfilProfesor: (
+    profesorId,
+    perfilId,
+    requisitoId,
+    datos,
+  ) =>
+    ipcRenderer.invoke(
+      "profesores:revisar-requisito-perfil",
+      profesorId,
+      perfilId,
+      requisitoId,
+      datos,
+    ),
+
+  obtenerMiExpedientePerfilProfesor: (
+    perfilId,
+  ) =>
+    ipcRenderer.invoke(
+      "profesores:mi-expediente-perfil",
+      perfilId,
+    ),
+
+  guardarEvidenciasRequisitoProfesor: (
+    perfilId,
+    requisitoId,
+    datos,
+  ) =>
+    ipcRenderer.invoke(
+      "profesores:guardar-evidencias-requisito",
+      perfilId,
+      requisitoId,
+      datos,
+    ),
 
   revisarPerfilProfesor: (profesorId, perfilId, datos) =>
     ipcRenderer.invoke(

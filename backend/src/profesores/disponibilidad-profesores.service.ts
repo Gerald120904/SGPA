@@ -522,10 +522,14 @@ export class DisponibilidadProfesoresService {
       return origen.anio === destino.anio && origen.ciclo === 1;
     }
 
+    if (destino.ciclo === 3) {
+      return origen.anio === destino.anio && origen.ciclo === 2;
+    }
+
     return (
       destino.ciclo === 1 &&
       origen.anio === destino.anio - 1 &&
-      origen.ciclo === 2
+      origen.ciclo === 3
     );
   }
 

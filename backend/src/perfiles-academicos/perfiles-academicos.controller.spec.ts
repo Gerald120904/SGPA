@@ -23,6 +23,10 @@ describe('PerfilesAcademicosController', () => {
     listarCursosPorPerfil: jest.fn(),
     asociarCurso: jest.fn(),
     desasociarCurso: jest.fn(),
+    listarAreas: jest.fn(),
+    guardarAreas: jest.fn(),
+    listarRequisitos: jest.fn(),
+    guardarRequisitos: jest.fn(),
   };
 
   const permisosService = {
@@ -87,6 +91,10 @@ describe('PerfilesAcademicosController', () => {
     perfilesService.listarCursosPorPerfil.mockResolvedValue([]);
     perfilesService.asociarCurso.mockResolvedValue({ id: 1 });
     perfilesService.desasociarCurso.mockResolvedValue(undefined);
+    perfilesService.listarAreas.mockResolvedValue([]);
+    perfilesService.guardarAreas.mockResolvedValue([]);
+    perfilesService.listarRequisitos.mockResolvedValue([]);
+    perfilesService.guardarRequisitos.mockResolvedValue([]);
   });
 
   afterAll(async () => {
@@ -172,5 +180,52 @@ describe('PerfilesAcademicosController', () => {
       .expect(403);
 
     expect(perfilesService.crear).not.toHaveBeenCalled();
+  });
+
+  it('lista y reemplaza áreas y requisitos', async () => {
+    const token = await crearToken('COORDINADOR');
+    const areas = {
+      areas: [{ tipo: 'DISCIPLINAR', descripcion: 'Computación', orden: 1 }],
+    };
+    const requisitos = {
+      requisitos: [
+        {
+          tipo: 'FORMACION_ACADEMICA',
+          obligatorio: true,
+          descripcion: 'Bachillerato universitario.',
+          orden: 1,
+        },
+      ],
+    };
+
+    await request(app.getHttpServer())
+      .get('/perfiles-academicos/1/areas')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, []);
+
+    await request(app.getHttpServer())
+      .put('/perfiles-academicos/1/areas')
+      .set('Authorization', `Bearer ${token}`)
+      .send(areas)
+      .expect(200, []);
+
+    await request(app.getHttpServer())
+      .put('/perfiles-academicos/1/requisitos')
+      .set('Authorization', `Bearer ${token}`)
+      .send(requisitos)
+      .expect(200, []);
+
+    expect(perfilesService.guardarAreas).toHaveBeenCalledWith(
+      1,
+      areas,
+      1,
+      false,
+    );
+    expect(perfilesService.guardarRequisitos).toHaveBeenCalledWith(
+      1,
+      requisitos,
+      1,
+      false,
+    );
   });
 });

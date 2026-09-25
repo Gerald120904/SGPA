@@ -13,6 +13,14 @@ import {
 } from '../../components/AlertModal.js';
 
 import {
+  SelectionCard
+} from '../../components/SelectionCard.js';
+
+import {
+  StatusBadge
+} from '../../components/StatusBadge.js';
+
+import {
   usuarioTienePermiso
 } from '../../app/session.js';
 
@@ -149,17 +157,77 @@ const RESULTADOS_ACADEMICOS = [
   }
 ];
 
+function configurarTamanoDialog(
+  dialog,
+  tamano = 'md'
+) {
+  if (!dialog) {
+    return;
+  }
+
+  dialog.classList.remove(
+    'sgpa-form-dialog-md',
+    'sgpa-form-dialog-lg'
+  );
+
+  dialog.classList.add(
+    tamano === 'lg'
+      ? 'sgpa-form-dialog-lg'
+      : 'sgpa-form-dialog-md'
+  );
+}
+
+function obtenerTonoEstadoEstudiante(
+  estado
+) {
+  switch (estado) {
+    case 'ACTIVO':
+      return 'success';
+
+    case 'INACTIVO':
+      return 'neutral';
+
+    case 'GRADUADO':
+      return 'info';
+
+    case 'RETIRADO':
+      return 'warning';
+
+    default:
+      return 'neutral';
+  }
+}
+
+function obtenerTonoEstadoSolicitud(
+  estado
+) {
+  switch (estado) {
+    case 'ACEPTADA':
+    case 'PROCESADA':
+      return 'success';
+
+    case 'RECHAZADA':
+      return 'danger';
+
+    case 'PENDIENTE':
+      return 'warning';
+
+    default:
+      return 'neutral';
+  }
+}
+
 export function EstudiantesPage() {
   return `
     <section
       id="estudiantesPage"
-      class="module-view"
+      class="module-view estudiantes-page"
     >
-      <div class="planes-toolbar" style="margin-bottom: 1.25rem;">
+      <div class="sgpa-toolbar">
         <div>
           <nav
+            class="estudiantes-breadcrumb"
             aria-label="Ruta de navegación"
-            style="font-size: 0.9rem; color: var(--color-muted, #64748b); margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.5rem;"
           >
             <span id="estudiantesBreadcrumb">
               Estudiantes
@@ -419,24 +487,26 @@ function renderizarEstudiantes() {
             </td>
 
             <td>
-              ${escapeHtml(
-                formatearEstado(
+              ${StatusBadge({
+                label: formatearEstado(
                   estudiante.estado
-                )
-              )}
+                ),
+                tone:
+                  obtenerTonoEstadoEstudiante(
+                    estudiante.estado
+                  )
+              })}
             </td>
 
             <td>
-              <div
-                class="table-actions"
-                style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;"
-              >
+              <div class="sgpa-table-actions">
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                   data-action="ver"
                   data-id="${estudiante.id}"
                   title="Ver estudiante"
+                  aria-label="Ver estudiante"
                 >
                   <i
                     data-lucide="eye"
@@ -446,10 +516,11 @@ function renderizarEstudiantes() {
 
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                   data-action="expediente"
                   data-id="${estudiante.id}"
                   title="Ver expediente académico"
+                  aria-label="Ver expediente académico"
                 >
                   <i
                     data-lucide="folder-open"
@@ -462,10 +533,11 @@ function renderizarEstudiantes() {
                     ? `
                       <button
                         type="button"
-                        class="btn btn-secondary btn-sm"
+                        class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                         data-action="editar"
                         data-id="${estudiante.id}"
                         title="Editar estudiante"
+                        aria-label="Editar estudiante"
                       >
                         <i
                           data-lucide="pencil"
@@ -475,10 +547,11 @@ function renderizarEstudiantes() {
 
                       <button
                         type="button"
-                        class="btn btn-secondary btn-sm"
+                        class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                         data-action="estado"
                         data-id="${estudiante.id}"
                         title="Cambiar estado"
+                        aria-label="Cambiar estado"
                       >
                         <i
                           data-lucide="toggle-left"
@@ -488,10 +561,11 @@ function renderizarEstudiantes() {
 
                       <button
                         type="button"
-                        class="btn btn-secondary btn-sm"
+                        class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                         data-action="plan"
                         data-id="${estudiante.id}"
                         title="Cambiar plan"
+                        aria-label="Cambiar plan"
                       >
                         <i
                           data-lucide="repeat-2"
@@ -1001,13 +1075,13 @@ async function mostrarCarreras() {
   actualizarEncabezadoYRuta();
 
   contenedor.innerHTML = `
-    <div class="planes-toolbar">
+    <div class="sgpa-toolbar">
       <div>
         <h3>Seleccione una carrera</h3>
         <p>Elija una carrera para ver sus planes de estudio y estudiantes asociados.</p>
       </div>
     </div>
-    <div class="carreras-message">Cargando carreras...</div>
+    <div class="sgpa-state-message">Cargando carreras...</div>
   `;
 
   try {
@@ -1064,13 +1138,13 @@ async function mostrarCarreras() {
 
     if (lista.length === 0) {
       contenedor.innerHTML = `
-        <div class="planes-toolbar">
+        <div class="sgpa-toolbar">
           <div>
             <h3>Seleccione una carrera</h3>
             <p>Elija una carrera para ver sus planes de estudio y estudiantes asociados.</p>
           </div>
         </div>
-        <div class="carreras-message" style="text-align: center; padding: 2rem;">
+        <div class="sgpa-state-message">
           No tiene carreras asignadas o disponibles.
         </div>
       `;
@@ -1079,7 +1153,7 @@ async function mostrarCarreras() {
     }
 
     contenedor.innerHTML = `
-      <div class="planes-toolbar">
+      <div class="sgpa-toolbar">
         <div>
           <h3>Seleccione una carrera</h3>
           <p>Elija una carrera para ver sus planes de estudio y estudiantes asociados.</p>
@@ -1093,56 +1167,18 @@ async function mostrarCarreras() {
               const numPlanes = planesPorCarrera.get(Number(carrera.id)) ?? 0;
               const numEstudiantes = estudiantesPorCarrera.get(Number(carrera.id)) ?? 0;
 
-              return `
-              <button
-                type="button"
-                class="module-card"
-                data-carrera-id="${carrera.id}"
-                aria-label="Seleccionar ${escapeHtml(carrera.nombre)}"
-              >
-                <span
-                  class="module-card-decoration"
-                  aria-hidden="true"
-                ></span>
-
-                <div class="module-card-top">
-                  <div class="module-card-icon">
-                    <i
-                      data-lucide="graduation-cap"
-                      aria-hidden="true"
-                    ></i>
-                  </div>
-                </div>
-
-                <div class="module-card-content">
-                  <strong>
-                    ${escapeHtml(carrera.nombre)}
-                  </strong>
-
-                  <p style="font-size: 0.85rem; color: var(--color-muted, #64748b); margin-top: 0.25rem;">
-                    ${numPlanes} ${numPlanes === 1 ? 'plan' : 'planes'} &middot; ${numEstudiantes} ${numEstudiantes === 1 ? 'estudiante' : 'estudiantes'}
-                  </p>
-                  ${
-                    carrera.descripcion
-                      ? `<p>${escapeHtml(carrera.descripcion)}</p>`
-                      : ''
-                  }
-                </div>
-
-                <div class="module-card-action">
-                  <span>Ver planes</span>
-                  <i
-                    data-lucide="chevron-right"
-                    aria-hidden="true"
-                  ></i>
-                </div>
-
-                <span
-                  class="module-card-hover-line"
-                  aria-hidden="true"
-                ></span>
-              </button>
-            `;
+              return SelectionCard({
+                dataAttribute: 'data-carrera-id',
+                dataValue: carrera.id,
+                icon: 'graduation-cap',
+                title: carrera.nombre,
+                description: carrera.descripcion || '',
+                details: [
+                  `${numPlanes} ${numPlanes === 1 ? 'plan' : 'planes'}`,
+                  `${numEstudiantes} ${numEstudiantes === 1 ? 'estudiante' : 'estudiantes'}`
+                ],
+                actionText: 'Ver planes'
+              });
             }
           )
           .join('')}
@@ -1157,12 +1193,12 @@ async function mostrarCarreras() {
     );
 
     contenedor.innerHTML = `
-      <div class="planes-toolbar">
+      <div class="sgpa-toolbar">
         <div>
           <h3>Seleccione una carrera</h3>
         </div>
       </div>
-      <div class="carreras-message carreras-error" role="alert">
+      <div class="sgpa-state-message sgpa-state-message-error" role="alert">
         <h3>No fue posible cargar las carreras</h3>
         <p>${escapeHtml(error?.message || 'Error de conexión.')}</p>
       </div>
@@ -1190,13 +1226,12 @@ async function mostrarPlanesCarrera(carrera) {
   actualizarEncabezadoYRuta();
 
   contenedor.innerHTML = `
-    <div class="planes-toolbar">
+    <div class="sgpa-toolbar">
       <div>
         <button
           type="button"
           id="volverACarrerasBtn"
-          class="btn btn-secondary btn-sm"
-          style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+          class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-back-button"
         >
           <i
             data-lucide="arrow-left"
@@ -1209,7 +1244,7 @@ async function mostrarPlanesCarrera(carrera) {
         <p>Planes de estudio de <strong>${escapeHtml(carrera.nombre)}</strong></p>
       </div>
     </div>
-    <div class="carreras-message">Cargando planes de estudio...</div>
+    <div class="sgpa-state-message">Cargando planes de estudio...</div>
   `;
   renderizarIconos();
 
@@ -1268,13 +1303,12 @@ async function mostrarPlanesCarrera(carrera) {
 
     if (planesDeCarrera.length === 0) {
       contenedor.innerHTML = `
-        <div class="planes-toolbar">
+        <div class="sgpa-toolbar">
           <div>
             <button
               type="button"
               id="volverACarrerasBtn"
-              class="btn btn-secondary btn-sm"
-              style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+              class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-back-button"
             >
               <i
                 data-lucide="arrow-left"
@@ -1287,7 +1321,7 @@ async function mostrarPlanesCarrera(carrera) {
             <p>Planes de estudio de <strong>${escapeHtml(carrera.nombre)}</strong></p>
           </div>
         </div>
-        <div class="carreras-message" style="text-align: center; padding: 2rem;">
+        <div class="sgpa-state-message">
           Esta carrera no tiene planes de estudio registrados.
         </div>
       `;
@@ -1296,13 +1330,12 @@ async function mostrarPlanesCarrera(carrera) {
     }
 
     contenedor.innerHTML = `
-      <div class="planes-toolbar">
+      <div class="sgpa-toolbar">
         <div>
           <button
             type="button"
             id="volverACarrerasBtn"
-            class="btn btn-secondary btn-sm"
-            style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+            class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-back-button"
           >
             <i
               data-lucide="arrow-left"
@@ -1323,57 +1356,21 @@ async function mostrarPlanesCarrera(carrera) {
               const numEst = estudiantesPorPlan.get(Number(plan.id)) ?? 0;
               const numSol = solicitudesPorPlan.get(Number(plan.id)) ?? 0;
 
-              return `
-              <button
-                type="button"
-                class="module-card"
-                data-plan-id="${plan.id}"
-                aria-label="Seleccionar ${escapeHtml(plan.nombre || plan.codigo)}"
-              >
-                <span
-                  class="module-card-decoration"
-                  aria-hidden="true"
-                ></span>
-
-                <div class="module-card-top">
-                  <div class="module-card-icon">
-                    <i
-                      data-lucide="book-open"
-                      aria-hidden="true"
-                    ></i>
-                  </div>
-                </div>
-
-                <div class="module-card-content">
-                  <strong>
-                    ${escapeHtml(plan.nombre || plan.codigo)}
-                  </strong>
-
-                  <p>
-                    ${numEst} ${numEst === 1 ? 'estudiante' : 'estudiantes'} &middot; ${numSol} ${numSol === 1 ? 'solicitud' : 'solicitudes'}${numSol === 1 ? ' pendiente' : ' pendientes'}
-                    &middot;
-                    ${
-                      plan.activo === false
-                        ? '<span style="color: var(--color-danger, #ef4444); font-weight: 600;">Inactivo</span>'
-                        : '<span style="color: var(--color-success, #10b981); font-weight: 600;">Activo</span>'
-                    }
-                  </p>
-                </div>
-
-                <div class="module-card-action">
-                  <span>Ver estudiantes</span>
-                  <i
-                    data-lucide="chevron-right"
-                    aria-hidden="true"
-                  ></i>
-                </div>
-
-                <span
-                  class="module-card-hover-line"
-                  aria-hidden="true"
-                ></span>
-              </button>
-            `;
+              return SelectionCard({
+                dataAttribute: 'data-plan-id',
+                dataValue: plan.id,
+                icon: 'book-open',
+                title: plan.nombre || plan.codigo,
+                details: [
+                  `${numEst} ${numEst === 1 ? 'estudiante' : 'estudiantes'}`,
+                  `${numSol} ${numSol === 1 ? 'solicitud pendiente' : 'solicitudes pendientes'}`
+                ],
+                status: StatusBadge({
+                  label: plan.activo === false ? 'Inactivo' : 'Activo',
+                  tone: plan.activo === false ? 'neutral' : 'success'
+                }),
+                actionText: 'Ver estudiantes'
+              });
             }
           )
           .join('')}
@@ -1388,13 +1385,12 @@ async function mostrarPlanesCarrera(carrera) {
     );
 
     contenedor.innerHTML = `
-      <div class="planes-toolbar">
+      <div class="sgpa-toolbar">
         <div>
           <button
             type="button"
             id="volverACarrerasBtn"
-            class="btn btn-secondary btn-sm"
-            style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+            class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-back-button"
           >
             <i
               data-lucide="arrow-left"
@@ -1406,7 +1402,7 @@ async function mostrarPlanesCarrera(carrera) {
           <h3>Seleccione un plan de estudio</h3>
         </div>
       </div>
-      <div class="carreras-message carreras-error" role="alert">
+      <div class="sgpa-state-message sgpa-state-message-error" role="alert">
         <h3>No fue posible cargar los planes de estudio</h3>
         <p>${escapeHtml(error?.message || 'Error de conexión.')}</p>
       </div>
@@ -1435,13 +1431,12 @@ async function mostrarEstudiantesPlan() {
     );
 
   contenedor.innerHTML = `
-    <div class="planes-toolbar">
+    <div class="sgpa-toolbar">
       <div>
         <button
           type="button"
           id="volverAPlanesBtn"
-          class="btn btn-secondary btn-sm"
-          style="margin-bottom: 0.75rem; display: inline-flex; align-items: center; gap: 0.35rem;"
+          class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-back-button"
         >
           <i
             data-lucide="arrow-left"
@@ -1459,11 +1454,11 @@ async function mostrarEstudiantesPlan() {
       ${
         puedeGestionar
           ? `
-            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <div class="sgpa-toolbar-actions">
               <button
                 id="importarEstudiantesExcelButton"
                 type="button"
-                class="btn btn-secondary"
+                class="sgpa-button sgpa-button-secondary"
               >
                 <i
                   data-lucide="file-spreadsheet"
@@ -1476,7 +1471,7 @@ async function mostrarEstudiantesPlan() {
               <button
                 id="nuevoEstudianteButton"
                 type="button"
-                class="btn btn-primary"
+                class="sgpa-button sgpa-button-primary"
               >
                 <i
                   data-lucide="user-plus"
@@ -1491,9 +1486,9 @@ async function mostrarEstudiantesPlan() {
       }
     </div>
 
-    <div class="planes-filters">
+    <div class="sgpa-filters">
       <label
-        class="planes-search"
+        class="sgpa-search"
         for="estudiantesBuscar"
       >
         <i
@@ -1511,7 +1506,7 @@ async function mostrarEstudiantesPlan() {
 
       <select
         id="estudiantesPeriodo"
-        class="planes-select"
+        class="sgpa-select"
         aria-label="Filtrar por período de ingreso"
       >
         <option value="">
@@ -1521,7 +1516,7 @@ async function mostrarEstudiantesPlan() {
 
       <select
         id="estudiantesEstado"
-        class="planes-select"
+        class="sgpa-select"
         aria-label="Filtrar por estado"
       >
         <option value="">
@@ -1544,10 +1539,10 @@ async function mostrarEstudiantesPlan() {
       id="estudiantesContent"
       aria-live="polite"
     >
-      <div class="carreras-message">Cargando estudiantes...</div>
+      <div class="sgpa-state-message">Cargando estudiantes...</div>
     </div>
 
-    <div class="planes-toolbar" style="margin-top: 2rem;">
+    <div class="sgpa-toolbar sgpa-section-spaced">
       <div>
         <h2>
           Solicitudes de formularios
@@ -1559,7 +1554,7 @@ async function mostrarEstudiantesPlan() {
       </div>
 
       <div>
-        <strong id="solicitudesFormulariosContador">
+        <strong id="solicitudesFormulariosContador" class="estudiantes-request-count">
           0 pendientes
         </strong>
       </div>
@@ -2039,6 +2034,8 @@ async function abrirDetalleEstudiante(
 
     renderizarIconos();
 
+    configurarTamanoDialog(dialog, 'md');
+
     dialog.showModal();
 
     habilitarCierreExterior(
@@ -2196,6 +2193,8 @@ async function abrirEditarEstudiante(
       });
 
     renderizarIconos();
+
+    configurarTamanoDialog(dialog, 'md');
 
     dialog.showModal();
 
@@ -2543,6 +2542,8 @@ async function abrirNuevoEstudiante() {
 
     renderizarIconos();
 
+    configurarTamanoDialog(dialog, 'md');
+
     dialog.showModal();
 
     habilitarCierreExterior(dialog);
@@ -2749,6 +2750,7 @@ async function abrirCambiarEstadoEstudiante(
     });
 
   renderizarIconos();
+  configurarTamanoDialog(dialog, 'md');
   dialog.showModal();
   habilitarCierreExterior(dialog);
 
@@ -3005,6 +3007,7 @@ async function abrirCambiarPlanEstudiante(
       });
 
     renderizarIconos();
+    configurarTamanoDialog(dialog, 'md');
     dialog.showModal();
     habilitarCierreExterior(dialog);
 
@@ -3287,11 +3290,11 @@ async function abrirExpedienteEstudiante(
               PERMISOS.GESTIONAR
             )
               ? `
-                <div class="sgpa-form-wide" style="margin-bottom: 0.5rem;">
+                <div class="sgpa-form-wide">
                   <button
                     id="registrarResultadoAcademicoButton"
                     type="button"
-                    class="btn btn-primary btn-sm"
+                    class="sgpa-form-primary"
                   >
                     <i
                       data-lucide="plus"
@@ -3330,6 +3333,8 @@ async function abrirExpedienteEstudiante(
       });
 
     renderizarIconos();
+
+    configurarTamanoDialog(dialog, 'lg');
 
     dialog.showModal();
 
@@ -3648,6 +3653,8 @@ async function abrirRegistrarResultadoAcademico(
       });
 
     renderizarIconos();
+
+    configurarTamanoDialog(dialog, 'md');
 
     document
       .getElementById(
@@ -4093,11 +4100,11 @@ function renderizarPreviewImportacionEstudiantes(
 
     ${tablaFilas}
 
-    <div style="margin-top: 1rem;">
+    <div class="sgpa-inline-actions">
       <button
         id="ejecutarImportacionEstudiantesButton"
         type="button"
-        class="btn btn-primary"
+        class="sgpa-form-primary"
         ${
           tieneErrores ||
           !tieneCambios
@@ -4275,7 +4282,7 @@ async function abrirImportacionEstudiantes() {
           true,
 
         body: `
-          <div class="sgpa-form-wide" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem;">
+          <div class="sgpa-form-wide sgpa-form-summary-grid">
             <label>
               <span>Carrera</span>
               <input
@@ -4295,11 +4302,11 @@ async function abrirImportacionEstudiantes() {
             </label>
           </div>
 
-          <div class="sgpa-form-wide" style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <div class="sgpa-form-wide sgpa-inline-actions">
             <button
               id="descargarPlantillaEstudiantesButton"
               type="button"
-              class="btn btn-secondary"
+              class="sgpa-form-secondary"
             >
               <i
                 data-lucide="download"
@@ -4312,7 +4319,7 @@ async function abrirImportacionEstudiantes() {
             <button
               id="seleccionarExcelEstudiantesButton"
               type="button"
-              class="btn btn-secondary"
+              class="sgpa-form-secondary"
             >
               <i
                 data-lucide="file-up"
@@ -4334,7 +4341,7 @@ async function abrirImportacionEstudiantes() {
             <button
               id="previsualizarImportacionEstudiantesButton"
               type="button"
-              class="btn btn-primary"
+              class="sgpa-form-primary"
               disabled
             >
               <i
@@ -4354,6 +4361,8 @@ async function abrirImportacionEstudiantes() {
       });
 
     renderizarIconos();
+
+    configurarTamanoDialog(dialog, 'lg');
 
     dialog.showModal();
 
@@ -4831,23 +4840,23 @@ function renderizarSolicitudesFormularios() {
             </td>
 
             <td>
-              ${escapeHtml(
-                solicitud.estado ||
-                '—'
-              )}
+              ${StatusBadge({
+                label: solicitud.estado || '—',
+                tone: obtenerTonoEstadoSolicitud(
+                  solicitud.estado
+                )
+              })}
             </td>
 
             <td>
-              <div
-                class="table-actions"
-                style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;"
-              >
+              <div class="sgpa-table-actions">
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                   data-solicitud-action="ver"
                   data-id="${solicitud.id}"
                   title="Ver solicitud"
+                  aria-label="Ver solicitud"
                 >
                   <i
                     data-lucide="eye"
@@ -4860,10 +4869,11 @@ function renderizarSolicitudesFormularios() {
                     ? `
                       <button
                         type="button"
-                        class="btn btn-secondary btn-sm"
+                        class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                         data-solicitud-action="aceptar"
                         data-id="${solicitud.id}"
                         title="Aceptar solicitud"
+                        aria-label="Aceptar solicitud"
                       >
                         <i
                           data-lucide="check"
@@ -4873,10 +4883,11 @@ function renderizarSolicitudesFormularios() {
 
                       <button
                         type="button"
-                        class="btn btn-secondary btn-sm"
+                        class="sgpa-button sgpa-button-secondary sgpa-button-sm sgpa-icon-button"
                         data-solicitud-action="rechazar"
                         data-id="${solicitud.id}"
                         title="Rechazar solicitud"
+                        aria-label="Rechazar solicitud"
                       >
                         <i
                           data-lucide="x"
@@ -5165,6 +5176,8 @@ function abrirRechazarSolicitud(
 
   renderizarIconos();
 
+  configurarTamanoDialog(dialog, 'md');
+
   dialog.showModal();
 
   habilitarCierreExterior(
@@ -5447,9 +5460,9 @@ function abrirDetalleSolicitud(
               <label class="sgpa-form-wide">
                 <span>Detalle de revisión / error</span>
                 <textarea
+                  class="estudiantes-error-textarea"
                   rows="2"
                   readonly
-                  style="color: var(--color-danger, #dc2626);"
                 >${escapeHtml(
                   solicitud.detalleError
                 )}</textarea>
@@ -5461,6 +5474,8 @@ function abrirDetalleSolicitud(
     });
 
   renderizarIconos();
+
+  configurarTamanoDialog(dialog, 'md');
 
   dialog.showModal();
 

@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { Curso } from '../cursos/entities/curso.entity';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
@@ -14,9 +14,13 @@ import { EstadoPerfilProfesor } from './constants/estado-perfil-profesor.constan
 import { ActualizarPerfilAcademicoDto } from './dto/actualizar-perfil-academico.dto';
 import { CrearPerfilAcademicoDto } from './dto/crear-perfil-academico.dto';
 import { FiltrarPerfilesAcademicosDto } from './dto/filtrar-perfiles-academicos.dto';
+import { GuardarAreasPerfilDto } from './dto/guardar-areas-perfil.dto';
+import { GuardarRequisitosPerfilDto } from './dto/guardar-requisitos-perfil.dto';
+import { AreaPerfilAcademico } from './entities/area-perfil-academico.entity';
 import { CursoPerfilAcademico } from './entities/curso-perfil-academico.entity';
 import { PerfilAcademico } from './entities/perfil-academico.entity';
 import { ProfesorPerfilAcademico } from './entities/profesor-perfil-academico.entity';
+import { RequisitoPerfilAcademico } from './entities/requisito-perfil-academico.entity';
 
 @Injectable()
 export class PerfilesAcademicosService {
@@ -27,11 +31,16 @@ export class PerfilesAcademicosService {
     private readonly cursoPerfilRepository: Repository<CursoPerfilAcademico>,
     @InjectRepository(ProfesorPerfilAcademico)
     private readonly profesorPerfilRepository: Repository<ProfesorPerfilAcademico>,
+    @InjectRepository(AreaPerfilAcademico)
+    private readonly areaPerfilRepository: Repository<AreaPerfilAcademico>,
+    @InjectRepository(RequisitoPerfilAcademico)
+    private readonly requisitoPerfilRepository: Repository<RequisitoPerfilAcademico>,
     @InjectRepository(Carrera)
     private readonly carreraRepository: Repository<Carrera>,
     @InjectRepository(Curso)
     private readonly cursoRepository: Repository<Curso>,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private async validarAlcanceCarrera(
@@ -99,6 +108,14 @@ export class PerfilesAcademicosService {
       where: { id },
       relations: {
         carrera: true,
+        areas: true,
+        requisitos: true,
+        cursos: { curso: true },
+      },
+      order: {
+        areas: { tipo: 'ASC', orden: 'ASC', id: 'ASC' },
+        requisitos: { obligatorio: 'DESC', orden: 'ASC', id: 'ASC' },
+        cursos: { id: 'ASC' },
       },
     });
 
@@ -137,6 +154,11 @@ export class PerfilesAcademicosService {
       codigo,
       nombre: dto.nombre.trim(),
       descripcion: dto.descripcion?.trim() || null,
+      numeroPerfil: dto.numeroPerfil?.trim() || null,
+      consecutivo: dto.consecutivo?.trim() || null,
+      acuerdoAprobacion: dto.acuerdoAprobacion?.trim() || null,
+      fechaAprobacion: dto.fechaAprobacion || null,
+      tipoRegistro: dto.tipoRegistro || null,
       activo: true,
       carrera,
     });
@@ -165,6 +187,26 @@ export class PerfilesAcademicosService {
 
     if (dto.descripcion !== undefined) {
       perfil.descripcion = dto.descripcion?.trim() || null;
+    }
+
+    if (dto.numeroPerfil !== undefined) {
+      perfil.numeroPerfil = dto.numeroPerfil?.trim() || null;
+    }
+
+    if (dto.consecutivo !== undefined) {
+      perfil.consecutivo = dto.consecutivo?.trim() || null;
+    }
+
+    if (dto.acuerdoAprobacion !== undefined) {
+      perfil.acuerdoAprobacion = dto.acuerdoAprobacion?.trim() || null;
+    }
+
+    if (dto.fechaAprobacion !== undefined) {
+      perfil.fechaAprobacion = dto.fechaAprobacion || null;
+    }
+
+    if (dto.tipoRegistro !== undefined) {
+      perfil.tipoRegistro = dto.tipoRegistro || null;
     }
 
     await this.perfilRepository.save(perfil);
@@ -236,6 +278,116 @@ export class PerfilesAcademicosService {
         id: 'ASC',
       },
     });
+  }
+
+  async listarAreas(perfilId: number): Promise<AreaPerfilAcademico[]> {
+    await this.obtenerPorId(perfilId);
+
+    return this.areaPerfilRepository.find({
+      where: { perfilAcademicoId: perfilId },
+      order: { tipo: 'ASC', orden: 'ASC', id: 'ASC' },
+    });
+  }
+
+  async guardarAreas(
+    perfilId: number,
+    dto: GuardarAreasPerfilDto,
+    usuarioId: number,
+    esAdminGlobal: boolean,
+  ): Promise<AreaPerfilAcademico[]> {
+    const perfil = await this.obtenerPorId(perfilId);
+    await this.validarAlcanceCarrera(
+      usuarioId,
+      esAdminGlobal,
+      perfil.carreraId,
+    );
+
+    const areas = dto.areas.map((area) => ({
+      ...area,
+      descripcion: area.descripcion.trim(),
+    }));
+
+    if (areas.some((area) => !area.descripcion)) {
+      throw new BadRequestException(
+        'Las descripciones de las áreas no pueden estar vacías.',
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(AreaPerfilAcademico, {
+        perfilAcademicoId: perfilId,
+      });
+
+      if (areas.length) {
+        await manager.save(
+          AreaPerfilAcademico,
+          areas.map((area) =>
+            manager.create(AreaPerfilAcademico, {
+              ...area,
+              perfilAcademicoId: perfilId,
+            }),
+          ),
+        );
+      }
+    });
+
+    return this.listarAreas(perfilId);
+  }
+
+  async listarRequisitos(
+    perfilId: number,
+  ): Promise<RequisitoPerfilAcademico[]> {
+    await this.obtenerPorId(perfilId);
+
+    return this.requisitoPerfilRepository.find({
+      where: { perfilAcademicoId: perfilId },
+      order: { obligatorio: 'DESC', orden: 'ASC', id: 'ASC' },
+    });
+  }
+
+  async guardarRequisitos(
+    perfilId: number,
+    dto: GuardarRequisitosPerfilDto,
+    usuarioId: number,
+    esAdminGlobal: boolean,
+  ): Promise<RequisitoPerfilAcademico[]> {
+    const perfil = await this.obtenerPorId(perfilId);
+    await this.validarAlcanceCarrera(
+      usuarioId,
+      esAdminGlobal,
+      perfil.carreraId,
+    );
+
+    const requisitos = dto.requisitos.map((requisito) => ({
+      ...requisito,
+      descripcion: requisito.descripcion.trim(),
+    }));
+
+    if (requisitos.some((requisito) => !requisito.descripcion)) {
+      throw new BadRequestException(
+        'Las descripciones de los requisitos no pueden estar vacías.',
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(RequisitoPerfilAcademico, {
+        perfilAcademicoId: perfilId,
+      });
+
+      if (requisitos.length) {
+        await manager.save(
+          RequisitoPerfilAcademico,
+          requisitos.map((requisito) =>
+            manager.create(RequisitoPerfilAcademico, {
+              ...requisito,
+              perfilAcademicoId: perfilId,
+            }),
+          ),
+        );
+      }
+    });
+
+    return this.listarRequisitos(perfilId);
   }
 
   async asociarCurso(

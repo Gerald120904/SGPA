@@ -1,0 +1,26 @@
+.estudiantes-page {
+  width: 100%;
+}
+
+.estudiantes-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.estudiantes-section {
+  margin-top: 32px;
+}
+
+.estudiantes-request-count {
+  color: #475467;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.estudiantes-error-textarea {
+  color: #b42318;
+}

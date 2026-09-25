@@ -304,6 +304,22 @@ function obtenerNombreEstado(
 }
 
 
+function obtenerNombreCiclo(
+  ciclo,
+) {
+  const ciclos = {
+    1: "I Ciclo",
+    2: "II Ciclo",
+    3: "Verano",
+  };
+
+  return (
+    ciclos[ciclo] ||
+    `Ciclo ${ciclo}`
+  );
+}
+
+
 function formatearFecha(
   fecha,
 ) {
@@ -497,9 +513,11 @@ function renderizarPeriodos() {
                     ${escapeHtml(
                       periodo.anio,
                     )}
-                    · Ciclo
+                    ·
                     ${escapeHtml(
-                      periodo.ciclo,
+                      obtenerNombreCiclo(
+                        periodo.ciclo,
+                      ),
                     )}
                   </small>
 
@@ -836,6 +854,17 @@ function abrirFormulario(
           }
         >
           II Ciclo
+        </option>
+
+        <option
+          value="3"
+          ${
+            periodo?.ciclo === 3
+              ? "selected"
+              : ""
+          }
+        >
+          Verano
         </option>
 
       </select>

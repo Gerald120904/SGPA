@@ -158,6 +158,42 @@ describe('PeriodosAcademicosService', () => {
     );
   });
 
+  it('genera correctamente el nombre y código para Verano (ciclo 3) con fechas que cruzan de año', async () => {
+    const guardado = crearPeriodo({
+      codigo: '2027-C3',
+      nombre: 'Verano 2027',
+      ciclo: 3,
+      fechaInicio: '2027-12-01',
+      fechaFin: '2028-02-05',
+      fechaLimiteDisponibilidad: '2027-11-15',
+    });
+
+    periodoRepository.findOne.mockResolvedValue(null);
+    periodoRepository.save.mockResolvedValue(guardado);
+
+    const resultado = await service.crear({
+      anio: 2027,
+      ciclo: 3,
+      fechaInicio: '2027-12-01',
+      fechaFin: '2028-02-05',
+      fechaLimiteDisponibilidad: '2027-11-15',
+    });
+
+    expect(periodoRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codigo: '2027-C3',
+        nombre: 'Verano 2027',
+        anio: 2027,
+        ciclo: 3,
+        fechaInicio: '2027-12-01',
+        fechaFin: '2028-02-05',
+        fechaLimiteDisponibilidad: '2027-11-15',
+      }),
+    );
+    expect(resultado.nombre).toBe('Verano 2027');
+    expect(resultado.codigo).toBe('2027-C3');
+  });
+
   it('convierte observaciones vacías en null', async () => {
     periodoRepository.findOne.mockResolvedValue(null);
     periodoRepository.save.mockResolvedValue(crearPeriodo());
@@ -189,7 +225,25 @@ describe('PeriodosAcademicosService', () => {
         fechaFin: '2027-06-25',
         fechaLimiteDisponibilidad: '2027-01-20',
       }),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow('Ya existe el I Ciclo del año 2027.');
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear un periodo Verano duplicado con mensaje correspondiente', async () => {
+    periodoRepository.findOne.mockResolvedValue(
+      crearPeriodo({ ciclo: 3, codigo: '2027-C3', nombre: 'Verano 2027' }),
+    );
+
+    await expect(
+      service.crear({
+        anio: 2027,
+        ciclo: 3,
+        fechaInicio: '2027-12-01',
+        fechaFin: '2028-02-05',
+        fechaLimiteDisponibilidad: '2027-11-15',
+      }),
+    ).rejects.toThrow('Ya existe el Verano del año 2027.');
 
     expect(periodoRepository.save).not.toHaveBeenCalled();
   });

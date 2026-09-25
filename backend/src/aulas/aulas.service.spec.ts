@@ -27,6 +27,7 @@ describe('AulasService', () => {
   let aulaRepository: {
     find: jest.Mock;
     findOne: jest.Mock;
+    count: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
     update: jest.Mock;
@@ -191,6 +192,7 @@ describe('AulasService', () => {
     aulaRepository = {
       find: jest.fn(),
       findOne: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn((datos: Partial<Aula>) => datos),
       save: jest.fn(),
       update: jest.fn(),
@@ -400,6 +402,42 @@ describe('AulasService', () => {
         tipo: TipoAula.AULA,
         tipoMobiliario: TipoMobiliarioAula.PUPITRE,
         origen: OrigenAula.UNA,
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(aulaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear una nueva aula UNA cuando ya existen 25', async () => {
+    aulaRepository.findOne.mockResolvedValue(null);
+    aulaRepository.count.mockResolvedValue(25);
+
+    await expect(
+      service.crear({
+        codigo: 'AULA-26',
+        nombre: 'Aula 26',
+        capacidad: 30,
+        tipo: TipoAula.AULA,
+        tipoMobiliario: TipoMobiliarioAula.PUPITRE,
+        origen: OrigenAula.UNA,
+      }),
+    ).rejects.toThrow(ConflictException);
+
+    expect(aulaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear una nueva aula UNED cuando ya existen 3', async () => {
+    aulaRepository.findOne.mockResolvedValue(null);
+    aulaRepository.count.mockResolvedValue(3);
+
+    await expect(
+      service.crear({
+        codigo: 'UNED-04',
+        nombre: 'Aula UNED 4',
+        capacidad: 30,
+        tipo: TipoAula.AULA,
+        tipoMobiliario: TipoMobiliarioAula.PUPITRE,
+        origen: OrigenAula.UNED,
       }),
     ).rejects.toThrow(ConflictException);
 

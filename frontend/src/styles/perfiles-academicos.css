@@ -1,0 +1,39 @@
+.perfiles-academicos-page { max-width: 1320px; margin: 0 auto; }
+.perfil-codigo { color: #b42318; letter-spacing: .04em; }
+.perfil-nombre { display: grid; gap: 4px; }
+.perfil-nombre small { color: #667085; }
+.perfil-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 26px; margin-bottom: 18px; border: 1px solid #eaecf0; border-left: 5px solid var(--una-red); border-radius: 14px; background: #fff; }
+.perfil-hero h2 { margin: 10px 0 5px; color: #101828; font-size: 24px; }
+.perfil-hero p { margin: 0; color: #667085; }
+.perfil-hero-badges { display: flex; align-items: center; gap: 8px; }
+.perfil-code-pill { padding: 5px 9px; border-radius: 7px; background: #fef3f2; color: #b42318; font-size: 12px; font-weight: 750; }
+.perfil-section { min-width: 0; padding: 22px; margin-bottom: 16px; border: 1px solid #eaecf0; border-radius: 12px; background: #fff; }
+.perfil-section header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 17px; }
+.perfil-section header span:first-child { color: #98a2b3; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.perfil-section h3 { display: flex; align-items: center; gap: 8px; margin: 3px 0 0; color: #1d2939; font-size: 16px; }
+.perfil-section h3 svg { width: 17px; height: 17px; color: #b42318; }
+.perfil-section ul { display: grid; gap: 9px; margin: 0; padding-left: 20px; color: #475467; font-size: 13px; line-height: 1.55; }
+.perfil-two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.perfil-official-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 0; }
+.perfil-official-grid div { min-width: 0; padding: 13px; border-radius: 9px; background: #f9fafb; }
+.perfil-official-grid dt { color: #667085; font-size: 11px; }
+.perfil-official-grid dd { margin: 5px 0 0; overflow-wrap: anywhere; color: #1d2939; font-size: 13px; font-weight: 650; }
+.perfil-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.perfil-chips > span { padding: 7px 10px; border: 1px solid #e4e7ec; border-radius: 8px; background: #f9fafb; color: #344054; font-size: 12px; font-weight: 700; }
+.perfil-requirements { display: grid; gap: 11px; }
+.perfil-requirements article { padding: 13px; border-left: 3px solid #d0d5dd; border-radius: 6px; background: #f9fafb; }
+.perfil-requirements strong { color: #344054; font-size: 12px; }
+.perfil-requirements p { margin: 5px 0 0; color: #667085; font-size: 12px; line-height: 1.55; }
+.perfil-empty { margin: 0; color: #98a2b3; font-size: 12px; font-style: italic; }
+.perfil-section-action { display: flex; justify-content: flex-end; margin: -7px 0 18px; }
+.sgpa-form-field-full { grid-column: 1 / -1; }
+.sgpa-form-field textarea { min-height: 100px; resize: vertical; }
+.sgpa-form-field small { color: #98a2b3; font-size: 10px; }
+.perfil-requisitos-editor { display: grid; gap: 14px; }
+#requisitosEditorRows { display: grid; gap: 12px; }
+.perfil-requisito-editor-row { display: grid; grid-template-columns: minmax(180px, 1fr) auto 80px 38px; gap: 9px; padding: 13px; border: 1px solid #eaecf0; border-radius: 9px; background: #f9fafb; }
+.perfil-requisito-editor-row select, .perfil-requisito-editor-row input[type="number"], .perfil-requisito-editor-row textarea { padding: 9px 10px; border: 1px solid #d0d5dd; border-radius: 7px; background: #fff; color: #344054; font: inherit; font-size: 12px; }
+.perfil-requisito-editor-row textarea { grid-column: 1 / -1; resize: vertical; }
+.perfil-required-check { display: flex; align-items: center; gap: 6px; color: #475467; font-size: 11px; }
+@media (max-width: 900px) { .perfil-official-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .perfil-hero { flex-direction: column; } .perfil-two-columns, .perfil-official-grid { grid-template-columns: 1fr; } .perfil-requisito-editor-row { grid-template-columns: 1fr 1fr; } }

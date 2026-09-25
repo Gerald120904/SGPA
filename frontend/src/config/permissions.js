@@ -132,6 +132,9 @@ const PERMISO_MODULO = {
   'planes-estudio':
     PERMISOS.PLANES_ESTUDIO_VER,
 
+  'perfiles-academicos':
+    PERMISOS.PERFILES_ACADEMICOS_VER,
+
   cursos:
     PERMISOS.CURSOS_VER,
 

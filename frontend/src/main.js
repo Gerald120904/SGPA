@@ -421,6 +421,53 @@ ipcMain.handle("carreras:cambiar-estado", async (_event, id, activo) => {
 });
 
 /* =========================================================
+   PERFILES ACADÉMICOS
+   ========================================================= */
+
+ipcMain.handle("perfiles-academicos:listar", async () => {
+  return ejecutarPeticionAutenticada("/perfiles-academicos");
+});
+
+ipcMain.handle("perfiles-academicos:obtener", async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}`);
+});
+
+ipcMain.handle("perfiles-academicos:actualizar", async (_event, id, datos) => {
+  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}`, {
+    method: "PATCH",
+    body: datos,
+  });
+});
+
+ipcMain.handle("perfiles-academicos:areas:listar", async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/areas`);
+});
+
+ipcMain.handle(
+  "perfiles-academicos:areas:guardar",
+  async (_event, id, areas) => {
+    return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/areas`, {
+      method: "PUT",
+      body: { areas },
+    });
+  },
+);
+
+ipcMain.handle("perfiles-academicos:requisitos:listar", async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/requisitos`);
+});
+
+ipcMain.handle(
+  "perfiles-academicos:requisitos:guardar",
+  async (_event, id, requisitos) => {
+    return ejecutarPeticionAutenticada(
+      `/perfiles-academicos/${id}/requisitos`,
+      { method: "PUT", body: { requisitos } },
+    );
+  },
+);
+
+/* =========================================================
    CURSOS
    ========================================================= */
 
@@ -1009,6 +1056,61 @@ ipcMain.handle(
 /* =========================================================
    PROFESORES - PERFILES Y ATESTADOS
    ========================================================= */
+
+ipcMain.handle(
+  "profesores:expediente-perfil",
+  async (_event, profesorId, perfilId) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${profesorId}/perfiles/${perfilId}/expediente`,
+    );
+  },
+);
+
+ipcMain.handle(
+  "profesores:revisar-requisito-perfil",
+  async (
+    _event,
+    profesorId,
+    perfilId,
+    requisitoId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${profesorId}/perfiles/${perfilId}/requisitos/${requisitoId}/revision`,
+      {
+        method: "PATCH",
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  "profesores:mi-expediente-perfil",
+  async (_event, perfilId) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/perfiles/${perfilId}/expediente`,
+    );
+  },
+);
+
+ipcMain.handle(
+  "profesores:guardar-evidencias-requisito",
+  async (
+    _event,
+    perfilId,
+    requisitoId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/perfiles/${perfilId}/requisitos/${requisitoId}/evidencias`,
+      {
+        method: "PUT",
+        body: datos,
+      },
+    );
+  },
+);
 
 ipcMain.handle(
   "profesores:revisar-perfil",

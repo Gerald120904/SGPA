@@ -9,10 +9,13 @@ import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academ
 import { CursoPerfilAcademico } from '../perfiles-academicos/entities/curso-perfil-academico.entity';
 import { PerfilAcademico } from '../perfiles-academicos/entities/perfil-academico.entity';
 import { ProfesorPerfilAcademico } from '../perfiles-academicos/entities/profesor-perfil-academico.entity';
+import { RequisitoPerfilAcademico } from '../perfiles-academicos/entities/requisito-perfil-academico.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { DisponibilidadProfesoresController } from './disponibilidad-profesores.controller';
 import { DisponibilidadProfesoresService } from './disponibilidad-profesores.service';
 import { AtestadoProfesor } from './entities/atestado-profesor.entity';
+import { CumplimientoRequisitoProfesor } from './entities/cumplimiento-requisito-profesor.entity';
+import { EvidenciaRequisitoProfesor } from './entities/evidencia-requisito-profesor.entity';
 import { BloqueDisponibilidadProfesor } from './entities/bloque-disponibilidad-profesor.entity';
 import { DisponibilidadProfesor } from './entities/disponibilidad-profesor.entity';
 import { HistorialDisponibilidadProfesor } from './entities/historial-disponibilidad-profesor.entity';
@@ -36,6 +39,9 @@ import { ProfesoresService } from './profesores.service';
       CursoPerfilAcademico,
       ProfesorPerfilAcademico,
       AtestadoProfesor,
+      RequisitoPerfilAcademico,
+      CumplimientoRequisitoProfesor,
+      EvidenciaRequisitoProfesor,
       ProyectoProfesor,
       DisponibilidadProfesor,
       BloqueDisponibilidadProfesor,

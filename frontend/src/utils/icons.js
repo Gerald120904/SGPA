@@ -30,6 +30,7 @@ import {
   ChevronLeft,
   ChevronDown,
 
+  ArrowLeft,
   ArrowUpRight,
 
   /* =======================================================
@@ -76,6 +77,12 @@ import {
 
   FileSpreadsheet,
   FileDown,
+  Download,
+  FileUp,
+  FolderOpen,
+  Repeat2,
+  ScanSearch,
+  ToggleLeft,
 
   GitBranch,
 
@@ -226,8 +233,15 @@ export function renderizarIconos() {
 
       FileSpreadsheet,
       FileDown,
+      Download,
+      FileUp,
+      FolderOpen,
+      Repeat2,
+      ScanSearch,
+      ToggleLeft,
 
       GitBranch,
+      ArrowLeft,
 
       List,
       ListChecks,

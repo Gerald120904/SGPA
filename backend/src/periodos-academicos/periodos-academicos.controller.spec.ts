@@ -241,7 +241,27 @@ describe('PeriodosAcademicosController', () => {
     expect(periodosAcademicosService.crear).not.toHaveBeenCalled();
   });
 
-  it('rechaza un ciclo mayor a 2', async () => {
+  it('crea un periodo académico válido para Verano (ciclo 3)', async () => {
+    const token = await crearToken('COORDINADOR');
+
+    const dto = {
+      anio: 2027,
+      ciclo: 3,
+      fechaInicio: '2027-12-01',
+      fechaFin: '2028-02-05',
+      fechaLimiteDisponibilidad: '2027-11-15',
+    };
+
+    await request(app.getHttpServer())
+      .post('/periodos-academicos')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(201, { id: 1 });
+
+    expect(periodosAcademicosService.crear).toHaveBeenCalledWith(dto);
+  });
+
+  it('rechaza un ciclo mayor a 3', async () => {
     const token = await crearToken('COORDINADOR');
 
     await request(app.getHttpServer())
@@ -249,7 +269,7 @@ describe('PeriodosAcademicosController', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         anio: 2027,
-        ciclo: 3,
+        ciclo: 4,
         fechaInicio: '2027-02-15',
         fechaFin: '2027-06-25',
         fechaLimiteDisponibilidad: '2027-01-20',

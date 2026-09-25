@@ -11,6 +11,7 @@ import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { EstadoPerfilProfesor } from '../perfiles-academicos/constants/estado-perfil-profesor.constant';
+import { EstadoCumplimientoRequisito } from './constants/estado-cumplimiento-requisito.constant';
 import { EstadoAtestadoProfesor } from './constants/estado-atestado-profesor.constant';
 import { TipoAtestadoProfesor } from './constants/tipo-atestado-profesor.constant';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
@@ -38,6 +39,9 @@ describe('ProfesoresController', () => {
     listarPerfilesDisponiblesMiPerfil: jest.fn(),
     listarPerfilesMiPerfil: jest.fn(),
     solicitarPerfilMiPerfil: jest.fn(),
+    obtenerExpedientePerfilProfesor: jest.fn(),
+    guardarEvidenciasRequisitoMiPerfil: jest.fn(),
+    revisarRequisitoPerfilProfesor: jest.fn(),
     revisarPerfilProfesor: jest.fn(),
     inactivarPerfilProfesor: jest.fn(),
     listarCursosHabilitadosMiPerfil: jest.fn(),
@@ -117,6 +121,15 @@ describe('ProfesoresController', () => {
 
     profesoresService.listarPerfilesMiPerfil.mockResolvedValue([]);
     profesoresService.solicitarPerfilMiPerfil.mockResolvedValue({ id: 100 });
+    profesoresService.obtenerExpedientePerfilProfesor.mockResolvedValue({
+      requisitos: [],
+    });
+    profesoresService.guardarEvidenciasRequisitoMiPerfil.mockResolvedValue({
+      id: 50,
+    });
+    profesoresService.revisarRequisitoPerfilProfesor.mockResolvedValue({
+      id: 500,
+    });
     profesoresService.revisarPerfilProfesor.mockResolvedValue({ id: 100 });
     profesoresService.inactivarPerfilProfesor.mockResolvedValue({
       id: 100,
@@ -238,7 +251,6 @@ describe('ProfesoresController', () => {
       profesoresService.listarPerfilesDisponiblesMiPerfil,
     ).toHaveBeenCalledWith(10);
   });
-
 
   it('consulta un profesor por id con PROFESORES_VER', async () => {
     permisosAsignados.add(PermisoSistema.PROFESORES_VER);
@@ -513,6 +525,100 @@ describe('ProfesoresController', () => {
       10,
       'Ya no imparto este núcleo',
     );
+  });
+
+  it('permite al PROFESOR consultar su expediente de requisitos', async () => {
+    const token = await crearToken(['PROFESOR'], 10);
+
+    await request(app.getHttpServer())
+      .get('/profesores/mi-perfil/perfiles/1/expediente')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { requisitos: [] });
+
+    expect(
+      profesoresService.obtenerExpedientePerfilProfesor,
+    ).toHaveBeenCalledWith(10, 1, 10);
+  });
+
+  it('permite al PROFESOR reemplazar evidencias de un requisito', async () => {
+    const token = await crearToken(['PROFESOR'], 10);
+    const dto = {
+      requisitoId: 50,
+      atestadoIds: [2, 5],
+      observacion: 'Documentos de respaldo',
+    };
+
+    await request(app.getHttpServer())
+      .put('/profesores/mi-perfil/perfiles/1/requisitos/50/evidencias')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(200, { id: 50 });
+
+    expect(
+      profesoresService.guardarEvidenciasRequisitoMiPerfil,
+    ).toHaveBeenCalledWith(10, 1, 50, dto);
+  });
+
+  it('rechaza atestadoIds duplicados al guardar evidencias', async () => {
+    const token = await crearToken(['PROFESOR'], 10);
+
+    await request(app.getHttpServer())
+      .put('/profesores/mi-perfil/perfiles/1/requisitos/50/evidencias')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ requisitoId: 50, atestadoIds: [2, 2] })
+      .expect(400);
+
+    expect(
+      profesoresService.guardarEvidenciasRequisitoMiPerfil,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('permite consultar un expediente con PERFILES_DOCENTES_VALIDAR', async () => {
+    permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
+
+    await request(app.getHttpServer())
+      .get('/profesores/10/perfiles/1/expediente')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { requisitos: [] });
+
+    expect(
+      profesoresService.obtenerExpedientePerfilProfesor,
+    ).toHaveBeenCalledWith(10, 1, 2);
+  });
+
+  it('permite marcar CUMPLE con PERFILES_DOCENTES_VALIDAR', async () => {
+    permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
+    const dto = {
+      estado: EstadoCumplimientoRequisito.CUMPLE,
+      observacion: 'Verificado',
+    };
+
+    await request(app.getHttpServer())
+      .patch('/profesores/10/perfiles/1/requisitos/50/revision')
+      .set('Authorization', `Bearer ${token}`)
+      .send(dto)
+      .expect(200, { id: 500 });
+
+    expect(
+      profesoresService.revisarRequisitoPerfilProfesor,
+    ).toHaveBeenCalledWith(10, 1, 50, 2, dto);
+  });
+
+  it('no permite PENDIENTE como revisión manual final', async () => {
+    permisosAsignados.add(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL'], 2);
+
+    await request(app.getHttpServer())
+      .patch('/profesores/10/perfiles/1/requisitos/50/revision')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ estado: EstadoCumplimientoRequisito.PENDIENTE })
+      .expect(400);
+
+    expect(
+      profesoresService.revisarRequisitoPerfilProfesor,
+    ).not.toHaveBeenCalled();
   });
 
   it('permite filtrar profesores por perfilAcademicoId con PROFESORES_VER', async () => {

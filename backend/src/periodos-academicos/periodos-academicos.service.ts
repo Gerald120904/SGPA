@@ -23,9 +23,13 @@ export class PeriodosAcademicosService {
   }
 
   private generarNombre(anio: number, ciclo: number): string {
-    const nombreCiclo = ciclo === 1 ? 'I Ciclo' : 'II Ciclo';
+    const nombresCiclo: Record<number, string> = {
+      1: 'I Ciclo',
+      2: 'II Ciclo',
+      3: 'Verano',
+    };
 
-    return `${nombreCiclo} ${anio}`;
+    return `${nombresCiclo[ciclo] ?? `Ciclo ${ciclo}`} ${anio}`;
   }
 
   private validarFechas(
@@ -87,8 +91,16 @@ export class PeriodosAcademicosService {
     });
 
     if (existente && existente.id !== excluirId) {
+      const nombresCiclo: Record<number, string> = {
+        1: 'I Ciclo',
+        2: 'II Ciclo',
+        3: 'Verano',
+      };
+
+      const nombreCiclo = nombresCiclo[ciclo] ?? `Ciclo ${ciclo}`;
+
       throw new ConflictException(
-        `Ya existe el ${ciclo === 1 ? 'I' : 'II'} Ciclo del año ${anio}.`,
+        `Ya existe el ${nombreCiclo} del año ${anio}.`,
       );
     }
   }

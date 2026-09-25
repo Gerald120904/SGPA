@@ -18,7 +18,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed:equipamientos": "node scripts/seed-equipamientos.js"
+    "seed:equipamientos": "node scripts/seed-equipamientos.js",
+    "seed:perfiles-academicos": "node scripts/seed-perfiles-academicos.js",
+    "verify:perfiles-academicos": "node scripts/verificar-perfiles-academicos.js",
+    "diagnose:perfiles-cursos": "node scripts/diagnosticar-cursos-perfiles.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
