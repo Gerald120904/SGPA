@@ -149,7 +149,6 @@ let instanciaActual = 0;
 let vistaDetallePlan = "LISTA";
 let observerMalla = null;
 let mallaAsignaturaSeleccionadaId = null;
-let mallaMostrarTodasConexiones = false;
 let nivelPaginaPlan = 1;
 let detalleEventosController = null;
 
@@ -962,7 +961,6 @@ async function alternarEstado(plan) {
 async function abrirDetallePlan(plan) {
   vistaDetallePlan = "LISTA";
   mallaAsignaturaSeleccionadaId = null;
-  mallaMostrarTodasConexiones = false;
   nivelPaginaPlan = 1;
   planSeleccionado = plan;
 
@@ -1075,7 +1073,6 @@ function volverListadoPlanes() {
   observerMalla = null;
   vistaDetallePlan = "LISTA";
   mallaAsignaturaSeleccionadaId = null;
-  mallaMostrarTodasConexiones = false;
   nivelPaginaPlan = 1;
   planSeleccionado = null;
   asignaturasPlan = [];
@@ -1799,10 +1796,6 @@ function obtenerRelacionesRutaSeleccionada() {
 }
 
 function obtenerRelacionesMallaVisibles() {
-  if (mallaMostrarTodasConexiones) {
-    return requisitosPlan;
-  }
-
   return obtenerRelacionesRutaSeleccionada();
 }
 
@@ -2040,18 +2033,6 @@ function renderizarMallaCurricular() {
         <div id="mallaSeleccionResumen" class="malla-selection-summary">
           ${renderizarResumenSeleccionMalla()}
         </div>
-
-        <label class="malla-connections-toggle" for="mallaMostrarTodasConexiones">
-          <span>Mostrar todas las conexiones</span>
-          <input
-            id="mallaMostrarTodasConexiones"
-            type="checkbox"
-            ${mallaMostrarTodasConexiones ? "checked" : ""}
-          >
-          <span class="malla-switch" aria-hidden="true">
-            <span></span>
-          </span>
-        </label>
       </div>
 
       <div id="mallaScroll" class="malla-scroll">
@@ -4381,50 +4362,6 @@ function conectarEventosDetallePlan(contenedor) {
         default:
           break;
       }
-    },
-    { signal },
-  );
-
-
-  contenedor.addEventListener(
-    "change",
-    (event) => {
-      const target = event.target;
-
-      if (!(target instanceof HTMLInputElement)) {
-        return;
-      }
-
-      if (target.id !== "mallaMostrarTodasConexiones") {
-        return;
-      }
-
-      const scrollYActual = window.scrollY;
-      const scrollXActual = window.scrollX;
-      const scrollMalla = document.getElementById("mallaScroll");
-      const scrollLeftMalla = scrollMalla?.scrollLeft || 0;
-
-      mallaMostrarTodasConexiones = target.checked;
-      actualizarEstadoVisualMalla();
-
-      /*
-       * Activar/desactivar el switch solo cambia las conexiones.
-       * Conservamos la posición de la página y del scroll horizontal
-       * para evitar el salto visual que se producía al mostrar todas.
-       */
-      window.requestAnimationFrame(() => {
-        window.scrollTo({
-          left: scrollXActual,
-          top: scrollYActual,
-          behavior: "auto",
-        });
-
-        if (scrollMalla) {
-          scrollMalla.scrollLeft = scrollLeftMalla;
-        }
-
-        dibujarConexionesMalla();
-      });
     },
     { signal },
   );
