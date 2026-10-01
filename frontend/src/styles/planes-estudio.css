@@ -1,4 +1,3 @@
-
 /* =========================================================
    PLANES DE ESTUDIO
    ========================================================= */
@@ -557,7 +556,7 @@
 
 .plan-semesters {
   display: grid;
-  gap: 16px;
+  gap: 18px;
 }
 
 .plan-semester {
@@ -873,13 +872,72 @@
    SELECTOR LISTA / MALLA
    ========================================================= */
 
+.malla-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.malla-workspace-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.malla-workspace-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #1d2939;
+}
+
+.malla-workspace-title > strong {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.malla-workspace-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(207, 32, 41, 0.07);
+  color: var(--una-red, #cf2029);
+}
+
+.malla-workspace-icon svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.9;
+}
+
+/* =========================================================
+   BARRA DE CONTROLES DE LA MALLA
+   ========================================================= */
+
+.malla-toolbar {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 9px 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
 .malla-legend {
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin-bottom: 10px;
+  gap: 16px;
   color: #667085;
-  font-size: 11px;
+  font-size: 10.5px;
+  white-space: nowrap;
 }
 
 .malla-legend > span {
@@ -889,573 +947,611 @@
 }
 
 .malla-legend-line {
-  width: 28px;
+  position: relative;
+  width: 30px;
   height: 0;
-  border-top: 2px solid #98a2b3;
+  border-top: 2px solid var(--una-red, #cf2029);
+}
+
+.malla-legend-line::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -1px;
+  width: 0;
+  height: 0;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 5px solid var(--una-red, #cf2029);
 }
 
 .malla-legend-dashed {
   border-top-style: dashed;
+  opacity: 0.75;
 }
+
+.malla-selection-summary {
+  min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-left: 1px solid #eaecf0;
+  border-right: 1px solid #eaecf0;
+}
+
+.malla-selection-empty {
+  overflow: hidden;
+  color: #98a2b3;
+  font-size: 10.5px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.malla-selection-label {
+  flex: 0 0 auto;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.malla-selection-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid rgba(207, 32, 41, 0.14);
+  border-radius: 999px;
+  background: rgba(207, 32, 41, 0.055);
+  color: #b71922;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.malla-selection-chip span {
+  min-width: 0;
+  overflow: hidden;
+  color: #344054;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================================
+   SWITCH MOSTRAR TODAS LAS CONEXIONES
+   ========================================================= */
+
+.malla-connections-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  color: #667085;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.malla-connections-toggle input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  clip-path: inset(50%);
+  pointer-events: none;
+}
+
+.malla-switch {
+  position: relative;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  background: #f2f4f7;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.malla-switch > span {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.18);
+  transform: translateX(0);
+  transition: transform 0.16s ease;
+}
+
+.malla-connections-toggle input:checked + .malla-switch {
+  border-color: var(--una-red, #cf2029);
+  background: var(--una-red, #cf2029);
+}
+
+.malla-connections-toggle input:checked + .malla-switch > span {
+  transform: translateX(16px);
+}
+
+.malla-connections-toggle input:focus-visible + .malla-switch {
+  box-shadow: 0 0 0 3px rgba(207, 32, 41, 0.10);
+}
+
+/* =========================================================
+   CONTENEDOR / CANVAS
+   ========================================================= */
 
 .malla-scroll {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   border: 1px solid #eaecf0;
-  border-radius: 10px;
-  background: #f9fafb;
+  border-radius: 12px;
+  background: #f8fafc;
 }
 
 .malla-canvas {
   position: relative;
+  isolation: isolate;
   width: max-content;
   min-width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 34px;
-  padding: 24px 45px 40px;
+  padding: 20px 34px 36px;
   box-sizing: border-box;
 }
-
-/* =========================================================
-   ESTRUCTURA HORIZONTAL DE LA MALLA
-   ========================================================= */
 
 .malla-plan-grid {
   position: relative;
   z-index: 2;
   width: max-content;
   min-width: 100%;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 250px;
-  align-items: start;
-  gap: 70px;
-  padding-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 30px;
 }
 
-.malla-column {
+/* =========================================================
+   NIVEL / CICLOS
+   ========================================================= */
+
+.malla-level-group {
   position: relative;
   z-index: 2;
+  flex: 0 0 auto;
+  width: 540px;
+  overflow: visible;
+  border: 1px solid #e4e7ec;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.malla-level-header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(207, 32, 41, 0.11);
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(
+    180deg,
+    rgba(207, 32, 41, 0.085) 0%,
+    rgba(207, 32, 41, 0.045) 100%
+  );
+  color: #b5121b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  text-align: center;
+}
+
+.malla-level-cycles {
+  display: grid;
+  grid-template-columns: repeat(2, 244px);
+  gap: 28px;
+  padding: 12px;
+}
+
+.malla-cycle-column {
+  position: relative;
   min-width: 0;
 }
 
-.malla-column-header {
+.malla-cycle-column + .malla-cycle-column::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14px;
+  width: 1px;
+  background: #edf0f4;
+}
+
+.malla-cycle-header {
+  min-height: 30px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 14px;
-  padding: 0 4px;
-}
-
-.malla-column-header span {
-  color: #b5121b;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.malla-column-header strong {
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
   color: #344054;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .malla-column-body {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+}
+
+.malla-cycle-empty {
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1px dashed #e4e7ec;
+  border-radius: 10px;
+  color: #98a2b3;
+  font-size: 9.5px;
+  font-weight: 550;
+  text-align: center;
 }
 
 /* =========================================================
-   CARDS DE MALLA - ESTILO PANEL DE GESTIÓN
+   CARDS DE MALLA
    ========================================================= */
 
 .malla-card {
-  position:
-    relative;
-
-  z-index:
-    3;
-
-  min-height:
-    128px;
-
-  display:
-    flex;
-
-  flex-direction:
-    column;
-
-  gap:
-    10px;
-
-  padding:
-    14px;
-
-  overflow:
-    hidden;
-
-  border:
-    1px solid #e4e7ec;
-
-  border-radius:
-    13px;
-
-  background:
-    #ffffff;
-
-  box-shadow:
-    0 2px 6px
-    rgba(
-      16,
-      24,
-      40,
-      0.035
-    );
-
-  cursor:
-    pointer;
-
+  position: relative;
+  z-index: 3;
+  min-height: 128px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(16, 24, 40, 0.035);
+  cursor: pointer;
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
-    transform 180ms ease;
+    transform 180ms ease,
+    background-color 180ms ease;
 }
 
-
-/* =========================================================
-   DECORACIÓN
-   ========================================================= */
-
 .malla-card-decoration {
-  position:
-    absolute;
-
-  right:
-    -29px;
-
-  bottom:
-    -37px;
-
-  z-index:
-    0;
-
-  width:
-    92px;
-
-  height:
-    92px;
-
-  border-radius:
-    50%;
-
-  background:
-    rgba(
-      207,
-      32,
-      41,
-      0.065
-    );
-
-  opacity:
-    1;
-
-  transform:
-    scale(0.94);
-
+  position: absolute;
+  right: -29px;
+  bottom: -37px;
+  z-index: 0;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: rgba(207, 32, 41, 0.065);
+  opacity: 1;
+  transform: scale(0.94);
   transition:
     background-color 220ms ease,
     transform 220ms ease;
 }
 
-
-/* =========================================================
-   TOP
-   ========================================================= */
-
 .malla-card-top {
-  position:
-    relative;
-
-  z-index:
-    2;
-
-  min-width:
-    0;
-
-  display:
-    flex;
-
-  align-items:
-    center;
-  justify-content:
-    space-between;
-
-  gap:
-    10px;
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
-
 
 .malla-card-top strong {
-  overflow:
-    hidden;
-
-  color:
-    #cf2029;
-
-  font-size:
-    11px;
-
-  font-weight:
-    750;
-
-  letter-spacing:
-    0.02em;
-
-  text-overflow:
-    ellipsis;
-
-  white-space:
-    nowrap;
+  overflow: hidden;
+  color: #cf2029;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
 
 .malla-card-credits {
-  flex:
-    0 0 auto;
-
-  display:
-    inline-flex;
-
-  align-items:
-    center;
-
-  padding:
-    3px 7px;
-
-  border:
-    1px solid #eaecf0;
-
-  border-radius:
-    999px;
-
-  background:
-    #f9fafb;
-
-  color:
-    #667085;
-
-  font-size:
-    9px;
-
-  font-weight:
-    650;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid #eaecf0;
+  border-radius: 999px;
+  background: #f9fafb;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 650;
 }
-
-
-/* =========================================================
-   NOMBRE
-   ========================================================= */
 
 .malla-card-name {
-  position:
-    relative;
-
-  z-index:
-    2;
-
-  color:
-    #182235;
-
-  font-size:
-    12px;
-
-  font-weight:
-    650;
-
-  line-height:
-    1.4;
-
-  letter-spacing:
-    -0.05px;
+  position: relative;
+  z-index: 2;
+  color: #182235;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -0.05px;
 }
-
-
-/* =========================================================
-   FOOTER
-   ========================================================= */
 
 .malla-card-footer {
-  position:
-    relative;
-
-  z-index:
-    2;
-
-  display:
-    flex;
-
-  align-items:
-    flex-end;
-
-  justify-content:
-    flex-start;
-
-  gap:
-    10px;
-
-  margin-top:
-    auto;
-
-  padding-top:
-    5px;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 5px;
 }
-
-
-/* =========================================================
-   RELACIONES
-   ========================================================= */
 
 .malla-card-relations {
-  min-width:
-    0;
-
-  display:
-    flex;
-
-  flex-wrap:
-    wrap;
-
-  align-items:
-    center;
-
-  gap:
-    5px;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
 }
 
-
-.malla-card-relations
-.malla-requirement-badge,
-.malla-card-relations
-.malla-coreq-badge {
-  display:
-    inline-flex;
-
-  align-items:
-    center;
-
-  padding:
-    3px 6px;
-
-  border-radius:
-    999px;
-
-  font-size:
-    8.5px;
-
-  font-weight:
-    700;
+.malla-card-relations .malla-requirement-badge,
+.malla-card-relations .malla-coreq-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 700;
 }
 
-
-.malla-card-relations
-.malla-requirement-badge {
-  background:
-    rgba(
-      207,
-      32,
-      41,
-      0.075
-    );
-
-  color:
-    #b71922;
+.malla-card-relations .malla-requirement-badge {
+  background: rgba(207, 32, 41, 0.075);
+  color: #b71922;
 }
 
-
-.malla-card-relations
-.malla-coreq-badge {
-  background:
-    #f4f3ff;
-
-  color:
-    #6941c6;
+.malla-card-relations .malla-coreq-badge {
+  border: 1px dashed rgba(207, 32, 41, 0.22);
+  background: rgba(207, 32, 41, 0.035);
+  color: #b71922;
 }
-
 
 .malla-card-no-relations {
-  color:
-    #98a2b3;
-
-  font-size:
-    8.5px;
-
-  font-weight:
-    600;
+  color: #98a2b3;
+  font-size: 8.5px;
+  font-weight: 600;
 }
 
+/* Ojo: consulta el modal de requisitos sin cambiar la selección */
+.malla-card-eye {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #eaecf0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #667085;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
 
-/* =========================================================
-   FLECHA
-   ========================================================= */
+.malla-card-eye:hover {
+  border-color: rgba(207, 32, 41, 0.24);
+  background: #ffffff;
+  color: var(--una-red, #cf2029);
+  transform: translateY(-1px);
+}
 
+.malla-card-eye:focus-visible {
+  outline: none;
+  border-color: var(--una-red, #cf2029);
+  box-shadow: 0 0 0 3px rgba(207, 32, 41, 0.10);
+}
 
-
-
-
-
-
-/* =========================================================
-   LÍNEA INFERIOR
-   ========================================================= */
+.malla-card-eye svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.9;
+}
 
 .malla-card-hover-line {
-  position:
-    absolute;
-
-  bottom:
-    0;
-
-  left:
-    0;
-
-  z-index:
-    4;
-
-  width:
-    0;
-
-  height:
-    2px;
-
-  background:
-    #cf2029;
-
-  transition:
-    width 260ms ease;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  width: 0;
+  height: 2px;
+  background: #cf2029;
+  transition: width 260ms ease;
 }
-
-
-/* =========================================================
-   HOVER
-   ========================================================= */
 
 .malla-card:hover {
-  border-color:
-    rgba(
-      207,
-      32,
-      41,
-      0.31
-    );
-
-  box-shadow:
-    0 8px 18px
-    rgba(
-      16,
-      24,
-      40,
-      0.07
-    );
-
-  transform:
-    translateY(-1px);
+  border-color: rgba(207, 32, 41, 0.28);
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.07);
+  transform: translateY(-1px);
 }
 
-
-.malla-card:hover
-.malla-card-decoration {
-  background:
-    rgba(
-      207,
-      32,
-      41,
-      0.12
-    );
-
-  transform:
-    scale(1.08);
+.malla-card:hover .malla-card-decoration {
+  background: rgba(207, 32, 41, 0.11);
+  transform: scale(1.08);
 }
 
-
-.malla-card:hover
-.malla-card-hover-line {
-  width:
-    74%;
+.malla-card:hover .malla-card-hover-line {
+  width: 70%;
 }
-
-
-/* =========================================================
-   FOCUS
-   ========================================================= */
 
 .malla-card:focus-visible {
-  outline:
-    none;
-
-  border-color:
-    #cf2029;
-
-  box-shadow:
-    0 0 0 3px
-    rgba(
-      207,
-      32,
-      41,
-      0.10
-    );
+  outline: none;
+  border-color: #cf2029;
+  box-shadow: 0 0 0 3px rgba(207, 32, 41, 0.10);
 }
 
+.malla-card.is-route {
+  border-color: #cf2029;
+  background: #fffafa;
+  box-shadow:
+    0 0 0 1px rgba(207, 32, 41, 0.08),
+    0 5px 14px rgba(16, 24, 40, 0.045);
+}
 
-/* =========================================================
-   INACTIVO
-   ========================================================= */
+.malla-card.is-route .malla-card-hover-line {
+  width: 100%;
+}
+
+.malla-card.is-route .malla-card-decoration {
+  background: rgba(207, 32, 41, 0.10);
+}
+
+.malla-card.is-selected {
+  border-color: #b5121b;
+  background: #fff7f7;
+  box-shadow:
+    0 0 0 2px rgba(207, 32, 41, 0.13),
+    0 8px 18px rgba(16, 24, 40, 0.055);
+}
+
+.malla-card.is-selected .malla-card-hover-line {
+  width: 100%;
+}
+
+.malla-card.is-selected .malla-card-decoration {
+  background: rgba(207, 32, 41, 0.12);
+}
 
 .malla-card-inactive {
-  opacity:
-    0.48;
+  opacity: 0.48;
 }
 
+/* =========================================================
+   CONEXIONES SVG
+   ========================================================= */
 
 .malla-connections {
   position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
-  overflow: visible;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   pointer-events: none;
+}
+
+/*
+ * El grid y los grupos no crean un stacking context propio.
+ * Así las líneas quedan por encima del fondo del nivel y por debajo
+ * de los cards, como en el esquema de referencia.
+ */
+.malla-plan-grid,
+.malla-level-group {
+  z-index: auto;
+}
+
+.malla-connection-halo {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .malla-connection {
   fill: none;
-  stroke: #98a2b3;
-  stroke-width: 2;
+  stroke: #cf2029;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
 .malla-connection-coreq {
-  stroke: #7f56d9;
-  stroke-dasharray: 6 5;
+  stroke: #cf2029;
+  stroke-width: 1.3;
+  stroke-dasharray: 5 4;
+  opacity: 1;
 }
 
-.malla-arrow-head {
-  fill: #98a2b3;
-}
-
+.malla-arrow-head,
 .malla-arrow-head-coreq {
-  fill: #7f56d9;
+  fill: none;
+  stroke: #cf2029;
+  stroke-width: 1.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+@media (max-width: 1100px) {
+  .malla-toolbar {
+    grid-template-columns: 1fr auto;
+  }
+
+  .malla-selection-summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    border: 0;
+    border-top: 1px solid #eaecf0;
+    padding: 9px 0 0;
+  }
 }
 
 @media (max-width: 800px) {
+  .malla-toolbar {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .malla-selection-summary {
+    border-top: 1px solid #eaecf0;
+    border-bottom: 1px solid #eaecf0;
+    padding: 9px 0;
+  }
+
+  .malla-connections-toggle {
+    justify-content: space-between;
+  }
+
   .malla-canvas {
-    gap: 28px;
-    padding: 20px 30px 32px;
+    padding: 18px 22px 30px;
   }
 
-  .malla-plan-grid {
-    grid-auto-columns: 220px;
-    gap: 55px;
+  .malla-level-group {
+    width: 474px;
   }
 
+  .malla-level-cycles {
+    grid-template-columns: repeat(2, 214px);
+    gap: 22px;
+  }
 }
 
 /* =========================================================

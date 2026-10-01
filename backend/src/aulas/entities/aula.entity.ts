@@ -3,6 +3,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -14,6 +15,7 @@ import { AulaEquipamiento } from './aula-equipamiento.entity';
 
 @Entity({ name: 'aulas' })
 @Check('chk_aula_capacidad', 'capacidad > 0')
+@Index('uq_aulas_codigo_origen', ['codigo', 'origen'], { unique: true })
 export class Aula {
   @PrimaryGeneratedColumn({
     type: 'int',
@@ -24,7 +26,6 @@ export class Aula {
   @Column({
     type: 'varchar',
     length: 30,
-    unique: true,
   })
   codigo!: string;
 

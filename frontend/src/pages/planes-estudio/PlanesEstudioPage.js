@@ -1,4 +1,3 @@
-
 import {
   actualizarPlanEstudio,
   cambiarEstadoPlanEstudio,
@@ -149,6 +148,7 @@ let planSeleccionado = null;
 let instanciaActual = 0;
 let vistaDetallePlan = "LISTA";
 let observerMalla = null;
+let mallaAsignaturaSeleccionadaId = null;
 let nivelPaginaPlan = 1;
 let detalleEventosController = null;
 
@@ -960,6 +960,7 @@ async function alternarEstado(plan) {
 
 async function abrirDetallePlan(plan) {
   vistaDetallePlan = "LISTA";
+  mallaAsignaturaSeleccionadaId = null;
   nivelPaginaPlan = 1;
   planSeleccionado = plan;
 
@@ -1071,6 +1072,7 @@ function volverListadoPlanes() {
   observerMalla?.disconnect();
   observerMalla = null;
   vistaDetallePlan = "LISTA";
+  mallaAsignaturaSeleccionadaId = null;
   nivelPaginaPlan = 1;
   planSeleccionado = null;
   asignaturasPlan = [];
@@ -1739,6 +1741,84 @@ function renderizarListaAsignaturas() {
   `;
 }
 
+function obtenerRelacionesRutaSeleccionada() {
+  const seleccionadaId = Number(mallaAsignaturaSeleccionadaId);
+
+  if (!seleccionadaId) {
+    return [];
+  }
+
+  const relaciones = requisitosPlan.filter(
+    (relacion) =>
+      Number(relacion.asignaturaId) &&
+      Number(relacion.requisitoAsignaturaId),
+  );
+
+  const resultado = new Map();
+  const visitados = new Set();
+
+  const agregarRelacion = (relacion) => {
+    const clave = `${relacion.requisitoAsignaturaId}-${relacion.asignaturaId}-${relacion.tipo}`;
+    resultado.set(clave, relacion);
+  };
+
+  /*
+   * La ruta de una asignatura muestra únicamente lo necesario para
+   * llegar hasta ella. Por eso recorremos requisitos y correquisitos
+   * hacia atrás, pero nunca continuamos hacia asignaturas posteriores.
+   *
+   * Ejemplo:
+   * A -> B -> C -> D
+   * Si se selecciona C, se muestran A -> B -> C.
+   * D permanece oculto hasta que se seleccione o se active
+   * "Mostrar todas las conexiones".
+   */
+  const visitarAntecesores = (asignaturaId) => {
+    const id = Number(asignaturaId);
+
+    if (!id || visitados.has(id)) {
+      return;
+    }
+
+    visitados.add(id);
+
+    relaciones
+      .filter((relacion) => Number(relacion.asignaturaId) === id)
+      .forEach((relacion) => {
+        agregarRelacion(relacion);
+        visitarAntecesores(relacion.requisitoAsignaturaId);
+      });
+  };
+
+  visitarAntecesores(seleccionadaId);
+
+  return Array.from(resultado.values());
+}
+
+function obtenerRelacionesMallaVisibles() {
+  return obtenerRelacionesRutaSeleccionada();
+}
+
+function obtenerIdsRutaMalla() {
+  const ids = new Set();
+
+  if (mallaAsignaturaSeleccionadaId) {
+    ids.add(Number(mallaAsignaturaSeleccionadaId));
+  }
+
+  /*
+   * El resaltado visual pertenece siempre a la ruta de la materia
+   * seleccionada. El switch puede dibujar todas las conexiones sin
+   * convertir todas las tarjetas en parte de la ruta resaltada.
+   */
+  for (const relacion of obtenerRelacionesRutaSeleccionada()) {
+    ids.add(Number(relacion.requisitoAsignaturaId));
+    ids.add(Number(relacion.asignaturaId));
+  }
+
+  return ids;
+}
+
 function renderizarTarjetaMalla(asignatura) {
   const datos = obtenerDatosAsignatura(asignatura);
   const requisitos = obtenerRequisitosDeAsignatura(asignatura.id);
@@ -1750,17 +1830,23 @@ function renderizarTarjetaMalla(asignatura) {
   ).length;
   const creditos = Number(asignatura.creditos || 0);
   const presentacionTipo = obtenerPresentacionTipoAsignatura(asignatura);
+  const seleccionada =
+    Number(asignatura.id) === Number(mallaAsignaturaSeleccionadaId);
+  const perteneceRuta = obtenerIdsRutaMalla().has(Number(asignatura.id));
 
   return `
     <article
       class="malla-card malla-card-type-${presentacionTipo.clase} ${
         asignatura.activo ? "" : "malla-card-inactive"
+      } ${seleccionada ? "is-selected" : ""} ${
+        !seleccionada && perteneceRuta ? "is-route" : ""
       }"
       data-malla-asignatura="${asignatura.id}"
       tabindex="0"
       role="button"
-      title="Ver requisitos de esta asignatura"
-      aria-label="Ver requisitos de ${escapeHtml(datos.nombre)}"
+      title="Mostrar requisitos previos hasta esta asignatura"
+      aria-label="Mostrar requisitos previos hasta ${escapeHtml(datos.nombre)}"
+      aria-pressed="${seleccionada}"
     >
       <span class="malla-card-decoration" aria-hidden="true"></span>
 
@@ -1796,6 +1882,16 @@ function renderizarTarjetaMalla(asignatura) {
               : ""
           }
         </div>
+
+        <button
+          class="malla-card-eye"
+          data-malla-eye="${asignatura.id}"
+          type="button"
+          title="Ver requisitos"
+          aria-label="Ver requisitos de ${escapeHtml(datos.nombre)}"
+        >
+          <i data-lucide="eye" aria-hidden="true"></i>
+        </button>
       </div>
 
       <span class="malla-card-hover-line" aria-hidden="true"></span>
@@ -1803,22 +1899,96 @@ function renderizarTarjetaMalla(asignatura) {
   `;
 }
 
+function agruparMallaPorNivel(asignaturas) {
+  const grupos = agruparAsignaturas(asignaturas);
+  const niveles = new Map();
+
+  for (const grupo of grupos) {
+    const nivel = Number(grupo.nivel);
+
+    if (!niveles.has(nivel)) {
+      niveles.set(nivel, {
+        nivel,
+        ciclos: new Map(),
+      });
+    }
+
+    niveles.get(nivel).ciclos.set(Number(grupo.ciclo), grupo.asignaturas);
+  }
+
+  return Array.from(niveles.values()).sort((a, b) => a.nivel - b.nivel);
+}
+
 function renderizarColumnasMalla(asignaturas) {
-  return agruparAsignaturas(asignaturas)
-    .map(
-      (grupo) => `
-        <section class="malla-column">
-          <header class="malla-column-header">
-            <span>NIVEL ${grupo.nivel}</span>
-            <strong>Ciclo ${grupo.ciclo}</strong>
+  return agruparMallaPorNivel(asignaturas)
+    .map((grupoNivel) => {
+      const renderizarCiclo = (ciclo) => {
+        const asignaturasCiclo = grupoNivel.ciclos.get(ciclo) || [];
+
+        return `
+          <section
+            class="malla-cycle-column"
+            data-malla-nivel="${grupoNivel.nivel}"
+            data-malla-ciclo="${ciclo}"
+          >
+            <header class="malla-cycle-header">
+              Ciclo ${ciclo}
+            </header>
+
+            <div class="malla-column-body">
+              ${
+                asignaturasCiclo.length
+                  ? asignaturasCiclo.map(renderizarTarjetaMalla).join("")
+                  : `<div class="malla-cycle-empty">Sin asignaturas</div>`
+              }
+            </div>
+          </section>
+        `;
+      };
+
+      return `
+        <section class="malla-level-group" data-malla-level="${grupoNivel.nivel}">
+          <header class="malla-level-header">
+            NIVEL ${grupoNivel.nivel}
           </header>
-          <div class="malla-column-body">
-            ${grupo.asignaturas.map(renderizarTarjetaMalla).join("")}
+
+          <div class="malla-level-cycles">
+            ${renderizarCiclo(1)}
+            ${renderizarCiclo(2)}
           </div>
         </section>
-      `,
-    )
+      `;
+    })
     .join("");
+}
+
+function obtenerAsignaturaMallaSeleccionada() {
+  return asignaturasPlan.find(
+    (asignatura) =>
+      Number(asignatura.id) === Number(mallaAsignaturaSeleccionadaId),
+  );
+}
+
+function renderizarResumenSeleccionMalla() {
+  const asignatura = obtenerAsignaturaMallaSeleccionada();
+
+  if (!asignatura) {
+    return `
+      <span class="malla-selection-empty">
+        Seleccione una asignatura para visualizar los requisitos necesarios para llegar hasta ella.
+      </span>
+    `;
+  }
+
+  const datos = obtenerDatosAsignatura(asignatura);
+
+  return `
+    <span class="malla-selection-label">Asignatura seleccionada:</span>
+    <strong class="malla-selection-chip">
+      ${escapeHtml(datos.codigo || "")}
+      <span>${escapeHtml(datos.nombre)}</span>
+    </strong>
+  `;
 }
 
 function renderizarMallaCurricular() {
@@ -1835,33 +2005,316 @@ function renderizarMallaCurricular() {
   return `
     ${renderizarSalidasMalla()}
 
-    <div class="malla-legend" aria-label="Tipos de conexión">
-      <span>
-        <i class="malla-legend-line" aria-hidden="true"></i>
-        Requisito
-      </span>
-      <span>
-        <i
-          class="malla-legend-line malla-legend-dashed"
-          aria-hidden="true"
-        ></i>
-        Correquisito
-      </span>
-    </div>
+    <section class="malla-workspace">
+      <header class="malla-workspace-heading">
+        <div class="malla-workspace-title">
+          <span class="malla-workspace-icon">
+            <i data-lucide="book-open" aria-hidden="true"></i>
+          </span>
+          <strong>Malla curricular</strong>
+        </div>
+      </header>
 
-    <div id="mallaScroll" class="malla-scroll">
-      <div id="mallaCanvas" class="malla-canvas">
-        <svg
-          id="mallaConnections"
-          class="malla-connections"
-          aria-hidden="true"
-        ></svg>
-        <div class="malla-plan-grid">
-          ${renderizarColumnasMalla(asignaturas)}
+      <div class="malla-toolbar">
+        <div class="malla-legend" aria-label="Tipos de conexión">
+          <span>
+            <i class="malla-legend-line" aria-hidden="true"></i>
+            Requisito
+          </span>
+          <span>
+            <i
+              class="malla-legend-line malla-legend-dashed"
+              aria-hidden="true"
+            ></i>
+            Correquisito
+          </span>
+        </div>
+
+        <div id="mallaSeleccionResumen" class="malla-selection-summary">
+          ${renderizarResumenSeleccionMalla()}
         </div>
       </div>
-    </div>
+
+      <div id="mallaScroll" class="malla-scroll">
+        <div id="mallaCanvas" class="malla-canvas">
+          <svg
+            id="mallaConnections"
+            class="malla-connections"
+            aria-hidden="true"
+          ></svg>
+          <div class="malla-plan-grid">
+            ${renderizarColumnasMalla(asignaturas)}
+          </div>
+        </div>
+      </div>
+    </section>
   `;
+}
+
+function rectanguloRelativoMalla(elemento, canvasRect, margen = 0) {
+  const rect = elemento.getBoundingClientRect();
+
+  return {
+    left: rect.left - canvasRect.left - margen,
+    right: rect.right - canvasRect.left + margen,
+    top: rect.top - canvasRect.top - margen,
+    bottom: rect.bottom - canvasRect.top + margen,
+    width: rect.width + margen * 2,
+    height: rect.height + margen * 2,
+  };
+}
+
+function segmentoCruzaRectangulo(x1, y1, x2, y2, rect) {
+  const tolerancia = 0.5;
+
+  if (Math.abs(y1 - y2) <= tolerancia) {
+    const izquierda = Math.min(x1, x2);
+    const derecha = Math.max(x1, x2);
+
+    return (
+      y1 > rect.top &&
+      y1 < rect.bottom &&
+      derecha > rect.left &&
+      izquierda < rect.right
+    );
+  }
+
+  if (Math.abs(x1 - x2) <= tolerancia) {
+    const arriba = Math.min(y1, y2);
+    const abajo = Math.max(y1, y2);
+
+    return (
+      x1 > rect.left &&
+      x1 < rect.right &&
+      abajo > rect.top &&
+      arriba < rect.bottom
+    );
+  }
+
+  return false;
+}
+
+function rutaOrtogonalLibre({
+  origen,
+  destino,
+  canvas,
+  canvasRect,
+  indiceRelacion = 0,
+}) {
+  const rectOrigen = rectanguloRelativoMalla(origen, canvasRect);
+  const rectDestino = rectanguloRelativoMalla(destino, canvasRect);
+  const altoCanvas = Math.max(canvas.clientHeight, 1);
+  const haciaDerecha = rectDestino.left >= rectOrigen.right;
+  const haciaIzquierda = rectDestino.right <= rectOrigen.left;
+  const direccion = haciaIzquierda ? -1 : 1;
+
+  const yOrigen = rectOrigen.top + rectOrigen.height / 2;
+  const yDestino = rectDestino.top + rectDestino.height / 2;
+
+  /*
+   * Relaciones dentro de la misma columna se sacan por el lateral
+   * con más espacio para no atravesar ninguna tarjeta.
+   */
+  if (!haciaDerecha && !haciaIzquierda) {
+    const salirDerecha =
+      Math.max(rectOrigen.right, rectDestino.right) +
+      26 +
+      (indiceRelacion % 4) * 6;
+
+    return [
+      { x: rectOrigen.right, y: yOrigen },
+      { x: salirDerecha, y: yOrigen },
+      { x: salirDerecha, y: yDestino },
+      { x: rectDestino.right, y: yDestino },
+    ];
+  }
+
+  const xInicio = direccion > 0 ? rectOrigen.right : rectOrigen.left;
+  const xFin = direccion > 0 ? rectDestino.left : rectDestino.right;
+  const espacioHorizontal = Math.abs(xFin - xInicio);
+  let xCorredorInicio;
+  let xCorredorFin;
+
+  /*
+   * Cuando dos columnas están juntas utilizamos el centro exacto del
+   * pasillo entre ambas. En saltos más largos salimos unos píxeles de
+   * cada card y luego buscamos el corredor horizontal libre.
+   */
+  if (espacioHorizontal <= 52) {
+    const centroPasillo = (xInicio + xFin) / 2;
+    xCorredorInicio = centroPasillo;
+    xCorredorFin = centroPasillo;
+  } else {
+    const desplazamiento = 24 + (indiceRelacion % 4) * 5;
+    xCorredorInicio = xInicio + direccion * desplazamiento;
+    xCorredorFin = xFin - direccion * desplazamiento;
+  }
+
+  const cards = Array.from(
+    canvas.querySelectorAll("[data-malla-asignatura]"),
+  ).filter((card) => card !== origen && card !== destino);
+
+  const obstaculos = cards.map((card) =>
+    rectanguloRelativoMalla(card, canvasRect, 4),
+  );
+
+  const candidatosY = new Set([
+    yOrigen,
+    yDestino,
+    (yOrigen + yDestino) / 2,
+  ]);
+
+  for (const obstaculo of obstaculos) {
+    candidatosY.add(obstaculo.top - 12);
+    candidatosY.add(obstaculo.bottom + 12);
+  }
+
+  const todosLosRects = [
+    rectanguloRelativoMalla(origen, canvasRect, 4),
+    rectanguloRelativoMalla(destino, canvasRect, 4),
+    ...obstaculos,
+  ];
+
+  const topMinimo = Math.min(...todosLosRects.map((rect) => rect.top));
+  const bottomMaximo = Math.max(...todosLosRects.map((rect) => rect.bottom));
+
+  candidatosY.add(Math.max(8, topMinimo - 22 - (indiceRelacion % 4) * 6));
+  candidatosY.add(
+    Math.min(
+      altoCanvas - 8,
+      bottomMaximo + 22 + (indiceRelacion % 4) * 6,
+    ),
+  );
+
+  const candidatoEsValido = (y) => {
+    if (!Number.isFinite(y) || y < 4 || y > altoCanvas - 4) {
+      return false;
+    }
+
+    return !obstaculos.some(
+      (rect) =>
+        segmentoCruzaRectangulo(
+          xCorredorInicio,
+          yOrigen,
+          xCorredorInicio,
+          y,
+          rect,
+        ) ||
+        segmentoCruzaRectangulo(
+          xCorredorInicio,
+          y,
+          xCorredorFin,
+          y,
+          rect,
+        ) ||
+        segmentoCruzaRectangulo(
+          xCorredorFin,
+          y,
+          xCorredorFin,
+          yDestino,
+          rect,
+        ),
+    );
+  };
+
+  const candidatosOrdenados = Array.from(candidatosY)
+    .filter(candidatoEsValido)
+    .sort((a, b) => {
+      const costoA = Math.abs(a - yOrigen) + Math.abs(a - yDestino);
+      const costoB = Math.abs(b - yOrigen) + Math.abs(b - yDestino);
+      return costoA - costoB;
+    });
+
+  const yCorredor =
+    candidatosOrdenados[0] ??
+    Math.max(8, topMinimo - 24 - (indiceRelacion % 4) * 6);
+
+  return [
+    { x: xInicio, y: yOrigen },
+    { x: xCorredorInicio, y: yOrigen },
+    { x: xCorredorInicio, y: yCorredor },
+    { x: xCorredorFin, y: yCorredor },
+    { x: xCorredorFin, y: yDestino },
+    { x: xFin, y: yDestino },
+  ];
+}
+
+function simplificarPuntosOrtogonal(puntos) {
+  if (puntos.length <= 2) {
+    return puntos;
+  }
+
+  const resultado = [puntos[0]];
+
+  for (let i = 1; i < puntos.length - 1; i += 1) {
+    const anterior = resultado[resultado.length - 1];
+    const actual = puntos[i];
+    const siguiente = puntos[i + 1];
+
+    const mismaHorizontal =
+      Math.abs(anterior.y - actual.y) < 0.5 &&
+      Math.abs(actual.y - siguiente.y) < 0.5;
+    const mismaVertical =
+      Math.abs(anterior.x - actual.x) < 0.5 &&
+      Math.abs(actual.x - siguiente.x) < 0.5;
+
+    if (!mismaHorizontal && !mismaVertical) {
+      resultado.push(actual);
+    }
+  }
+
+  resultado.push(puntos[puntos.length - 1]);
+  return resultado;
+}
+
+function construirPathRedondeado(puntos, radio = 10) {
+  const ruta = simplificarPuntosOrtogonal(puntos);
+
+  if (ruta.length < 2) {
+    return "";
+  }
+
+  let d = `M ${ruta[0].x} ${ruta[0].y}`;
+
+  for (let i = 1; i < ruta.length - 1; i += 1) {
+    const anterior = ruta[i - 1];
+    const actual = ruta[i];
+    const siguiente = ruta[i + 1];
+    const distanciaAnterior = Math.hypot(
+      actual.x - anterior.x,
+      actual.y - anterior.y,
+    );
+    const distanciaSiguiente = Math.hypot(
+      siguiente.x - actual.x,
+      siguiente.y - actual.y,
+    );
+    const r = Math.min(radio, distanciaAnterior / 2, distanciaSiguiente / 2);
+
+    const antes = {
+      x:
+        actual.x +
+        ((anterior.x - actual.x) / Math.max(distanciaAnterior, 1)) * r,
+      y:
+        actual.y +
+        ((anterior.y - actual.y) / Math.max(distanciaAnterior, 1)) * r,
+    };
+    const despues = {
+      x:
+        actual.x +
+        ((siguiente.x - actual.x) / Math.max(distanciaSiguiente, 1)) * r,
+      y:
+        actual.y +
+        ((siguiente.y - actual.y) / Math.max(distanciaSiguiente, 1)) * r,
+    };
+
+    d += ` L ${antes.x} ${antes.y}`;
+    d += ` Q ${actual.x} ${actual.y} ${despues.x} ${despues.y}`;
+  }
+
+  const ultimo = ruta[ruta.length - 1];
+  d += ` L ${ultimo.x} ${ultimo.y}`;
+
+  return d;
 }
 
 function dibujarConexionesMalla() {
@@ -1873,47 +2326,64 @@ function dibujarConexionesMalla() {
   }
 
   const canvasRect = canvas.getBoundingClientRect();
-  const ancho = canvas.scrollWidth;
-  const alto = canvas.scrollHeight;
 
-  svg.setAttribute("width", String(ancho));
-  svg.setAttribute("height", String(alto));
+  /*
+   * Usamos el tamaño real de layout del canvas y no scrollHeight.
+   * El SVG es absoluto y sus rutas no deben aumentar la altura del
+   * contenedor. Esto evita el crecimiento en blanco que aparecía al
+   * activar "Mostrar todas las conexiones".
+   */
+  const ancho = Math.max(1, Math.ceil(canvas.clientWidth));
+  const alto = Math.max(1, Math.ceil(canvas.clientHeight));
+
+  /*
+   * El SVG ocupa el canvas por CSS (100% x 100%).
+   * Solo actualizamos el viewBox, para que dibujar muchas relaciones
+   * nunca cambie el tamaño del documento ni genere espacio en blanco.
+   */
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
   svg.setAttribute("viewBox", `0 0 ${ancho} ${alto}`);
+  svg.setAttribute("preserveAspectRatio", "none");
 
   let contenido = `
     <defs>
       <marker
         id="mallaArrow"
-        markerWidth="8"
-        markerHeight="8"
-        refX="7"
-        refY="4"
+        markerWidth="7"
+        markerHeight="7"
+        refX="6.2"
+        refY="3.5"
         orient="auto"
-        markerUnits="strokeWidth"
+        markerUnits="userSpaceOnUse"
+        viewBox="0 0 7 7"
       >
         <path
-          d="M 0 0 L 8 4 L 0 8 z"
+          d="M 0.8 0.8 L 6.2 3.5 L 0.8 6.2"
           class="malla-arrow-head"
         ></path>
       </marker>
       <marker
         id="mallaArrowCoreq"
-        markerWidth="8"
-        markerHeight="8"
-        refX="7"
-        refY="4"
+        markerWidth="7"
+        markerHeight="7"
+        refX="6.2"
+        refY="3.5"
         orient="auto"
-        markerUnits="strokeWidth"
+        markerUnits="userSpaceOnUse"
+        viewBox="0 0 7 7"
       >
         <path
-          d="M 0 0 L 8 4 L 0 8 z"
+          d="M 0.8 0.8 L 6.2 3.5 L 0.8 6.2"
           class="malla-arrow-head-coreq"
         ></path>
       </marker>
     </defs>
   `;
 
-  for (const relacion of requisitosPlan) {
+  const relacionesVisibles = obtenerRelacionesMallaVisibles();
+
+  relacionesVisibles.forEach((relacion, indice) => {
     const origen = canvas.querySelector(
       `[data-malla-asignatura="${relacion.requisitoAsignaturaId}"]`,
     );
@@ -1922,32 +2392,61 @@ function dibujarConexionesMalla() {
     );
 
     if (!origen || !destino) {
-      continue;
+      return;
     }
 
-    const rectOrigen = origen.getBoundingClientRect();
-    const rectDestino = destino.getBoundingClientRect();
-    const x1 = rectOrigen.right - canvasRect.left;
-    const y1 = rectOrigen.top - canvasRect.top + rectOrigen.height / 2;
-    const x2 = rectDestino.left - canvasRect.left;
-    const y2 = rectDestino.top - canvasRect.top + rectDestino.height / 2;
-    const distancia = Math.max(45, Math.abs(x2 - x1) * 0.45);
-    const control1 = x2 >= x1 ? x1 + distancia : x1 - distancia;
-    const control2 = x2 >= x1 ? x2 - distancia : x2 + distancia;
+    const puntos = rutaOrtogonalLibre({
+      origen,
+      destino,
+      canvas,
+      canvasRect,
+      indiceRelacion: indice,
+    });
+    const d = construirPathRedondeado(puntos, 4);
     const esCorrequisito = relacion.tipo === "CORREQUISITO";
 
     contenido += `
       <path
-        d="M ${x1} ${y1} C ${control1} ${y1}, ${control2} ${y2}, ${x2} ${y2}"
+        d="${d}"
+        class="malla-connection-halo"
+      ></path>
+      <path
+        d="${d}"
         class="malla-connection ${
           esCorrequisito ? "malla-connection-coreq" : ""
         }"
         marker-end="url(#${esCorrequisito ? "mallaArrowCoreq" : "mallaArrow"})"
       ></path>
     `;
-  }
+  });
 
   svg.innerHTML = contenido;
+}
+
+function actualizarEstadoVisualMalla() {
+  const canvas = document.getElementById("mallaCanvas");
+
+  if (!canvas) {
+    return;
+  }
+
+  const idsRuta = obtenerIdsRutaMalla();
+
+  canvas.querySelectorAll("[data-malla-asignatura]").forEach((card) => {
+    const id = Number(card.dataset.mallaAsignatura);
+    const seleccionada = id === Number(mallaAsignaturaSeleccionadaId);
+
+    card.classList.toggle("is-selected", seleccionada);
+    card.classList.toggle("is-route", !seleccionada && idsRuta.has(id));
+    card.setAttribute("aria-pressed", String(seleccionada));
+  });
+
+  const resumen = document.getElementById("mallaSeleccionResumen");
+  if (resumen) {
+    resumen.innerHTML = renderizarResumenSeleccionMalla();
+  }
+
+  dibujarConexionesMalla();
 }
 
 async function descargarPlantillaPlan() {
@@ -2592,7 +3091,6 @@ function renderizarDetallePlan() {
       dibujarConexionesMalla();
 
       const canvas = document.getElementById("mallaCanvas");
-      const scroll = document.getElementById("mallaScroll");
 
       if (canvas && typeof ResizeObserver !== "undefined") {
         observerMalla = new ResizeObserver(() => {
@@ -2600,10 +3098,6 @@ function renderizarDetallePlan() {
         });
 
         observerMalla.observe(canvas);
-
-        if (scroll) {
-          observerMalla.observe(scroll);
-        }
       }
     });
   }
@@ -3757,15 +4251,26 @@ function conectarEventosDetallePlan(contenedor) {
         return;
       }
 
-      const cardMalla = target.closest("[data-malla-asignatura]");
-      if (cardMalla && contenedor.contains(cardMalla)) {
+      const ojoMalla = target.closest("[data-malla-eye]");
+      if (ojoMalla && contenedor.contains(ojoMalla)) {
         event.preventDefault();
-        const asignatura = obtenerAsignaturaPorId(
-          cardMalla.dataset.mallaAsignatura,
-        );
+        event.stopPropagation();
+        const asignatura = obtenerAsignaturaPorId(ojoMalla.dataset.mallaEye);
         if (asignatura) {
           abrirFormularioRequisitos(asignatura);
         }
+        return;
+      }
+
+      const cardMalla = target.closest("[data-malla-asignatura]");
+      if (cardMalla && contenedor.contains(cardMalla)) {
+        event.preventDefault();
+        const id = Number(cardMalla.dataset.mallaAsignatura);
+
+        mallaAsignaturaSeleccionadaId =
+          Number(mallaAsignaturaSeleccionadaId) === id ? null : id;
+
+        actualizarEstadoVisualMalla();
         return;
       }
 
@@ -3870,18 +4375,23 @@ function conectarEventosDetallePlan(contenedor) {
       }
 
       const target = event.target instanceof Element ? event.target : null;
+
+      if (target?.closest("[data-malla-eye]")) {
+        return;
+      }
+
       const cardMalla = target?.closest("[data-malla-asignatura]");
       if (!cardMalla || !contenedor.contains(cardMalla)) {
         return;
       }
 
       event.preventDefault();
-      const asignatura = obtenerAsignaturaPorId(
-        cardMalla.dataset.mallaAsignatura,
-      );
-      if (asignatura) {
-        abrirFormularioRequisitos(asignatura);
-      }
+      const id = Number(cardMalla.dataset.mallaAsignatura);
+
+      mallaAsignaturaSeleccionadaId =
+        Number(mallaAsignaturaSeleccionadaId) === id ? null : id;
+
+      actualizarEstadoVisualMalla();
     },
     { signal },
   );

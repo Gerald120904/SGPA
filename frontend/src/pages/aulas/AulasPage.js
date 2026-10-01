@@ -218,6 +218,30 @@ const PLANO_SECTOR_HUMANISTICO = [
 
 const PLANO_SECTOR_BIBLIOTECA = [
   {
+    key: 'biblioteca-sala-samara',
+    numero: 4,
+    codigo: 'SALA-4-SAMARA',
+    area: 'bib-left',
+    nombreEspecial: 'Sámara',
+    etiquetaPlano: 'Sala Sámara',
+    ubicacion: 'Biblioteca, Campus Nicoya',
+    tipo: 'SALA',
+    tipoMobiliario: 'MESA_GRUPAL',
+    origen: 'UNA',
+  },
+  {
+    key: 'biblioteca-sala-nantyumeth',
+    numero: 5,
+    codigo: 'SALA-5-NANTYUMETH',
+    area: 'bib-top',
+    nombreEspecial: 'Nantyumeth',
+    etiquetaPlano: 'Sala Nantyumeth',
+    ubicacion: 'Biblioteca, Campus Nicoya',
+    tipo: 'SALA',
+    tipoMobiliario: 'MESA_GRUPAL',
+    origen: 'UNA',
+  },
+  {
     key: 'biblioteca-sala-exdecanos',
     numero: 3,
     codigo: 'SALA-3',
@@ -478,8 +502,9 @@ const ORIGENES_AULA = {
 
 
 const LIMITES_AULAS_POR_ORIGEN = {
-  UNA: 25,
+  UNA: 27,
   UNED: 3,
+  OTRO: 15,
 };
 
 
@@ -669,6 +694,17 @@ function obtenerLimiteOrigen(
 }
 
 
+function obtenerMaximoNumeroOrigen(
+  origen,
+) {
+  return (
+    LIMITES_AULAS_POR_ORIGEN[
+      origen
+    ] ?? 1
+  );
+}
+
+
 function origenTieneCupo(
   origen,
   aulaEditada = null,
@@ -700,6 +736,7 @@ function origenTieneCupo(
 function buscarEspacioDuplicado(
   numero,
   tipo,
+  origen,
   excluirId = null,
   codigoSugerido = '',
 ) {
@@ -722,6 +759,7 @@ function buscarEspacioDuplicado(
   return aulas.find(
     (item) =>
       item.id !== excluirId &&
+      item.origen === origen &&
       String(item.codigo || '')
         .trim()
         .toUpperCase() === codigo,
@@ -1007,6 +1045,10 @@ function etiquetaPrincipalSlot(
     slot?.numero ??
     '';
 
+  if (slot?.etiquetaPlano) {
+    return slot.etiquetaPlano;
+  }
+
   return numero
     ? `${prefijoVisibleEspacio(tipo)} ${numero}`
     : prefijoVisibleEspacio(tipo);
@@ -1085,13 +1127,19 @@ function renderizarSlotPlanoRegistrable(
       ? numeroAdministrativo
         ? `Aula ${numeroAdministrativo} potencial`
         : 'Disponible para habilitar'
-      : aula
-        ? especial ||
-            nombreTipoAula(
+      : slot.etiquetaPlano
+        ? aula
+          ? nombreTipoAula(
               aula.tipo,
             )
-        : especial ||
-            'Disponible para registrar';
+          : 'Disponible para registrar'
+        : aula
+          ? especial ||
+              nombreTipoAula(
+                aula.tipo,
+              )
+          : especial ||
+              'Disponible para registrar';
 
   const claseTipo =
     mostrarComoAdministrativo
@@ -1808,16 +1856,6 @@ function renderizarVistaListado() {
 
 
     <div class="aulas-view-bar">
-
-      <div>
-        <strong>
-          Visualización
-        </strong>
-
-        <span>
-          Consulte el catálogo en lista o seleccione un aula desde el croquis.
-        </span>
-      </div>
 
       <div
         class="aulas-view-switch"
@@ -2664,11 +2702,8 @@ function renderizarPlanoAulas(
             </div>
 
             <div class="aulas-biblioteca-grid">
-              <div class="aulas-plan-support-block is-biblioteca is-vertical" style="grid-area: bib-left;">Biblioteca</div>
-              <div class="aulas-plan-support-block is-biblioteca is-vertical" style="grid-area: bib-top;">Biblioteca</div>
               ${bibliotecaSlots}
               <div class="aulas-plan-support-block is-biblioteca is-library-main" style="grid-area: bib-main;">Biblioteca</div>
-              <div class="aulas-plan-support-block is-biblioteca is-vertical" style="grid-area: bib-right;">Biblioteca</div>
             </div>
           </section>
 
@@ -7430,9 +7465,7 @@ function abrirFormularioAula(
         'Límite de espacios alcanzado',
 
       mensaje:
-        sugerencia.origen === 'UNA'
-          ? `La UNA ya tiene los ${limite} espacios permitidos registrados. No es posible habilitar otro espacio dentro de la UNA.`
-          : `La UNED ya tiene los ${limite} espacios configurados registrados. No es posible registrar otro espacio de la UNED.`,
+        `${nombreOrigen(sugerencia.origen)} ya alcanzó el límite de ${limite} espacios registrados. No es posible registrar otro espacio con ese origen.`,
     });
 
     return;
@@ -7453,13 +7486,10 @@ function abrirFormularioAula(
   const origenPreferido =
     aula?.origen ||
     sugerencia?.origen ||
-    (
-      origenTieneCupo('UNA')
-        ? 'UNA'
-        : origenTieneCupo('UNED')
-          ? 'UNED'
-          : 'OTRO'
-    );
+    ['UNA', 'UNED', 'OTRO'].find(
+      (origen) =>
+        origenTieneCupo(origen),
+    ) || 'UNA';
 
   content.innerHTML =
     FormDialog({
@@ -7493,7 +7523,7 @@ function abrirFormularioAula(
             id="aulaNumero"
             type="number"
             min="1"
-            max="9999"
+            max="${obtenerMaximoNumeroOrigen(origenPreferido)}"
             step="1"
             inputmode="numeric"
             value="${escapeHtml(
@@ -7504,9 +7534,10 @@ function abrirFormularioAula(
           >
 
           <small
+            id="aulaNumeroHelp"
             class="aulas-form-help"
           >
-            Ingrese únicamente el número. El nombre final se adapta al tipo de espacio seleccionado.
+            Para ${nombreOrigen(origenPreferido)}, el número permitido es del 1 al ${obtenerMaximoNumeroOrigen(origenPreferido)}.
           </small>
 
           <small
@@ -7589,7 +7620,9 @@ function abrirFormularioAula(
             id="aulaCapacidad"
             type="number"
             min="1"
-            max="65535"
+            max="70"
+            step="1"
+            inputmode="numeric"
             value="${escapeHtml(
               aula?.capacidad ||
                 sugerencia?.capacidad ||
@@ -7597,6 +7630,16 @@ function abrirFormularioAula(
             )}"
             required
           >
+
+          <small class="aulas-form-help">
+            Capacidad permitida: de 1 a 70 estudiantes.
+          </small>
+
+          <small
+            id="aulaCapacidadValidation"
+            class="aulas-field-validation"
+            aria-live="polite"
+          ></small>
 
         </label>
 
@@ -7768,6 +7811,11 @@ function abrirFormularioAula(
           'aulaNumero',
         );
 
+      const capacidadInput =
+        document.getElementById(
+          'aulaCapacidad',
+        );
+
       const tipoInput =
         document.getElementById(
           'aulaTipo',
@@ -7778,9 +7826,19 @@ function abrirFormularioAula(
           'aulaOrigen',
         );
 
+      const numeroHelp =
+        document.getElementById(
+          'aulaNumeroHelp',
+        );
+
       const numeroMensaje =
         document.getElementById(
           'aulaNumeroValidation',
+        );
+
+      const capacidadMensaje =
+        document.getElementById(
+          'aulaCapacidadValidation',
         );
 
       const origenMensaje =
@@ -7788,42 +7846,124 @@ function abrirFormularioAula(
           'aulaOrigenDisponibilidad',
         );
 
+      const origen =
+        origenInput?.value || 'UNA';
+
+      const maximoNumero =
+        obtenerMaximoNumeroOrigen(
+          origen,
+        );
+
+      const numeroTieneValor =
+        String(
+          numeroInput?.value ?? '',
+        ).trim() !== '';
+
       const numero =
         Number(
           numeroInput?.value,
         );
 
-      const tipo =
-        tipoInput?.value || 'AULA';
-
-      const origen =
-        origenInput?.value || 'UNA';
-
-      const duplicada =
-        buscarEspacioDuplicado(
-          numero,
-          tipo,
-          aula?.id ?? null,
-          sugerencia?.codigo || '',
+      const numeroFueraRango =
+        numeroTieneValor &&
+        (
+          !Number.isInteger(numero) ||
+          numero < 1 ||
+          numero > maximoNumero
         );
 
       if (numeroInput) {
+        numeroInput.max =
+          String(maximoNumero);
+
         numeroInput.classList.toggle(
           'is-invalid',
-          Boolean(duplicada),
+          numeroFueraRango,
+        );
+      }
+
+      if (numeroHelp) {
+        numeroHelp.textContent =
+          `Para ${nombreOrigen(origen)}, el número permitido es del 1 al ${maximoNumero}.`;
+      }
+
+      const tipo =
+        tipoInput?.value || 'AULA';
+
+      const duplicada =
+        numeroTieneValor &&
+        !numeroFueraRango
+          ? buscarEspacioDuplicado(
+              numero,
+              tipo,
+              origen,
+              aula?.id ?? null,
+              sugerencia?.codigo || '',
+            )
+          : null;
+
+      if (numeroInput && duplicada) {
+        numeroInput.classList.add(
+          'is-invalid',
         );
       }
 
       if (numeroMensaje) {
-        if (duplicada) {
+        if (numeroFueraRango) {
           numeroMensaje.textContent =
-            `Esta aula ya está asignada como ${nombreVisibleAula(duplicada)}.`;
+            `Para ${nombreOrigen(origen)}, el número del espacio debe estar entre 1 y ${maximoNumero}.`;
+          numeroMensaje.classList.add(
+            'is-error',
+          );
+        } else if (duplicada) {
+          numeroMensaje.textContent =
+            `Este espacio ya está asignado en ${nombreOrigen(origen)} como ${nombreVisibleAula(duplicada)}.`;
           numeroMensaje.classList.add(
             'is-error',
           );
         } else {
           numeroMensaje.textContent = '';
           numeroMensaje.classList.remove(
+            'is-error',
+          );
+        }
+      }
+
+      const capacidadTieneValor =
+        String(
+          capacidadInput?.value ?? '',
+        ).trim() !== '';
+
+      const capacidad =
+        Number(
+          capacidadInput?.value,
+        );
+
+      const capacidadFueraRango =
+        capacidadTieneValor &&
+        (
+          !Number.isInteger(capacidad) ||
+          capacidad < 1 ||
+          capacidad > 70
+        );
+
+      if (capacidadInput) {
+        capacidadInput.classList.toggle(
+          'is-invalid',
+          capacidadFueraRango,
+        );
+      }
+
+      if (capacidadMensaje) {
+        if (capacidadFueraRango) {
+          capacidadMensaje.textContent =
+            'La capacidad debe ser un número entero entre 1 y 70 estudiantes.';
+          capacidadMensaje.classList.add(
+            'is-error',
+          );
+        } else {
+          capacidadMensaje.textContent = '';
+          capacidadMensaje.classList.remove(
             'is-error',
           );
         }
@@ -7866,15 +8006,14 @@ function abrirFormularioAula(
           origenMensaje.textContent =
             limiteAlcanzado
               ? `${nombreOrigen(origen)} alcanzó el límite de ${limite} espacios registrados.`
-              : `${nombreOrigen(origen)}: ${cantidad}/${limite} espacios registrados · ${disponibles} disponibles.`;
+              : `${nombreOrigen(origen)}: ${cantidad}/${limite} espacios registrados - ${disponibles} disponibles.`;
 
           origenMensaje.classList.toggle(
             'is-error',
             limiteAlcanzado,
           );
         } else {
-          origenMensaje.textContent =
-            'Este origen no tiene un límite institucional configurado.';
+          origenMensaje.textContent = '';
           origenMensaje.classList.remove(
             'is-error',
           );
@@ -7884,6 +8023,8 @@ function abrirFormularioAula(
       return {
         duplicada,
         limiteAlcanzado,
+        numeroFueraRango,
+        capacidadFueraRango,
       };
     };
 
@@ -7991,6 +8132,15 @@ function abrirFormularioAula(
     )
     ?.addEventListener(
       'change',
+      actualizarPreview,
+    );
+
+  document
+    .getElementById(
+      'aulaCapacidad',
+    )
+    ?.addEventListener(
+      'input',
       validarFormularioEnLinea,
     );
 
@@ -8044,6 +8194,44 @@ function abrirFormularioAula(
           validarFormularioEnLinea();
 
         if (
+          validacionEnLinea.numeroFueraRango
+        ) {
+          const origenSeleccionado =
+            document.getElementById(
+              'aulaOrigen',
+            )?.value || 'UNA';
+
+          const maximoNumero =
+            obtenerMaximoNumeroOrigen(
+              origenSeleccionado,
+            );
+
+          mostrarError({
+            titulo:
+              'Número de espacio inválido',
+
+            mensaje:
+              `Para ${nombreOrigen(origenSeleccionado)}, el número debe estar entre 1 y ${maximoNumero}.`,
+          });
+
+          return;
+        }
+
+        if (
+          validacionEnLinea.capacidadFueraRango
+        ) {
+          mostrarError({
+            titulo:
+              'Capacidad inválida',
+
+            mensaje:
+              'La capacidad debe ser un número entero entre 1 y 70 estudiantes.',
+          });
+
+          return;
+        }
+
+        if (
           validacionEnLinea.duplicada
         ) {
           mostrarError({
@@ -8051,7 +8239,7 @@ function abrirFormularioAula(
               'Aula ya asignada',
 
             mensaje:
-              `El número indicado ya corresponde a ${nombreVisibleAula(validacionEnLinea.duplicada)}. Utilice otro número de espacio.`,
+              `El número indicado ya corresponde a ${nombreVisibleAula(validacionEnLinea.duplicada)} dentro de ${nombreOrigen(document.getElementById('aulaOrigen')?.value)}. Puede utilizar el mismo número en otro origen, pero no repetirlo dentro del mismo.`,
           });
 
           return;
@@ -8071,20 +8259,6 @@ function abrirFormularioAula(
           return;
         }
 
-        if (
-          !Number.isInteger(numero) ||
-          numero < 1
-        ) {
-          mostrarError({
-            titulo:
-              'Número de espacio inválido',
-
-            mensaje:
-              'Ingrese un número entero mayor a cero.',
-          });
-
-          return;
-        }
 
         const datos = {
 
@@ -8092,6 +8266,9 @@ function abrirFormularioAula(
             construirCodigoEspacio(
               numero,
               tipo,
+              !editando
+                ? sugerencia?.codigo || ''
+                : '',
             ),
 
           nombre:
@@ -8137,15 +8314,16 @@ function abrirFormularioAula(
         };
 
         if (
-          !datos.capacidad ||
-          datos.capacidad < 1
+          !Number.isInteger(datos.capacidad) ||
+          datos.capacidad < 1 ||
+          datos.capacidad > 70
         ) {
           mostrarError({
             titulo:
               'Capacidad inválida',
 
             mensaje:
-              'La capacidad debe ser mayor a cero.',
+              'La capacidad debe ser un número entero entre 1 y 70 estudiantes.',
           });
 
           return;

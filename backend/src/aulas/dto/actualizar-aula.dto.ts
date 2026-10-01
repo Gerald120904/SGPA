@@ -37,7 +37,7 @@ export class ActualizarAulaDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(65535)
+  @Max(70)
   capacidad?: number;
 
   @IsOptional()
