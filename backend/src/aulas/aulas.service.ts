@@ -72,27 +72,28 @@ export class AulasService {
 
   private async validarCodigoDuplicado(
     codigo: string,
+    origen: OrigenAula,
     excluirId?: number,
   ): Promise<void> {
-    const existente = await this.aulaRepository.findOne({ where: { codigo } });
+    const existente = await this.aulaRepository.findOne({
+      where: { codigo, origen },
+    });
 
     if (existente && existente.id !== excluirId) {
-      throw new ConflictException('El código del aula ya está registrado.');
+      throw new ConflictException(
+        `El código del aula ya está registrado para el origen ${origen}.`,
+      );
     }
   }
 
   private async validarLimiteOrigen(origen: OrigenAula): Promise<void> {
-    const limites: Partial<Record<OrigenAula, number>> = {
-      [OrigenAula.UNA]: 25,
+    const limites: Record<OrigenAula, number> = {
+      [OrigenAula.UNA]: 27,
       [OrigenAula.UNED]: 3,
+      [OrigenAula.OTRO]: 15,
     };
 
     const limite = limites[origen];
-
-    // Por el momento, OTRO no tiene un límite definido.
-    if (limite === undefined) {
-      return;
-    }
 
     const cantidadRegistrada = await this.aulaRepository.count({
       where: { origen },
@@ -101,6 +102,44 @@ export class AulasService {
     if (cantidadRegistrada >= limite) {
       throw new ConflictException(
         `Se alcanzó el límite de ${limite} espacios registrados para ${origen}.`,
+      );
+    }
+  }
+
+
+  private obtenerNumeroEspacioDesdeCodigo(codigo: string): number | null {
+    const coincidencia = String(codigo).match(/\d+/);
+
+    if (!coincidencia) {
+      return null;
+    }
+
+    const numero = Number(coincidencia[0]);
+
+    return Number.isInteger(numero) ? numero : null;
+  }
+
+  private validarNumeroPorOrigen(codigo: string, origen: OrigenAula): void {
+    const maximos: Record<OrigenAula, number> = {
+      [OrigenAula.UNA]: 27,
+      [OrigenAula.UNED]: 3,
+      [OrigenAula.OTRO]: 15,
+    };
+
+    const numero = this.obtenerNumeroEspacioDesdeCodigo(codigo);
+    const maximo = maximos[origen];
+
+    if (numero === null || numero < 1 || numero > maximo) {
+      throw new BadRequestException(
+        `Para ${origen}, el número del espacio debe estar entre 1 y ${maximo}.`,
+      );
+    }
+  }
+
+  private validarCapacidadAula(capacidad: number): void {
+    if (!Number.isInteger(capacidad) || capacidad < 1 || capacidad > 70) {
+      throw new BadRequestException(
+        'La capacidad del aula debe ser un número entero entre 1 y 70 estudiantes.',
       );
     }
   }
@@ -544,7 +583,7 @@ export class AulasService {
 
   private relanzarErrorAula(error: unknown): never {
     if (this.obtenerCodigoError(error) === 'ER_DUP_ENTRY') {
-      throw new ConflictException('El código del aula ya está registrado.');
+      throw new ConflictException('El código del aula ya está registrado para ese origen.');
     }
 
     throw error;
@@ -625,13 +664,10 @@ export class AulasService {
       throw new BadRequestException('El nombre del aula es obligatorio.');
     }
 
-    if (dto.capacidad <= 0) {
-      throw new BadRequestException(
-        'La capacidad del aula debe ser mayor a cero.',
-      );
-    }
+    this.validarNumeroPorOrigen(codigo, dto.origen);
+    this.validarCapacidadAula(dto.capacidad);
 
-    await this.validarCodigoDuplicado(codigo);
+    await this.validarCodigoDuplicado(codigo, dto.origen);
     await this.validarLimiteOrigen(dto.origen);
 
     const aula = this.aulaRepository.create({
@@ -702,17 +738,35 @@ export class AulasService {
       activo: aula.activo,
     };
 
+    const codigoFinal =
+      dto.codigo !== undefined
+        ? dto.codigo.trim().toUpperCase()
+        : aula.codigo;
+
+    const origenFinal =
+      dto.origen !== undefined
+        ? dto.origen
+        : aula.origen;
+
+    if (!codigoFinal) {
+      throw new BadRequestException(
+        'El código del aula no puede estar vacío.',
+      );
+    }
+
+    this.validarNumeroPorOrigen(
+      codigoFinal,
+      origenFinal,
+    );
+
+    await this.validarCodigoDuplicado(
+      codigoFinal,
+      origenFinal,
+      id,
+    );
+
     if (dto.codigo !== undefined) {
-      const codigo = dto.codigo.trim().toUpperCase();
-
-      if (!codigo) {
-        throw new BadRequestException(
-          'El código del aula no puede estar vacío.',
-        );
-      }
-
-      await this.validarCodigoDuplicado(codigo, id);
-      aula.codigo = codigo;
+      aula.codigo = codigoFinal;
     }
 
     if (dto.nombre !== undefined) {
@@ -732,11 +786,9 @@ export class AulasService {
     }
 
     if (dto.capacidad !== undefined) {
-      if (dto.capacidad <= 0) {
-        throw new BadRequestException(
-          'La capacidad del aula debe ser mayor a cero.',
-        );
-      }
+      this.validarCapacidadAula(
+        dto.capacidad,
+      );
 
       aula.capacidad = dto.capacidad;
     }
