@@ -59,6 +59,11 @@ const GRADOS_PLAN = {
   OTRO: "Otro",
 };
 
+const MIN_CREDITOS_ASIGNATURA = 1;
+const MAX_CREDITOS_ASIGNATURA = 6;
+const MAX_ORDEN_ASIGNATURA = 200;
+const MAX_NOMBRE_ASIGNATURA = 120;
+
 const TIPOS_OPTATIVA_PLAN = {
   DISCIPLINARIA: {
     etiqueta: "Disciplinaria / de carrera",
@@ -3122,7 +3127,7 @@ function crearFilaCargaRapidaAsignatura(indice) {
         <input
           type="text"
           class="carga-asignatura-nombre"
-          maxlength="150"
+          maxlength="${MAX_NOMBRE_ASIGNATURA}"
           placeholder="Programación I"
           required
         >
@@ -3133,8 +3138,8 @@ function crearFilaCargaRapidaAsignatura(indice) {
         <input
           type="number"
           class="carga-asignatura-creditos"
-          min="0"
-          max="30"
+          min="${MIN_CREDITOS_ASIGNATURA}"
+          max="${MAX_CREDITOS_ASIGNATURA}"
           value="3"
           required
         >
@@ -3146,7 +3151,7 @@ function crearFilaCargaRapidaAsignatura(indice) {
           type="number"
           class="carga-asignatura-orden"
           min="1"
-          max="999"
+          max="${MAX_ORDEN_ASIGNATURA}"
           value="${indice + 1}"
           required
         >
@@ -3422,6 +3427,12 @@ function construirCargaRapida() {
       throw new Error(`Fila ${index + 1}: debe indicar el nombre.`);
     }
 
+    if (nombreReferencia.length > MAX_NOMBRE_ASIGNATURA) {
+      throw new Error(
+        `Fila ${index + 1}: el nombre no puede superar ${MAX_NOMBRE_ASIGNATURA} caracteres.`,
+      );
+    }
+
     if (codigosUtilizados.has(codigoReferencia)) {
       throw new Error(
         `Fila ${index + 1}: el código ${codigoReferencia} está repetido dentro de esta carga.`,
@@ -3430,14 +3441,24 @@ function construirCargaRapida() {
 
     codigosUtilizados.add(codigoReferencia);
 
-    if (!Number.isInteger(creditos) || creditos < 0 || creditos > 30) {
+    if (
+      !Number.isInteger(creditos) ||
+      creditos < MIN_CREDITOS_ASIGNATURA ||
+      creditos > MAX_CREDITOS_ASIGNATURA
+    ) {
       throw new Error(
-        `Fila ${index + 1}: los créditos deben estar entre 0 y 30.`,
+        `Fila ${index + 1}: los créditos deben estar entre ${MIN_CREDITOS_ASIGNATURA} y ${MAX_CREDITOS_ASIGNATURA}.`,
       );
     }
 
-    if (!Number.isInteger(orden) || orden < 1 || orden > 999) {
-      throw new Error(`Fila ${index + 1}: el orden debe estar entre 1 y 999.`);
+    if (
+      !Number.isInteger(orden) ||
+      orden < 1 ||
+      orden > MAX_ORDEN_ASIGNATURA
+    ) {
+      throw new Error(
+        `Fila ${index + 1}: el orden debe estar entre 1 y ${MAX_ORDEN_ASIGNATURA}.`,
+      );
     }
 
     if (tipo === "OPTATIVA" && !tipoOptativa) {
@@ -3579,7 +3600,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
           <span>Nombre de la asignatura</span>
           <input
             id="asignaturaNombreReferencia"
-            maxlength="150"
+            maxlength="${MAX_NOMBRE_ASIGNATURA}"
             value="${escapeHtml(
               asignatura?.nombreReferencia || asignatura?.curso?.nombre || "",
             )}"
@@ -3619,8 +3640,8 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
         <input
           id="asignaturaCreditos"
           type="number"
-          min="0"
-          max="30"
+          min="${MIN_CREDITOS_ASIGNATURA}"
+          max="${MAX_CREDITOS_ASIGNATURA}"
           value="${asignatura?.creditos ?? 0}"
           required
         >
@@ -3632,7 +3653,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
           id="asignaturaOrden"
           type="number"
           min="1"
-          max="999"
+          max="${MAX_ORDEN_ASIGNATURA}"
           value="${ordenInicial}"
           required
         >
@@ -4033,6 +4054,45 @@ async function guardarAsignatura(asignatura, cerrar) {
     return;
   }
 
+  if (nombreReferencia.length > MAX_NOMBRE_ASIGNATURA) {
+    errorBox.textContent =
+      `El nombre de la asignatura no puede superar ${MAX_NOMBRE_ASIGNATURA} caracteres.`;
+    errorBox.classList.remove("hidden");
+    nombreInput?.focus();
+    return;
+  }
+
+  const creditos = Number(
+    document.getElementById("asignaturaCreditos")?.value,
+  );
+  const orden = Number(
+    document.getElementById("asignaturaOrden")?.value,
+  );
+
+  if (
+    !Number.isInteger(creditos) ||
+    creditos < MIN_CREDITOS_ASIGNATURA ||
+    creditos > MAX_CREDITOS_ASIGNATURA
+  ) {
+    errorBox.textContent =
+      `Los créditos deben estar entre ${MIN_CREDITOS_ASIGNATURA} y ${MAX_CREDITOS_ASIGNATURA}.`;
+    errorBox.classList.remove("hidden");
+    document.getElementById("asignaturaCreditos")?.focus();
+    return;
+  }
+
+  if (
+    !Number.isInteger(orden) ||
+    orden < 1 ||
+    orden > MAX_ORDEN_ASIGNATURA
+  ) {
+    errorBox.textContent =
+      `El orden debe estar entre 1 y ${MAX_ORDEN_ASIGNATURA}.`;
+    errorBox.classList.remove("hidden");
+    document.getElementById("asignaturaOrden")?.focus();
+    return;
+  }
+
   const tipo =
     document.getElementById("asignaturaTipo")?.value || "OBLIGATORIA";
   const tipoOptativa =
@@ -4050,8 +4110,8 @@ async function guardarAsignatura(asignatura, cerrar) {
     nombreReferencia,
     nivel: Number(document.getElementById("asignaturaNivel")?.value),
     ciclo: Number(document.getElementById("asignaturaCiclo")?.value),
-    creditos: Number(document.getElementById("asignaturaCreditos")?.value),
-    orden: Number(document.getElementById("asignaturaOrden")?.value),
+    creditos,
+    orden,
     tipo,
     tipoOptativa: tipo === "OPTATIVA" ? tipoOptativa : null,
   };
@@ -5598,34 +5658,121 @@ function renderizarDatoResumen(nombre, valor) {
 }
 
 function abrirDetalleResumenPlan() {
-  if (!resumenPlan) return;
+  if (!resumenPlan || !planSeleccionado) {
+    return;
+  }
+
   const dialog = document.getElementById("asignaturaDialog");
   const content = document.getElementById("asignaturaDialogContent");
-  if (!dialog || !content) return;
+
+  if (!dialog || !content) {
+    return;
+  }
+
   const horas = resumenPlan.horas || {};
-  const ciclos = Array.isArray(resumenPlan.ciclos) ? resumenPlan.ciclos : [];
-  const lista = (items, render, vacio) =>
-    items.length
-      ? items.map(render).join("")
-      : `<div class="plan-requirements-empty">${vacio}</div>`;
-  content.innerHTML = `
-    <div class="plan-form plan-summary-detail">
-      <header class="plan-dialog-header"><div><h3>Resumen del plan</h3><p>${escapeHtml(planSeleccionado.nombre)}</p></div><button id="cerrarResumenPlan" class="planes-icon-button" type="button"><i data-lucide="x"></i></button></header>
-      <div class="plan-summary-detail-content">
-        <section class="plan-summary-detail-section"><h4>Horas académicas</h4><div class="plan-summary-hours">${renderizarDatoResumen("Teoría", horas.teoria)}${renderizarDatoResumen("Práctica", horas.practica)}${renderizarDatoResumen("Laboratorio", horas.laboratorio)}${renderizarDatoResumen("Gira", horas.gira)}${renderizarDatoResumen("Estudio independiente", horas.estudioIndependiente)}${renderizarDatoResumen("Horas totales", horas.totales)}${renderizarDatoResumen("Horas docente", horas.docente)}</div></section>
-        <section class="plan-summary-detail-section"><h4>Créditos por ciclo</h4><div class="plan-summary-cycle-list">${lista(ciclos, (grupo) => `<div class="plan-summary-cycle"><div><strong>Nivel ${grupo.nivel} · Ciclo ${grupo.ciclo}</strong><small>${grupo.cantidadAsignaturas} asignaturas</small></div><span>${grupo.creditos} cr.</span></div>`, "No hay ciclos registrados.")}</div></section>
-      </div>
-      <footer class="plan-dialog-footer"><button id="cerrarResumenPlanFooter" class="planes-secondary-button" type="button">Cerrar</button></footer>
-    </div>`;
+  const ciclos = Array.isArray(resumenPlan.ciclos)
+    ? resumenPlan.ciclos
+    : [];
+
+  const ciclosHtml = ciclos.length
+    ? ciclos
+        .map(
+          (grupo) => `
+            <div class="plan-summary-cycle">
+              <div>
+                <strong>
+                  Nivel ${grupo.nivel} · Ciclo ${grupo.ciclo}
+                </strong>
+                <small>
+                  ${grupo.cantidadAsignaturas} asignatura${
+                    Number(grupo.cantidadAsignaturas) === 1 ? "" : "s"
+                  }
+                </small>
+              </div>
+
+              <span>
+                ${grupo.creditos} cr.
+              </span>
+            </div>
+          `,
+        )
+        .join("")
+    : `
+        <div class="plan-requirements-empty">
+          No hay ciclos registrados.
+        </div>
+      `;
+
+  const body = `
+    <div class="plan-summary-detail-content">
+
+      <section class="plan-summary-detail-section">
+        <div class="plan-summary-detail-heading">
+          <span class="plan-summary-detail-icon">
+            <i data-lucide="clock-3" aria-hidden="true"></i>
+          </span>
+
+          <div>
+            <h4>Horas académicas</h4>
+            <p>
+              Distribución acumulada de horas registrada para las asignaturas del plan.
+            </p>
+          </div>
+        </div>
+
+        <div class="plan-summary-hours">
+          ${renderizarDatoResumen("Teoría", horas.teoria)}
+          ${renderizarDatoResumen("Práctica", horas.practica)}
+          ${renderizarDatoResumen("Laboratorio", horas.laboratorio)}
+          ${renderizarDatoResumen("Gira", horas.gira)}
+          ${renderizarDatoResumen(
+            "Estudio independiente",
+            horas.estudioIndependiente,
+          )}
+          ${renderizarDatoResumen("Horas totales", horas.totales)}
+          ${renderizarDatoResumen("Horas docente", horas.docente)}
+        </div>
+      </section>
+
+      <section class="plan-summary-detail-section">
+        <div class="plan-summary-detail-heading">
+          <span class="plan-summary-detail-icon">
+            <i data-lucide="layers-3" aria-hidden="true"></i>
+          </span>
+
+          <div>
+            <h4>Créditos por ciclo</h4>
+            <p>
+              Distribución de la carga crediticia según el nivel y ciclo académico.
+            </p>
+          </div>
+        </div>
+
+        <div class="plan-summary-cycle-list">
+          ${ciclosHtml}
+        </div>
+      </section>
+
+    </div>
+  `;
+
+  content.innerHTML = FormDialog({
+    formId: "resumenPlanForm",
+    title: "Resumen del plan",
+    description: planSeleccionado.nombre,
+    body,
+    cancelButtonId: "cerrarResumenPlan",
+    cancelText: "Cerrar",
+    layout: "custom",
+    formClass: "plan-summary-dialog",
+  });
+
   renderizarIconos();
-  if (!dialog.open) dialog.showModal();
-  const cerrar = () => dialog.close();
+  mostrarDialogHerramienta();
+
   document
     .getElementById("cerrarResumenPlan")
-    ?.addEventListener("click", cerrar);
-  document
-    .getElementById("cerrarResumenPlanFooter")
-    ?.addEventListener("click", cerrar);
+    ?.addEventListener("click", () => dialog.close());
 }
 
 function formatearTipoSalida(tipo) {
