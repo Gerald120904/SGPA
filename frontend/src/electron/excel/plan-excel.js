@@ -1,4 +1,3 @@
-
 import ExcelJS from "exceljs";
 
 function normalizarCabecera(valor) {
@@ -161,6 +160,47 @@ function aplicarValidacionNumero(
   }
 }
 
+function aplicarValidacionNumeroEntre(
+  worksheet,
+  columna,
+  hasta,
+  minimo,
+  maximo,
+  permitirVacio = false,
+  tipo = "whole",
+) {
+  for (let fila = 2; fila <= hasta; fila += 1) {
+    worksheet.getCell(`${columna}${fila}`).dataValidation = {
+      type: tipo,
+      operator: "between",
+      formulae: [minimo, maximo],
+      allowBlank: permitirVacio,
+      showErrorMessage: true,
+      errorTitle: "Valor fuera de rango",
+      error: `El valor debe estar entre ${minimo} y ${maximo}.`,
+    };
+  }
+}
+
+function aplicarValidacionLongitudTexto(
+  worksheet,
+  columna,
+  hasta,
+  maximo,
+) {
+  for (let fila = 2; fila <= hasta; fila += 1) {
+    worksheet.getCell(`${columna}${fila}`).dataValidation = {
+      type: "textLength",
+      operator: "lessThanOrEqual",
+      formulae: [maximo],
+      allowBlank: false,
+      showErrorMessage: true,
+      errorTitle: "Texto demasiado largo",
+      error: `El texto no puede superar ${maximo} caracteres.`,
+    };
+  }
+}
+
 export async function crearPlantillaExcelPlan(destino) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "SGPA";
@@ -249,9 +289,14 @@ export async function crearPlantillaExcelPlan(destino) {
     ["DISCIPLINARIA", "ABIERTA", "SEDE"],
     true,
   );
-  for (const columna of ["D", "E", "F"])
+  aplicarValidacionLongitudTexto(asignaturas, "C", 600, 120);
+
+  for (const columna of ["D", "E"])
     aplicarValidacionNumero(asignaturas, columna, 600, 1);
-  aplicarValidacionNumero(asignaturas, "G", 600, 0);
+
+  aplicarValidacionNumeroEntre(asignaturas, "F", 600, 1, 200);
+  aplicarValidacionNumeroEntre(asignaturas, "G", 600, 1, 6);
+
   for (const columna of ["J", "K", "L", "M", "N", "O", "P"])
     aplicarValidacionNumero(asignaturas, columna, 600, 0, true, "decimal");
 
@@ -319,7 +364,7 @@ export async function crearPlantillaExcelPlan(destino) {
     ["", ""],
     [
       "ASIGNATURAS",
-      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan. TIPO admite OBLIGATORIA, GENERAL, OPTATIVA u OTRA. Cuando TIPO sea OPTATIVA, TIPO_OPTATIVA debe indicar DISCIPLINARIA, ABIERTA o SEDE; para los demás tipos debe quedar vacío.",
+      "CLAVE identifica cada asignatura dentro del archivo y se utiliza para requisitos y salidas. CODIGO y NOMBRE corresponden a la información curricular de la asignatura dentro del plan. NOMBRE admite hasta 120 caracteres. ORDEN debe estar entre 1 y 200 y CREDITOS entre 1 y 6. TIPO admite OBLIGATORIA, GENERAL, OPTATIVA u OTRA. Cuando TIPO sea OPTATIVA, TIPO_OPTATIVA debe indicar DISCIPLINARIA, ABIERTA o SEDE; para los demás tipos debe quedar vacío.",
     ],
     [
       "Asignaturas",

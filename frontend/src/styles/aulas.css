@@ -2588,3 +2588,366 @@
   color: #b42318;
   font-weight: 600;
 }
+
+/* =========================================================
+   AJUSTES DE QA - AULAS
+   ========================================================= */
+
+/* Botón Volver estandarizado con el rojo institucional. */
+.aulas-page .aulas-back-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid #b5121b;
+  border-radius: 9px;
+  background: #b5121b;
+  color: #ffffff;
+  font-weight: 600;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.aulas-page .aulas-back-button:hover {
+  border-color: #951019;
+  background: #951019;
+  box-shadow: 0 4px 11px rgba(181, 18, 27, 0.16);
+  transform: translateY(-1px);
+}
+
+.aulas-page .aulas-back-button:active {
+  transform: translateY(0);
+}
+
+.aulas-page .aulas-back-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Botones de acción iguales a Planes de estudio. */
+.sgpa-data-table[aria-label="Listado de aulas"] .aulas-icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f5f7;
+  color: #475467;
+  vertical-align: middle;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] .aulas-icon-button:hover {
+  background: #e8ebef;
+  transform: translateY(-1px);
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] .aulas-icon-button:active {
+  transform: translateY(0);
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] .aulas-icon-button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] .aulas-icon-button.is-danger {
+  color: #b42318;
+}
+
+.sgpa-data-table[aria-label="Listado de aulas"] .aulas-icon-button.is-success {
+  color: #067647;
+}
+
+/* =========================================================
+   PAGINACIÓN DEL LISTADO
+   ========================================================= */
+
+.aulas-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  margin-top: 16px;
+
+  padding: 12px 14px;
+
+  border: 1px solid #e4e7ec;
+  border-radius: 11px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 2px
+    rgba(16, 24, 40, 0.025);
+}
+
+
+.aulas-pagination-controls {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+
+/* =========================================================
+   ANTERIOR / SIGUIENTE
+   ========================================================= */
+
+.aulas-pagination-nav {
+  min-height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding: 0 10px;
+
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #475467;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+
+.aulas-pagination-nav svg {
+  width: 14px;
+  height: 14px;
+}
+
+
+.aulas-pagination-nav:not(:disabled):hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.28
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.055
+    );
+
+  color: #cf2029;
+
+  transform:
+    translateY(-1px);
+}
+
+
+.aulas-pagination-nav:disabled {
+  opacity: 0.38;
+
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   NÚMEROS
+   ========================================================= */
+
+.aulas-pagination-pages {
+  display: flex;
+  align-items: center;
+
+  gap: 5px;
+}
+
+
+.aulas-pagination-page {
+  width: 34px;
+  height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #667085;
+
+  cursor: pointer;
+
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+
+.aulas-pagination-page:hover {
+  border-color:
+    rgba(
+      207,
+      32,
+      41,
+      0.25
+    );
+
+  background:
+    rgba(
+      207,
+      32,
+      41,
+      0.05
+    );
+
+  color: #cf2029;
+
+  transform:
+    translateY(-1px);
+}
+
+
+.aulas-pagination-page.is-active {
+  border-color: #cf2029;
+
+  background: #cf2029;
+
+  color: #ffffff;
+
+  box-shadow:
+    0 3px 7px
+    rgba(
+      207,
+      32,
+      41,
+      0.15
+    );
+}
+/* =========================================================
+   SELECTOR DE HORA COMPACTO
+   ========================================================= */
+
+.aulas-time-compact {
+  display: inline-grid;
+  grid-template-columns: 66px auto 66px;
+  align-items: start;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+}
+
+.aulas-time-compact.is-inline {
+  margin: 0;
+}
+
+.aulas-time-part {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.aulas-time-part input {
+  width: 66px;
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1d2939;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+  outline: 0;
+}
+
+.aulas-time-part input:focus {
+  border-color: rgba(181, 18, 27, 0.45);
+  box-shadow: 0 0 0 3px rgba(181, 18, 27, 0.06);
+}
+
+.aulas-time-part input.is-invalid {
+  border-color: #f04438;
+  background: #fff7f7;
+}
+
+.aulas-time-part small {
+  color: #98a2b3;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.aulas-time-separator {
+  align-self: start;
+  padding-top: 9px;
+  color: #475467;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.aulas-time-help {
+  display: block;
+  margin-top: 5px;
+  color: #98a2b3;
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+.aulas-datetime-compact {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+}
+
+.aulas-datetime-compact > input[type="date"] {
+  width: 100%;
+  min-height: 42px;
+}
+
+@media (max-width: 700px) {
+  .aulas-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .aulas-pagination-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .aulas-datetime-compact {
+    grid-template-columns: 1fr;
+  }
+}

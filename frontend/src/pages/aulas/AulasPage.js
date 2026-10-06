@@ -111,6 +111,9 @@ let instanciaActual = 0;
 
 let vistaAulasActual = 'LISTA';
 
+const AULAS_POR_PAGINA = 10;
+let paginaAulasActual = 1;
+
 let aulaPlanoSeleccionadaId = null;
 
 let pisoEdificio2Actual = 3;
@@ -1416,6 +1419,421 @@ function horaCorta(
 }
 
 
+function normalizarHoraFormulario(valor) {
+  const texto = String(valor || '').trim();
+  const match = texto.match(/^(\d{1,2}):(\d{1,2})/);
+
+  if (!match) {
+    return '';
+  }
+
+  const hora = Number(match[1]);
+  const minuto = Number(match[2]);
+
+  if (
+    !Number.isInteger(hora) ||
+    !Number.isInteger(minuto) ||
+    hora < 0 ||
+    hora > 23 ||
+    minuto < 0 ||
+    minuto > 59
+  ) {
+    return '';
+  }
+
+  return `${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}`;
+}
+
+
+function separarFechaHoraFormulario(valor) {
+  const texto = String(valor || '').trim();
+
+  if (!texto) {
+    return {
+      fecha: '',
+      hora: '',
+    };
+  }
+
+  const [fecha = '', hora = ''] = texto.split('T');
+
+  return {
+    fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha)
+      ? fecha
+      : '',
+    hora: normalizarHoraFormulario(hora),
+  };
+}
+
+
+function renderizarControlHoraCompacto(
+  id,
+  valor = '',
+) {
+  const horaNormalizada =
+    normalizarHoraFormulario(valor);
+
+  const [hora = '', minuto = ''] =
+    horaNormalizada
+      ? horaNormalizada.split(':')
+      : ['', ''];
+
+  return `
+    <div
+      class="aulas-time-compact"
+      data-aulas-time-control
+      data-target-id="${id}"
+    >
+      <div class="aulas-time-part">
+        <input
+          type="text"
+          inputmode="numeric"
+          maxlength="2"
+          value="${escapeHtml(hora)}"
+          placeholder="HH"
+          aria-label="Hora"
+          data-time-hour
+          autocomplete="off"
+        >
+        <small>Hora</small>
+      </div>
+
+      <span
+        class="aulas-time-separator"
+        aria-hidden="true"
+      >:</span>
+
+      <div class="aulas-time-part">
+        <input
+          type="text"
+          inputmode="numeric"
+          maxlength="2"
+          value="${escapeHtml(minuto)}"
+          placeholder="MM"
+          aria-label="Minutos"
+          data-time-minute
+          autocomplete="off"
+        >
+        <small>Min</small>
+      </div>
+
+      <input
+        id="${id}"
+        type="hidden"
+        value="${escapeHtml(horaNormalizada)}"
+      >
+    </div>
+
+    <small class="aulas-time-help">
+      Formato de 24 horas. Ejemplo: 07:30 o 18:45.
+    </small>
+  `;
+}
+
+
+function renderizarControlFechaHoraCompacto(
+  id,
+  valor = '',
+) {
+  const partes =
+    separarFechaHoraFormulario(valor);
+
+  const [hora = '', minuto = ''] =
+    partes.hora
+      ? partes.hora.split(':')
+      : ['', ''];
+
+  return `
+    <div
+      class="aulas-datetime-compact"
+      data-aulas-datetime-control
+      data-target-id="${id}"
+    >
+      <input
+        type="date"
+        value="${escapeHtml(partes.fecha)}"
+        aria-label="Fecha"
+        data-datetime-date
+      >
+
+      <div class="aulas-time-compact is-inline">
+        <div class="aulas-time-part">
+          <input
+            type="text"
+            inputmode="numeric"
+            maxlength="2"
+            value="${escapeHtml(hora)}"
+            placeholder="HH"
+            aria-label="Hora"
+            data-time-hour
+            autocomplete="off"
+          >
+          <small>Hora</small>
+        </div>
+
+        <span
+          class="aulas-time-separator"
+          aria-hidden="true"
+        >:</span>
+
+        <div class="aulas-time-part">
+          <input
+            type="text"
+            inputmode="numeric"
+            maxlength="2"
+            value="${escapeHtml(minuto)}"
+            placeholder="MM"
+            aria-label="Minutos"
+            data-time-minute
+            autocomplete="off"
+          >
+          <small>Min</small>
+        </div>
+      </div>
+
+      <input
+        id="${id}"
+        type="hidden"
+        value="${escapeHtml(
+          partes.fecha && partes.hora
+            ? `${partes.fecha}T${partes.hora}`
+            : '',
+        )}"
+      >
+    </div>
+  `;
+}
+
+
+function prepararParteHora(
+  input,
+  maximo,
+) {
+  if (!input) {
+    return '';
+  }
+
+  let valor = String(input.value || '')
+    .replace(/\D/g, '')
+    .slice(0, 2);
+
+  input.value = valor;
+
+  if (!valor) {
+    input.classList.remove('is-invalid');
+    return '';
+  }
+
+  const numero = Number(valor);
+  const valido =
+    Number.isInteger(numero) &&
+    numero >= 0 &&
+    numero <= maximo;
+
+  input.classList.toggle(
+    'is-invalid',
+    !valido,
+  );
+
+  if (!valido) {
+    return '';
+  }
+
+  return String(numero).padStart(2, '0');
+}
+
+
+function sincronizarControlHoraCompacto(
+  control,
+) {
+  const targetId =
+    control?.dataset?.targetId;
+
+  if (!targetId) {
+    return;
+  }
+
+  const hidden =
+    document.getElementById(targetId);
+
+  const horaInput =
+    control.querySelector('[data-time-hour]');
+
+  const minutoInput =
+    control.querySelector('[data-time-minute]');
+
+  if (!hidden || !horaInput || !minutoInput) {
+    return;
+  }
+
+  const hora =
+    prepararParteHora(horaInput, 23);
+
+  const minuto =
+    prepararParteHora(minutoInput, 59);
+
+  hidden.value =
+    hora && minuto
+      ? `${hora}:${minuto}`
+      : '';
+}
+
+
+function sincronizarControlFechaHoraCompacto(
+  control,
+) {
+  const targetId =
+    control?.dataset?.targetId;
+
+  if (!targetId) {
+    return;
+  }
+
+  const hidden =
+    document.getElementById(targetId);
+
+  const fechaInput =
+    control.querySelector('[data-datetime-date]');
+
+  const horaInput =
+    control.querySelector('[data-time-hour]');
+
+  const minutoInput =
+    control.querySelector('[data-time-minute]');
+
+  if (
+    !hidden ||
+    !fechaInput ||
+    !horaInput ||
+    !minutoInput
+  ) {
+    return;
+  }
+
+  const hora =
+    prepararParteHora(horaInput, 23);
+
+  const minuto =
+    prepararParteHora(minutoInput, 59);
+
+  hidden.value =
+    fechaInput.value && hora && minuto
+      ? `${fechaInput.value}T${hora}:${minuto}`
+      : '';
+}
+
+
+function inicializarControlesHorario(
+  root = document,
+) {
+  root
+    .querySelectorAll(
+      '[data-aulas-time-control]',
+    )
+    .forEach(
+      (control) => {
+        const sincronizar = () =>
+          sincronizarControlHoraCompacto(
+            control,
+          );
+
+        control
+          .querySelectorAll(
+            '[data-time-hour], [data-time-minute]',
+          )
+          .forEach(
+            (input) => {
+              input.addEventListener(
+                'input',
+                sincronizar,
+              );
+
+              input.addEventListener(
+                'blur',
+                () => {
+                  sincronizar();
+
+                  if (
+                    input.value &&
+                    !input.classList.contains(
+                      'is-invalid',
+                    )
+                  ) {
+                    input.value =
+                      String(
+                        Number(input.value),
+                      ).padStart(2, '0');
+
+                    sincronizar();
+                  }
+                },
+              );
+            },
+          );
+
+        sincronizar();
+      },
+    );
+
+  root
+    .querySelectorAll(
+      '[data-aulas-datetime-control]',
+    )
+    .forEach(
+      (control) => {
+        const sincronizar = () =>
+          sincronizarControlFechaHoraCompacto(
+            control,
+          );
+
+        control
+          .querySelectorAll(
+            '[data-datetime-date], [data-time-hour], [data-time-minute]',
+          )
+          .forEach(
+            (input) => {
+              input.addEventListener(
+                'input',
+                sincronizar,
+              );
+
+              input.addEventListener(
+                'change',
+                sincronizar,
+              );
+
+              input.addEventListener(
+                'blur',
+                () => {
+                  sincronizar();
+
+                  if (
+                    input.matches(
+                      '[data-time-hour], [data-time-minute]',
+                    ) &&
+                    input.value &&
+                    !input.classList.contains(
+                      'is-invalid',
+                    )
+                  ) {
+                    input.value =
+                      String(
+                        Number(input.value),
+                      ).padStart(2, '0');
+
+                    sincronizar();
+                  }
+                },
+              );
+            },
+          );
+
+        sincronizar();
+      },
+    );
+}
+
+
 function seleccionarPeriodoPreferido(
   periodos,
 ) {
@@ -1922,7 +2340,10 @@ function renderizarVistaListado() {
     )
     ?.addEventListener(
       'input',
-      renderizarAulas,
+      () => {
+        paginaAulasActual = 1;
+        renderizarAulas();
+      },
     );
 
 
@@ -2000,7 +2421,10 @@ function renderizarVistaListado() {
     )
     ?.addEventListener(
       'change',
-      renderizarAulas,
+      () => {
+        paginaAulasActual = 1;
+        renderizarAulas();
+      },
     );
 
 
@@ -2010,7 +2434,10 @@ function renderizarVistaListado() {
     )
     ?.addEventListener(
       'change',
-      renderizarAulas,
+      () => {
+        paginaAulasActual = 1;
+        renderizarAulas();
+      },
     );
 
 
@@ -2028,6 +2455,12 @@ function renderizarVistaListado() {
               'PLANO'
                 ? 'PLANO'
                 : 'LISTA';
+
+            if (
+              vistaAulasActual === 'LISTA'
+            ) {
+              paginaAulasActual = 1;
+            }
 
             document
               .querySelectorAll(
@@ -2221,6 +2654,144 @@ function renderizarAulas() {
 }
 
 
+function renderizarPaginacionAulas(
+  totalElementos,
+) {
+  const totalPaginas =
+    Math.max(
+      1,
+      Math.ceil(
+        totalElementos /
+          AULAS_POR_PAGINA,
+      ),
+    );
+
+  paginaAulasActual =
+    Math.min(
+      Math.max(
+        paginaAulasActual,
+        1,
+      ),
+      totalPaginas,
+    );
+
+  if (
+    totalElementos <=
+    AULAS_POR_PAGINA
+  ) {
+    return '';
+  }
+
+  const anterior =
+    paginaAulasActual - 1;
+
+  const siguiente =
+    paginaAulasActual + 1;
+
+  const paginas =
+    Array.from(
+      {
+        length:
+          totalPaginas,
+      },
+      (_, indice) =>
+        indice + 1,
+    );
+
+  return `
+    <nav
+      class="aulas-pagination"
+      aria-label="Paginación de aulas"
+    >
+      <div
+        class="aulas-pagination-controls"
+      >
+
+        <button
+          type="button"
+          class="aulas-pagination-nav"
+          data-aulas-page="${anterior}"
+          ${
+            paginaAulasActual === 1
+              ? 'disabled'
+              : ''
+          }
+          aria-label="Página anterior"
+        >
+          <i
+            data-lucide="chevron-left"
+            aria-hidden="true"
+          ></i>
+
+          <span>
+            Anterior
+          </span>
+        </button>
+
+
+        <div
+          class="aulas-pagination-pages"
+          aria-label="Páginas disponibles"
+        >
+          ${paginas
+            .map(
+              (pagina) => `
+                <button
+                  type="button"
+                  class="
+                    aulas-pagination-page
+                    ${
+                      pagina ===
+                      paginaAulasActual
+                        ? 'is-active'
+                        : ''
+                    }
+                  "
+                  data-aulas-page="${pagina}"
+                  aria-label="Ir a la página ${pagina}"
+                  aria-current="${
+                    pagina ===
+                    paginaAulasActual
+                      ? 'page'
+                      : 'false'
+                  }"
+                >
+                  ${pagina}
+                </button>
+              `,
+            )
+            .join('')}
+        </div>
+
+
+        <button
+          type="button"
+          class="aulas-pagination-nav"
+          data-aulas-page="${siguiente}"
+          ${
+            paginaAulasActual ===
+            totalPaginas
+              ? 'disabled'
+              : ''
+          }
+          aria-label="Página siguiente"
+        >
+          <span>
+            Siguiente
+          </span>
+
+          <i
+            data-lucide="chevron-right"
+            aria-hidden="true"
+          ></i>
+        </button>
+
+      </div>
+    </nav>
+  `;
+}
+
+
 function renderizarListaAulas(
   contenido,
   filtradas,
@@ -2228,8 +2799,36 @@ function renderizarListaAulas(
   const puedeGestionar =
     puedeGestionarAulas();
 
+  const totalPaginas =
+    Math.max(
+      1,
+      Math.ceil(
+        filtradas.length /
+          AULAS_POR_PAGINA,
+      ),
+    );
+
+  paginaAulasActual =
+    Math.min(
+      Math.max(
+        paginaAulasActual,
+        1,
+      ),
+      totalPaginas,
+    );
+
+  const inicio =
+    (paginaAulasActual - 1) *
+    AULAS_POR_PAGINA;
+
+  const aulasPagina =
+    filtradas.slice(
+      inicio,
+      inicio + AULAS_POR_PAGINA,
+    );
+
   const filas =
-    filtradas
+    aulasPagina
       .map(
         (aula) => `
           <tr>
@@ -2409,9 +3008,8 @@ function renderizarListaAulas(
       )
       .join('');
 
-  contenido.innerHTML =
-    DataTable({
-
+  contenido.innerHTML = `
+    ${DataTable({
       columns: [
         'Número',
         'Aula',
@@ -2422,17 +3020,17 @@ function renderizarListaAulas(
         'Estado',
         'Acciones',
       ],
-
-      rows:
-        filas,
-
+      rows: filas,
       emptyMessage:
         'No se encontraron aulas.',
-
       ariaLabel:
         'Listado de aulas',
+    })}
 
-    });
+    ${renderizarPaginacionAulas(
+      filtradas.length,
+    )}
+  `;
 
   renderizarIconos();
 }
@@ -3439,6 +4037,28 @@ async function cambiarDisponibilidadAcademicaAulaPlano(
 async function manejarAccionTabla(
   event,
 ) {
+  const botonPagina =
+    event.target.closest(
+      '[data-aulas-page]',
+    );
+
+  if (botonPagina) {
+    const pagina =
+      Number(
+        botonPagina.dataset.aulasPage,
+      );
+
+    if (
+      Number.isInteger(pagina) &&
+      pagina >= 1
+    ) {
+      paginaAulasActual = pagina;
+      renderizarAulas();
+    }
+
+    return;
+  }
+
   const selectorPisoToggle =
     event.target.closest(
       '[data-edificio2-floor-toggle]',
@@ -4753,6 +5373,9 @@ async function abrirDetalleAula(
     `;
 
 
+    inicializarControlesHorario(vista);
+
+
     document
       .getElementById(
         'volverAulasButton',
@@ -5990,15 +6613,13 @@ function abrirFormularioIndisponibilidad(
             Inicio
           </span>
 
-          <input
-            id="indisponibilidadInicio"
-            type="datetime-local"
-            value="${fechaParaInput(
+          ${renderizarControlFechaHoraCompacto(
+            'indisponibilidadInicio',
+            fechaParaInput(
               indisponibilidad
                 ?.fechaHoraInicio,
-            )}"
-            required
-          >
+            ),
+          )}
 
         </label>
 
@@ -6009,15 +6630,13 @@ function abrirFormularioIndisponibilidad(
             Finalización
           </span>
 
-          <input
-            id="indisponibilidadFin"
-            type="datetime-local"
-            value="${fechaParaInput(
+          ${renderizarControlFechaHoraCompacto(
+            'indisponibilidadFin',
+            fechaParaInput(
               indisponibilidad
                 ?.fechaHoraFin,
-            )}"
-            required
-          >
+            ),
+          )}
 
         </label>
 
@@ -6061,6 +6680,8 @@ function abrirFormularioIndisponibilidad(
 
     });
 
+
+  inicializarControlesHorario(content);
 
   dialog.showModal();
 
@@ -6648,14 +7269,12 @@ function abrirFormularioReserva(
 
           <span>Inicio</span>
 
-          <input
-            id="reservaInicio"
-            type="datetime-local"
-            value="${fechaParaInput(
+          ${renderizarControlFechaHoraCompacto(
+            'reservaInicio',
+            fechaParaInput(
               reserva?.fechaHoraInicio,
-            )}"
-            required
-          >
+            ),
+          )}
 
         </label>
 
@@ -6664,14 +7283,12 @@ function abrirFormularioReserva(
 
           <span>Finalización</span>
 
-          <input
-            id="reservaFin"
-            type="datetime-local"
-            value="${fechaParaInput(
+          ${renderizarControlFechaHoraCompacto(
+            'reservaFin',
+            fechaParaInput(
               reserva?.fechaHoraFin,
-            )}"
-            required
-          >
+            ),
+          )}
 
         </label>
 
@@ -6711,6 +7328,8 @@ function abrirFormularioReserva(
 
     });
 
+
+  inicializarControlesHorario(content);
 
   dialog.showModal();
 
@@ -7058,12 +7677,10 @@ function renderizarSeccionOcupacion() {
             Desde
           </span>
 
-          <input
-            id="ocupacionInicio"
-            type="datetime-local"
-            value="${rango.inicio}"
-            required
-          >
+          ${renderizarControlFechaHoraCompacto(
+            'ocupacionInicio',
+            rango.inicio,
+          )}
 
         </label>
 
@@ -7074,12 +7691,10 @@ function renderizarSeccionOcupacion() {
             Hasta
           </span>
 
-          <input
-            id="ocupacionFin"
-            type="datetime-local"
-            value="${rango.fin}"
-            required
-          >
+          ${renderizarControlFechaHoraCompacto(
+            'ocupacionFin',
+            rango.fin,
+          )}
 
         </label>
 
@@ -7521,15 +8136,15 @@ function abrirFormularioAula(
 
           <input
             id="aulaNumero"
-            type="number"
-            min="1"
-            max="${obtenerMaximoNumeroOrigen(origenPreferido)}"
-            step="1"
+            type="text"
             inputmode="numeric"
+            maxlength="${String(obtenerMaximoNumeroOrigen(origenPreferido)).length}"
+            data-max-value="${obtenerMaximoNumeroOrigen(origenPreferido)}"
             value="${escapeHtml(
               numeroActual,
             )}"
             placeholder="Ej. 17"
+            autocomplete="off"
             required
           >
 
@@ -7561,7 +8176,7 @@ function abrirFormularioAula(
           <input
             id="aulaNombreEspecial"
             type="text"
-            maxlength="100"
+            maxlength="50"
             value="${escapeHtml(
               nombreEspecialActual,
             )}"
@@ -7571,7 +8186,7 @@ function abrirFormularioAula(
           <small
             class="aulas-form-help"
           >
-            Úselo solo cuando el espacio tenga una denominación particular.
+            Úselo solo cuando el espacio tenga una denominación particular. Máximo 50 caracteres.
           </small>
 
         </label>
@@ -7607,6 +8222,10 @@ function abrirFormularioAula(
             placeholder="Ej. Edificio académico, segundo piso"
           >
 
+          <small class="aulas-form-help">
+            Máximo 150 caracteres.
+          </small>
+
         </label>
 
 
@@ -7618,16 +8237,16 @@ function abrirFormularioAula(
 
           <input
             id="aulaCapacidad"
-            type="number"
-            min="1"
-            max="70"
-            step="1"
+            type="text"
             inputmode="numeric"
+            maxlength="2"
+            data-max-value="70"
             value="${escapeHtml(
               aula?.capacidad ||
                 sugerencia?.capacidad ||
                 '',
             )}"
+            autocomplete="off"
             required
           >
 
@@ -7804,6 +8423,19 @@ function abrirFormularioAula(
     dialog,
   );
 
+  const limpiarEntradaNumerica = (
+    input,
+    maximoCaracteres,
+  ) => {
+    if (!input) {
+      return;
+    }
+
+    input.value = String(input.value || '')
+      .replace(/\D/g, '')
+      .slice(0, maximoCaracteres);
+  };
+
   const validarFormularioEnLinea =
     () => {
       const numeroInput =
@@ -7873,7 +8505,10 @@ function abrirFormularioAula(
         );
 
       if (numeroInput) {
-        numeroInput.max =
+        numeroInput.maxLength =
+          String(maximoNumero).length;
+
+        numeroInput.dataset.maxValue =
           String(maximoNumero);
 
         numeroInput.classList.toggle(
@@ -8105,7 +8740,24 @@ function abrirFormularioAula(
     )
     ?.addEventListener(
       'input',
-      actualizarPreview,
+      (event) => {
+        const origen =
+          document.getElementById(
+            'aulaOrigen',
+          )?.value || 'UNA';
+
+        const maximoNumero =
+          obtenerMaximoNumeroOrigen(
+            origen,
+          );
+
+        limpiarEntradaNumerica(
+          event.currentTarget,
+          String(maximoNumero).length,
+        );
+
+        actualizarPreview();
+      },
     );
 
   document
@@ -8132,7 +8784,29 @@ function abrirFormularioAula(
     )
     ?.addEventListener(
       'change',
-      actualizarPreview,
+      () => {
+        const numeroInput =
+          document.getElementById(
+            'aulaNumero',
+          );
+
+        const origen =
+          document.getElementById(
+            'aulaOrigen',
+          )?.value || 'UNA';
+
+        const maximoNumero =
+          obtenerMaximoNumeroOrigen(
+            origen,
+          );
+
+        limpiarEntradaNumerica(
+          numeroInput,
+          String(maximoNumero).length,
+        );
+
+        actualizarPreview();
+      },
     );
 
   document
@@ -8141,7 +8815,14 @@ function abrirFormularioAula(
     )
     ?.addEventListener(
       'input',
-      validarFormularioEnLinea,
+      (event) => {
+        limpiarEntradaNumerica(
+          event.currentTarget,
+          2,
+        );
+
+        validarFormularioEnLinea();
+      },
     );
 
   actualizarPreview();
@@ -9043,17 +9724,10 @@ function abrirFormularioBloqueAula(
             Hora inicio
           </span>
 
-          <input
-            id="disponibilidadAulaInicio"
-            type="time"
-            value="${escapeHtml(
-              horaCorta(
-                bloque?.horaInicio ||
-                  '',
-              ),
-            )}"
-            required
-          >
+          ${renderizarControlHoraCompacto(
+            'disponibilidadAulaInicio',
+            bloque?.horaInicio || '',
+          )}
         </label>
 
 
@@ -9062,17 +9736,10 @@ function abrirFormularioBloqueAula(
             Hora fin
           </span>
 
-          <input
-            id="disponibilidadAulaFin"
-            type="time"
-            value="${escapeHtml(
-              horaCorta(
-                bloque?.horaFin ||
-                  '',
-              ),
-            )}"
-            required
-          >
+          ${renderizarControlHoraCompacto(
+            'disponibilidadAulaFin',
+            bloque?.horaFin || '',
+          )}
         </label>
 
       `,
@@ -9093,6 +9760,8 @@ function abrirFormularioBloqueAula(
 
     });
 
+
+  inicializarControlesHorario(content);
 
   dialog.showModal();
 
@@ -10039,11 +10708,9 @@ function renderizarBusquedaAulasDisponibles() {
             Hora inicio
           </span>
 
-          <input
-            id="buscarAulaHoraInicio"
-            type="time"
-            required
-          >
+          ${renderizarControlHoraCompacto(
+            'buscarAulaHoraInicio',
+          )}
 
         </label>
 
@@ -10054,11 +10721,9 @@ function renderizarBusquedaAulasDisponibles() {
             Hora fin
           </span>
 
-          <input
-            id="buscarAulaHoraFin"
-            type="time"
-            required
-          >
+          ${renderizarControlHoraCompacto(
+            'buscarAulaHoraFin',
+          )}
 
         </label>
 
@@ -10275,6 +10940,9 @@ function renderizarBusquedaAulasDisponibles() {
     </section>
 
   `;
+
+
+  inicializarControlesHorario(vista);
 
 
   document
@@ -11167,6 +11835,7 @@ async function evaluarAulaDisponible(
 
 export function iniciarAulasPage() {
   instanciaActual += 1;
+  paginaAulasActual = 1;
 
   const instancia =
     instanciaActual;
