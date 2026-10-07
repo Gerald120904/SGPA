@@ -246,9 +246,13 @@ export class EstudiantesService {
     const asignatura = await this.planAsignaturaRepository.findOne({
       where: { id: dto.planAsignaturaId },
     });
-    if (!asignatura || asignatura.planEstudioId !== estudiante.planEstudioId) {
+    if (
+      !asignatura ||
+      !asignatura.activo ||
+      asignatura.planEstudioId !== estudiante.planEstudioId
+    ) {
       throw new BadRequestException(
-        'La asignatura no pertenece al plan actual del estudiante.',
+        'La asignatura no existe, está inactiva o no pertenece al plan actual del estudiante.',
       );
     }
     const periodo = await this.periodoRepository.findOne({
@@ -367,13 +371,28 @@ export class EstudiantesService {
       relations: { planAsignatura: true, periodo: true },
       order: { createdAt: 'ASC' },
     });
+    const historialHastaReferencia = historial.filter((item) => {
+      if (item.periodoId == null) {
+        // Aprobaciones importadas desde Excel o Google Forms
+        // no poseen período y se consideran antecedentes previos.
+        return true;
+      }
+      if (!item.periodo) {
+        return false;
+      }
+      return (
+        item.periodo.anio < periodoReferencia.anio ||
+        (item.periodo.anio === periodoReferencia.anio &&
+          item.periodo.ciclo <= periodoReferencia.ciclo)
+      );
+    });
     const aprobadasIds = new Set(
-      historial
+      historialHastaReferencia
         .filter((item) => item.resultado === ResultadoAcademico.APROBADO)
         .map((item) => item.planAsignaturaId),
     );
     const cursosAprobadosIds = new Set(
-      historial
+      historialHastaReferencia
         .filter(
           (item) =>
             item.resultado === ResultadoAcademico.APROBADO &&
@@ -382,12 +401,12 @@ export class EstudiantesService {
         .map((item) => item.planAsignatura.cursoId!),
     );
     const reprobadasIds = new Set(
-      historial
+      historialHastaReferencia
         .filter((item) => item.resultado === ResultadoAcademico.REPROBADO)
         .map((item) => item.planAsignaturaId),
     );
     const cursosReprobadosIds = new Set(
-      historial
+      historialHastaReferencia
         .filter(
           (item) =>
             item.resultado === ResultadoAcademico.REPROBADO &&
@@ -456,6 +475,7 @@ export class EstudiantesService {
       resumen: {
         totalPlan: asignaturas.length,
         aprobadas: aprobadas.length,
+        reprobadas: reprobadas.length,
         pendientes: pendientes.length,
         rezagadas: rezagadas.length,
       },

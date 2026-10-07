@@ -198,20 +198,16 @@ function obtenerTonoEstadoEstudiante(
   }
 }
 
-function obtenerTonoEstadoSolicitud(
-  estado
-) {
+function obtenerTonoEstadoSolicitud(estado) {
   switch (estado) {
-    case 'ACEPTADA':
-    case 'PROCESADA':
+    case 'PROCESADO':
       return 'success';
-
-    case 'RECHAZADA':
+    case 'RECHAZADO':
+    case 'ERROR':
       return 'danger';
-
     case 'PENDIENTE':
+    case 'REQUIERE_REVISION':
       return 'warning';
-
     default:
       return 'neutral';
   }
@@ -342,6 +338,25 @@ function obtenerTextoPeriodo(periodo) {
   );
 }
 
+function esPeriodoIgualOPosterior(periodo, periodoIngreso) {
+  if (
+    !periodo ||
+    !periodoIngreso ||
+    periodo.anio == null ||
+    periodo.ciclo == null ||
+    periodoIngreso.anio == null ||
+    periodoIngreso.ciclo == null
+  ) {
+    return true;
+  }
+
+  return (
+    periodo.anio > periodoIngreso.anio ||
+    (periodo.anio === periodoIngreso.anio &&
+      periodo.ciclo >= periodoIngreso.ciclo)
+  );
+}
+
 function obtenerTextoPlan(plan) {
   if (!plan) {
     return '—';
@@ -369,9 +384,19 @@ function obtenerNombreResponsable(usuario) {
     return '—';
   }
 
+  const nombreDesdePartes = [
+    usuario.nombres,
+    usuario.apellido1,
+    usuario.apellido2
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
   return (
     usuario.nombreCompleto ||
     usuario.nombre ||
+    nombreDesdePartes ||
     usuario.correo ||
     usuario.email ||
     '—'
@@ -817,10 +842,9 @@ function renderizarProgresoEstudiante(
   const resumen =
     progreso?.resumen ?? {};
 
-  const reprobadas =
-    Array.isArray(
-      progreso?.reprobadas
-    )
+  const reprobadas = Number.isFinite(Number(resumen.reprobadas))
+    ? Number(resumen.reprobadas)
+    : Array.isArray(progreso?.reprobadas)
       ? progreso.reprobadas.length
       : 0;
 
@@ -2883,8 +2907,9 @@ async function abrirCambiarPlanEstudiante(
               estudiante.planEstudioId
         );
 
-    const periodos =
-      resultadoPeriodos.periodos ?? [];
+    const periodos = (resultadoPeriodos.periodos ?? []).filter((periodo) =>
+      esPeriodoIgualOPosterior(periodo, estudiante.periodoIngreso)
+    );
 
     const dialog =
       document.getElementById(
@@ -3193,12 +3218,13 @@ async function abrirExpedienteEstudiante(
           )
         : [];
 
-    const periodos =
-      Array.isArray(
-        resultadoPeriodos.periodos
-      )
+    const periodos = (
+      Array.isArray(resultadoPeriodos.periodos)
         ? resultadoPeriodos.periodos
-        : [];
+        : []
+    ).filter((periodo) =>
+      esPeriodoIgualOPosterior(periodo, estudiante.periodoIngreso)
+    );
 
     content.innerHTML =
       FormDialog({
@@ -3465,12 +3491,13 @@ async function abrirRegistrarResultadoAcademico(
             )
         : [];
 
-    const periodos =
-      Array.isArray(
-        resultadoPeriodos.periodos
-      )
+    const periodos = (
+      Array.isArray(resultadoPeriodos.periodos)
         ? resultadoPeriodos.periodos
-        : [];
+        : []
+    ).filter((periodo) =>
+      esPeriodoIgualOPosterior(periodo, estudiante.periodoIngreso)
+    );
 
     content.innerHTML =
       FormDialog({
@@ -3645,7 +3672,7 @@ async function abrirRegistrarResultadoAcademico(
             <textarea
               id="resultadoObservaciones"
               rows="3"
-              maxlength="500"
+              maxlength="1000"
               placeholder="Opcional"
             ></textarea>
           </label>
@@ -3894,48 +3921,39 @@ function obtenerResumenImportacion(
   };
 }
 
-function obtenerDetalleFilaImportacion(
-  fila
-) {
-  if (fila.mensaje) {
-    return fila.mensaje;
+function obtenerDetalleFilaImportacion(fila) {
+  if (Array.isArray(fila.errores) && fila.errores.length > 0) {
+    return fila.errores.join(' · ');
   }
 
-  if (fila.error) {
-    return fila.error;
-  }
+  const detalles = [];
 
-  if (fila.detalle) {
-    return fila.detalle;
-  }
-
-  if (
-    Array.isArray(
-      fila.errores
-    ) &&
-    fila.errores.length > 0
-  ) {
-    return fila.errores.join(', ');
+  if (Array.isArray(fila.cambiosDatos) && fila.cambiosDatos.length > 0) {
+    detalles.push(
+      ...fila.cambiosDatos.map((cambio) => {
+        const actual = cambio.actual ?? '—';
+        const nuevo = cambio.nuevo ?? '—';
+        return `${cambio.campo}: ${actual} → ${nuevo}`;
+      })
+    );
   }
 
   if (
-    Array.isArray(
-      fila.cambios
-    )
+    Array.isArray(fila.aprobacionesNuevas) &&
+    fila.aprobacionesNuevas.length > 0
   ) {
-    return fila.cambios.join(', ');
+    detalles.push(
+      `Aprobaciones nuevas: ${fila.aprobacionesNuevas
+        .map((item) => item.codigo || `Asignatura #${item.planAsignaturaId}`)
+        .join(', ')}`
+    );
   }
 
-  if (
-    fila.cambios &&
-    typeof fila.cambios === 'object'
-  ) {
-    return Object.keys(
-      fila.cambios
-    ).join(', ');
+  if (detalles.length > 0) {
+    return detalles.join(' · ');
   }
 
-  return '—';
+  return 'Sin cambios adicionales';
 }
 
 function renderizarPreviewImportacionEstudiantes(
@@ -4100,13 +4118,30 @@ function renderizarPreviewImportacionEstudiantes(
 
     ${tablaFilas}
 
+    ${
+      tieneErrores
+        ? `
+      <p class="sgpa-field-help">
+        ${resumen.errores} fila${
+            resumen.errores === 1 ? '' : 's'
+          } contiene${
+            resumen.errores === 1 ? '' : 'n'
+          } errores y será${
+            resumen.errores === 1 ? '' : 'n'
+          } omitida${
+            resumen.errores === 1 ? '' : 's'
+          }. Las filas válidas sí pueden importarse.
+      </p>
+    `
+        : ''
+    }
+
     <div class="sgpa-inline-actions">
       <button
         id="ejecutarImportacionEstudiantesButton"
         type="button"
         class="sgpa-form-primary"
         ${
-          tieneErrores ||
           !tieneCambios
             ? 'disabled'
             : ''
@@ -4137,7 +4172,12 @@ function renderizarPreviewImportacionEstudiantes(
               'Confirmar importación',
 
             mensaje:
-              `Se crearán ${resumen.creados} estudiantes y se actualizarán ${resumen.actualizados}. Los registros sin cambios se conservarán.`,
+              `Se crearán ${resumen.creados} estudiantes, ` +
+              `se actualizarán ${resumen.actualizados} y ` +
+              `${resumen.sinCambios} se conservarán sin cambios.` +
+              (resumen.errores > 0
+                ? ` ${resumen.errores} fila(s) con errores serán omitidas.`
+                : ''),
 
             textoConfirmar:
               'Importar estudiantes',
@@ -4203,8 +4243,9 @@ function renderizarPreviewImportacionEstudiantes(
 
             mensaje:
               `${resumenFinal.creados} estudiantes creados, ` +
-              `${resumenFinal.actualizados} actualizados y ` +
-              `${resumenFinal.sinCambios} sin cambios.`
+              `${resumenFinal.actualizados} actualizados, ` +
+              `${resumenFinal.sinCambios} sin cambios y ` +
+              `${resumenFinal.errores} omitidos por errores.`
           });
 
           await cargarEstudiantes(

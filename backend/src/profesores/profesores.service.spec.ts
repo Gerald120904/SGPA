@@ -52,6 +52,7 @@ describe('ProfesoresService', () => {
 
   let profesorCarreraRepository: {
     find: jest.Mock;
+    findOne: jest.Mock;
     delete: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
@@ -194,6 +195,10 @@ describe('ProfesoresService', () => {
 
     profesorCarreraRepository = {
       find: jest.fn().mockResolvedValue([]),
+      findOne: jest.fn().mockResolvedValue({
+        profesorUsuarioId: 10,
+        carreraId: 1,
+      }),
       delete: jest.fn(),
       create: jest.fn((valor) => valor),
       save: jest.fn(),
@@ -529,10 +534,22 @@ describe('ProfesoresService', () => {
       profesorPendiente,
     ]);
 
-    profesorCarreraRepository.find.mockResolvedValue([]);
+    profesorCarreraRepository.find.mockImplementation(async ({ where }) => {
+      if (where.profesorUsuarioId === 10) {
+        return [
+          {
+            profesorUsuarioId: 10,
+            carreraId: 1,
+            carrera,
+          },
+        ];
+      }
+      return [];
+    });
 
     const perfilSeguridad = {
       id: 1,
+      carreraId: 1,
       codigo: 'INF-SEG',
       nombre: 'Seguridad Informática',
       activo: true,
@@ -835,6 +852,7 @@ describe('ProfesoresService', () => {
             estado: EstadoPerfilProfesor.APROBADO,
             perfilAcademico: {
               id: 1,
+              carreraId: 1,
               codigo: 'INF-SEG',
               nombre: 'Seguridad Informática',
               activo: true,
@@ -860,6 +878,7 @@ describe('ProfesoresService', () => {
         },
         perfilAcademico: {
           id: 1,
+          carreraId: 1,
           codigo: 'INF-SEG',
           nombre: 'Seguridad Informática',
           activo: true,
@@ -1105,6 +1124,24 @@ describe('ProfesoresService', () => {
       await expect(
         service.solicitarPerfilMiPerfil(10, { perfilAcademicoId: 1 }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('impide solicitar un perfil académico de una carrera no asignada al profesor', async () => {
+      usuarioRepository.findOne.mockResolvedValue(crearProfesor());
+
+      perfilRepository.findOne.mockResolvedValue(perfilSeguridad);
+
+      profesorCarreraRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.solicitarPerfilMiPerfil(10, {
+          perfilAcademicoId: 1,
+        }),
+      ).rejects.toThrow(
+        'No puede solicitar un perfil académico de una carrera que no tiene asignada.',
+      );
+
+      expect(profesorPerfilRepository.findOne).not.toHaveBeenCalled();
     });
 
     it('rechaza aprobar perfil a un profesor inactivo', async () => {
@@ -1523,10 +1560,18 @@ describe('ProfesoresService', () => {
   describe('ELEGIBILIDAD', () => {
     beforeEach(() => {
       usuarioRepository.findOne.mockResolvedValue(crearProfesor());
+      profesorCarreraRepository.find.mockResolvedValue([
+        {
+          profesorUsuarioId: 10,
+          carreraId: 1,
+          carrera,
+        },
+      ]);
     });
 
     const perfilSeguridad = {
       id: 1,
+      carreraId: 1,
       codigo: 'INF-SEG',
       nombre: 'Seguridad Informática',
       activo: true,
@@ -1534,6 +1579,7 @@ describe('ProfesoresService', () => {
 
     const perfilMatematica = {
       id: 3,
+      carreraId: 1,
       codigo: 'INF-MAT',
       nombre: 'Matemática para Informática',
       activo: true,
@@ -1590,6 +1636,7 @@ describe('ProfesoresService', () => {
     it('profesor con DATOS no es elegible para curso SEGURIDAD', async () => {
       const perfilDatos = {
         id: 2,
+        carreraId: 1,
         codigo: 'INF-DAT',
         nombre: 'Datos',
         activo: true,
@@ -1657,6 +1704,36 @@ describe('ProfesoresService', () => {
       expect(cursosHabilitados[0].habilitadoPor.map((h) => h.perfilId)).toEqual(
         expect.arrayContaining([1, 3]),
       );
+    });
+
+    it('no habilita cursos de un perfil aprobado si su carrera ya no está asignada al profesor', async () => {
+      profesorPerfilRepository.find.mockResolvedValue([
+        {
+          id: 100,
+          profesorUsuarioId: 10,
+          perfilAcademicoId: 1,
+          estado: EstadoPerfilProfesor.APROBADO,
+          perfilAcademico: perfilSeguridad,
+        },
+      ]);
+
+      profesorCarreraRepository.find.mockResolvedValue([]);
+
+      cursoPerfilRepository.find.mockResolvedValue([
+        {
+          id: 1,
+          perfilAcademicoId: 1,
+          cursoId: 50,
+          activo: true,
+          curso: cursoSeguridad,
+          perfilAcademico: perfilSeguridad,
+        },
+      ]);
+
+      const resultado = await service.listarCursosHabilitadosMiPerfil(10);
+
+      expect(resultado).toEqual([]);
+      expect(cursoPerfilRepository.find).not.toHaveBeenCalled();
     });
   });
 
@@ -1774,6 +1851,33 @@ describe('ProfesoresService', () => {
 
       const resultado = await service.actualizarAtestadoMiPerfil(10, 1, {
         nombre: 'Maestría en Computación',
+      });
+
+      expect(resultado.estado).toBe(EstadoAtestadoProfesor.PENDIENTE);
+      expect(resultado.revisadoPorUsuarioId).toBeNull();
+      expect(resultado.fechaRevision).toBeNull();
+      expect(resultado.observacionRevision).toBeNull();
+    });
+
+    it('editar atestado RECHAZADO vuelve automáticamente a PENDIENTE', async () => {
+      usuarioRepository.findOne.mockResolvedValue(crearProfesor());
+
+      atestadoRepository.findOne.mockResolvedValue({
+        id: 1,
+        profesorUsuarioId: 10,
+        tipo: TipoAtestadoProfesor.CERTIFICACION,
+        nombre: 'Certificación rechazada',
+        institucion: 'Institución',
+        estado: EstadoAtestadoProfesor.RECHAZADO,
+        revisadoPorUsuarioId: 2,
+        fechaRevision: new Date(),
+        observacionRevision: 'Documento incorrecto',
+      });
+
+      atestadoRepository.save.mockImplementation(async (datos) => datos);
+
+      const resultado = await service.actualizarAtestadoMiPerfil(10, 1, {
+        nombre: 'Certificación corregida',
       });
 
       expect(resultado.estado).toBe(EstadoAtestadoProfesor.PENDIENTE);

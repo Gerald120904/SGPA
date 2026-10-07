@@ -262,8 +262,24 @@ export class ProfesoresService {
       },
     });
 
+    const carrerasAsignadas = await this.profesorCarreraRepository.find({
+      where: {
+        profesorUsuarioId,
+      },
+    });
+
+    const carreraIdsAsignadas = new Set(
+      carrerasAsignadas.map((item) => item.carreraId),
+    );
+
+    if (!carreraIdsAsignadas.size) {
+      return [];
+    }
+
     const perfilesActivos = perfiles.filter(
-      (item) => item.perfilAcademico?.activo,
+      (item) =>
+        item.perfilAcademico?.activo === true &&
+        carreraIdsAsignadas.has(item.perfilAcademico.carreraId),
     );
 
     if (!perfilesActivos.length) {
@@ -818,6 +834,19 @@ export class ProfesoresService {
     if (!perfil.activo) {
       throw new BadRequestException(
         'No se puede solicitar un perfil académico inactivo.',
+      );
+    }
+
+    const carreraAsignada = await this.profesorCarreraRepository.findOne({
+      where: {
+        profesorUsuarioId: usuarioId,
+        carreraId: perfil.carreraId,
+      },
+    });
+
+    if (!carreraAsignada) {
+      throw new ForbiddenException(
+        'No puede solicitar un perfil académico de una carrera que no tiene asignada.',
       );
     }
 
@@ -1855,7 +1884,10 @@ export class ProfesoresService {
       atestado.descripcion = dto.descripcion?.trim() || null;
     }
 
-    if (atestado.estado === EstadoAtestadoProfesor.APROBADO) {
+    if (
+      atestado.estado === EstadoAtestadoProfesor.APROBADO ||
+      atestado.estado === EstadoAtestadoProfesor.RECHAZADO
+    ) {
       atestado.estado = EstadoAtestadoProfesor.PENDIENTE;
       atestado.revisadoPorUsuarioId = null;
       atestado.fechaRevision = null;

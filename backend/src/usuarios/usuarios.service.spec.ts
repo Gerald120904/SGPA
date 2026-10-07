@@ -30,6 +30,13 @@ describe('UsuariosService', () => {
     activo: true,
   } as Rol;
 
+  const rolProfesor = {
+    id: 3,
+    nombre: RolSistema.PROFESOR,
+    descripcion: 'Profesor',
+    activo: true,
+  } as Rol;
+
   const rolEstudiante = {
     id: 4,
     nombre: RolSistema.ASISTENTE_ESTUDIANTIL,
@@ -99,6 +106,7 @@ describe('UsuariosService', () => {
   let txUsuarioRolRepository: {
     create: jest.Mock;
     save: jest.Mock;
+    delete: jest.Mock;
   };
   let txUsuarioPermisoRepository: {
     create: jest.Mock;
@@ -146,6 +154,7 @@ describe('UsuariosService', () => {
     txUsuarioRolRepository = {
       create: jest.fn((datos) => datos),
       save: jest.fn(),
+      delete: jest.fn(),
     };
     txUsuarioPermisoRepository = {
       create: jest.fn((datos) => datos),
@@ -185,7 +194,6 @@ describe('UsuariosService', () => {
     );
   });
 
-
   it('lista usuarios con roles identificables y sin campos sensibles', async () => {
     usuarioRepository.find.mockResolvedValue([
       crearUsuario({
@@ -219,6 +227,25 @@ describe('UsuariosService', () => {
     expect(resultado[0]).not.toHaveProperty('passwordHash');
     expect(resultado[0]).not.toHaveProperty('passwordResetTokenHash');
     expect(resultado[0]).not.toHaveProperty('passwordResetExpiresAt');
+  });
+
+  it('buscarPorId carga roles y carreras docentes', async () => {
+    usuarioRepository.findOne.mockResolvedValue(crearUsuario());
+
+    await service.buscarPorId(1);
+
+    expect(usuarioRepository.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        relations: {
+          usuarioRoles: {
+            rol: true,
+          },
+          profesorCarreras: {
+            carrera: true,
+          },
+        },
+      }),
+    );
   });
 
   it('crea usuario y roles en una transacción con password cifrado', async () => {
@@ -256,6 +283,26 @@ describe('UsuariosService', () => {
     ).resolves.toBe(true);
     expect(usuarioGuardado.correo).toBe('admin@sgpa.local');
     expect(resultado).not.toHaveProperty('passwordHash');
+  });
+
+  it('rechaza crear carreras docentes sin incluir el rol PROFESOR', async () => {
+    usuarioRepository.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.crear({
+        cedula: '888888888',
+        nombres: 'Coordinador',
+        apellido1: 'Sin Profesor',
+        correo: 'coordinador.sin.profesor@sgpa.local',
+        password: 'ClaveSegura123',
+        roles: [RolSistema.COORDINADOR],
+        carreraIds: [10],
+      }),
+    ).rejects.toThrow(
+      'Solo un usuario con rol PROFESOR puede tener carreras docentes asociadas.',
+    );
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
   it('crea ASISTENTE_ESTUDIANTIL sin permisos personalizados y no guarda permisos', async () => {
@@ -308,7 +355,32 @@ describe('UsuariosService', () => {
     expect(permisosGuardados.length).toBeGreaterThan(0);
     expect(
       permisosGuardados.some(
-        (p: { permiso: PermisoSistema }) => p.permiso === PermisoSistema.PERIODOS_VER,
+        (p: { permiso: PermisoSistema }) =>
+          p.permiso === PermisoSistema.PERIODOS_VER,
+      ),
+    ).toBe(true);
+    expect(
+      permisosGuardados.some(
+        (p: { permiso: PermisoSistema }) =>
+          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_VER,
+      ),
+    ).toBe(true);
+    expect(
+      permisosGuardados.some(
+        (p: { permiso: PermisoSistema }) =>
+          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_CREAR,
+      ),
+    ).toBe(true);
+    expect(
+      permisosGuardados.some(
+        (p: { permiso: PermisoSistema }) =>
+          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
+      ),
+    ).toBe(true);
+    expect(
+      permisosGuardados.some(
+        (p: { permiso: PermisoSistema }) =>
+          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS,
       ),
     ).toBe(true);
   });
@@ -403,8 +475,16 @@ describe('UsuariosService', () => {
 
   it('actualiza las carreras asociadas a un usuario profesor', async () => {
     usuarioRepository.findOne
-      .mockResolvedValueOnce(crearUsuario())
-      .mockResolvedValueOnce(crearUsuario());
+      .mockResolvedValueOnce(
+        crearUsuario({
+          usuarioRoles: [{ rol: rolProfesor } as UsuarioRol],
+        }),
+      )
+      .mockResolvedValueOnce(
+        crearUsuario({
+          usuarioRoles: [{ rol: rolProfesor } as UsuarioRol],
+        }),
+      );
     carreraRepository.find.mockResolvedValue([
       { id: 10, activo: true },
       { id: 20, activo: true },
@@ -425,6 +505,27 @@ describe('UsuariosService', () => {
     ]);
   });
 
+  it('rechaza carreras docentes para un usuario sin rol PROFESOR', async () => {
+    usuarioRepository.findOne.mockResolvedValue(
+      crearUsuario({
+        usuarioRoles: [
+          {
+            rol: rolCoordinador,
+          } as UsuarioRol,
+        ],
+      }),
+    );
+
+    await expect(
+      service.actualizar(1, {
+        carreraIds: [10],
+      }),
+    ).rejects.toThrow(
+      'Solo un usuario con rol PROFESOR puede tener carreras docentes asociadas.',
+    );
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
 
   it('impide que el administrador desactive su propia cuenta', async () => {
     usuarioRepository.findOne.mockResolvedValue(crearUsuario());
@@ -462,12 +563,6 @@ describe('UsuariosService', () => {
   });
 
   it('asigna un rol oficial activo', async () => {
-    const rolProfesor = {
-      id: 3,
-      nombre: RolSistema.PROFESOR,
-      descripcion: 'Profesor',
-      activo: true,
-    } as Rol;
     usuarioRepository.findOne
       .mockResolvedValueOnce(crearUsuario({ id: 2 }))
       .mockResolvedValueOnce(
@@ -529,11 +624,47 @@ describe('UsuariosService', () => {
 
     const resultado = await service.revocarRol(2, 3, 1);
 
-    expect(usuarioRolRepository.delete).toHaveBeenCalledWith({
+    expect(txUsuarioRolRepository.delete).toHaveBeenCalledWith({
       usuarioId: 2,
       rolId: 3,
     });
+    expect(txProfesorCarreraRepository.delete).toHaveBeenCalledWith({
+      profesorUsuarioId: 2,
+    });
     expect(resultado.roles).toEqual([]);
+  });
+
+  it('al revocar PROFESOR elimina sus carreras docentes activas', async () => {
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(
+        crearUsuario({
+          id: 2,
+        }),
+      )
+      .mockResolvedValueOnce(
+        crearUsuario({
+          id: 2,
+          usuarioRoles: [],
+          profesorCarreras: [],
+        }),
+      );
+
+    usuarioRolRepository.findOne.mockResolvedValue({
+      usuarioId: 2,
+      rolId: 3,
+      rol: rolProfesor,
+    });
+
+    await service.revocarRol(2, 3, 1);
+
+    expect(txUsuarioRolRepository.delete).toHaveBeenCalledWith({
+      usuarioId: 2,
+      rolId: 3,
+    });
+
+    expect(txProfesorCarreraRepository.delete).toHaveBeenCalledWith({
+      profesorUsuarioId: 2,
+    });
   });
 
   it('devuelve 404 para un usuario inexistente', async () => {
