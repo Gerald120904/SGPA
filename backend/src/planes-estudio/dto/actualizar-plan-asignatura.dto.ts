@@ -27,13 +27,13 @@ export class ActualizarPlanAsignaturaDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(999)
+  @Max(200)
   orden?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
-  @Max(30)
+  @Min(1)
+  @Max(6)
   creditos?: number;
 
   @IsOptional()
@@ -98,6 +98,6 @@ export class ActualizarPlanAsignaturaDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(150)
+  @MaxLength(120)
   nombreReferencia?: string | null;
 }

@@ -797,74 +797,139 @@
   background: currentColor;
 }
 
-.plan-summary-detail {
-  min-width: min(720px, calc(100vw - 40px));
+.plan-summary-dialog {
+  width: 100%;
 }
-.plan-summary-detail-content {
+
+.sgpa-form-body .plan-summary-detail-content {
   display: grid;
-  gap: 20px;
-  padding: 20px 22px;
+  gap: 16px;
+  padding: 0;
 }
+
 .plan-summary-detail-section {
   display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.plan-summary-detail-heading {
+  display: flex;
+  align-items: flex-start;
   gap: 10px;
 }
-.plan-summary-detail-section h4 {
-  margin: 0;
-  color: #344054;
-  font-size: 12px;
+
+.plan-summary-detail-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(207, 32, 41, 0.08);
+  color: #cf2029;
 }
+
+.plan-summary-detail-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.plan-summary-detail-heading h4 {
+  margin: 1px 0 3px;
+  color: #1d2939;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.plan-summary-detail-heading p {
+  margin: 0;
+  color: #667085;
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
 .plan-summary-hours {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
+
 .plan-summary-hour {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 9px;
+  gap: 4px;
+  min-height: 58px;
+  padding: 10px 11px;
   border: 1px solid #eaecf0;
-  border-radius: 7px;
+  border-radius: 9px;
+  background: #fafbfc;
 }
+
 .plan-summary-hour span {
   color: #667085;
   font-size: 9px;
 }
+
 .plan-summary-hour strong {
   color: #344054;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 700;
 }
+
 .plan-summary-cycle-list {
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
+
 .plan-summary-cycle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 15px;
-  padding: 9px 10px;
+  min-height: 46px;
+  padding: 9px 11px;
   border: 1px solid #eaecf0;
-  border-radius: 7px;
+  border-radius: 9px;
+  background: #fafbfc;
 }
+
+.plan-summary-cycle > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
 .plan-summary-cycle strong {
   color: #344054;
   font-size: 10px;
+  font-weight: 700;
 }
+
 .plan-summary-cycle small {
   color: #98a2b3;
   font-size: 8px;
 }
+
 .plan-summary-cycle > span {
-  color: #475467;
+  color: #cf2029;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 @media (max-width: 700px) {
   .plan-summary-hours {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-summary-detail-section {
+    padding: 13px;
   }
 }
 

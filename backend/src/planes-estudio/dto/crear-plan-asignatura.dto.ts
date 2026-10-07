@@ -26,12 +26,12 @@ export class CrearPlanAsignaturaDto {
 
   @IsInt()
   @Min(1)
-  @Max(999)
+  @Max(200)
   orden!: number;
 
   @IsInt()
-  @Min(0)
-  @Max(30)
+  @Min(1)
+  @Max(6)
   creditos!: number;
 
   @IsOptional()
@@ -84,8 +84,9 @@ export class CrearPlanAsignaturaDto {
   @IsEnum(TipoPlanAsignatura)
   tipo!: TipoPlanAsignatura;
 
-  @ValidateIf((dto: CrearPlanAsignaturaDto) =>
-    dto.tipo === TipoPlanAsignatura.OPTATIVA,
+  @ValidateIf(
+    (dto: CrearPlanAsignaturaDto) =>
+      dto.tipo === TipoPlanAsignatura.OPTATIVA,
   )
   @IsEnum(TipoOptativa)
   tipoOptativa?: TipoOptativa;
@@ -97,6 +98,6 @@ export class CrearPlanAsignaturaDto {
 
   @IsString()
   @MinLength(1)
-  @MaxLength(150)
+  @MaxLength(120)
   nombreReferencia!: string;
 }
