@@ -227,6 +227,28 @@ describe('DisponibilidadProfesoresService', () => {
     expect(resultado.bloques).toEqual([]);
   });
 
+  it.each([
+    EstadoPeriodoAcademico.BORRADOR,
+    EstadoPeriodoAcademico.EN_CURSO,
+    EstadoPeriodoAcademico.CERRADO,
+    EstadoPeriodoAcademico.CANCELADO,
+  ])(
+    'devuelve BLOQUEADA sin disponibilidad cuando el periodo está %s',
+    async (estado) => {
+      const periodo = crearPeriodo({ estado });
+
+      periodoRepository.findOne.mockResolvedValue(periodo);
+      disponibilidadRepository.findOne.mockResolvedValue(null);
+
+      const resultado = await service.consultarMiDisponibilidad(10, 2);
+
+      expect(resultado.registrada).toBe(false);
+      expect(resultado.estado).toBe(EstadoDisponibilidad.BLOQUEADA);
+      expect(resultado.puedeEditar).toBe(false);
+      expect(resultado.bloques).toEqual([]);
+    },
+  );
+
   it('ordena los bloques de lunes a domingo y por hora de inicio', async () => {
     const periodo = crearPeriodo();
 
@@ -593,13 +615,13 @@ describe('DisponibilidadProfesoresService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('copia la disponibilidad del periodo inmediatamente anterior', async () => {
+  it('copia la disponibilidad del periodo inmediatamente anterior (Verano -> I Ciclo)', async () => {
     const origen = crearPeriodo({
       id: 1,
-      codigo: '2098-C2',
-      nombre: 'II Ciclo 2098',
+      codigo: '2098-C3',
+      nombre: 'Verano 2098',
       anio: 2098,
-      ciclo: 2,
+      ciclo: 3,
       estado: EstadoPeriodoAcademico.CERRADO,
     });
 
@@ -660,6 +682,109 @@ describe('DisponibilidadProfesoresService', () => {
     );
 
     expect(resultado.bloques).toHaveLength(1);
+  });
+
+  it('copia la disponibilidad del periodo inmediatamente anterior (II Ciclo -> Verano)', async () => {
+    const origen = crearPeriodo({
+      id: 1,
+      codigo: '2099-C2',
+      nombre: 'II Ciclo 2099',
+      anio: 2099,
+      ciclo: 2,
+      estado: EstadoPeriodoAcademico.CERRADO,
+    });
+
+    const destino = crearPeriodo({
+      id: 2,
+      codigo: '2099-C3',
+      nombre: 'Verano 2099',
+      anio: 2099,
+      ciclo: 3,
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(origen)
+      .mockResolvedValueOnce(destino)
+      .mockResolvedValueOnce(destino);
+
+    periodoRepository.find.mockResolvedValue([destino]);
+
+    const disponibilidadOrigen = crearDisponibilidad({
+      id: 40,
+      periodoAcademicoId: 1,
+      periodoAcademico: origen,
+      bloques: [
+        crearBloque({
+          disponibilidadId: 40,
+          dia: DiaSemana.JUEVES,
+          horaInicio: '10:00:00',
+          horaFin: '14:00:00',
+        }),
+      ],
+    });
+
+    const disponibilidadDestino = crearDisponibilidad({
+      periodoAcademicoId: 2,
+      periodoAcademico: destino,
+      bloques: [
+        crearBloque({
+          dia: DiaSemana.JUEVES,
+          horaInicio: '10:00:00',
+          horaFin: '14:00:00',
+        }),
+      ],
+    });
+
+    disponibilidadRepository.findOne
+      .mockResolvedValueOnce(disponibilidadOrigen)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(disponibilidadDestino);
+
+    const resultado = await service.copiarDisponibilidadAnterior(10, {
+      periodoOrigenId: 1,
+      periodoDestinoId: 2,
+    });
+
+    expect(txHistorialRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accion: 'COPIAR_PERIODO_ANTERIOR',
+      }),
+    );
+
+    expect(resultado.bloques).toHaveLength(1);
+  });
+
+  it('rechaza copiar desde II Ciclo del año anterior a I Ciclo directamente (debe ser desde Verano)', async () => {
+    const origen = crearPeriodo({
+      id: 1,
+      codigo: '2098-C2',
+      anio: 2098,
+      ciclo: 2,
+      estado: EstadoPeriodoAcademico.CERRADO,
+    });
+
+    const destino = crearPeriodo({
+      id: 2,
+      codigo: '2099-C1',
+      anio: 2099,
+      ciclo: 1,
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(origen)
+      .mockResolvedValueOnce(destino)
+      .mockResolvedValueOnce(destino);
+
+    periodoRepository.find.mockResolvedValue([destino]);
+
+    await expect(
+      service.copiarDisponibilidadAnterior(10, {
+        periodoOrigenId: 1,
+        periodoDestinoId: 2,
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
   it('rechaza copiar desde un periodo que no es el inmediatamente anterior', async () => {

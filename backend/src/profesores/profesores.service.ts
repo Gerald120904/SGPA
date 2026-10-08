@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { Curso } from '../cursos/entities/curso.entity';
@@ -17,7 +17,10 @@ import { EstadoPerfilProfesor } from '../perfiles-academicos/constants/estado-pe
 import { CursoPerfilAcademico } from '../perfiles-academicos/entities/curso-perfil-academico.entity';
 import { PerfilAcademico } from '../perfiles-academicos/entities/perfil-academico.entity';
 import { ProfesorPerfilAcademico } from '../perfiles-academicos/entities/profesor-perfil-academico.entity';
+import { RequisitoPerfilAcademico } from '../perfiles-academicos/entities/requisito-perfil-academico.entity';
+import { EstadoCumplimientoRequisito } from './constants/estado-cumplimiento-requisito.constant';
 import { EstadoAtestadoProfesor } from './constants/estado-atestado-profesor.constant';
+import { TipoAtestadoProfesor } from './constants/tipo-atestado-profesor.constant';
 import { EstadoDisponibilidad } from './constants/estado-disponibilidad.constant';
 import {
   AccionHistorialPerfilProfesor,
@@ -29,11 +32,15 @@ import { CambiarEstadoProyectoProfesorDto } from './dto/cambiar-estado-proyecto-
 import { CrearAtestadoProfesorDto } from './dto/crear-atestado-profesor.dto';
 import { CrearProyectoProfesorDto } from './dto/crear-proyecto-profesor.dto';
 import { FiltroProfesoresDto } from './dto/filtro-profesores.dto';
+import { GuardarEvidenciasRequisitoDto } from './dto/guardar-evidencias-requisito.dto';
 import { RevisarAtestadoProfesorDto } from './dto/revisar-atestado-profesor.dto';
 import { RevisarPerfilProfesorDto } from './dto/revisar-perfil-profesor.dto';
+import { RevisarRequisitoPerfilProfesorDto } from './dto/revisar-requisito-perfil-profesor.dto';
 import { SolicitarPerfilProfesorDto } from './dto/solicitar-perfil-profesor.dto';
 import { AtestadoProfesor } from './entities/atestado-profesor.entity';
+import { CumplimientoRequisitoProfesor } from './entities/cumplimiento-requisito-profesor.entity';
 import { DisponibilidadProfesor } from './entities/disponibilidad-profesor.entity';
+import { EvidenciaRequisitoProfesor } from './entities/evidencia-requisito-profesor.entity';
 import { HistorialPerfilProfesor } from './entities/historial-perfil-profesor.entity';
 import { ProfesorCarrera } from './entities/profesor-carrera.entity';
 import { ProyectoProfesor } from './entities/proyecto-profesor.entity';
@@ -65,6 +72,15 @@ export class ProfesoresService {
 
     @InjectRepository(AtestadoProfesor)
     private readonly atestadoRepository: Repository<AtestadoProfesor>,
+
+    @InjectRepository(RequisitoPerfilAcademico)
+    private readonly requisitoPerfilRepository: Repository<RequisitoPerfilAcademico>,
+
+    @InjectRepository(CumplimientoRequisitoProfesor)
+    private readonly cumplimientoRequisitoRepository: Repository<CumplimientoRequisitoProfesor>,
+
+    @InjectRepository(EvidenciaRequisitoProfesor)
+    private readonly evidenciaRequisitoRepository: Repository<EvidenciaRequisitoProfesor>,
 
     @InjectRepository(ProyectoProfesor)
     private readonly proyectoRepository: Repository<ProyectoProfesor>,
@@ -122,12 +138,12 @@ export class ProfesoresService {
     disponibilidad: DisponibilidadProfesor | undefined,
     periodo: PeriodoAcademico,
   ): EstadoDisponibilidad {
-    if (!disponibilidad) {
-      return EstadoDisponibilidad.PENDIENTE;
-    }
-
     if (periodo.estado !== EstadoPeriodoAcademico.EN_PREPARACION) {
       return EstadoDisponibilidad.BLOQUEADA;
+    }
+
+    if (!disponibilidad) {
+      return EstadoDisponibilidad.PENDIENTE;
     }
 
     return disponibilidad.estado;
@@ -246,8 +262,24 @@ export class ProfesoresService {
       },
     });
 
+    const carrerasAsignadas = await this.profesorCarreraRepository.find({
+      where: {
+        profesorUsuarioId,
+      },
+    });
+
+    const carreraIdsAsignadas = new Set(
+      carrerasAsignadas.map((item) => item.carreraId),
+    );
+
+    if (!carreraIdsAsignadas.size) {
+      return [];
+    }
+
     const perfilesActivos = perfiles.filter(
-      (item) => item.perfilAcademico?.activo,
+      (item) =>
+        item.perfilAcademico?.activo === true &&
+        carreraIdsAsignadas.has(item.perfilAcademico.carreraId),
     );
 
     if (!perfilesActivos.length) {
@@ -353,6 +385,8 @@ export class ProfesoresService {
       nombre: item.nombre,
       institucion: item.institucion,
       fechaObtencion: item.fechaObtencion,
+      fechaInicio: item.fechaInicio,
+      fechaFin: item.fechaFin,
       descripcion: item.descripcion,
       estado: item.estado,
       revisadoPorUsuarioId: item.revisadoPorUsuarioId,
@@ -711,7 +745,6 @@ export class ProfesoresService {
     }));
   }
 
-
   // --- Cursos Habilitados ---
 
   async listarCursosHabilitadosMiPerfil(usuarioId: number) {
@@ -728,6 +761,55 @@ export class ProfesoresService {
     const perfiles = await this.obtenerPerfilesProfesor(usuarioId);
 
     return perfiles.map((item) => this.mapearPerfilProfesor(item));
+  }
+
+  private async prepararCumplimientosSolicitud(
+    manager: EntityManager,
+    solicitudId: number,
+    perfilAcademicoId: number,
+    resetearEvaluacion: boolean,
+  ): Promise<CumplimientoRequisitoProfesor[]> {
+    const requisitoRepo = manager.getRepository(RequisitoPerfilAcademico);
+    const cumplimientoRepo = manager.getRepository(
+      CumplimientoRequisitoProfesor,
+    );
+    const requisitos = await requisitoRepo.find({
+      where: { perfilAcademicoId },
+      order: { orden: 'ASC', id: 'ASC' },
+    });
+    const existentes = await cumplimientoRepo.find({
+      where: { profesorPerfilAcademicoId: solicitudId },
+    });
+    const porRequisito = new Map(
+      existentes.map((item) => [item.requisitoPerfilAcademicoId, item]),
+    );
+    const cumplimientos = requisitos.map((requisito) => {
+      const existente = porRequisito.get(requisito.id);
+
+      if (existente) {
+        if (resetearEvaluacion) {
+          existente.estado = EstadoCumplimientoRequisito.PENDIENTE;
+          existente.observacionRevision = null;
+          existente.revisadoPorUsuarioId = null;
+          existente.fechaRevision = null;
+        }
+        return existente;
+      }
+
+      return cumplimientoRepo.create({
+        profesorPerfilAcademicoId: solicitudId,
+        requisitoPerfilAcademicoId: requisito.id,
+        estado: EstadoCumplimientoRequisito.PENDIENTE,
+        observacionProfesor: null,
+        observacionRevision: null,
+        revisadoPorUsuarioId: null,
+        fechaRevision: null,
+      });
+    });
+
+    return cumplimientos.length
+      ? cumplimientoRepo.save(cumplimientos)
+      : cumplimientos;
   }
 
   async solicitarPerfilMiPerfil(
@@ -752,6 +834,19 @@ export class ProfesoresService {
     if (!perfil.activo) {
       throw new BadRequestException(
         'No se puede solicitar un perfil académico inactivo.',
+      );
+    }
+
+    const carreraAsignada = await this.profesorCarreraRepository.findOne({
+      where: {
+        profesorUsuarioId: usuarioId,
+        carreraId: perfil.carreraId,
+      },
+    });
+
+    if (!carreraAsignada) {
+      throw new ForbiddenException(
+        'No puede solicitar un perfil académico de una carrera que no tiene asignada.',
       );
     }
 
@@ -790,6 +885,13 @@ export class ProfesoresService {
         existente.observacionRevision = null;
 
         await profesorPerfilRepo.save(existente);
+
+        await this.prepararCumplimientosSolicitud(
+          manager,
+          existente.id,
+          perfil.id,
+          true,
+        );
 
         await this.registrarHistorialPerfil(
           usuarioId,
@@ -844,6 +946,13 @@ export class ProfesoresService {
         });
 
         const solicitudGuardada = await profesorPerfilRepo.save(solicitud);
+
+        await this.prepararCumplimientosSolicitud(
+          manager,
+          solicitudGuardada.id,
+          perfil.id,
+          false,
+        );
 
         await this.registrarHistorialPerfil(
           usuarioId,
@@ -914,8 +1023,7 @@ export class ProfesoresService {
 
     const esAdmin = (usuario?.usuarioRoles ?? []).some(
       (relacion) =>
-        relacion.rol?.activo &&
-        relacion.rol.nombre === RolSistema.ADMIN_GLOBAL,
+        relacion.rol?.activo && relacion.rol.nombre === RolSistema.ADMIN_GLOBAL,
     );
 
     if (esAdmin) {
@@ -937,6 +1045,322 @@ export class ProfesoresService {
         'No posee autoridad académica sobre la carrera asociada a este perfil.',
       );
     }
+  }
+
+  async guardarEvidenciasRequisitoMiPerfil(
+    usuarioId: number,
+    perfilId: number,
+    requisitoId: number,
+    dto: GuardarEvidenciasRequisitoDto,
+  ) {
+    await this.validarProfesorParaAutogestion(usuarioId);
+
+    if (dto.requisitoId !== requisitoId) {
+      throw new BadRequestException(
+        'El requisito del cuerpo no coincide con el requisito de la ruta.',
+      );
+    }
+
+    const solicitud = await this.profesorPerfilRepository.findOne({
+      where: {
+        profesorUsuarioId: usuarioId,
+        perfilAcademicoId: perfilId,
+      },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException(
+        'Solicitud de perfil académico no encontrada.',
+      );
+    }
+
+    const requisito = await this.requisitoPerfilRepository.findOne({
+      where: { id: requisitoId, perfilAcademicoId: perfilId },
+    });
+
+    if (!requisito) {
+      throw new NotFoundException(
+        'El requisito no pertenece al perfil académico solicitado.',
+      );
+    }
+
+    const cumplimiento = await this.cumplimientoRequisitoRepository.findOne({
+      where: {
+        profesorPerfilAcademicoId: solicitud.id,
+        requisitoPerfilAcademicoId: requisito.id,
+      },
+    });
+
+    if (!cumplimiento) {
+      throw new NotFoundException(
+        'No existe el registro de cumplimiento para este requisito.',
+      );
+    }
+
+    const atestados = dto.atestadoIds.length
+      ? await this.atestadoRepository.find({
+          where: { id: In(dto.atestadoIds) },
+        })
+      : [];
+
+    if (atestados.length !== dto.atestadoIds.length) {
+      throw new NotFoundException('Uno o más atestados no existen.');
+    }
+
+    if (atestados.some((item) => item.profesorUsuarioId !== usuarioId)) {
+      throw new ForbiddenException(
+        'Solo puede asociar atestados pertenecientes a su perfil docente.',
+      );
+    }
+
+    if (
+      atestados.some((item) => item.estado === EstadoAtestadoProfesor.INACTIVO)
+    ) {
+      throw new BadRequestException(
+        'No se pueden asociar atestados inactivos como evidencia.',
+      );
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const cumplimientoRepo = manager.getRepository(
+        CumplimientoRequisitoProfesor,
+      );
+      const evidenciaRepo = manager.getRepository(EvidenciaRequisitoProfesor);
+      const profesorPerfilRepo = manager.getRepository(ProfesorPerfilAcademico);
+      const historialRepo = manager.getRepository(HistorialPerfilProfesor);
+
+      await evidenciaRepo.delete({
+        cumplimientoRequisitoId: cumplimiento.id,
+      });
+
+      if (atestados.length) {
+        await evidenciaRepo.save(
+          atestados.map((atestado) =>
+            evidenciaRepo.create({
+              cumplimientoRequisitoId: cumplimiento.id,
+              atestadoProfesorId: atestado.id,
+            }),
+          ),
+        );
+      }
+
+      cumplimiento.estado = EstadoCumplimientoRequisito.PENDIENTE;
+      cumplimiento.revisadoPorUsuarioId = null;
+      cumplimiento.fechaRevision = null;
+      cumplimiento.observacionRevision = null;
+      cumplimiento.observacionProfesor = dto.observacion?.trim() || null;
+      await cumplimientoRepo.save(cumplimiento);
+
+      if (
+        requisito.obligatorio &&
+        solicitud.estado === EstadoPerfilProfesor.APROBADO
+      ) {
+        const estadoAnterior = solicitud.estado;
+        solicitud.estado = EstadoPerfilProfesor.PENDIENTE;
+        solicitud.revisadoPorUsuarioId = null;
+        solicitud.fechaRevision = null;
+        solicitud.observacionRevision = null;
+        await profesorPerfilRepo.save(solicitud);
+
+        await this.registrarHistorialPerfil(
+          usuarioId,
+          usuarioId,
+          TipoHistorialPerfilProfesor.PERFIL_ACADEMICO,
+          AccionHistorialPerfilProfesor.INVALIDAR_PERFIL,
+          {
+            perfilAcademicoId: perfilId,
+            estado: estadoAnterior,
+          },
+          {
+            perfilAcademicoId: perfilId,
+            estado: EstadoPerfilProfesor.PENDIENTE,
+            motivo:
+              'Cambio o invalidación de evidencia asociada a un requisito obligatorio.',
+          },
+          null,
+          perfilId,
+          historialRepo,
+        );
+      }
+    });
+
+    const expediente = await this.obtenerExpedientePerfilProfesor(
+      usuarioId,
+      perfilId,
+      usuarioId,
+    );
+    return expediente.requisitos.find((item) => item.id === requisitoId);
+  }
+
+  async obtenerExpedientePerfilProfesor(
+    profesorId: number,
+    perfilId: number,
+    usuarioConsultaId: number,
+  ) {
+    const profesor =
+      profesorId === usuarioConsultaId
+        ? await this.validarProfesorParaAutogestion(profesorId)
+        : await this.obtenerProfesor(profesorId);
+
+    const solicitud = await this.profesorPerfilRepository.findOne({
+      where: {
+        profesorUsuarioId: profesorId,
+        perfilAcademicoId: perfilId,
+      },
+      relations: {
+        perfilAcademico: { carrera: true },
+      },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException(
+        'Solicitud de perfil académico no encontrada.',
+      );
+    }
+
+    if (profesorId !== usuarioConsultaId) {
+      await this.validarAlcanceSobrePerfilProfesor(
+        usuarioConsultaId,
+        solicitud.perfilAcademico?.carreraId ??
+          solicitud.perfilAcademico?.carrera?.id,
+      );
+    }
+
+    const [requisitos, cumplimientos, atestadosDisponibles] = await Promise.all(
+      [
+        this.requisitoPerfilRepository.find({
+          where: { perfilAcademicoId: perfilId },
+          order: { orden: 'ASC', id: 'ASC' },
+        }),
+        this.cumplimientoRequisitoRepository.find({
+          where: { profesorPerfilAcademicoId: solicitud.id },
+          relations: {
+            evidencias: { atestado: true },
+            revisadoPor: true,
+          },
+          order: { id: 'ASC', evidencias: { id: 'ASC' } },
+        }),
+        this.atestadoRepository.find({
+          where: { profesorUsuarioId: profesorId },
+          order: { createdAt: 'DESC' },
+        }),
+      ],
+    );
+    const cumplimientoPorRequisito = new Map(
+      cumplimientos.map((item) => [item.requisitoPerfilAcademicoId, item]),
+    );
+
+    return {
+      profesor: {
+        id: profesor.id,
+        nombre: [profesor.nombres, profesor.apellido1, profesor.apellido2]
+          .filter(Boolean)
+          .join(' '),
+      },
+      solicitud: {
+        id: solicitud.id,
+        estado: solicitud.estado,
+        observacionRevision: solicitud.observacionRevision,
+      },
+      perfil: {
+        id: solicitud.perfilAcademico.id,
+        codigo: solicitud.perfilAcademico.codigo,
+        nombre: solicitud.perfilAcademico.nombre,
+        numeroPerfil: solicitud.perfilAcademico.numeroPerfil,
+      },
+      requisitos: requisitos.map((requisito) => {
+        const cumplimiento = cumplimientoPorRequisito.get(requisito.id);
+        return {
+          id: requisito.id,
+          tipo: requisito.tipo,
+          obligatorio: requisito.obligatorio,
+          descripcion: requisito.descripcion,
+          orden: requisito.orden,
+          cumplimiento: cumplimiento
+            ? {
+                id: cumplimiento.id,
+                estado: cumplimiento.estado,
+                observacionProfesor: cumplimiento.observacionProfesor,
+                observacionRevision: cumplimiento.observacionRevision,
+                revisadoPorUsuarioId: cumplimiento.revisadoPorUsuarioId,
+                fechaRevision: cumplimiento.fechaRevision,
+              }
+            : null,
+          evidencias: (cumplimiento?.evidencias ?? []).map((evidencia) => ({
+            id: evidencia.atestado.id,
+            tipo: evidencia.atestado.tipo,
+            nombre: evidencia.atestado.nombre,
+            institucion: evidencia.atestado.institucion,
+            fechaObtencion: evidencia.atestado.fechaObtencion,
+            fechaInicio: evidencia.atestado.fechaInicio,
+            fechaFin: evidencia.atestado.fechaFin,
+            descripcion: evidencia.atestado.descripcion,
+            estado: evidencia.atestado.estado,
+          })),
+        };
+      }),
+      atestadosDisponibles: atestadosDisponibles
+        .filter((item) => item.estado !== EstadoAtestadoProfesor.INACTIVO)
+        .map((item) => this.mapearAtestadoProfesor(item)),
+    };
+  }
+
+  async revisarRequisitoPerfilProfesor(
+    profesorId: number,
+    perfilId: number,
+    requisitoId: number,
+    revisorUsuarioId: number,
+    dto: RevisarRequisitoPerfilProfesorDto,
+  ) {
+    await this.obtenerProfesor(profesorId);
+
+    const solicitud = await this.profesorPerfilRepository.findOne({
+      where: {
+        profesorUsuarioId: profesorId,
+        perfilAcademicoId: perfilId,
+      },
+      relations: { perfilAcademico: { carrera: true } },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException(
+        'Solicitud de perfil académico no encontrada.',
+      );
+    }
+
+    await this.validarAlcanceSobrePerfilProfesor(
+      revisorUsuarioId,
+      solicitud.perfilAcademico?.carreraId ??
+        solicitud.perfilAcademico?.carrera?.id,
+    );
+
+    const requisito = await this.requisitoPerfilRepository.findOne({
+      where: { id: requisitoId, perfilAcademicoId: perfilId },
+    });
+    if (!requisito) {
+      throw new NotFoundException(
+        'El requisito no pertenece al perfil académico solicitado.',
+      );
+    }
+
+    const cumplimiento = await this.cumplimientoRequisitoRepository.findOne({
+      where: {
+        profesorPerfilAcademicoId: solicitud.id,
+        requisitoPerfilAcademicoId: requisitoId,
+      },
+    });
+    if (!cumplimiento) {
+      throw new NotFoundException(
+        'No existe el registro de cumplimiento para este requisito.',
+      );
+    }
+
+    cumplimiento.estado = dto.estado;
+    cumplimiento.observacionRevision = dto.observacion?.trim() || null;
+    cumplimiento.revisadoPorUsuarioId = revisorUsuarioId;
+    cumplimiento.fechaRevision = new Date();
+
+    return this.cumplimientoRequisitoRepository.save(cumplimiento);
   }
 
   async revisarPerfilProfesor(
@@ -989,6 +1413,37 @@ export class ProfesoresService {
       if (!solicitud.perfilAcademico?.activo) {
         throw new BadRequestException(
           'No se puede aprobar un perfil académico que se encuentra inactivo.',
+        );
+      }
+
+      const [requisitosObligatorios, cumplimientos] = await Promise.all([
+        this.requisitoPerfilRepository.find({
+          where: {
+            perfilAcademicoId: perfilId,
+            obligatorio: true,
+          },
+        }),
+        this.cumplimientoRequisitoRepository.find({
+          where: {
+            profesorPerfilAcademicoId: solicitud.id,
+          },
+        }),
+      ]);
+      const estadoPorRequisito = new Map(
+        cumplimientos.map((item) => [
+          item.requisitoPerfilAcademicoId,
+          item.estado,
+        ]),
+      );
+      const requisitosObligatoriosCumplidos = requisitosObligatorios.every(
+        (requisito) =>
+          estadoPorRequisito.get(requisito.id) ===
+          EstadoCumplimientoRequisito.CUMPLE,
+      );
+
+      if (!requisitosObligatoriosCumplidos) {
+        throw new BadRequestException(
+          'No se puede aprobar el perfil académico porque existen requisitos obligatorios pendientes o incumplidos.',
         );
       }
     }
@@ -1206,6 +1661,121 @@ export class ProfesoresService {
 
   // --- Atestados del Profesor ---
 
+  private validarDatosAtestado(
+    tipo: TipoAtestadoProfesor,
+    fechaInicio?: string | null,
+    fechaFin?: string | null,
+  ): void {
+    const esExperiencia =
+      tipo === TipoAtestadoProfesor.EXPERIENCIA_DOCENTE ||
+      tipo === TipoAtestadoProfesor.EXPERIENCIA_PROFESIONAL;
+
+    if (esExperiencia && !fechaInicio) {
+      throw new BadRequestException(
+        'Las evidencias de experiencia deben indicar una fecha de inicio.',
+      );
+    }
+
+    if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
+      throw new BadRequestException(
+        'La fecha de fin no puede ser anterior a la fecha de inicio.',
+      );
+    }
+  }
+
+  private async invalidarCumplimientosPorAtestado(
+    atestadoId: number,
+    manager: EntityManager,
+    usuarioAccionId?: number,
+  ): Promise<void> {
+    const evidenciaRepo = manager.getRepository(EvidenciaRequisitoProfesor);
+    const cumplimientoRepo = manager.getRepository(
+      CumplimientoRequisitoProfesor,
+    );
+    const profesorPerfilRepo = manager.getRepository(ProfesorPerfilAcademico);
+    const historialRepo = manager.getRepository(HistorialPerfilProfesor);
+
+    const evidencias = await evidenciaRepo.find({
+      where: { atestadoProfesorId: atestadoId },
+    });
+
+    if (evidencias.length === 0) {
+      return;
+    }
+
+    const cumplimientoIds = [
+      ...new Set(evidencias.map((e) => e.cumplimientoRequisitoId)),
+    ];
+
+    const cumplimientos = await cumplimientoRepo.find({
+      where: { id: In(cumplimientoIds) },
+      relations: {
+        requisitoPerfilAcademico: true,
+        profesorPerfilAcademico: true,
+      },
+    });
+
+    for (const c of cumplimientos) {
+      c.estado = EstadoCumplimientoRequisito.PENDIENTE;
+      c.revisadoPorUsuarioId = null;
+      c.fechaRevision = null;
+      c.observacionRevision = null;
+      await cumplimientoRepo.save(c);
+    }
+
+    const perfilesAfectadosMap = new Map<
+      number,
+      { perfil: ProfesorPerfilAcademico; tieneObligatorio: boolean }
+    >();
+
+    for (const c of cumplimientos) {
+      if (c.profesorPerfilAcademico) {
+        const perfilSolicitudId = c.profesorPerfilAcademico.id;
+        const entry = perfilesAfectadosMap.get(perfilSolicitudId) || {
+          perfil: c.profesorPerfilAcademico,
+          tieneObligatorio: false,
+        };
+        if (c.requisitoPerfilAcademico?.obligatorio) {
+          entry.tieneObligatorio = true;
+        }
+        perfilesAfectadosMap.set(perfilSolicitudId, entry);
+      }
+    }
+
+    for (const { perfil, tieneObligatorio } of perfilesAfectadosMap.values()) {
+      if (tieneObligatorio && perfil.estado === EstadoPerfilProfesor.APROBADO) {
+        const estadoAnterior = perfil.estado;
+        perfil.estado = EstadoPerfilProfesor.PENDIENTE;
+        perfil.revisadoPorUsuarioId = null;
+        perfil.fechaRevision = null;
+        perfil.observacionRevision = null;
+        await profesorPerfilRepo.save(perfil);
+
+        const accionUserId = usuarioAccionId ?? perfil.profesorUsuarioId;
+
+        await this.registrarHistorialPerfil(
+          perfil.profesorUsuarioId,
+          accionUserId,
+          TipoHistorialPerfilProfesor.PERFIL_ACADEMICO,
+          AccionHistorialPerfilProfesor.INVALIDAR_PERFIL,
+          {
+            perfilAcademicoId: perfil.perfilAcademicoId,
+            estado: estadoAnterior,
+          },
+          {
+            perfilAcademicoId: perfil.perfilAcademicoId,
+            estado: EstadoPerfilProfesor.PENDIENTE,
+            motivo:
+              'Cambio o invalidación de evidencia asociada a un requisito obligatorio.',
+          },
+          null,
+          perfil.perfilAcademicoId,
+          historialRepo,
+        );
+      }
+    }
+  }
+
   async listarAtestadosMiPerfil(usuarioId: number) {
     await this.validarProfesorParaAutogestion(usuarioId);
     const atestados = await this.obtenerAtestadosProfesor(usuarioId);
@@ -1217,13 +1787,20 @@ export class ProfesoresService {
     dto: CrearAtestadoProfesorDto,
   ) {
     await this.validarProfesorParaAutogestion(usuarioId);
+    this.validarDatosAtestado(dto.tipo, dto.fechaInicio, dto.fechaFin);
+
+    const esExperiencia =
+      dto.tipo === TipoAtestadoProfesor.EXPERIENCIA_DOCENTE ||
+      dto.tipo === TipoAtestadoProfesor.EXPERIENCIA_PROFESIONAL;
 
     const atestado = this.atestadoRepository.create({
       profesorUsuarioId: usuarioId,
       tipo: dto.tipo,
       nombre: dto.nombre.trim(),
       institucion: dto.institucion.trim(),
-      fechaObtencion: dto.fechaObtencion || null,
+      fechaObtencion: esExperiencia ? null : dto.fechaObtencion || null,
+      fechaInicio: esExperiencia ? dto.fechaInicio || null : null,
+      fechaFin: esExperiencia ? dto.fechaFin || null : null,
       descripcion: dto.descripcion?.trim() || null,
       estado: EstadoAtestadoProfesor.PENDIENTE,
       revisadoPorUsuarioId: null,
@@ -1259,9 +1836,31 @@ export class ProfesoresService {
       );
     }
 
-    if (dto.tipo !== undefined) {
-      atestado.tipo = dto.tipo;
-    }
+    const tipoResultante = dto.tipo ?? atestado.tipo;
+    const fechaInicioResultante =
+      dto.fechaInicio !== undefined
+        ? dto.fechaInicio || null
+        : atestado.fechaInicio;
+    const fechaFinResultante =
+      dto.fechaFin !== undefined
+        ? dto.fechaFin || null
+        : atestado.fechaFin;
+    const fechaObtencionResultante =
+      dto.fechaObtencion !== undefined
+        ? dto.fechaObtencion || null
+        : atestado.fechaObtencion;
+
+    this.validarDatosAtestado(
+      tipoResultante,
+      fechaInicioResultante,
+      fechaFinResultante,
+    );
+
+    const esExperiencia =
+      tipoResultante === TipoAtestadoProfesor.EXPERIENCIA_DOCENTE ||
+      tipoResultante === TipoAtestadoProfesor.EXPERIENCIA_PROFESIONAL;
+
+    atestado.tipo = tipoResultante;
 
     if (dto.nombre !== undefined) {
       atestado.nombre = dto.nombre.trim();
@@ -1271,22 +1870,37 @@ export class ProfesoresService {
       atestado.institucion = dto.institucion.trim();
     }
 
-    if (dto.fechaObtencion !== undefined) {
-      atestado.fechaObtencion = dto.fechaObtencion || null;
+    if (esExperiencia) {
+      atestado.fechaObtencion = null;
+      atestado.fechaInicio = fechaInicioResultante;
+      atestado.fechaFin = fechaFinResultante;
+    } else {
+      atestado.fechaObtencion = fechaObtencionResultante;
+      atestado.fechaInicio = null;
+      atestado.fechaFin = null;
     }
 
     if (dto.descripcion !== undefined) {
       atestado.descripcion = dto.descripcion?.trim() || null;
     }
 
-    if (atestado.estado === EstadoAtestadoProfesor.APROBADO) {
+    if (
+      atestado.estado === EstadoAtestadoProfesor.APROBADO ||
+      atestado.estado === EstadoAtestadoProfesor.RECHAZADO
+    ) {
       atestado.estado = EstadoAtestadoProfesor.PENDIENTE;
       atestado.revisadoPorUsuarioId = null;
       atestado.fechaRevision = null;
       atestado.observacionRevision = null;
     }
 
-    const guardado = await this.atestadoRepository.save(atestado);
+    const guardado = await this.dataSource.transaction(async (manager) => {
+      const atestadoRepo = manager.getRepository(AtestadoProfesor);
+      const saved = await atestadoRepo.save(atestado);
+      await this.invalidarCumplimientosPorAtestado(atestado.id, manager, usuarioId);
+      return saved;
+    });
+
     return this.mapearAtestadoProfesor(guardado);
   }
 
@@ -1310,7 +1924,13 @@ export class ProfesoresService {
 
     atestado.estado = EstadoAtestadoProfesor.INACTIVO;
 
-    const guardado = await this.atestadoRepository.save(atestado);
+    const guardado = await this.dataSource.transaction(async (manager) => {
+      const atestadoRepo = manager.getRepository(AtestadoProfesor);
+      const saved = await atestadoRepo.save(atestado);
+      await this.invalidarCumplimientosPorAtestado(atestado.id, manager, usuarioId);
+      return saved;
+    });
+
     return this.mapearAtestadoProfesor(guardado);
   }
 
@@ -1383,7 +2003,19 @@ export class ProfesoresService {
     atestado.fechaRevision = new Date();
     atestado.observacionRevision = dto.observacion?.trim() || null;
 
-    const guardado = await this.atestadoRepository.save(atestado);
+    const guardado = await this.dataSource.transaction(async (manager) => {
+      const atestadoRepo = manager.getRepository(AtestadoProfesor);
+      const saved = await atestadoRepo.save(atestado);
+      if (dto.estado === EstadoAtestadoProfesor.RECHAZADO) {
+        await this.invalidarCumplimientosPorAtestado(
+          atestado.id,
+          manager,
+          revisorUsuarioId,
+        );
+      }
+      return saved;
+    });
+
     return this.mapearAtestadoProfesor(guardado);
   }
 

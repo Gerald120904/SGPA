@@ -5,12 +5,14 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { EstadoAtestadoProfesor } from '../constants/estado-atestado-profesor.constant';
 import { TipoAtestadoProfesor } from '../constants/tipo-atestado-profesor.constant';
+import { EvidenciaRequisitoProfesor } from './evidencia-requisito-profesor.entity';
 
 @Entity({ name: 'atestados_profesor' })
 @Index('IDX_atestados_profesor', ['profesorUsuarioId'])
@@ -52,6 +54,20 @@ export class AtestadoProfesor {
     nullable: true,
   })
   fechaObtencion!: string | null;
+
+  @Column({
+    name: 'fecha_inicio',
+    type: 'date',
+    nullable: true,
+  })
+  fechaInicio!: string | null;
+
+  @Column({
+    name: 'fecha_fin',
+    type: 'date',
+    nullable: true,
+  })
+  fechaFin!: string | null;
 
   @Column({
     type: 'varchar',
@@ -108,6 +124,12 @@ export class AtestadoProfesor {
     name: 'revisado_por_usuario_id',
   })
   revisadoPor!: Usuario | null;
+
+  @OneToMany(
+    () => EvidenciaRequisitoProfesor,
+    (evidencia) => evidencia.atestado,
+  )
+  evidenciasRequisitos!: EvidenciaRequisitoProfesor[];
 
   @CreateDateColumn({
     name: 'created_at',

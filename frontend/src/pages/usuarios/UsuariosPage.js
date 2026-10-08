@@ -206,14 +206,6 @@ const INFORMACION_PERMISOS = {
       'Permite evaluar y utilizar aulas dentro de procesos de asignación académica.',
   },
 
-  AULAS_CAMBIO_AUTORIZAR: {
-    nombre:
-      'Autorizar cambios de aula',
-
-    descripcion:
-      'Permite autorizar excepciones o cambios de aula cuando el proceso académico lo requiera.',
-  },
-
 };
 
 

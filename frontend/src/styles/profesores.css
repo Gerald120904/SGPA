@@ -806,3 +806,290 @@
   font-size: 13px;
 }
 
+/* =========================================================
+   EXPEDIENTE DE REQUISITOS DEL PERFIL
+   ========================================================= */
+
+.profesores-expediente {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px;
+}
+
+.profesores-expediente-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eaecf0;
+}
+
+.profesores-expediente-title-wrap h3 {
+  margin: 0 0 4px;
+  color: #1d2939;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.profesores-expediente-title-wrap p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.profesores-expediente-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.profesores-expediente-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #f0f4f8;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid #dde2ea;
+}
+
+.profesores-expediente-progress strong {
+  color: #027a48;
+}
+
+.profesores-requisitos-list {
+  display: grid;
+  gap: 14px;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.profesores-requisito-card {
+  padding: 16px;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.profesores-requisito-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profesores-requisito-header strong {
+  color: #1d2939;
+  font-size: 14px;
+}
+
+.profesores-requisito-header-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profesores-requisito-description {
+  margin: 0;
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.profesores-requisito-evidencias {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+}
+
+.profesores-requisito-evidencias > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #344054;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.profesores-evidencia-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #eaecf0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.profesores-evidencia-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profesores-evidencia-item-info strong {
+  color: #344054;
+  font-size: 13px;
+}
+
+.profesores-evidencia-item-info small {
+  color: #667085;
+  font-size: 12px;
+}
+
+.profesores-evidencias-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.profesores-obs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.profesores-obs-field span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475467;
+}
+
+.profesores-obs-field textarea {
+  min-height: 58px;
+  padding: 8px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  background: #ffffff;
+  color: #1d2939;
+}
+
+.profesores-obs-field textarea:focus {
+  border-color: #1570ef;
+  outline: 2px solid #d1e9ff;
+}
+
+.profesores-requisito-obs {
+  font-size: 12.5px;
+  color: #475467;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-left: 3px solid #98a2b3;
+  border-radius: 0 6px 6px 0;
+  line-height: 1.45;
+}
+
+.profesores-requisito-obs strong {
+  color: #344054;
+}
+
+.profesores-requisito-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.profesores-empty-evidencias {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px dashed #d0d5dd;
+  text-align: center;
+}
+
+.profesores-empty-evidencias p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.profesores-expediente-decision {
+  margin-top: 14px;
+  padding: 16px;
+  border-top: 1px solid #eaecf0;
+  background: #fcfcfd;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.profesores-decision-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profesores-decision-summary h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d2939;
+}
+
+.profesores-decision-summary p {
+  margin: 0;
+  font-size: 13px;
+  color: #475467;
+  font-weight: 500;
+}
+
+.profesores-decision-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+  color: #b54708;
+  font-size: 13px;
+}
+
+.profesores-decision-warning svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.profesores-decision-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.profesores-expediente-footer {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #eaecf0;
+  display: flex;
+  justify-content: flex-end;
+}

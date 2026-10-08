@@ -4,14 +4,17 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { Curso } from '../cursos/entities/curso.entity';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
-import { EstadoPerfilProfesor } from './constants/estado-perfil-profesor.constant';
+import { TipoAreaPerfil } from './constants/tipo-area-perfil.constant';
+import { TipoRequisitoPerfil } from './constants/tipo-requisito-perfil.constant';
+import { AreaPerfilAcademico } from './entities/area-perfil-academico.entity';
 import { CursoPerfilAcademico } from './entities/curso-perfil-academico.entity';
 import { PerfilAcademico } from './entities/perfil-academico.entity';
 import { ProfesorPerfilAcademico } from './entities/profesor-perfil-academico.entity';
+import { RequisitoPerfilAcademico } from './entities/requisito-perfil-academico.entity';
 import { PerfilesAcademicosService } from './perfiles-academicos.service';
 
 describe('PerfilesAcademicosService', () => {
@@ -35,6 +38,8 @@ describe('PerfilesAcademicosService', () => {
   let profesorPerfilRepository: {
     count: jest.Mock;
   };
+  let areaPerfilRepository: { find: jest.Mock };
+  let requisitoPerfilRepository: { find: jest.Mock };
   let carreraRepository: {
     findOne: jest.Mock;
   };
@@ -43,6 +48,14 @@ describe('PerfilesAcademicosService', () => {
   };
   let estructuraAcademicaService: {
     tieneAlcanceSobreCarrera: jest.Mock;
+  };
+  let dataSource: {
+    transaction: jest.Mock;
+  };
+  let transactionalManager: {
+    delete: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
   };
 
   const carreraSistemas = {
@@ -79,8 +92,11 @@ describe('PerfilesAcademicosService', () => {
     };
 
     profesorPerfilRepository = {
-      count: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     };
+
+    areaPerfilRepository = { find: jest.fn() };
+    requisitoPerfilRepository = { find: jest.fn() };
 
     carreraRepository = {
       findOne: jest.fn(),
@@ -94,16 +110,159 @@ describe('PerfilesAcademicosService', () => {
       tieneAlcanceSobreCarrera: jest.fn().mockResolvedValue(true),
     };
 
+    transactionalManager = {
+      delete: jest.fn(),
+      create: jest.fn((_entidad, datos) => datos),
+      save: jest.fn(),
+    };
+    dataSource = {
+      transaction: jest.fn(async (callback) => callback(transactionalManager)),
+    };
+
     service = new PerfilesAcademicosService(
       perfilRepository as unknown as Repository<PerfilAcademico>,
       cursoPerfilRepository as unknown as Repository<CursoPerfilAcademico>,
       profesorPerfilRepository as unknown as Repository<ProfesorPerfilAcademico>,
+      areaPerfilRepository as unknown as Repository<AreaPerfilAcademico>,
+      requisitoPerfilRepository as unknown as Repository<RequisitoPerfilAcademico>,
       carreraRepository as unknown as Repository<Carrera>,
       cursoRepository as unknown as Repository<Curso>,
       estructuraAcademicaService as unknown as EstructuraAcademicaService,
+      dataSource as unknown as DataSource,
     );
 
     jest.clearAllMocks();
+  });
+
+  describe('ÁREAS Y REQUISITOS', () => {
+    const perfil = {
+      id: 10,
+      carreraId: 1,
+      codigo: 'PERF-BASE',
+      activo: true,
+    } as PerfilAcademico;
+
+    it('reemplaza todas las áreas dentro de una transacción', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
+      areaPerfilRepository.find.mockResolvedValue([
+        {
+          id: 1,
+          perfilAcademicoId: 10,
+          tipo: TipoAreaPerfil.DISCIPLINAR,
+          descripcion: 'Ingeniería de software',
+          orden: 1,
+        },
+      ]);
+
+      const resultado = await service.guardarAreas(
+        10,
+        {
+          areas: [
+            {
+              tipo: TipoAreaPerfil.DISCIPLINAR,
+              descripcion: '  Ingeniería de software  ',
+              orden: 1,
+            },
+          ],
+        },
+        1,
+        true,
+      );
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(transactionalManager.delete).toHaveBeenCalledWith(
+        AreaPerfilAcademico,
+        { perfilAcademicoId: 10 },
+      );
+      expect(transactionalManager.save).toHaveBeenCalledWith(
+        AreaPerfilAcademico,
+        [expect.objectContaining({ descripcion: 'Ingeniería de software' })],
+      );
+      expect(resultado).toHaveLength(1);
+    });
+
+    it('permite vaciar la configuración de requisitos', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
+      requisitoPerfilRepository.find.mockResolvedValue([]);
+
+      await expect(
+        service.guardarRequisitos(10, { requisitos: [] }, 1, true),
+      ).resolves.toEqual([]);
+
+      expect(transactionalManager.delete).toHaveBeenCalledWith(
+        RequisitoPerfilAcademico,
+        { perfilAcademicoId: 10 },
+      );
+      expect(transactionalManager.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza descripciones formadas solo por espacios', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
+
+      await expect(
+        service.guardarRequisitos(
+          10,
+          {
+            requisitos: [
+              {
+                tipo: TipoRequisitoPerfil.FORMACION_ACADEMICA,
+                obligatorio: true,
+                descripcion: '   ',
+                orden: 1,
+              },
+            ],
+          },
+          1,
+          true,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('no permite modificar áreas si el perfil ya fue solicitado por un profesor', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
+
+      profesorPerfilRepository.count.mockResolvedValue(1);
+
+      await expect(
+        service.guardarAreas(
+          10,
+          {
+            areas: [
+              {
+                tipo: TipoAreaPerfil.DISCIPLINAR,
+                descripcion: 'Ingeniería de software',
+                orden: 1,
+              },
+            ],
+          },
+          1,
+          true,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('no permite modificar requisitos si el perfil ya fue solicitado por un profesor', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
+
+      profesorPerfilRepository.count.mockResolvedValue(1);
+
+      await expect(
+        service.guardarRequisitos(
+          10,
+          {
+            requisitos: [],
+          },
+          1,
+          true,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
   });
 
   describe('PERFILES', () => {
@@ -219,25 +378,86 @@ describe('PerfilesAcademicosService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('no permite desactivar perfil si tiene profesores aprobados o cursos activos', async () => {
-      perfilRepository.findOne.mockResolvedValue({
-        id: 10,
-        carreraId: 1,
+    it('permite desactivar un perfil aunque tenga profesores o cursos históricos', async () => {
+      perfilRepository.findOne
+        .mockResolvedValueOnce({
+          id: 10,
+          carreraId: 1,
+          codigo: 'INF-SEG',
+          activo: true,
+        })
+        .mockResolvedValueOnce({
+          id: 10,
+          carreraId: 1,
+          codigo: 'INF-SEG',
+          activo: false,
+        });
+
+      const resultado = await service.cambiarEstado(10, false, 1, true);
+
+      expect(perfilRepository.update).toHaveBeenCalledWith(10, {
+        activo: false,
+      });
+
+      expect(resultado.activo).toBe(false);
+
+      expect(profesorPerfilRepository.count).not.toHaveBeenCalled();
+
+      expect(cursoPerfilRepository.count).not.toHaveBeenCalled();
+    });
+
+    it('permite reactivar un perfil inactivo', async () => {
+      perfilRepository.findOne
+        .mockResolvedValueOnce({
+          id: 10,
+          carreraId: 1,
+          codigo: 'INF-SEG',
+          activo: false,
+        })
+        .mockResolvedValueOnce({
+          id: 10,
+          carreraId: 1,
+          codigo: 'INF-SEG',
+          activo: true,
+        });
+
+      const resultado = await service.cambiarEstado(10, true, 1, true);
+
+      expect(perfilRepository.update).toHaveBeenCalledWith(10, {
         activo: true,
       });
-      profesorPerfilRepository.count.mockResolvedValue(2);
-      cursoPerfilRepository.count.mockResolvedValue(0);
 
-      await expect(
-        service.cambiarEstado(10, false, 1, true),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(resultado.activo).toBe(true);
+    });
+  });
 
+  describe('ESTADO DE ESTRUCTURA', () => {
+    const perfil = {
+      id: 10,
+      carreraId: 1,
+      codigo: 'PERF-BASE',
+      nombre: 'Perfil base',
+      activo: true,
+    } as PerfilAcademico;
+
+    it('indica que la estructura es editable si el perfil nunca fue utilizado', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
       profesorPerfilRepository.count.mockResolvedValue(0);
-      cursoPerfilRepository.count.mockResolvedValue(1);
 
-      await expect(
-        service.cambiarEstado(10, false, 1, true),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      const resultado = await service.obtenerDetallePorId(10);
+
+      expect(resultado.utilizado).toBe(false);
+      expect(resultado.estructuraEditable).toBe(true);
+    });
+
+    it('indica que la estructura está bloqueada si el perfil ya fue utilizado', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfil);
+      profesorPerfilRepository.count.mockResolvedValue(1);
+
+      const resultado = await service.obtenerDetallePorId(10);
+
+      expect(resultado.utilizado).toBe(true);
+      expect(resultado.estructuraEditable).toBe(false);
     });
   });
 
@@ -255,6 +475,7 @@ describe('PerfilesAcademicosService', () => {
       codigo: 'EIF472',
       nombre: 'Seguridad de Sistemas',
       activo: true,
+      carreras: [carreraSistemas],
     } as Curso;
 
     const cursoActivo2 = {
@@ -262,6 +483,7 @@ describe('PerfilesAcademicosService', () => {
       codigo: 'EIF203',
       nombre: 'Estructuras Discretas',
       activo: true,
+      carreras: [carreraSistemas],
     } as Curso;
 
     it('curso puede tener 1 perfil', async () => {
@@ -335,6 +557,50 @@ describe('PerfilesAcademicosService', () => {
       await expect(
         service.asociarCurso(10, 50, 1, true),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rechaza asociar un curso de otra carrera al perfil', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfilActivo);
+
+      cursoRepository.findOne.mockResolvedValue({
+        id: 60,
+        codigo: 'ADM101',
+        nombre: 'Administración General',
+        activo: true,
+        carreras: [carreraAdministracion],
+      } as Curso);
+
+      await expect(
+        service.asociarCurso(10, 60, 1, true),
+      ).rejects.toThrow(
+        'El curso seleccionado no pertenece a la carrera del perfil académico.',
+      );
+
+      expect(cursoPerfilRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('no permite asociar cursos si el perfil ya fue solicitado', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfilActivo);
+
+      profesorPerfilRepository.count.mockResolvedValue(1);
+
+      await expect(
+        service.asociarCurso(10, 50, 1, true),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(cursoRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('no permite desasociar cursos si el perfil ya fue solicitado', async () => {
+      perfilRepository.findOne.mockResolvedValue(perfilActivo);
+
+      profesorPerfilRepository.count.mockResolvedValue(1);
+
+      await expect(
+        service.desasociarCurso(10, 50, 1, true),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(cursoPerfilRepository.findOne).not.toHaveBeenCalled();
     });
   });
 

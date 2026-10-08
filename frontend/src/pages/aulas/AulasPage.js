@@ -504,7 +504,14 @@ const ORIGENES_AULA = {
 };
 
 
-const LIMITES_AULAS_POR_ORIGEN = {
+const LIMITES_REGISTRO_POR_ORIGEN = {
+  UNA: 25,
+  UNED: 3,
+  OTRO: 15,
+};
+
+
+const MAXIMOS_NUMERO_POR_ORIGEN = {
   UNA: 27,
   UNED: 3,
   OTRO: 15,
@@ -690,7 +697,7 @@ function obtenerLimiteOrigen(
   origen,
 ) {
   return (
-    LIMITES_AULAS_POR_ORIGEN[
+    LIMITES_REGISTRO_POR_ORIGEN[
       origen
     ] ?? null
   );
@@ -701,7 +708,7 @@ function obtenerMaximoNumeroOrigen(
   origen,
 ) {
   return (
-    LIMITES_AULAS_POR_ORIGEN[
+    MAXIMOS_NUMERO_POR_ORIGEN[
       origen
     ] ?? 1
   );
@@ -6342,6 +6349,11 @@ async function cambiarEstadoEquipamientoDelAula(
 function renderizarIndisponibilidades(
   indisponibilidades,
 ) {
+  const aulaActiva =
+    Boolean(
+      aulaDetalleActual?.activo,
+    );
+
   if (
     !indisponibilidades.length
   ) {
@@ -6462,39 +6474,48 @@ function renderizarIndisponibilidades(
                       class="aulas-actions"
                     >
 
-                      <button
-                        type="button"
-                        class="aulas-secondary-button"
-                        data-indisponibilidad-action="editar"
-                        data-indisponibilidad-id="${
-                          item.id
-                        }"
-                      >
-                        Editar
-                      </button>
+                      ${
+                        aulaActiva
+                          ? `
+                            <button
+                              type="button"
+                              class="aulas-secondary-button"
+                              data-indisponibilidad-action="editar"
+                              data-indisponibilidad-id="${item.id}"
+                            >
+                              Editar
+                            </button>
+                          `
+                          : ''
+                      }
 
 
-                      <button
-                        type="button"
-                        class="
-                          aulas-secondary-button
-                          ${
-                            item.activo
-                              ? 'is-danger'
-                              : 'is-success'
-                          }
-                        "
-                        data-indisponibilidad-action="estado"
-                        data-indisponibilidad-id="${
-                          item.id
-                        }"
-                      >
-                        ${
-                          item.activo
-                            ? 'Inactivar'
-                            : 'Reactivar'
-                        }
-                      </button>
+                      ${
+                        item.activo ||
+                        aulaActiva
+                          ? `
+                            <button
+                              type="button"
+                              class="
+                                aulas-secondary-button
+                                ${
+                                  item.activo
+                                    ? 'is-danger'
+                                    : 'is-success'
+                                }
+                              "
+                              data-indisponibilidad-action="estado"
+                              data-indisponibilidad-id="${item.id}"
+                            >
+                              ${
+                                item.activo
+                                  ? 'Inactivar'
+                                  : 'Reactivar'
+                              }
+                            </button>
+                          `
+                          : ''
+                      }
 
                     </div>
                   `
@@ -6992,6 +7013,11 @@ async function cambiarEstadoIndisponibilidad(
 function renderizarReservasAula(
   reservas,
 ) {
+  const aulaActiva =
+    Boolean(
+      aulaDetalleActual?.activo,
+    );
+
   if (!reservas.length) {
     return `
       <p class="aulas-muted">
@@ -7116,39 +7142,48 @@ function renderizarReservasAula(
                       class="aulas-actions"
                     >
 
-                      <button
-                        type="button"
-                        class="aulas-secondary-button"
-                        data-reserva-action="editar"
-                        data-reserva-id="${
-                          reserva.id
-                        }"
-                      >
-                        Editar
-                      </button>
+                      ${
+                        aulaActiva
+                          ? `
+                            <button
+                              type="button"
+                              class="aulas-secondary-button"
+                              data-reserva-action="editar"
+                              data-reserva-id="${reserva.id}"
+                            >
+                              Editar
+                            </button>
+                          `
+                          : ''
+                      }
 
 
-                      <button
-                        type="button"
-                        class="
-                          aulas-secondary-button
-                          ${
-                            reserva.activo
-                              ? 'is-danger'
-                              : 'is-success'
-                          }
-                        "
-                        data-reserva-action="estado"
-                        data-reserva-id="${
-                          reserva.id
-                        }"
-                      >
-                        ${
-                          reserva.activo
-                            ? 'Inactivar'
-                            : 'Reactivar'
-                        }
-                      </button>
+                      ${
+                        reserva.activo ||
+                        aulaActiva
+                          ? `
+                            <button
+                              type="button"
+                              class="
+                                aulas-secondary-button
+                                ${
+                                  reserva.activo
+                                    ? 'is-danger'
+                                    : 'is-success'
+                                }
+                              "
+                              data-reserva-action="estado"
+                              data-reserva-id="${reserva.id}"
+                            >
+                              ${
+                                reserva.activo
+                                  ? 'Inactivar'
+                                  : 'Reactivar'
+                              }
+                            </button>
+                          `
+                          : ''
+                      }
 
                     </div>
                   `
@@ -11778,13 +11813,18 @@ async function evaluarAulaDisponible(
 
     if (!evaluacion.apta) {
 
+      const mensaje =
+        evaluacion.motivo ===
+        'AULA_INACTIVA'
+          ? 'El aula se encuentra inactiva y no puede utilizarse para asignaciones.'
+          : 'El aula ya no está disponible o no cumple todos los requisitos indicados.';
+
       mostrarError({
 
         titulo:
           'Aula no apta',
 
-        mensaje:
-          'El aula ya no está disponible o no cumple todos los requisitos indicados.',
+        mensaje,
 
       });
 

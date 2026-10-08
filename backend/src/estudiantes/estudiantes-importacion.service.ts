@@ -79,7 +79,7 @@ export class EstudiantesImportacionService {
       carreraId: dto.carreraId,
       planEstudioId: dto.planEstudioId,
       resumen: this.resumir(filas),
-      filas: filas.map(({ datos: _datos, ...fila }) => fila),
+      filas,
     };
   }
 
@@ -159,7 +159,7 @@ export class EstudiantesImportacionService {
       aprobacionesNuevas,
       sinCambios: filas.filter((fila) => fila.accion === 'SIN_CAMBIOS').length,
       errores: filas.filter((fila) => fila.accion === 'ERROR').length,
-      filas: filas.map(({ datos: _datos, ...fila }) => fila),
+      filas,
     };
   }
 

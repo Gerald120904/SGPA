@@ -64,6 +64,10 @@ describe('PeriodosAcademicosService', () => {
 
     periodoRepository.find.mockResolvedValue(periodos);
 
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-01-20');
+
     const resultado = await service.listar();
 
     expect(periodoRepository.find).toHaveBeenCalledWith({
@@ -73,7 +77,104 @@ describe('PeriodosAcademicosService', () => {
       },
     });
 
-    expect(resultado).toEqual(periodos);
+    expect(resultado).toEqual(
+      periodos.map((periodo) => ({
+        ...periodo,
+        transicionesEstado: [
+          {
+            estado: EstadoPeriodoAcademico.EN_PREPARACION,
+            disponible: true,
+            motivo: null,
+          },
+          {
+            estado: EstadoPeriodoAcademico.CANCELADO,
+            disponible: true,
+            motivo: null,
+          },
+        ],
+      })),
+    );
+  });
+
+  it('informa que preparar está bloqueado cuando venció la fecha límite', async () => {
+    periodoRepository.find.mockResolvedValue([
+      crearPeriodo({ estado: EstadoPeriodoAcademico.BORRADOR }),
+    ]);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-01-21');
+
+    const [resultado] = await service.listar();
+
+    expect(resultado.transicionesEstado).toEqual([
+      {
+        estado: EstadoPeriodoAcademico.EN_PREPARACION,
+        disponible: false,
+        motivo: 'La fecha límite de disponibilidad docente ya venció.',
+      },
+      {
+        estado: EstadoPeriodoAcademico.CANCELADO,
+        disponible: true,
+        motivo: null,
+      },
+    ]);
+  });
+
+  it('informa que iniciar está bloqueado antes de la fecha de inicio', async () => {
+    periodoRepository.find.mockResolvedValue([
+      crearPeriodo({ estado: EstadoPeriodoAcademico.EN_PREPARACION }),
+    ]);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-02-14');
+
+    const [resultado] = await service.listar();
+
+    expect(resultado.transicionesEstado).toEqual([
+      {
+        estado: EstadoPeriodoAcademico.EN_CURSO,
+        disponible: false,
+        motivo: 'El periodo podrá iniciarse a partir del 2027-02-15.',
+      },
+      {
+        estado: EstadoPeriodoAcademico.CANCELADO,
+        disponible: true,
+        motivo: null,
+      },
+    ]);
+  });
+
+  it('informa que cerrar está bloqueado antes de la fecha de finalización', async () => {
+    periodoRepository.find.mockResolvedValue([
+      crearPeriodo({ estado: EstadoPeriodoAcademico.EN_CURSO }),
+    ]);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-06-24');
+
+    const [resultado] = await service.listar();
+
+    expect(resultado.transicionesEstado).toEqual([
+      {
+        estado: EstadoPeriodoAcademico.CERRADO,
+        disponible: false,
+        motivo: 'El periodo podrá cerrarse a partir del 2027-06-25.',
+      },
+    ]);
+  });
+
+  it.each([
+    EstadoPeriodoAcademico.CERRADO,
+    EstadoPeriodoAcademico.CANCELADO,
+  ])('no ofrece transiciones para un periodo %s', async (estado) => {
+    periodoRepository.find.mockResolvedValue([crearPeriodo({ estado })]);
+
+    const [resultado] = await service.listar();
+
+    expect(resultado.transicionesEstado).toEqual([]);
   });
 
   it('obtiene un periodo por id', async () => {
@@ -158,6 +259,42 @@ describe('PeriodosAcademicosService', () => {
     );
   });
 
+  it('genera correctamente el nombre y código para Verano (ciclo 3) con fechas que cruzan de año', async () => {
+    const guardado = crearPeriodo({
+      codigo: '2027-C3',
+      nombre: 'Verano 2027',
+      ciclo: 3,
+      fechaInicio: '2027-12-01',
+      fechaFin: '2028-02-05',
+      fechaLimiteDisponibilidad: '2027-11-15',
+    });
+
+    periodoRepository.findOne.mockResolvedValue(null);
+    periodoRepository.save.mockResolvedValue(guardado);
+
+    const resultado = await service.crear({
+      anio: 2027,
+      ciclo: 3,
+      fechaInicio: '2027-12-01',
+      fechaFin: '2028-02-05',
+      fechaLimiteDisponibilidad: '2027-11-15',
+    });
+
+    expect(periodoRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codigo: '2027-C3',
+        nombre: 'Verano 2027',
+        anio: 2027,
+        ciclo: 3,
+        fechaInicio: '2027-12-01',
+        fechaFin: '2028-02-05',
+        fechaLimiteDisponibilidad: '2027-11-15',
+      }),
+    );
+    expect(resultado.nombre).toBe('Verano 2027');
+    expect(resultado.codigo).toBe('2027-C3');
+  });
+
   it('convierte observaciones vacías en null', async () => {
     periodoRepository.findOne.mockResolvedValue(null);
     periodoRepository.save.mockResolvedValue(crearPeriodo());
@@ -189,7 +326,25 @@ describe('PeriodosAcademicosService', () => {
         fechaFin: '2027-06-25',
         fechaLimiteDisponibilidad: '2027-01-20',
       }),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow('Ya existe el I Ciclo del año 2027.');
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear un periodo Verano duplicado con mensaje correspondiente', async () => {
+    periodoRepository.findOne.mockResolvedValue(
+      crearPeriodo({ ciclo: 3, codigo: '2027-C3', nombre: 'Verano 2027' }),
+    );
+
+    await expect(
+      service.crear({
+        anio: 2027,
+        ciclo: 3,
+        fechaInicio: '2027-12-01',
+        fechaFin: '2028-02-05',
+        fechaLimiteDisponibilidad: '2027-11-15',
+      }),
+    ).rejects.toThrow('Ya existe el Verano del año 2027.');
 
     expect(periodoRepository.save).not.toHaveBeenCalled();
   });
@@ -312,6 +467,32 @@ describe('PeriodosAcademicosService', () => {
     expect(resultado.observaciones).toBe('Actualizado');
   });
 
+  it.each([
+    ['año', { anio: 2028 }],
+    ['ciclo', { ciclo: 2 }],
+    ['fecha de inicio', { fechaInicio: '2027-02-20' }],
+    ['fecha de finalización', { fechaFin: '2027-06-30' }],
+    [
+      'fecha límite de disponibilidad',
+      { fechaLimiteDisponibilidad: '2027-01-25' },
+    ],
+  ])(
+    'rechaza modificar %s cuando el periodo está EN_PREPARACION',
+    async (_campo, cambios) => {
+      const periodo = crearPeriodo({
+        estado: EstadoPeriodoAcademico.EN_PREPARACION,
+      });
+
+      periodoRepository.findOne.mockResolvedValue(periodo);
+
+      await expect(service.actualizar(1, cambios)).rejects.toThrow(
+        'Cuando el periodo académico está en preparación únicamente pueden modificarse las observaciones.',
+      );
+
+      expect(periodoRepository.save).not.toHaveBeenCalled();
+    },
+  );
+
   it('impide modificar un periodo en curso', async () => {
     periodoRepository.findOne.mockResolvedValue(
       crearPeriodo({ estado: EstadoPeriodoAcademico.EN_CURSO }),
@@ -358,6 +539,10 @@ describe('PeriodosAcademicosService', () => {
     periodoRepository.findOne.mockResolvedValue(periodo);
     periodoRepository.save.mockImplementation(async (entidad) => entidad);
 
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-01-20');
+
     const resultado = await service.cambiarEstado(
       1,
       EstadoPeriodoAcademico.EN_PREPARACION,
@@ -390,12 +575,70 @@ describe('PeriodosAcademicosService', () => {
     periodoRepository.findOne.mockResolvedValue(periodo);
     periodoRepository.save.mockImplementation(async (entidad) => entidad);
 
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-02-15');
+
     const resultado = await service.cambiarEstado(
       1,
       EstadoPeriodoAcademico.EN_CURSO,
     );
 
     expect(resultado.estado).toBe(EstadoPeriodoAcademico.EN_CURSO);
+  });
+
+  it('rechaza iniciar un segundo periodo EN_CURSO', async () => {
+    const periodoNuevo = crearPeriodo({
+      id: 2,
+      codigo: '2027-C2',
+      nombre: 'II Ciclo 2027',
+      ciclo: 2,
+      estado: EstadoPeriodoAcademico.EN_PREPARACION,
+    });
+
+    const periodoEnCurso = crearPeriodo({
+      id: 1,
+      codigo: '2027-C1',
+      nombre: 'I Ciclo 2027',
+      ciclo: 1,
+      estado: EstadoPeriodoAcademico.EN_CURSO,
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodoNuevo)
+      .mockResolvedValueOnce(periodoEnCurso);
+
+    await expect(
+      service.cambiarEstado(2, EstadoPeriodoAcademico.EN_CURSO),
+    ).rejects.toThrow(
+      'Ya existe un periodo académico en curso: 2027-C1.',
+    );
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('permite iniciar un periodo si no existe otro EN_CURSO', async () => {
+    const periodo = crearPeriodo({
+      estado: EstadoPeriodoAcademico.EN_PREPARACION,
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodo)
+      .mockResolvedValueOnce(null);
+
+    periodoRepository.save.mockImplementation(async (entidad) => entidad);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-02-15');
+
+    const resultado = await service.cambiarEstado(
+      1,
+      EstadoPeriodoAcademico.EN_CURSO,
+    );
+
+    expect(resultado.estado).toBe(EstadoPeriodoAcademico.EN_CURSO);
+    expect(periodoRepository.save).toHaveBeenCalledTimes(1);
   });
 
   it('permite cambiar EN_CURSO a CERRADO', async () => {
@@ -406,12 +649,83 @@ describe('PeriodosAcademicosService', () => {
     periodoRepository.findOne.mockResolvedValue(periodo);
     periodoRepository.save.mockImplementation(async (entidad) => entidad);
 
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-06-25');
+
     const resultado = await service.cambiarEstado(
       1,
       EstadoPeriodoAcademico.CERRADO,
     );
 
     expect(resultado.estado).toBe(EstadoPeriodoAcademico.CERRADO);
+  });
+
+  it('rechaza pasar a EN_PREPARACION si la fecha límite de disponibilidad ya venció', async () => {
+    const periodo = crearPeriodo({
+      estado: EstadoPeriodoAcademico.BORRADOR,
+      fechaLimiteDisponibilidad: '2027-01-20',
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodo)
+      .mockResolvedValueOnce(null);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-01-21');
+
+    await expect(
+      service.cambiarEstado(1, EstadoPeriodoAcademico.EN_PREPARACION),
+    ).rejects.toThrow(
+      'No se puede pasar el periodo a preparación porque la fecha límite de disponibilidad docente ya venció.',
+    );
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza iniciar un periodo antes de su fecha de inicio', async () => {
+    const periodo = crearPeriodo({
+      estado: EstadoPeriodoAcademico.EN_PREPARACION,
+      fechaInicio: '2027-02-15',
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodo)
+      .mockResolvedValueOnce(null);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-02-14');
+
+    await expect(
+      service.cambiarEstado(1, EstadoPeriodoAcademico.EN_CURSO),
+    ).rejects.toThrow(
+      'No se puede iniciar el periodo académico antes de su fecha de inicio.',
+    );
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza cerrar un periodo antes de su fecha de finalización', async () => {
+    const periodo = crearPeriodo({
+      estado: EstadoPeriodoAcademico.EN_CURSO,
+      fechaFin: '2027-06-25',
+    });
+
+    periodoRepository.findOne.mockResolvedValue(periodo);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-06-24');
+
+    await expect(
+      service.cambiarEstado(1, EstadoPeriodoAcademico.CERRADO),
+    ).rejects.toThrow(
+      'No se puede cerrar el periodo académico antes de su fecha de finalización.',
+    );
+
+    expect(periodoRepository.save).not.toHaveBeenCalled();
   });
 
   it('rechaza cambiar directamente BORRADOR a CERRADO', async () => {
@@ -521,6 +835,10 @@ describe('PeriodosAcademicosService', () => {
       .mockResolvedValueOnce(null);
 
     periodoRepository.save.mockImplementation(async (entidad) => entidad);
+
+    jest
+      .spyOn(service as any, 'obtenerFechaActualLocal')
+      .mockReturnValue('2027-01-20');
 
     const resultado = await service.cambiarEstado(
       1,

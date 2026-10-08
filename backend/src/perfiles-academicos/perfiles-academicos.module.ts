@@ -6,8 +6,10 @@ import { Curso } from '../cursos/entities/curso.entity';
 import { EstructuraAcademicaModule } from '../estructura-academica/estructura-academica.module';
 import { PermisosModule } from '../permisos/permisos.module';
 import { CursoPerfilAcademico } from './entities/curso-perfil-academico.entity';
+import { AreaPerfilAcademico } from './entities/area-perfil-academico.entity';
 import { PerfilAcademico } from './entities/perfil-academico.entity';
 import { ProfesorPerfilAcademico } from './entities/profesor-perfil-academico.entity';
+import { RequisitoPerfilAcademico } from './entities/requisito-perfil-academico.entity';
 import { PerfilesAcademicosController } from './perfiles-academicos.controller';
 import { PerfilesAcademicosService } from './perfiles-academicos.service';
 
@@ -17,6 +19,8 @@ import { PerfilesAcademicosService } from './perfiles-academicos.service';
       PerfilAcademico,
       CursoPerfilAcademico,
       ProfesorPerfilAcademico,
+      AreaPerfilAcademico,
+      RequisitoPerfilAcademico,
       Carrera,
       Curso,
     ]),

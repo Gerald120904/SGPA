@@ -964,11 +964,34 @@ async function cerrarFormulario(
       );
     }
 
+    let sincronizacionFinal = null;
+    try {
+      const resultadoSync = await sincronizarFormularioEstudiantes(
+        formulario.id,
+      );
+      if (resultadoSync && resultadoSync.ok !== false) {
+        sincronizacionFinal = resultadoSync.data ?? resultadoSync;
+      }
+    } catch (error) {
+      console.error(
+        'El formulario se cerró, pero falló la sincronización final:',
+        error,
+      );
+    }
+
     mostrarExito({
-      titulo:
-        'Formulario cerrado',
-      mensaje:
-        'Google Forms dejó de aceptar nuevas respuestas. La información existente permanece disponible.'
+      titulo: 'Formulario cerrado',
+      mensaje: sincronizacionFinal
+        ? (
+            'Google Forms dejó de aceptar nuevas respuestas. ' +
+            `La sincronización final detectó ${
+              sincronizacionFinal.nuevas ?? 0
+            } respuesta(s) nueva(s).`
+          )
+        : (
+            'Google Forms dejó de aceptar nuevas respuestas. ' +
+            'La información existente permanece disponible.'
+          ),
     });
 
     await cargarFormularios();

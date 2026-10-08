@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UnauthorizedException,
@@ -25,6 +26,8 @@ import { ActualizarPerfilAcademicoDto } from './dto/actualizar-perfil-academico.
 import { CambiarEstadoPerfilAcademicoDto } from './dto/cambiar-estado-perfil-academico.dto';
 import { CrearPerfilAcademicoDto } from './dto/crear-perfil-academico.dto';
 import { FiltrarPerfilesAcademicosDto } from './dto/filtrar-perfiles-academicos.dto';
+import { GuardarAreasPerfilDto } from './dto/guardar-areas-perfil.dto';
+import { GuardarRequisitosPerfilDto } from './dto/guardar-requisitos-perfil.dto';
 import { PerfilesAcademicosService } from './perfiles-academicos.service';
 
 @Controller('perfiles-academicos')
@@ -53,7 +56,41 @@ export class PerfilesAcademicosController {
 
   @Get(':id')
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
-    return this.service.obtenerPorId(id);
+    return this.service.obtenerDetallePorId(id);
+  }
+
+  @Get(':id/areas')
+  listarAreas(@Param('id', ParseIntPipe) id: number) {
+    return this.service.listarAreas(id);
+  }
+
+  @Put(':id/areas')
+  @UseGuards(PermisosGuard)
+  @Permisos(PermisoSistema.PERFILES_ACADEMICOS_GESTIONAR)
+  guardarAreas(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: Request,
+    @Body() dto: GuardarAreasPerfilDto,
+  ) {
+    const { sub, esAdminGlobal } = this.obtenerUsuario(request);
+    return this.service.guardarAreas(id, dto, sub, esAdminGlobal);
+  }
+
+  @Get(':id/requisitos')
+  listarRequisitos(@Param('id', ParseIntPipe) id: number) {
+    return this.service.listarRequisitos(id);
+  }
+
+  @Put(':id/requisitos')
+  @UseGuards(PermisosGuard)
+  @Permisos(PermisoSistema.PERFILES_ACADEMICOS_GESTIONAR)
+  guardarRequisitos(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: Request,
+    @Body() dto: GuardarRequisitosPerfilDto,
+  ) {
+    const { sub, esAdminGlobal } = this.obtenerUsuario(request);
+    return this.service.guardarRequisitos(id, dto, sub, esAdminGlobal);
   }
 
   @Post()

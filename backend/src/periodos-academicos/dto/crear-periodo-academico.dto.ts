@@ -16,7 +16,7 @@ export class CrearPeriodoAcademicoDto {
 
   @IsInt()
   @Min(1)
-  @Max(2)
+  @Max(3)
   ciclo!: number;
 
   @IsDateString()

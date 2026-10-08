@@ -112,9 +112,6 @@ export const PERMISOS =
     AULAS_ASIGNAR:
       'AULAS_ASIGNAR',
 
-    AULAS_CAMBIO_AUTORIZAR:
-      'AULAS_CAMBIO_AUTORIZAR',
-
   });
 
 
@@ -131,6 +128,9 @@ const PERMISO_MODULO = {
 
   'planes-estudio':
     PERMISOS.PLANES_ESTUDIO_VER,
+
+  'perfiles-academicos':
+    PERMISOS.PERFILES_ACADEMICOS_VER,
 
   cursos:
     PERMISOS.CURSOS_VER,

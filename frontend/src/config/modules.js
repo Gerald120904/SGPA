@@ -73,6 +73,16 @@ export const MODULES = [
   },
 
   {
+    id: 'perfiles-academicos',
+    title: 'Perfiles académicos',
+    navLabel: 'Perfiles académicos',
+    route: '/perfiles-academicos',
+    icon: 'badge-check',
+    section: 'Gestión académica',
+    description: 'Definición oficial de áreas, requisitos y cursos por perfil'
+  },
+
+  {
     id: 'cursos',
     title: 'Cursos',
     route: '/cursos',

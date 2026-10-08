@@ -106,6 +106,22 @@ describe('EstudiantesImportacionService', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
+  it('devuelve los datos normalizados necesarios para la previsualización', async () => {
+    const resultado = await service.validar(9, dto());
+    expect(resultado.filas[0]).toMatchObject({
+      fila: 2,
+      cedula: '001234567',
+      accion: 'CREAR',
+      datos: {
+        nombres: 'Ana',
+        apellido1: 'Solís',
+        apellido2: null,
+        correoInstitucional: 'ana@una.ac.cr',
+        telefono: '08880000',
+      },
+    });
+  });
+
   it('detecta cédulas repetidas dentro del archivo', async () => {
     const entrada = dto();
     entrada.estudiantes.push({ ...entrada.estudiantes[0], fila: 3 });
@@ -393,6 +409,44 @@ describe('EstudiantesImportacionService', () => {
       actualizados: 0,
       aprobacionesNuevas: 0,
       sinCambios: 1,
+    });
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('procesa filas válidas aunque otras filas tengan errores', async () => {
+    const entrada = dto();
+    entrada.estudiantes.push({
+      ...entrada.estudiantes[0],
+      fila: 3,
+      cedula: '009999999',
+      correoInstitucional: 'otro@una.ac.cr',
+      periodoIngresoCodigo: 'PERIODO-INEXISTENTE',
+    });
+    const save = jest.fn(async (valor) => ({
+      ...valor,
+      id: 20,
+    }));
+    const create = jest.fn((valor) => valor);
+    const update = jest.fn();
+    dataSource.transaction.mockImplementation(async (callback) =>
+      callback({
+        getRepository: (entity: unknown) =>
+          entity === Estudiante
+            ? {
+                save,
+                create,
+                update,
+              }
+            : {
+                save,
+                create,
+              },
+      } as never),
+    );
+    const resultado = await service.ejecutar(9, entrada);
+    expect(resultado).toMatchObject({
+      creados: 1,
+      errores: 1,
     });
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
   });

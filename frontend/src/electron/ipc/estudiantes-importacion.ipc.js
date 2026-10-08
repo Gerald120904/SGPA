@@ -73,9 +73,12 @@ export function registrarEstudiantesImportacionIpc({
           { method: "POST", body: { ...contexto, ...datos } },
         );
         if (!resultado.ok) return resultado;
+        const clave =
+          accion === "validar" ? "validacion" : "importacion";
         return {
           ok: true,
-          [accion === "validar" ? "validacion" : "importacion"]: resultado.data,
+          data: resultado.data,
+          [clave]: resultado.data,
         };
       },
     );

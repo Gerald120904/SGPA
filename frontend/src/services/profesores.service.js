@@ -47,6 +47,70 @@ export function obtenerDisponibilidadProfesor(
     );
 }
 
+export function obtenerExpedientePerfilProfesor(
+  profesorId,
+  perfilId,
+) {
+  validarApi(
+    'obtenerExpedientePerfilProfesor',
+  );
+
+  return window.sgpa
+    .obtenerExpedientePerfilProfesor(
+      profesorId,
+      perfilId,
+    );
+}
+
+export function revisarRequisitoPerfilProfesor(
+  profesorId,
+  perfilId,
+  requisitoId,
+  datos,
+) {
+  validarApi(
+    'revisarRequisitoPerfilProfesor',
+  );
+
+  return window.sgpa
+    .revisarRequisitoPerfilProfesor(
+      profesorId,
+      perfilId,
+      requisitoId,
+      datos,
+    );
+}
+
+export function obtenerMiExpedientePerfilProfesor(
+  perfilId,
+) {
+  validarApi(
+    'obtenerMiExpedientePerfilProfesor',
+  );
+
+  return window.sgpa
+    .obtenerMiExpedientePerfilProfesor(
+      perfilId,
+    );
+}
+
+export function guardarEvidenciasRequisitoProfesor(
+  perfilId,
+  requisitoId,
+  datos,
+) {
+  validarApi(
+    'guardarEvidenciasRequisitoProfesor',
+  );
+
+  return window.sgpa
+    .guardarEvidenciasRequisitoProfesor(
+      perfilId,
+      requisitoId,
+      datos,
+    );
+}
+
 export function revisarPerfilProfesor(
   profesorId,
   perfilId,

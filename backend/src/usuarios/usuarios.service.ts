@@ -69,6 +69,13 @@ export class UsuariosService {
     };
   }
 
+  private usuarioTieneRol(usuario: Usuario, rol: RolSistema): boolean {
+    return (usuario.usuarioRoles ?? []).some(
+      (relacion) =>
+        relacion.rol?.activo === true && relacion.rol.nombre === rol,
+    );
+  }
+
   private async obtenerEntidadPorId(id: number): Promise<Usuario> {
     const usuario = await this.buscarPorId(id);
 
@@ -154,6 +161,12 @@ export class UsuariosService {
     const correo = dto.correo.trim().toLowerCase();
 
     await this.validarDuplicados(cedula, correo);
+
+    if (dto.carreraIds?.length && !dto.roles.includes(RolSistema.PROFESOR)) {
+      throw new BadRequestException(
+        'Solo un usuario con rol PROFESOR puede tener carreras docentes asociadas.',
+      );
+    }
 
     const permisosFinales = dto.roles.includes(RolSistema.ADMIN_GLOBAL)
       ? []
@@ -256,7 +269,7 @@ export class UsuariosService {
   }
 
   async actualizar(id: number, dto: ActualizarUsuarioDto) {
-    await this.obtenerEntidadPorId(id);
+    const usuarioActual = await this.obtenerEntidadPorId(id);
 
     const cedula = dto.cedula?.trim();
     const correo = dto.correo?.trim().toLowerCase();
@@ -279,6 +292,16 @@ export class UsuariosService {
       } catch (error) {
         this.relanzarErrorPersistencia(error);
       }
+    }
+
+    if (
+      dto.carreraIds !== undefined &&
+      dto.carreraIds.length > 0 &&
+      !this.usuarioTieneRol(usuarioActual, RolSistema.PROFESOR)
+    ) {
+      throw new BadRequestException(
+        'Solo un usuario con rol PROFESOR puede tener carreras docentes asociadas.',
+      );
     }
 
     if (dto.carreraIds !== undefined) {
@@ -318,7 +341,6 @@ export class UsuariosService {
 
     return this.obtenerPorId(id);
   }
-
 
   async cambiarEstado(id: number, activo: boolean, usuarioActualId: number) {
     await this.obtenerEntidadPorId(id);
@@ -396,9 +418,20 @@ export class UsuariosService {
       );
     }
 
-    await this.usuarioRolRepository.delete({
-      usuarioId: id,
-      rolId,
+    await this.dataSource.transaction(async (manager) => {
+      const relaciones = manager.getRepository(UsuarioRol);
+      const profesorCarreras = manager.getRepository(ProfesorCarrera);
+
+      await relaciones.delete({
+        usuarioId: id,
+        rolId,
+      });
+
+      if (relacion.rol.nombre === RolSistema.PROFESOR) {
+        await profesorCarreras.delete({
+          profesorUsuarioId: id,
+        });
+      }
     });
 
     return this.obtenerPorId(id);
@@ -421,6 +454,9 @@ export class UsuariosService {
       relations: {
         usuarioRoles: {
           rol: true,
+        },
+        profesorCarreras: {
+          carrera: true,
         },
       },
     });

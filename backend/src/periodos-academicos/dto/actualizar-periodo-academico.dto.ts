@@ -18,7 +18,7 @@ export class ActualizarPeriodoAcademicoDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(2)
+  @Max(3)
   ciclo?: number;
 
   @IsOptional()

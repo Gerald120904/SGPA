@@ -1,0 +1,4 @@
+export enum TipoAreaPerfil {
+  DISCIPLINAR = 'DISCIPLINAR',
+  ESTRATEGICA = 'ESTRATEGICA',
+}

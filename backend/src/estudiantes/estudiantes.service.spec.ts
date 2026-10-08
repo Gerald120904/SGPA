@@ -241,7 +241,11 @@ describe('EstudiantesService', () => {
 
   it('conserva intentos académicos independientes', async () => {
     estudiantes.findOne.mockResolvedValue(estudiante);
-    asignaturas.findOne.mockResolvedValue({ id: 20, planEstudioId: 10 });
+    asignaturas.findOne.mockResolvedValue({
+      id: 20,
+      planEstudioId: 10,
+      activo: true,
+    });
     periodos.findOne.mockResolvedValue(periodoIngreso);
 
     await service.registrarResultado(3, 7, {
@@ -265,7 +269,11 @@ describe('EstudiantesService', () => {
 
   it('rechaza un resultado académico anterior al período de ingreso', async () => {
     estudiantes.findOne.mockResolvedValue(estudiante);
-    asignaturas.findOne.mockResolvedValue({ id: 20, planEstudioId: 10 });
+    asignaturas.findOne.mockResolvedValue({
+      id: 20,
+      planEstudioId: 10,
+      activo: true,
+    });
     periodos.findOne.mockResolvedValue({ id: 9, anio: 2024, ciclo: 2 });
 
     await expect(
@@ -278,6 +286,28 @@ describe('EstudiantesService', () => {
     ).rejects.toThrow(
       'El período del resultado académico no puede ser anterior al período de ingreso.',
     );
+    expect(historialAcademico.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza registrar resultados sobre una asignatura inactiva', async () => {
+    estudiantes.findOne.mockResolvedValue(estudiante);
+    asignaturas.findOne.mockResolvedValue({
+      id: 20,
+      planEstudioId: 10,
+      activo: false,
+    });
+
+    await expect(
+      service.registrarResultado(3, 7, {
+        planAsignaturaId: 20,
+        periodoId: 1,
+        resultado: ResultadoAcademico.APROBADO,
+        origenAcademico: OrigenAcademico.CURSADO,
+      }),
+    ).rejects.toThrow(
+      'La asignatura no existe, está inactiva o no pertenece al plan actual del estudiante.',
+    );
+
     expect(historialAcademico.save).not.toHaveBeenCalled();
   });
 
@@ -332,6 +362,7 @@ describe('EstudiantesService', () => {
     expect(progreso.resumen).toEqual({
       totalPlan: 3,
       aprobadas: 1,
+      reprobadas: 1,
       pendientes: 2,
       rezagadas: 1,
     });
@@ -403,6 +434,87 @@ describe('EstudiantesService', () => {
       expect.objectContaining({ planAsignaturaId: 94, codigo: 'EG-I' }),
     ]);
     expect(progreso.reprobadas).toEqual([]);
+  });
+
+  it('ignora resultados posteriores al período de referencia al calcular progreso', async () => {
+    estudiantes.findOne.mockResolvedValue(estudiante);
+    periodos.findOne.mockResolvedValue({ id: 4, anio: 2025, ciclo: 2 });
+    const materia = {
+      id: 30,
+      planEstudioId: 10,
+      cursoId: null,
+      curso: null,
+      codigoReferencia: 'TEST-A',
+      nombreReferencia: 'Materia prueba',
+      activo: true,
+      nivel: 1,
+      ciclo: 1,
+      orden: 1,
+      creditos: 3,
+    } as PlanAsignatura;
+    asignaturas.find.mockResolvedValue([materia]);
+    historialAcademico.find.mockResolvedValue([
+      {
+        planAsignaturaId: 30,
+        periodoId: 4,
+        periodo: { id: 4, anio: 2025, ciclo: 2 },
+        resultado: ResultadoAcademico.REPROBADO,
+        planAsignatura: materia,
+      } as HistorialAcademicoEstudiante,
+      {
+        planAsignaturaId: 30,
+        periodoId: 5,
+        periodo: { id: 5, anio: 2026, ciclo: 1 },
+        resultado: ResultadoAcademico.APROBADO,
+        planAsignatura: materia,
+      } as HistorialAcademicoEstudiante,
+    ]);
+    requisitos.find.mockResolvedValue([]);
+
+    const progreso = await service.obtenerProgreso(3, 7, 4);
+
+    expect(progreso.aprobadas).toHaveLength(0);
+    expect(progreso.reprobadas).toEqual([
+      expect.objectContaining({ planAsignaturaId: 30 }),
+    ]);
+    expect(progreso.pendientes).toEqual([
+      expect.objectContaining({ planAsignaturaId: 30 }),
+    ]);
+  });
+
+  it('considera aprobaciones importadas sin período en el progreso', async () => {
+    estudiantes.findOne.mockResolvedValue(estudiante);
+    periodos.findOne.mockResolvedValue({ id: 4, anio: 2026, ciclo: 1 });
+    const materia = {
+      id: 30,
+      planEstudioId: 10,
+      cursoId: null,
+      curso: null,
+      codigoReferencia: 'TEST-A',
+      nombreReferencia: 'Materia prueba',
+      activo: true,
+      nivel: 1,
+      ciclo: 1,
+      orden: 1,
+      creditos: 3,
+    } as PlanAsignatura;
+    asignaturas.find.mockResolvedValue([materia]);
+    historialAcademico.find.mockResolvedValue([
+      {
+        planAsignaturaId: 30,
+        periodoId: null,
+        periodo: null,
+        resultado: ResultadoAcademico.APROBADO,
+        planAsignatura: materia,
+      } as HistorialAcademicoEstudiante,
+    ]);
+    requisitos.find.mockResolvedValue([]);
+
+    const progreso = await service.obtenerProgreso(3, 7, 4);
+
+    expect(progreso.aprobadas).toEqual([
+      expect.objectContaining({ planAsignaturaId: 30 }),
+    ]);
   });
 
   it('rechaza progreso para un período anterior al ingreso y permite el período de ingreso', async () => {

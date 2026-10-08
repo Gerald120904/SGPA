@@ -27,17 +27,15 @@ import { CrearAtestadoProfesorDto } from './dto/crear-atestado-profesor.dto';
 import { CrearProyectoProfesorDto } from './dto/crear-proyecto-profesor.dto';
 import { FiltroProfesoresDto } from './dto/filtro-profesores.dto';
 import { InactivarPerfilProfesorDto } from './dto/inactivar-perfil-profesor.dto';
+import { GuardarEvidenciasRequisitoDto } from './dto/guardar-evidencias-requisito.dto';
 import { RevisarAtestadoProfesorDto } from './dto/revisar-atestado-profesor.dto';
 import { RevisarPerfilProfesorDto } from './dto/revisar-perfil-profesor.dto';
+import { RevisarRequisitoPerfilProfesorDto } from './dto/revisar-requisito-perfil-profesor.dto';
 import { SolicitarPerfilProfesorDto } from './dto/solicitar-perfil-profesor.dto';
 import { ProfesoresService } from './profesores.service';
 
 @Controller('profesores')
-@UseGuards(
-  AuthGuard,
-  RolesGuard,
-  PermisosGuard,
-)
+@UseGuards(AuthGuard, RolesGuard, PermisosGuard)
 export class ProfesoresController {
   constructor(private readonly profesoresService: ProfesoresService) {}
 
@@ -67,7 +65,6 @@ export class ProfesoresController {
     );
   }
 
-
   @Get('mi-perfil/perfiles')
   @Roles(RolSistema.PROFESOR)
   listarPerfilesMiPerfil(@Req() request: Request) {
@@ -84,6 +81,36 @@ export class ProfesoresController {
   ) {
     return this.profesoresService.solicitarPerfilMiPerfil(
       this.obtenerUsuarioId(request),
+      dto,
+    );
+  }
+
+  @Get('mi-perfil/perfiles/:perfilId/expediente')
+  @Roles(RolSistema.PROFESOR)
+  obtenerExpedienteMiPerfil(
+    @Req() request: Request,
+    @Param('perfilId', ParseIntPipe) perfilId: number,
+  ) {
+    const usuarioId = this.obtenerUsuarioId(request);
+    return this.profesoresService.obtenerExpedientePerfilProfesor(
+      usuarioId,
+      perfilId,
+      usuarioId,
+    );
+  }
+
+  @Put('mi-perfil/perfiles/:perfilId/requisitos/:requisitoId/evidencias')
+  @Roles(RolSistema.PROFESOR)
+  guardarEvidenciasRequisitoMiPerfil(
+    @Req() request: Request,
+    @Param('perfilId', ParseIntPipe) perfilId: number,
+    @Param('requisitoId', ParseIntPipe) requisitoId: number,
+    @Body() dto: GuardarEvidenciasRequisitoDto,
+  ) {
+    return this.profesoresService.guardarEvidenciasRequisitoMiPerfil(
+      this.obtenerUsuarioId(request),
+      perfilId,
+      requisitoId,
       dto,
     );
   }
@@ -115,6 +142,38 @@ export class ProfesoresController {
     return this.profesoresService.revisarPerfilProfesor(
       profesorId,
       perfilId,
+      this.obtenerUsuarioId(request),
+      dto,
+    );
+  }
+
+  @Get(':profesorId/perfiles/:perfilId/expediente')
+  @Permisos(PermisoSistema.PERFILES_DOCENTES_VALIDAR)
+  obtenerExpedientePerfilProfesor(
+    @Param('profesorId', ParseIntPipe) profesorId: number,
+    @Param('perfilId', ParseIntPipe) perfilId: number,
+    @Req() request: Request,
+  ) {
+    return this.profesoresService.obtenerExpedientePerfilProfesor(
+      profesorId,
+      perfilId,
+      this.obtenerUsuarioId(request),
+    );
+  }
+
+  @Patch(':profesorId/perfiles/:perfilId/requisitos/:requisitoId/revision')
+  @Permisos(PermisoSistema.PERFILES_DOCENTES_VALIDAR)
+  revisarRequisitoPerfilProfesor(
+    @Param('profesorId', ParseIntPipe) profesorId: number,
+    @Param('perfilId', ParseIntPipe) perfilId: number,
+    @Param('requisitoId', ParseIntPipe) requisitoId: number,
+    @Req() request: Request,
+    @Body() dto: RevisarRequisitoPerfilProfesorDto,
+  ) {
+    return this.profesoresService.revisarRequisitoPerfilProfesor(
+      profesorId,
+      perfilId,
+      requisitoId,
       this.obtenerUsuarioId(request),
       dto,
     );

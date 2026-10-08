@@ -27,6 +27,11 @@ import {
 } from '../pages/planes-estudio/PlanesEstudioPage.js';
 
 import {
+  PerfilesAcademicosPage,
+  iniciarPerfilesAcademicosPage
+} from '../pages/perfiles-academicos/PerfilesAcademicosPage.js';
+
+import {
   CursosPage,
   iniciarCursosPage
 } from '../pages/cursos/CursosPage.js';
@@ -122,6 +127,9 @@ const PAGE_RENDERERS = {
 
   'planes-estudio':
     PlanesEstudioPage,
+
+  'perfiles-academicos':
+    PerfilesAcademicosPage,
 
   cursos:
     CursosPage,
@@ -473,6 +481,15 @@ function renderizarRuta(
   ) {
 
     iniciarPlanesEstudioPage();
+
+  }
+
+  if (
+    module.id ===
+    'perfiles-academicos'
+  ) {
+
+    iniciarPerfilesAcademicosPage();
 
   }
 

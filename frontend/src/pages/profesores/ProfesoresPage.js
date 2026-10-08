@@ -2,6 +2,10 @@ import {
   listarProfesores,
   obtenerProfesor,
   obtenerDisponibilidadProfesor,
+  obtenerExpedientePerfilProfesor,
+  revisarRequisitoPerfilProfesor,
+  obtenerMiExpedientePerfilProfesor,
+  guardarEvidenciasRequisitoProfesor,
   revisarPerfilProfesor,
   inactivarPerfilProfesor,
   revisarAtestadoProfesor,
@@ -38,6 +42,10 @@ import {
 import {
   StatCard,
 } from '../../components/StatCard.js';
+
+import {
+  StatusBadge,
+} from '../../components/StatusBadge.js';
 
 import {
   FormDialog,
@@ -184,6 +192,18 @@ export function ProfesoresPage() {
       >
         <div
           id="profesorRevisionDialogContent"
+        ></div>
+      </dialog>
+
+      <dialog
+        id="profesorExpedienteDialog"
+        class="
+          sgpa-form-dialog
+          sgpa-form-dialog-lg
+        "
+      >
+        <div
+          id="profesorExpedienteDialogContent"
         ></div>
       </dialog>
 
@@ -388,14 +408,12 @@ const NOMBRES_ESTADO_PROFESOR = {
 
 
 const NOMBRES_TIPO_ATESTADO = {
-  TITULO_ACADEMICO:
-    'Título académico',
-
-  CERTIFICACION:
-    'Certificación',
-
-  OTRO:
-    'Otro',
+  TITULO_ACADEMICO: 'Título académico',
+  CERTIFICACION: 'Certificación',
+  EXPERIENCIA_DOCENTE: 'Experiencia docente',
+  EXPERIENCIA_PROFESIONAL: 'Experiencia profesional',
+  CAPACITACION: 'Capacitación',
+  OTRO: 'Otro',
 };
 
 
@@ -422,6 +440,53 @@ function nombreTipoAtestado(
     tipo ||
     '—'
   );
+}
+
+
+function nombreTipoRequisito(tipo) {
+  const nombres = {
+    FORMACION_ACADEMICA:
+      'Formación académica',
+    IDIOMA_INSTRUMENTAL:
+      'Idioma instrumental',
+    EXPERIENCIA_DOCENTE:
+      'Experiencia docente',
+    GRADO_COMPLEMENTARIO:
+      'Grado complementario',
+    IDIOMA_GLOBAL:
+      'Idioma global',
+    EXPERIENCIA_PROFESIONAL:
+      'Experiencia profesional',
+    CAPACITACIONES:
+      'Capacitaciones',
+    OTROS:
+      'Otros requisitos',
+    JORNADA:
+      'Jornada',
+    HORARIO:
+      'Horario',
+    CAMPUS:
+      'Campus',
+  };
+
+  return nombres[tipo] || tipo;
+}
+
+
+function tonoCumplimiento(estado) {
+  switch (estado) {
+    case 'CUMPLE':
+      return 'success';
+
+    case 'NO_CUMPLE':
+      return 'danger';
+
+    case 'NO_APLICA':
+      return 'neutral';
+
+    default:
+      return 'warning';
+  }
 }
 
 
@@ -1011,6 +1076,764 @@ async function cargarDisponibilidadProfesor(
 
 
 /* =========================================================
+   EXPEDIENTE DE REQUISITOS DEL PERFIL
+   ========================================================= */
+
+function abrirRevisionRequisitoDialog({
+  perfilId,
+  requisitoId,
+  estado,
+  requisitoNombre = '',
+}) {
+  const dialog = document.getElementById('profesorRevisionDialog');
+  const content = document.getElementById('profesorRevisionDialogContent');
+
+  if (!dialog || !content || !profesorDetalleActual) {
+    return;
+  }
+
+  content.innerHTML = FormDialog({
+    formId: 'profesorRevisionRequisitoForm',
+    title: 'Revisar requisito',
+    description: `Requisito: ${escapeHtml(requisitoNombre)}`,
+    body: `
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+        <span style="font-size: 13px; color: #475467; font-weight: 500;">Estado a asignar:</span>
+        ${StatusBadge({
+          label: estado,
+          tone: tonoCumplimiento(estado),
+        })}
+      </div>
+
+      <label class="sgpa-form-wide">
+        <span>Observación de revisión (opcional):</span>
+        <textarea
+          id="profesorRevisionRequisitoObservacion"
+          rows="3"
+          maxlength="500"
+          placeholder="Observación de la revisión..."
+        ></textarea>
+      </label>
+    `,
+    errorId: 'profesorRevisionRequisitoError',
+    cancelButtonId: 'cancelarProfesorRevisionRequisito',
+    submitButtonId: 'guardarProfesorRevisionRequisito',
+    submitText: 'Guardar revisión',
+  });
+
+  dialog.showModal();
+  habilitarCierreExterior(dialog);
+
+  document
+    .getElementById('cancelarProfesorRevisionRequisito')
+    ?.addEventListener('click', () => {
+      dialog.close();
+    });
+
+  document
+    .getElementById('profesorRevisionRequisitoForm')
+    ?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const observacion =
+        document
+          .getElementById('profesorRevisionRequisitoObservacion')
+          ?.value?.trim() || '';
+
+      const boton = document.getElementById(
+        'guardarProfesorRevisionRequisito',
+      );
+      if (boton) {
+        boton.disabled = true;
+      }
+
+      try {
+        const resultado = await revisarRequisitoPerfilProfesor(
+          profesorDetalleActual.id,
+          perfilId,
+          requisitoId,
+          {
+            estado,
+            observacion,
+          },
+        );
+
+        if (!resultado?.ok) {
+          throw new Error(
+            resultado?.message || 'No fue posible realizar la revisión del requisito.',
+          );
+        }
+
+        dialog.close();
+
+        mostrarExito({
+          titulo: 'Requisito actualizado',
+          mensaje: 'El estado del requisito fue guardado correctamente.',
+        });
+
+        // Recargar el expediente sin cerrar el modal de expediente
+        const resExp = await obtenerExpedientePerfilProfesor(
+          profesorDetalleActual.id,
+          perfilId,
+        );
+
+        if (resExp?.ok) {
+          renderizarExpedientePerfil({
+            expediente: resExp.data,
+            modo: 'gestion',
+            perfilId,
+          });
+        }
+      } catch (error) {
+        mostrarError({
+          titulo: 'No se pudo revisar el requisito',
+          mensaje: error?.message || 'Error al guardar la revisión del requisito.',
+        });
+      } finally {
+        if (boton) {
+          boton.disabled = false;
+        }
+      }
+    });
+
+  renderizarIconos();
+}
+
+async function abrirExpedientePerfilGestion(perfilId) {
+  if (!puedeValidarPerfilesDocentes()) {
+    mostrarError({
+      titulo: 'Acceso restringido',
+      mensaje: 'No posee permiso para consultar el expediente del perfil docente.',
+    });
+    return;
+  }
+
+  if (!profesorDetalleActual) {
+    return;
+  }
+
+  const dialog = document.getElementById('profesorExpedienteDialog');
+  const content = document.getElementById('profesorExpedienteDialogContent');
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="profesores-loading-inline">
+      Cargando expediente de requisitos...
+    </div>
+  `;
+
+  dialog.showModal();
+  habilitarCierreExterior(dialog);
+
+  try {
+    const resultado = await obtenerExpedientePerfilProfesor(
+      profesorDetalleActual.id,
+      perfilId,
+    );
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message || 'No fue posible consultar el expediente de requisitos.',
+      );
+    }
+
+    renderizarExpedientePerfil({
+      expediente: resultado.data,
+      modo: 'gestion',
+      perfilId,
+    });
+  } catch (error) {
+    content.innerHTML = `
+      <div class="profesores-expediente">
+        <div class="profesores-expediente-header">
+          <div class="profesores-expediente-title-wrap">
+            <h3>Error al cargar expediente</h3>
+            <p>${escapeHtml(error?.message || 'No fue posible cargar el expediente de requisitos.')}</p>
+          </div>
+          <button type="button" class="profesores-action-button" id="cerrarExpedienteErrorBtn">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    `;
+
+    document
+      .getElementById('cerrarExpedienteErrorBtn')
+      ?.addEventListener('click', () => dialog.close());
+
+    renderizarIconos();
+  }
+}
+
+async function abrirMiExpedientePerfil(perfilId) {
+  const dialog = document.getElementById('profesorExpedienteDialog');
+  const content = document.getElementById('profesorExpedienteDialogContent');
+
+  if (!dialog || !content) {
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="profesores-loading-inline">
+      Cargando expediente de requisitos...
+    </div>
+  `;
+
+  dialog.showModal();
+  habilitarCierreExterior(dialog);
+
+  try {
+    const resultado = await obtenerMiExpedientePerfilProfesor(perfilId);
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message || 'No fue posible consultar su expediente de requisitos.',
+      );
+    }
+
+    renderizarExpedientePerfil({
+      expediente: resultado.data,
+      modo: 'profesor',
+      perfilId,
+    });
+  } catch (error) {
+    content.innerHTML = `
+      <div class="profesores-expediente">
+        <div class="profesores-expediente-header">
+          <div class="profesores-expediente-title-wrap">
+            <h3>Error al cargar expediente</h3>
+            <p>${escapeHtml(error?.message || 'No fue posible cargar el expediente de requisitos.')}</p>
+          </div>
+          <button type="button" class="profesores-action-button" id="cerrarExpedienteErrorBtn">
+            Cerrar
+          </button>
+        </div>
+      </div>
+    `;
+
+    document
+      .getElementById('cerrarExpedienteErrorBtn')
+      ?.addEventListener('click', () => dialog.close());
+
+    renderizarIconos();
+  }
+}
+
+function renderizarExpedientePerfil({
+  expediente,
+  modo,
+  perfilId,
+}) {
+  const dialog = document.getElementById('profesorExpedienteDialog');
+  const content = document.getElementById('profesorExpedienteDialogContent');
+
+  if (!dialog || !content || !expediente) {
+    return;
+  }
+
+  const requisitos = Array.isArray(expediente.requisitos)
+    ? expediente.requisitos
+    : [];
+
+  const obligatorios = requisitos.filter((item) => item.obligatorio);
+  const obligatoriosCumplidos = obligatorios.filter(
+    (item) => item.cumplimiento?.estado === 'CUMPLE',
+  );
+
+  const estadoSolicitud = expediente.solicitud?.estado || 'PENDIENTE';
+  const tonoSolicitud =
+    estadoSolicitud === 'APROBADO'
+      ? 'success'
+      : estadoSolicitud === 'RECHAZADO'
+        ? 'danger'
+        : estadoSolicitud === 'INACTIVO'
+          ? 'neutral'
+          : 'warning';
+
+  const tituloPerfil = expediente.perfil?.codigo
+    ? `${expediente.perfil.codigo} — ${expediente.perfil.nombre}`
+    : expediente.perfil?.nombre || 'Perfil académico';
+
+  content.innerHTML = `
+    <div class="profesores-expediente">
+
+      <div class="profesores-expediente-header">
+        <div class="profesores-expediente-title-wrap">
+          <h3>${escapeHtml(tituloPerfil)}</h3>
+          <p>
+            ${expediente.perfil?.numeroPerfil ? `Perfil ${escapeHtml(String(expediente.perfil.numeroPerfil))}` : ''}
+            ${modo === 'gestion' && expediente.profesor?.nombre ? ` · Profesor: <strong>${escapeHtml(expediente.profesor.nombre)}</strong>` : ''}
+          </p>
+
+          <div class="profesores-expediente-header-meta">
+            <span style="font-size: 13px; color: #475467;">Estado de solicitud:</span>
+            ${StatusBadge({
+              label: estadoSolicitud,
+              tone: tonoSolicitud,
+            })}
+
+            <div class="profesores-expediente-progress">
+              <span>Requisitos obligatorios:</span>
+              <strong>${obligatoriosCumplidos.length} de ${obligatorios.length} cumplidos</strong>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="profesores-icon-button"
+          data-action="cerrar-expediente"
+          title="Cerrar expediente"
+          aria-label="Cerrar expediente"
+        >
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div class="profesores-requisitos-list">
+        ${
+          requisitos.length
+            ? requisitos
+                .map((item) => {
+                  const estadoCumplimiento =
+                    item.cumplimiento?.estado || 'PENDIENTE';
+
+                  return `
+                    <article class="profesores-requisito-card">
+
+                      <div class="profesores-requisito-header">
+                        <strong>${escapeHtml(nombreTipoRequisito(item.tipo))}</strong>
+
+                        <div class="profesores-requisito-header-badges">
+                          ${
+                            item.obligatorio
+                              ? StatusBadge({
+                                  label: 'OBLIGATORIO',
+                                  tone: 'warning',
+                                })
+                              : StatusBadge({
+                                  label: 'FACULTATIVO',
+                                  tone: 'neutral',
+                                })
+                          }
+
+                          ${StatusBadge({
+                            label: estadoCumplimiento,
+                            tone: tonoCumplimiento(estadoCumplimiento),
+                          })}
+                        </div>
+                      </div>
+
+                      <p class="profesores-requisito-description">
+                        ${escapeHtml(item.descripcion || '')}
+                      </p>
+
+                      <div class="profesores-requisito-evidencias">
+                        <span>Evidencias</span>
+
+                        ${
+                          modo === 'profesor' && estadoSolicitud === 'PENDIENTE'
+                            ? `
+                              ${
+                                !expediente.atestadosDisponibles ||
+                                !expediente.atestadosDisponibles.length
+                                  ? `
+                                    <div class="profesores-empty-evidencias">
+                                      <p class="profesores-muted">
+                                        No tiene atestados disponibles.<br>
+                                        Registre primero un atestado en la sección "Mis atestados" para poder utilizarlo como evidencia.
+                                      </p>
+                                    </div>
+                                  `
+                                  : `
+                                    <div class="profesores-evidencias-checklist">
+                                      ${expediente.atestadosDisponibles
+                                        .filter(
+                                          (at) => at.estado !== 'INACTIVO',
+                                        )
+                                        .map((at) => {
+                                          const checked = (
+                                            item.evidencias || []
+                                          ).some((ev) => ev.id === at.id);
+
+                                          return `
+                                            <label class="profesores-checkbox-item">
+                                              <input
+                                                type="checkbox"
+                                                name="evidencia-${item.id}"
+                                                value="${at.id}"
+                                                ${checked ? 'checked' : ''}
+                                              >
+                                              <span>
+                                                <strong>${escapeHtml(at.nombre)}</strong>
+                                                <small>
+                                                  ${escapeHtml(nombreTipoAtestado(at.tipo))} · ${escapeHtml(at.institucion || '')}
+                                                  ${
+                                                    at.tipo === 'EXPERIENCIA_DOCENTE' || at.tipo === 'EXPERIENCIA_PROFESIONAL'
+                                                      ? ` · ${escapeHtml(at.fechaInicio || '—')} — ${escapeHtml(at.fechaFin || 'Actualidad')}`
+                                                      : (at.fechaObtencion ? ` · ${escapeHtml(at.fechaObtencion)}` : '')
+                                                  }
+                                                </small>
+                                              </span>
+                                            </label>
+                                          `;
+                                        })
+                                        .join('')}
+                                    </div>
+                                  `
+                              }
+
+                              <label class="profesores-obs-field">
+                                <span>Observación del profesor:</span>
+                                <textarea
+                                  data-observacion-requisito="${item.id}"
+                                  rows="2"
+                                  maxlength="500"
+                                  placeholder="Observación opcional sobre este requisito..."
+                                >${escapeHtml(item.cumplimiento?.observacionProfesor || '')}</textarea>
+                              </label>
+
+                              <div class="profesores-requisito-actions">
+                                <button
+                                  type="button"
+                                  class="profesores-action-button is-success"
+                                  data-action="guardar-evidencias-requisito"
+                                  data-requisito-id="${item.id}"
+                                  data-perfil-id="${perfilId}"
+                                >
+                                  <i data-lucide="save" aria-hidden="true"></i>
+                                  Guardar evidencias
+                                </button>
+                              </div>
+                            `
+                            : `
+                              ${
+                                item.evidencias && item.evidencias.length
+                                  ? item.evidencias
+                                      .map(
+                                        (ev) => `
+                                          <div class="profesores-evidencia-item">
+                                            <div class="profesores-evidencia-item-info">
+                                              <strong>${escapeHtml(ev.nombre)}</strong>
+                                              <small>
+                                                ${escapeHtml(nombreTipoAtestado(ev.tipo))}
+                                                ${ev.institucion ? ` · ${escapeHtml(ev.institucion)}` : ''}
+                                                ${
+                                                  ev.tipo === 'EXPERIENCIA_DOCENTE' || ev.tipo === 'EXPERIENCIA_PROFESIONAL'
+                                                    ? ` · ${escapeHtml(ev.fechaInicio || '—')} — ${escapeHtml(ev.fechaFin || 'Actualidad')}`
+                                                    : (ev.fechaObtencion ? ` · Obtenida: ${escapeHtml(ev.fechaObtencion)}` : '')
+                                                }
+                                              </small>
+                                              ${
+                                                ev.descripcion
+                                                  ? `<small style="color: #667085;">${escapeHtml(ev.descripcion)}</small>`
+                                                  : ''
+                                              }
+                                            </div>
+                                            ${StatusBadge({
+                                              label: ev.estado,
+                                              tone:
+                                                ev.estado === 'APROBADO'
+                                                  ? 'success'
+                                                  : ev.estado === 'RECHAZADO'
+                                                    ? 'danger'
+                                                    : 'warning',
+                                            })}
+                                          </div>
+                                        `,
+                                      )
+                                      .join('')
+                                  : `
+                                    <p class="profesores-muted" style="margin: 0;">
+                                      Sin evidencias adjuntas.
+                                    </p>
+                                  `
+                              }
+                            `
+                        }
+                      </div>
+
+                      ${
+                        item.cumplimiento?.observacionProfesor &&
+                        (modo === 'gestion' || estadoSolicitud !== 'PENDIENTE')
+                          ? `
+                            <div class="profesores-requisito-obs">
+                              <strong>Observación del profesor:</strong>
+                              ${escapeHtml(item.cumplimiento.observacionProfesor)}
+                            </div>
+                          `
+                          : ''
+                      }
+
+                      ${
+                        item.cumplimiento?.observacionRevision
+                          ? `
+                            <div class="profesores-requisito-obs">
+                              <strong>Observación de revisión:</strong>
+                              ${escapeHtml(item.cumplimiento.observacionRevision)}
+                            </div>
+                          `
+                          : ''
+                      }
+
+                      ${
+                        modo === 'gestion' &&
+                        estadoSolicitud === 'PENDIENTE' &&
+                        puedeValidarPerfilesDocentes()
+                          ? `
+                            <div class="profesores-requisito-actions">
+                              <button
+                                type="button"
+                                class="profesores-action-button is-success"
+                                data-action="revisar-requisito-dialog"
+                                data-requisito-id="${item.id}"
+                                data-requisito-nombre="${escapeHtml(nombreTipoRequisito(item.tipo))}"
+                                data-estado="CUMPLE"
+                                data-perfil-id="${perfilId}"
+                              >
+                                Cumple
+                              </button>
+
+                              <button
+                                type="button"
+                                class="profesores-action-button is-danger"
+                                data-action="revisar-requisito-dialog"
+                                data-requisito-id="${item.id}"
+                                data-requisito-nombre="${escapeHtml(nombreTipoRequisito(item.tipo))}"
+                                data-estado="NO_CUMPLE"
+                                data-perfil-id="${perfilId}"
+                              >
+                                No cumple
+                              </button>
+
+                              ${
+                                !item.obligatorio
+                                  ? `
+                                    <button
+                                      type="button"
+                                      class="profesores-action-button"
+                                      data-action="revisar-requisito-dialog"
+                                      data-requisito-id="${item.id}"
+                                      data-requisito-nombre="${escapeHtml(nombreTipoRequisito(item.tipo))}"
+                                      data-estado="NO_APLICA"
+                                      data-perfil-id="${perfilId}"
+                                    >
+                                      No aplica
+                                    </button>
+                                  `
+                                  : ''
+                              }
+                            </div>
+                          `
+                          : ''
+                      }
+
+                    </article>
+                  `;
+                })
+                .join('')
+            : `
+              <p class="profesores-muted" style="text-align: center; padding: 24px 0;">
+                No hay requisitos registrados para este perfil.
+              </p>
+            `
+        }
+      </div>
+
+      ${
+        modo === 'gestion'
+          ? `
+            <div class="profesores-expediente-decision">
+              <div class="profesores-decision-summary">
+                <h4>Decisión final</h4>
+                <p>${obligatoriosCumplidos.length} de ${obligatorios.length} requisitos obligatorios cumplidos</p>
+              </div>
+
+              ${
+                obligatoriosCumplidos.length !== obligatorios.length &&
+                estadoSolicitud === 'PENDIENTE'
+                  ? `
+                    <div class="profesores-decision-warning">
+                      <i data-lucide="alert-circle" aria-hidden="true"></i>
+                      <span>Aprobación no disponible. Hay requisitos obligatorios pendientes o incumplidos.</span>
+                    </div>
+                  `
+                  : ''
+              }
+
+              <div class="profesores-decision-actions">
+                ${
+                  estadoSolicitud === 'PENDIENTE' &&
+                  puedeValidarPerfilesDocentes()
+                    ? `
+                      <button
+                        type="button"
+                        class="profesores-action-button is-danger"
+                        data-action="rechazar-perfil-desde-expediente"
+                        data-perfil-id="${perfilId}"
+                      >
+                        Rechazar perfil
+                      </button>
+
+                      <button
+                        type="button"
+                        class="profesores-action-button is-success"
+                        data-action="aprobar-perfil-desde-expediente"
+                        data-perfil-id="${perfilId}"
+                        ${
+                          obligatoriosCumplidos.length !==
+                          obligatorios.length
+                            ? 'disabled'
+                            : ''
+                        }
+                      >
+                        Aprobar perfil
+                      </button>
+                    `
+                    : ''
+                }
+
+                <button
+                  type="button"
+                  class="profesores-action-button"
+                  data-action="cerrar-expediente"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          `
+          : `
+            <div class="profesores-expediente-footer">
+              <button
+                type="button"
+                class="profesores-action-button"
+                data-action="cerrar-expediente"
+              >
+                Cerrar
+              </button>
+            </div>
+          `
+      }
+
+    </div>
+  `;
+
+  // Event handlers inside expediente content
+  content.onclick = async (event) => {
+    const boton = event.target.closest('[data-action]');
+    if (!boton) {
+      return;
+    }
+
+    const action = boton.dataset.action;
+
+    if (action === 'cerrar-expediente') {
+      dialog.close();
+      return;
+    }
+
+    if (action === 'guardar-evidencias-requisito') {
+      const reqId = Number(boton.dataset.requisitoId);
+      const pId = Number(boton.dataset.perfilId);
+      const checkboxes = content.querySelectorAll(
+        `input[name="evidencia-${reqId}"]:checked`,
+      );
+      const atestadoIds = Array.from(checkboxes).map((cb) => Number(cb.value));
+      const textarea = content.querySelector(
+        `textarea[data-observacion-requisito="${reqId}"]`,
+      );
+      const observacion = textarea?.value?.trim() || '';
+
+      boton.disabled = true;
+
+      try {
+        const resultado = await guardarEvidenciasRequisitoProfesor(
+          pId,
+          reqId,
+          {
+            requisitoId: reqId,
+            atestadoIds,
+            observacion,
+          },
+        );
+
+        if (!resultado?.ok) {
+          throw new Error(
+            resultado?.message || 'No fue posible guardar las evidencias.',
+          );
+        }
+
+        mostrarExito({
+          titulo: 'Evidencias guardadas',
+          mensaje: 'Las evidencias y observaciones fueron actualizadas correctamente.',
+        });
+
+        const resExp = await obtenerMiExpedientePerfilProfesor(pId);
+        if (resExp?.ok) {
+          renderizarExpedientePerfil({
+            expediente: resExp.data,
+            modo: 'profesor',
+            perfilId: pId,
+          });
+        }
+      } catch (error) {
+        mostrarError({
+          titulo: 'Error al guardar evidencias',
+          mensaje: error?.message || 'No fue posible guardar las evidencias.',
+        });
+      } finally {
+        boton.disabled = false;
+      }
+
+      return;
+    }
+
+    if (action === 'revisar-requisito-dialog') {
+      const reqId = Number(boton.dataset.requisitoId);
+      const pId = Number(boton.dataset.perfilId);
+      const estado = boton.dataset.estado;
+      const requisitoNombre = boton.dataset.requisitoNombre || '';
+
+      abrirRevisionRequisitoDialog({
+        perfilId: pId,
+        requisitoId: reqId,
+        estado,
+        requisitoNombre,
+      });
+
+      return;
+    }
+
+    if (action === 'aprobar-perfil-desde-expediente') {
+      const pId = Number(boton.dataset.perfilId);
+      abrirRevisionProfesor({
+        tipo: 'perfil',
+        id: pId,
+        estado: 'APROBADO',
+      });
+
+      return;
+    }
+
+    if (action === 'rechazar-perfil-desde-expediente') {
+      const pId = Number(boton.dataset.perfilId);
+      abrirRevisionProfesor({
+        tipo: 'perfil',
+        id: pId,
+        estado: 'RECHAZADO',
+      });
+    }
+  };
+
+  renderizarIconos();
+}
+
+
+/* =========================================================
    REVISIÓN (MODAL REUTILIZABLE - GESTIÓN)
    ========================================================= */
 
@@ -1209,6 +2032,13 @@ function abrirRevisionProfesor({
 
 
           dialog.close();
+
+          const expDialog = document.getElementById(
+            'profesorExpedienteDialog',
+          );
+          if (expDialog && expDialog.open) {
+            expDialog.close();
+          }
 
 
           mostrarExito({
@@ -1825,44 +2655,26 @@ async function abrirProfesor(
                               <div
                                 class="profesores-review-actions"
                               >
+                                <button
+                                  type="button"
+                                  class="profesores-action-button"
+                                  data-action="revisar-expediente-perfil"
+                                  data-perfil-id="${
+                                    perfil
+                                      .perfilAcademicoId
+                                  }"
+                                >
+                                  <i
+                                    data-lucide="clipboard-list"
+                                    aria-hidden="true"
+                                  ></i>
 
-                                ${
-                                  perfil.estado ===
-                                  'PENDIENTE'
-                                    ? `
-                                      <button
-                                        type="button"
-                                        class="
-                                          profesores-action-button
-                                          is-success
-                                        "
-                                        data-action="aprobar-perfil"
-                                        data-perfil-id="${
-                                          perfil
-                                            .perfilAcademicoId
-                                        }"
-                                      >
-                                        Aprobar
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        class="
-                                          profesores-action-button
-                                          is-danger
-                                        "
-                                        data-action="rechazar-perfil"
-                                        data-perfil-id="${
-                                          perfil
-                                            .perfilAcademicoId
-                                        }"
-                                      >
-                                        Rechazar
-                                      </button>
-                                    `
-                                    : ''
-                                }
-
+                                  ${
+                                    perfil.estado === 'PENDIENTE'
+                                      ? 'Revisar requisitos'
+                                      : 'Ver expediente'
+                                  }
+                                </button>
 
                                 ${
                                   perfil.estado !==
@@ -2046,19 +2858,36 @@ async function abrirProfesor(
 
 
                         ${
-                          atestado.fechaObtencion
-                            ? `
-                              <div
-                                class="profesores-review-meta"
-                              >
-                                Obtenido:
-                                ${escapeHtml(
-                                  atestado
-                                    .fechaObtencion,
-                                )}
-                              </div>
-                            `
-                            : ''
+                          atestado.tipo === 'EXPERIENCIA_DOCENTE' ||
+                          atestado.tipo === 'EXPERIENCIA_PROFESIONAL'
+                            ? (atestado.fechaInicio || atestado.fechaFin
+                                ? `
+                                  <div
+                                    class="profesores-review-meta"
+                                  >
+                                    Periodo:
+                                    ${escapeHtml(
+                                      atestado.fechaInicio || '—',
+                                    )}
+                                    —
+                                    ${escapeHtml(
+                                      atestado.fechaFin || 'Actualidad',
+                                    )}
+                                  </div>
+                                `
+                                : '')
+                            : (atestado.fechaObtencion
+                                ? `
+                                  <div
+                                    class="profesores-review-meta"
+                                  >
+                                    Obtenido:
+                                    ${escapeHtml(
+                                      atestado.fechaObtencion,
+                                    )}
+                                  </div>
+                                `
+                                : '')
                         }
 
 
@@ -2308,28 +3137,14 @@ async function abrirProfesor(
 
         if (
           action ===
-          'aprobar-perfil' ||
-          action ===
-          'rechazar-perfil'
+          'revisar-expediente-perfil'
         ) {
-          abrirRevisionProfesor({
-
-            tipo:
-              'perfil',
-
-            id:
-              Number(
-                boton.dataset
-                  .perfilId,
-              ),
-
-            estado:
-              action ===
-              'aprobar-perfil'
-                ? 'APROBADO'
-                : 'RECHAZADO',
-
-          });
+          await abrirExpedientePerfilGestion(
+            Number(
+              boton.dataset
+                .perfilId,
+            ),
+          );
 
           return;
         }
@@ -3449,6 +4264,21 @@ function renderizarMiPerfilDocente() {
               .atestadoId,
           ),
         );
+
+        return;
+      }
+
+
+      if (
+        action ===
+        'ver-mi-expediente-perfil'
+      ) {
+        await abrirMiExpedientePerfil(
+          Number(
+            boton.dataset
+              .perfilId,
+          ),
+        );
       }
 
     },
@@ -3650,6 +4480,27 @@ function renderizarMisPerfiles(
                   : ''
               }
 
+
+              <div class="profesores-review-actions">
+                <button
+                  type="button"
+                  class="profesores-action-button"
+                  data-action="ver-mi-expediente-perfil"
+                  data-perfil-id="${perfil.perfilAcademicoId}"
+                >
+                  <i
+                    data-lucide="clipboard-list"
+                    aria-hidden="true"
+                  ></i>
+
+                  ${
+                    perfil.estado === 'PENDIENTE'
+                      ? 'Gestionar evidencias'
+                      : 'Ver expediente'
+                  }
+                </button>
+              </div>
+
             </article>
           `,
         )
@@ -3728,18 +4579,36 @@ function renderizarMisAtestados(
 
 
               ${
-                atestado.fechaObtencion
-                  ? `
-                    <div
-                      class="profesores-review-meta"
-                    >
-                      Fecha de obtención:
-                      ${escapeHtml(
-                        atestado.fechaObtencion,
-                      )}
-                    </div>
-                  `
-                  : ''
+                atestado.tipo === 'EXPERIENCIA_DOCENTE' ||
+                atestado.tipo === 'EXPERIENCIA_PROFESIONAL'
+                  ? (atestado.fechaInicio || atestado.fechaFin
+                      ? `
+                        <div
+                          class="profesores-review-meta"
+                        >
+                          Periodo:
+                          ${escapeHtml(
+                            atestado.fechaInicio || '—',
+                          )}
+                          —
+                          ${escapeHtml(
+                            atestado.fechaFin || 'Actualidad',
+                          )}
+                        </div>
+                      `
+                      : '')
+                  : (atestado.fechaObtencion
+                      ? `
+                        <div
+                          class="profesores-review-meta"
+                        >
+                          Fecha de obtención:
+                          ${escapeHtml(
+                            atestado.fechaObtencion,
+                          )}
+                        </div>
+                      `
+                      : '')
               }
 
 
@@ -4303,6 +5172,10 @@ function abrirFormularioAtestado(
     Boolean(atestado);
 
 
+  const esExpInicial =
+    atestado?.tipo === 'EXPERIENCIA_DOCENTE' ||
+    atestado?.tipo === 'EXPERIENCIA_PROFESIONAL';
+
   content.innerHTML =
     FormDialog({
 
@@ -4317,7 +5190,7 @@ function abrirFormularioAtestado(
       description:
         editando
           ? 'Actualice la información del atestado.'
-          : 'Registre un respaldo académico para su perfil docente.',
+          : 'Registre un respaldo académico o de experiencia para su perfil docente.',
 
       body: `
 
@@ -4369,6 +5242,42 @@ function abrirFormularioAtestado(
             </option>
 
             <option
+              value="EXPERIENCIA_DOCENTE"
+              ${
+                atestado?.tipo ===
+                'EXPERIENCIA_DOCENTE'
+                  ? 'selected'
+                  : ''
+              }
+            >
+              Experiencia docente
+            </option>
+
+            <option
+              value="EXPERIENCIA_PROFESIONAL"
+              ${
+                atestado?.tipo ===
+                'EXPERIENCIA_PROFESIONAL'
+                  ? 'selected'
+                  : ''
+              }
+            >
+              Experiencia profesional
+            </option>
+
+            <option
+              value="CAPACITACION"
+              ${
+                atestado?.tipo ===
+                'CAPACITACION'
+                  ? 'selected'
+                  : ''
+              }
+            >
+              Capacitación
+            </option>
+
+            <option
               value="OTRO"
               ${
                 atestado?.tipo ===
@@ -4408,7 +5317,7 @@ function abrirFormularioAtestado(
         <label>
 
           <span>
-            Institución
+            Institución / organización
           </span>
 
           <input
@@ -4426,22 +5335,68 @@ function abrirFormularioAtestado(
         </label>
 
 
-        <label>
+        <div
+          id="atestadoFechaObtencionContainer"
+          class="${esExpInicial ? 'hidden' : ''}"
+        >
+          <label>
 
-          <span>
-            Fecha de obtención
-          </span>
+            <span>
+              Fecha de obtención
+            </span>
 
-          <input
-            id="atestadoFechaObtencion"
-            type="date"
-            value="${
-              atestado?.fechaObtencion ||
-              ''
-            }"
-          >
+            <input
+              id="atestadoFechaObtencion"
+              type="date"
+              value="${
+                atestado?.fechaObtencion ||
+                ''
+              }"
+            >
 
-        </label>
+          </label>
+        </div>
+
+
+        <div
+          id="atestadoPeriodoContainer"
+          class="${esExpInicial ? '' : 'hidden'}"
+        >
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <label>
+              <span>
+                Fecha de inicio *
+              </span>
+
+              <input
+                id="atestadoFechaInicio"
+                type="date"
+                value="${
+                  atestado?.fechaInicio ||
+                  ''
+                }"
+              >
+            </label>
+
+            <label>
+              <span>
+                Fecha de fin
+              </span>
+
+              <input
+                id="atestadoFechaFin"
+                type="date"
+                value="${
+                  atestado?.fechaFin ||
+                  ''
+                }"
+              >
+            </label>
+          </div>
+          <small style="color: #667085; font-size: 12px; margin-top: 4px; display: block;">
+            Deje la fecha de fin vacía si la experiencia continúa actualmente.
+          </small>
+        </div>
 
 
         <label
@@ -4491,6 +5446,41 @@ function abrirFormularioAtestado(
   );
 
 
+  const selectTipo =
+    document.getElementById(
+      'atestadoTipo',
+    );
+
+  const containerFechaObtencion =
+    document.getElementById(
+      'atestadoFechaObtencionContainer',
+    );
+
+  const containerPeriodo =
+    document.getElementById(
+      'atestadoPeriodoContainer',
+    );
+
+
+  selectTipo?.addEventListener(
+    'change',
+    () => {
+      const tipo = selectTipo.value;
+      const esExp =
+        tipo === 'EXPERIENCIA_DOCENTE' ||
+        tipo === 'EXPERIENCIA_PROFESIONAL';
+
+      if (esExp) {
+        containerFechaObtencion?.classList.add('hidden');
+        containerPeriodo?.classList.remove('hidden');
+      } else {
+        containerFechaObtencion?.classList.remove('hidden');
+        containerPeriodo?.classList.add('hidden');
+      }
+    },
+  );
+
+
   document
     .getElementById(
       'cancelarMiAtestado',
@@ -4512,48 +5502,107 @@ function abrirFormularioAtestado(
         event.preventDefault();
 
 
-        const datos = {
+        const errorBox =
+          document.getElementById(
+            'miAtestadoFormError',
+          );
 
-          tipo:
+        errorBox?.classList.add('hidden');
+
+
+        const tipo =
+          document
+            .getElementById(
+              'atestadoTipo',
+            )
+            ?.value;
+
+        const nombre =
+          document
+            .getElementById(
+              'atestadoNombre',
+            )
+            ?.value
+            ?.trim();
+
+        const institucion =
+          document
+            .getElementById(
+              'atestadoInstitucion',
+            )
+            ?.value
+            ?.trim();
+
+        const descripcion =
+          document
+            .getElementById(
+              'atestadoDescripcion',
+            )
+            ?.value
+            ?.trim() ||
+          undefined;
+
+        const esExperiencia =
+          tipo === 'EXPERIENCIA_DOCENTE' ||
+          tipo === 'EXPERIENCIA_PROFESIONAL';
+
+        let fechaInicio = undefined;
+        let fechaFin = undefined;
+        let fechaObtencion = undefined;
+
+        if (esExperiencia) {
+          fechaInicio =
             document
               .getElementById(
-                'atestadoTipo',
+                'atestadoFechaInicio',
               )
-              ?.value,
+              ?.value || undefined;
 
-          nombre:
+          fechaFin =
             document
               .getElementById(
-                'atestadoNombre',
+                'atestadoFechaFin',
               )
-              ?.value
-              ?.trim(),
+              ?.value || undefined;
 
-          institucion:
-            document
-              .getElementById(
-                'atestadoInstitucion',
-              )
-              ?.value
-              ?.trim(),
+          if (!fechaInicio) {
+            if (errorBox) {
+              errorBox.textContent =
+                'Las evidencias de experiencia deben indicar una fecha de inicio.';
+              errorBox.classList.remove('hidden');
+            }
+            return;
+          }
 
-          fechaObtencion:
+          if (
+            fechaInicio &&
+            fechaFin &&
+            fechaFin < fechaInicio
+          ) {
+            if (errorBox) {
+              errorBox.textContent =
+                'La fecha de fin no puede ser anterior a la fecha de inicio.';
+              errorBox.classList.remove('hidden');
+            }
+            return;
+          }
+        } else {
+          fechaObtencion =
             document
               .getElementById(
                 'atestadoFechaObtencion',
               )
-              ?.value ||
-            undefined,
+              ?.value || undefined;
+        }
 
-          descripcion:
-            document
-              .getElementById(
-                'atestadoDescripcion',
-              )
-              ?.value
-              ?.trim() ||
-            undefined,
-
+        const datos = {
+          tipo,
+          nombre,
+          institucion,
+          fechaObtencion,
+          fechaInicio,
+          fechaFin,
+          descripcion,
         };
 
 
@@ -5586,16 +6635,21 @@ function obtenerPeriodoAnteriorDisponibilidad(
   }
 
 
-  const anioOrigen =
-    destino.ciclo === 2
-      ? destino.anio
-      : destino.anio - 1;
+  let anioOrigen;
+  let cicloOrigen;
 
-
-  const cicloOrigen =
-    destino.ciclo === 2
-      ? 1
-      : 2;
+  if (destino.ciclo === 2) {
+    anioOrigen = destino.anio;
+    cicloOrigen = 1;
+  } else if (destino.ciclo === 3) {
+    anioOrigen = destino.anio;
+    cicloOrigen = 2;
+  } else if (destino.ciclo === 1) {
+    anioOrigen = destino.anio - 1;
+    cicloOrigen = 3;
+  } else {
+    return null;
+  }
 
 
   return (

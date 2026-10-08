@@ -67,6 +67,16 @@ describe('PermisosService', () => {
     expect(catalogo).toContain(PermisoSistema.PERFILES_DOCENTES_VALIDAR);
   });
 
+  it('no expone permisos obsoletos de autorización de cambios de aula', () => {
+    const catalogo = service.obtenerCatalogo();
+    const permisoObsoleto = ['AULAS', 'CAMBIO', 'AUTORIZAR'].join('_');
+
+    expect(catalogo).not.toContain(permisoObsoleto);
+    expect(catalogo).toContain(PermisoSistema.AULAS_VER);
+    expect(catalogo).toContain(PermisoSistema.AULAS_GESTIONAR);
+    expect(catalogo).toContain(PermisoSistema.AULAS_ASIGNAR);
+  });
+
   describe('usuarioTienePermisos', () => {
     it('retorna true si la lista de permisos requeridos es vacía', async () => {
       const tiene = await service.usuarioTienePermisos(1, []);

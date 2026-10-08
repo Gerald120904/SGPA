@@ -30,6 +30,14 @@ export class ActualizarAtestadoProfesorDto {
   fechaObtencion?: string;
 
   @IsOptional()
+  @IsDateString()
+  fechaInicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaFin?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(500)
   descripcion?: string;

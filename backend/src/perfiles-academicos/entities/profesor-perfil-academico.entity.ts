@@ -5,12 +5,14 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { EstadoPerfilProfesor } from '../constants/estado-perfil-profesor.constant';
 import { PerfilAcademico } from './perfil-academico.entity';
+import { CumplimientoRequisitoProfesor } from '../../profesores/entities/cumplimiento-requisito-profesor.entity';
 
 @Entity({
   name: 'profesor_perfiles_academicos',
@@ -114,6 +116,12 @@ export class ProfesorPerfilAcademico {
     name: 'revisado_por_usuario_id',
   })
   revisadoPor!: Usuario | null;
+
+  @OneToMany(
+    () => CumplimientoRequisitoProfesor,
+    (item) => item.profesorPerfilAcademico,
+  )
+  cumplimientos!: CumplimientoRequisitoProfesor[];
 
   @CreateDateColumn({
     name: 'created_at',
