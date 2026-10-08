@@ -112,9 +112,6 @@ export const PERMISOS =
     AULAS_ASIGNAR:
       'AULAS_ASIGNAR',
 
-    AULAS_CAMBIO_AUTORIZAR:
-      'AULAS_CAMBIO_AUTORIZAR',
-
   });
 
 

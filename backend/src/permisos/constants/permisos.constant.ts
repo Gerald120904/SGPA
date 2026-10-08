@@ -83,9 +83,6 @@ export enum PermisoSistema {
 
   AULAS_ASIGNAR = 'AULAS_ASIGNAR',
 
-  AULAS_CAMBIO_AUTORIZAR =
-    'AULAS_CAMBIO_AUTORIZAR',
-
   /* =======================================================
      ESTRUCTURA ACADÉMICA
      ======================================================= */

@@ -105,18 +105,29 @@ export class PeriodosAcademicosService {
     }
   }
 
-  private async validarUnicoPeriodoEnPreparacion(
+  private async validarUnicoPeriodoEnEstado(
+    estado: EstadoPeriodoAcademico,
     excluirId?: number,
   ): Promise<void> {
     const existente = await this.periodoRepository.findOne({
       where: {
-        estado: EstadoPeriodoAcademico.EN_PREPARACION,
+        estado,
       },
     });
 
-    if (existente && existente.id !== excluirId) {
+    if (!existente || existente.id === excluirId) {
+      return;
+    }
+
+    if (estado === EstadoPeriodoAcademico.EN_PREPARACION) {
       throw new ConflictException(
         `Ya existe un periodo académico en preparación: ${existente.codigo}.`,
+      );
+    }
+
+    if (estado === EstadoPeriodoAcademico.EN_CURSO) {
+      throw new ConflictException(
+        `Ya existe un periodo académico en curso: ${existente.codigo}.`,
       );
     }
   }
@@ -137,6 +148,28 @@ export class PeriodosAcademicosService {
     if (periodo.estado === EstadoPeriodoAcademico.CANCELADO) {
       throw new BadRequestException(
         'No se puede modificar un periodo académico cancelado.',
+      );
+    }
+  }
+
+  private validarCambiosEnPreparacion(
+    periodo: PeriodoAcademico,
+    dto: ActualizarPeriodoAcademicoDto,
+  ): void {
+    if (periodo.estado !== EstadoPeriodoAcademico.EN_PREPARACION) {
+      return;
+    }
+
+    const modificaEstructura =
+      dto.anio !== undefined ||
+      dto.ciclo !== undefined ||
+      dto.fechaInicio !== undefined ||
+      dto.fechaFin !== undefined ||
+      dto.fechaLimiteDisponibilidad !== undefined;
+
+    if (modificaEstructura) {
+      throw new BadRequestException(
+        'Cuando el periodo académico está en preparación únicamente pueden modificarse las observaciones.',
       );
     }
   }
@@ -175,6 +208,107 @@ export class PeriodosAcademicosService {
     }
   }
 
+  private obtenerFechaActualLocal(): string {
+    const ahora = new Date();
+    const anio = ahora.getFullYear();
+    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+    const dia = String(ahora.getDate()).padStart(2, '0');
+
+    return `${anio}-${mes}-${dia}`;
+  }
+
+  private validarFechaParaTransicion(
+    periodo: PeriodoAcademico,
+    nuevoEstado: EstadoPeriodoAcademico,
+  ): void {
+    const motivo = this.obtenerMotivoBloqueoFecha(periodo, nuevoEstado);
+
+    if (!motivo) {
+      return;
+    }
+
+    if (
+      nuevoEstado === EstadoPeriodoAcademico.EN_PREPARACION
+    ) {
+      throw new BadRequestException(
+        'No se puede pasar el periodo a preparación porque la fecha límite de disponibilidad docente ya venció.',
+      );
+    }
+
+    if (
+      nuevoEstado === EstadoPeriodoAcademico.EN_CURSO
+    ) {
+      throw new BadRequestException(
+        'No se puede iniciar el periodo académico antes de su fecha de inicio.',
+      );
+    }
+
+    throw new BadRequestException(
+      'No se puede cerrar el periodo académico antes de su fecha de finalización.',
+    );
+  }
+
+  private obtenerMotivoBloqueoFecha(
+    periodo: PeriodoAcademico,
+    nuevoEstado: EstadoPeriodoAcademico,
+  ): string | null {
+    const hoy = this.obtenerFechaActualLocal();
+
+    if (
+      nuevoEstado === EstadoPeriodoAcademico.EN_PREPARACION &&
+      hoy > periodo.fechaLimiteDisponibilidad
+    ) {
+      return 'La fecha límite de disponibilidad docente ya venció.';
+    }
+
+    if (
+      nuevoEstado === EstadoPeriodoAcademico.EN_CURSO &&
+      hoy < periodo.fechaInicio
+    ) {
+      return `El periodo podrá iniciarse a partir del ${periodo.fechaInicio}.`;
+    }
+
+    if (
+      nuevoEstado === EstadoPeriodoAcademico.CERRADO &&
+      hoy < periodo.fechaFin
+    ) {
+      return `El periodo podrá cerrarse a partir del ${periodo.fechaFin}.`;
+    }
+
+    return null;
+  }
+
+  private obtenerTransicionesInterfaz(periodo: PeriodoAcademico) {
+    const transiciones: Record<
+      EstadoPeriodoAcademico,
+      EstadoPeriodoAcademico[]
+    > = {
+      [EstadoPeriodoAcademico.BORRADOR]: [
+        EstadoPeriodoAcademico.EN_PREPARACION,
+        EstadoPeriodoAcademico.CANCELADO,
+      ],
+      [EstadoPeriodoAcademico.EN_PREPARACION]: [
+        EstadoPeriodoAcademico.EN_CURSO,
+        EstadoPeriodoAcademico.CANCELADO,
+      ],
+      [EstadoPeriodoAcademico.EN_CURSO]: [
+        EstadoPeriodoAcademico.CERRADO,
+      ],
+      [EstadoPeriodoAcademico.CERRADO]: [],
+      [EstadoPeriodoAcademico.CANCELADO]: [],
+    };
+
+    return (transiciones[periodo.estado] ?? []).map((estado) => {
+      const motivo = this.obtenerMotivoBloqueoFecha(periodo, estado);
+
+      return {
+        estado,
+        disponible: motivo === null,
+        motivo,
+      };
+    });
+  }
+
   private relanzarErrorPersistencia(error: unknown): never {
     const codigo =
       (
@@ -194,13 +328,18 @@ export class PeriodosAcademicosService {
     throw error;
   }
 
-  async listar(): Promise<PeriodoAcademico[]> {
-    return this.periodoRepository.find({
+  async listar() {
+    const periodos = await this.periodoRepository.find({
       order: {
         anio: 'DESC',
         ciclo: 'DESC',
       },
     });
+
+    return periodos.map((periodo) => ({
+      ...periodo,
+      transicionesEstado: this.obtenerTransicionesInterfaz(periodo),
+    }));
   }
 
   async obtenerPorId(id: number): Promise<PeriodoAcademico> {
@@ -242,6 +381,7 @@ export class PeriodosAcademicosService {
     const periodo = await this.obtenerEntidadPorId(id);
 
     this.validarPeriodoEditable(periodo);
+    this.validarCambiosEnPreparacion(periodo, dto);
 
     const nuevoAnio = dto.anio ?? periodo.anio;
     const nuevoCiclo = dto.ciclo ?? periodo.ciclo;
@@ -287,9 +427,14 @@ export class PeriodosAcademicosService {
 
     if (
       periodo.estado !== nuevoEstado &&
-      nuevoEstado === EstadoPeriodoAcademico.EN_PREPARACION
+      (nuevoEstado === EstadoPeriodoAcademico.EN_PREPARACION ||
+        nuevoEstado === EstadoPeriodoAcademico.EN_CURSO)
     ) {
-      await this.validarUnicoPeriodoEnPreparacion(periodo.id);
+      await this.validarUnicoPeriodoEnEstado(nuevoEstado, periodo.id);
+    }
+
+    if (periodo.estado !== nuevoEstado) {
+      this.validarFechaParaTransicion(periodo, nuevoEstado);
     }
 
     periodo.estado = nuevoEstado;

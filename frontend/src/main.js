@@ -432,12 +432,32 @@ ipcMain.handle("perfiles-academicos:obtener", async (_event, id) => {
   return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}`);
 });
 
+ipcMain.handle("perfiles-academicos:crear", async (_event, datos) => {
+  return ejecutarPeticionAutenticada("/perfiles-academicos", {
+    method: "POST",
+    body: datos,
+  });
+});
+
 ipcMain.handle("perfiles-academicos:actualizar", async (_event, id, datos) => {
   return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}`, {
     method: "PATCH",
     body: datos,
   });
 });
+
+ipcMain.handle(
+  "perfiles-academicos:cambiar-estado",
+  async (_event, id, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/perfiles-academicos/${id}/estado`,
+      {
+        method: "PATCH",
+        body: { activo },
+      },
+    );
+  },
+);
 
 ipcMain.handle("perfiles-academicos:areas:listar", async (_event, id) => {
   return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/areas`);
@@ -463,6 +483,39 @@ ipcMain.handle(
     return ejecutarPeticionAutenticada(
       `/perfiles-academicos/${id}/requisitos`,
       { method: "PUT", body: { requisitos } },
+    );
+  },
+);
+
+ipcMain.handle(
+  "perfiles-academicos:cursos:listar",
+  async (_event, perfilId) => {
+    return ejecutarPeticionAutenticada(
+      `/perfiles-academicos/${perfilId}/cursos`,
+    );
+  },
+);
+
+ipcMain.handle(
+  "perfiles-academicos:cursos:asociar",
+  async (_event, perfilId, cursoId) => {
+    return ejecutarPeticionAutenticada(
+      `/perfiles-academicos/${perfilId}/cursos/${cursoId}`,
+      {
+        method: "POST",
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  "perfiles-academicos:cursos:desasociar",
+  async (_event, perfilId, cursoId) => {
+    return ejecutarPeticionAutenticada(
+      `/perfiles-academicos/${perfilId}/cursos/${cursoId}`,
+      {
+        method: "DELETE",
+      },
     );
   },
 );

@@ -10,6 +10,10 @@ import {
 } from "../../components/DataTable.js";
 
 import {
+  StatusBadge,
+} from "../../components/StatusBadge.js";
+
+import {
   FormDialog,
   habilitarCierreExterior,
 } from "../../components/FormDialog.js";
@@ -59,6 +63,21 @@ const ESTADOS = {
   CANCELADO:
     "Cancelado",
 };
+
+
+function obtenerTonoEstado(
+  estado,
+) {
+  const tonos = {
+    BORRADOR: "neutral",
+    EN_PREPARACION: "info",
+    EN_CURSO: "success",
+    CERRADO: "neutral",
+    CANCELADO: "danger",
+  };
+
+  return tonos[estado] || "neutral";
+}
 
 
 const TRANSICIONES = {
@@ -451,32 +470,80 @@ function renderizarPeriodos() {
             ] || [];
 
 
+          const informacionBackend =
+            Array.isArray(
+              periodo.transicionesEstado,
+            )
+              ? periodo.transicionesEstado
+              : [];
+
+
           const accionesEstado =
             puedeGestionar
               ? transiciones
                   .map(
-                    (
-                      transicion,
-                    ) => `
-                      <button
-                        class="
-                          periodos-transition-button
+                    (transicion) => {
+                      const informacion =
+                        informacionBackend.find(
+                          (item) =>
+                            item.estado ===
+                            transicion.estado,
+                        );
+
+                      const disponible =
+                        informacion
+                          ?.disponible !==
+                        false;
+
+                      const motivo =
+                        informacion?.motivo ||
+                        "";
+
+                      return `
+                        <div
+                          class="periodos-transition-wrapper"
+                        >
+                          <button
+                            class="
+                              periodos-transition-button
+                              ${
+                                transicion.peligro
+                                  ? "periodos-danger-button"
+                                  : ""
+                              }
+                            "
+                            type="button"
+                            data-action="estado"
+                            data-id="${periodo.id}"
+                            data-estado="${transicion.estado}"
+                            ${disponible ? "" : "disabled"}
+                            title="${escapeHtml(
+                              motivo ||
+                                transicion.titulo,
+                            )}"
+                          >
+                            ${escapeHtml(
+                              transicion.texto,
+                            )}
+                          </button>
+
                           ${
-                            transicion.peligro
-                              ? "periodos-danger-button"
+                            !disponible &&
+                            motivo
+                              ? `
+                                <small
+                                  class="periodos-transition-reason"
+                                >
+                                  ${escapeHtml(
+                                    motivo,
+                                  )}
+                                </small>
+                              `
                               : ""
                           }
-                        "
-                        type="button"
-                        data-action="estado"
-                        data-id="${periodo.id}"
-                        data-estado="${transicion.estado}"
-                      >
-                        ${escapeHtml(
-                          transicion.texto,
-                        )}
-                      </button>
-                    `,
+                        </div>
+                      `;
+                    },
                   )
                   .join("")
               : "";
@@ -556,25 +623,16 @@ function renderizarPeriodos() {
 
               <td>
 
-                <span
-                  class="
-                    periodos-status
-                    periodos-status-${String(
-                      periodo.estado,
-                    )
-                      .toLowerCase()
-                      .replaceAll(
-                        "_",
-                        "-",
-                      )}
-                  "
-                >
-                  ${escapeHtml(
+                ${StatusBadge({
+                  label:
                     obtenerNombreEstado(
                       periodo.estado,
                     ),
-                  )}
-                </span>
+                  tone:
+                    obtenerTonoEstado(
+                      periodo.estado,
+                    ),
+                })}
 
               </td>
 
@@ -775,6 +833,27 @@ function abrirFormulario(
     Boolean(periodo);
 
 
+  const estructuraBloqueada =
+    periodo?.estado ===
+    "EN_PREPARACION";
+
+
+  const notaFormulario =
+    estructuraBloqueada
+      ? `
+        El periodo ya está en preparación.
+        El calendario quedó bloqueado para
+        proteger la disponibilidad docente.
+        Únicamente puede modificar las
+        observaciones.
+      `
+      : `
+        El código y nombre del periodo
+        son generados automáticamente
+        por el sistema.
+      `;
+
+
   const body = `
 
     <div
@@ -783,9 +862,7 @@ function abrirFormulario(
         periodos-form-note
       "
     >
-      El código y nombre del periodo
-      son generados automáticamente
-      por el sistema.
+      ${notaFormulario}
     </div>
 
 
@@ -804,6 +881,7 @@ function abrirFormulario(
           periodo?.anio ?? ""
         }"
         required
+        ${estructuraBloqueada ? "disabled" : ""}
       >
 
     </label>
@@ -818,6 +896,7 @@ function abrirFormulario(
       <select
         id="periodoCiclo"
         required
+        ${estructuraBloqueada ? "disabled" : ""}
       >
 
         ${
@@ -886,6 +965,7 @@ function abrirFormulario(
           ""
         }"
         required
+        ${estructuraBloqueada ? "disabled" : ""}
       >
 
     </label>
@@ -905,6 +985,7 @@ function abrirFormulario(
           ""
         }"
         required
+        ${estructuraBloqueada ? "disabled" : ""}
       >
 
     </label>
@@ -928,6 +1009,7 @@ function abrirFormulario(
           ""
         }"
         required
+        ${estructuraBloqueada ? "disabled" : ""}
       >
 
     </label>
@@ -1117,40 +1199,48 @@ function abrirFormulario(
         );
 
 
-        if (
-          fechaFin <=
-          fechaInicio
-        ) {
+        if (!estructuraBloqueada) {
+          if (
+            fechaFin <=
+            fechaInicio
+          ) {
 
-          mostrarErrorFormulario(
-            "La fecha de finalización debe ser posterior a la fecha de inicio.",
-          );
+            mostrarErrorFormulario(
+              "La fecha de finalización debe ser posterior a la fecha de inicio.",
+            );
 
-          return;
+            return;
+          }
+
+
+          if (
+            fechaLimiteDisponibilidad >=
+            fechaInicio
+          ) {
+
+            mostrarErrorFormulario(
+              "La fecha límite de disponibilidad debe ser anterior al inicio del periodo.",
+            );
+
+            return;
+          }
         }
 
 
-        if (
-          fechaLimiteDisponibilidad >=
-          fechaInicio
-        ) {
-
-          mostrarErrorFormulario(
-            "La fecha límite de disponibilidad debe ser anterior al inicio del periodo.",
-          );
-
-          return;
-        }
-
-
-        const datos = {
-          anio,
-          ciclo,
-          fechaInicio,
-          fechaFin,
-          fechaLimiteDisponibilidad,
-          observaciones,
-        };
+        const datos =
+          editando &&
+          estructuraBloqueada
+            ? {
+                observaciones,
+              }
+            : {
+                anio,
+                ciclo,
+                fechaInicio,
+                fechaFin,
+                fechaLimiteDisponibilidad,
+                observaciones,
+              };
 
 
         if (guardarButton) {

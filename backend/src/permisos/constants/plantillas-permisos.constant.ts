@@ -73,8 +73,6 @@ export const PERMISOS_PREDETERMINADOS_POR_ROL:
 
     PermisoSistema.AULAS_ASIGNAR,
 
-    PermisoSistema.AULAS_CAMBIO_AUTORIZAR,
-
   ],
 
 

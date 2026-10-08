@@ -10,7 +10,6 @@ import { DataSource, Repository } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { Curso } from '../cursos/entities/curso.entity';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
-import { EstadoPerfilProfesor } from './constants/estado-perfil-profesor.constant';
 import { ActualizarPerfilAcademicoDto } from './dto/actualizar-perfil-academico.dto';
 import { CrearPerfilAcademicoDto } from './dto/crear-perfil-academico.dto';
 import { FiltrarPerfilesAcademicosDto } from './dto/filtrar-perfiles-academicos.dto';
@@ -61,6 +60,26 @@ export class PerfilesAcademicosService {
     if (!autorizado) {
       throw new ForbiddenException(
         'No posee autoridad académica sobre esta carrera.',
+      );
+    }
+  }
+
+  private async perfilEstaUtilizado(perfilId: number): Promise<boolean> {
+    const cantidadSolicitudes = await this.profesorPerfilRepository.count({
+      where: {
+        perfilAcademicoId: perfilId,
+      },
+    });
+
+    return cantidadSolicitudes > 0;
+  }
+
+  private async validarPerfilNoUtilizado(perfilId: number): Promise<void> {
+    const utilizado = await this.perfilEstaUtilizado(perfilId);
+
+    if (utilizado) {
+      throw new ConflictException(
+        'No se puede modificar la estructura del perfil académico porque ya ha sido solicitado por uno o más profesores. Cree un nuevo perfil para aplicar cambios estructurales.',
       );
     }
   }
@@ -124,6 +143,17 @@ export class PerfilesAcademicosService {
     }
 
     return perfil;
+  }
+
+  async obtenerDetallePorId(id: number) {
+    const perfil = await this.obtenerPorId(id);
+    const utilizado = await this.perfilEstaUtilizado(id);
+
+    return {
+      ...perfil,
+      utilizado,
+      estructuraEditable: !utilizado,
+    };
   }
 
   async crear(
@@ -227,36 +257,14 @@ export class PerfilesAcademicosService {
       perfil.carreraId,
     );
 
-    if (!activo) {
-      const [profesoresAprobados, cursosActivos] = await Promise.all([
-        this.profesorPerfilRepository.count({
-          where: {
-            perfilAcademicoId: id,
-            estado: EstadoPerfilProfesor.APROBADO,
-          },
-        }),
-        this.cursoPerfilRepository.count({
-          where: {
-            perfilAcademicoId: id,
-            activo: true,
-          },
-        }),
-      ]);
-
-      if (profesoresAprobados > 0) {
-        throw new BadRequestException(
-          'No se puede desactivar el perfil académico porque tiene profesores con este perfil aprobado.',
-        );
-      }
-
-      if (cursosActivos > 0) {
-        throw new BadRequestException(
-          'No se puede desactivar el perfil académico porque tiene cursos asociados activos.',
-        );
-      }
+    if (perfil.activo === activo) {
+      return perfil;
     }
 
-    await this.perfilRepository.update(id, { activo });
+    await this.perfilRepository.update(id, {
+      activo,
+    });
+
     return this.obtenerPorId(id);
   }
 
@@ -301,6 +309,7 @@ export class PerfilesAcademicosService {
       esAdminGlobal,
       perfil.carreraId,
     );
+    await this.validarPerfilNoUtilizado(perfilId);
 
     const areas = dto.areas.map((area) => ({
       ...area,
@@ -357,6 +366,7 @@ export class PerfilesAcademicosService {
       esAdminGlobal,
       perfil.carreraId,
     );
+    await this.validarPerfilNoUtilizado(perfilId);
 
     const requisitos = dto.requisitos.map((requisito) => ({
       ...requisito,
@@ -410,8 +420,13 @@ export class PerfilesAcademicosService {
       );
     }
 
+    await this.validarPerfilNoUtilizado(perfilId);
+
     const curso = await this.cursoRepository.findOne({
       where: { id: cursoId },
+      relations: {
+        carreras: true,
+      },
     });
 
     if (!curso) {
@@ -421,6 +436,16 @@ export class PerfilesAcademicosService {
     if (!curso.activo) {
       throw new BadRequestException(
         'No se puede asociar un curso inactivo a un perfil académico.',
+      );
+    }
+
+    const perteneceACarrera = (curso.carreras ?? []).some(
+      (carrera) => carrera.id === perfil.carreraId,
+    );
+
+    if (!perteneceACarrera) {
+      throw new BadRequestException(
+        'El curso seleccionado no pertenece a la carrera del perfil académico.',
       );
     }
 
@@ -474,6 +499,8 @@ export class PerfilesAcademicosService {
       esAdminGlobal,
       perfil.carreraId,
     );
+
+    await this.validarPerfilNoUtilizado(perfilId);
 
     const relacion = await this.cursoPerfilRepository.findOne({
       where: {

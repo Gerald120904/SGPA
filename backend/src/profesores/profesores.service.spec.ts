@@ -955,6 +955,31 @@ describe('ProfesoresService', () => {
     );
   });
 
+  it('considera BLOQUEADA la disponibilidad inexistente cuando el periodo está CERRADO', async () => {
+    usuarioRepository.find.mockResolvedValue([crearProfesor()]);
+
+    profesorCarreraRepository.find.mockResolvedValue([]);
+    profesorPerfilRepository.find.mockResolvedValue([]);
+
+    periodoRepository.findOne.mockResolvedValue({
+      id: 2,
+      codigo: '2099-C1',
+      estado: EstadoPeriodoAcademico.CERRADO,
+    });
+
+    disponibilidadRepository.find.mockResolvedValue([]);
+
+    const resultado = await service.listar({
+      periodoAcademicoId: 2,
+      estadoDisponibilidad: EstadoDisponibilidad.BLOQUEADA,
+    });
+
+    expect(resultado).toHaveLength(1);
+    expect((resultado[0] as any).disponibilidadPeriodo.estado).toBe(
+      EstadoDisponibilidad.BLOQUEADA,
+    );
+  });
+
   it('consulta el historial del perfil sin exponer datos sensibles', async () => {
     usuarioRepository.findOne.mockResolvedValue(crearProfesor());
 

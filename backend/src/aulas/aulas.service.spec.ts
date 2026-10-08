@@ -432,14 +432,51 @@ describe('AulasService', () => {
 
     await expect(
       service.crear({
-        codigo: 'UNED-04',
-        nombre: 'Aula UNED 4',
+        codigo: 'UNED-03-B',
+        nombre: 'Aula UNED adicional',
         capacidad: 30,
         tipo: TipoAula.AULA,
         tipoMobiliario: TipoMobiliarioAula.PUPITRE,
         origen: OrigenAula.UNED,
       }),
     ).rejects.toThrow(ConflictException);
+
+    expect(aulaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('permite número UNA 27 si todavía hay cupo de registro', async () => {
+    aulaRepository.findOne.mockResolvedValue(null);
+    aulaRepository.count.mockResolvedValue(24);
+    aulaRepository.save.mockImplementation(async (entidad) => entidad);
+
+    await expect(
+      service.crear({
+        codigo: 'AULA-27',
+        nombre: 'Aula 27',
+        capacidad: 30,
+        tipo: TipoAula.AULA,
+        tipoMobiliario: TipoMobiliarioAula.PUPITRE,
+        origen: OrigenAula.UNA,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it('rechaza número UNA mayor a 27 aunque todavía haya cupo', async () => {
+    aulaRepository.findOne.mockResolvedValue(null);
+    aulaRepository.count.mockResolvedValue(10);
+
+    await expect(
+      service.crear({
+        codigo: 'AULA-28',
+        nombre: 'Aula 28',
+        capacidad: 30,
+        tipo: TipoAula.AULA,
+        tipoMobiliario: TipoMobiliarioAula.PUPITRE,
+        origen: OrigenAula.UNA,
+      }),
+    ).rejects.toThrow(
+      'Para UNA, el número del espacio debe estar entre 1 y 27.',
+    );
 
     expect(aulaRepository.save).not.toHaveBeenCalled();
   });
@@ -1063,6 +1100,38 @@ describe('AulasService', () => {
   });
 
   describe('indisponibilidades de aulas', () => {
+    it('permite registrar una indisponibilidad sin depender de la disponibilidad base', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: true,
+        }),
+      );
+
+      indisponibilidadAulaRepository.find.mockResolvedValue([]);
+      reservaAulaRepository.find.mockResolvedValue([]);
+      indisponibilidadAulaRepository.save.mockImplementation(
+        async (entidad) => ({
+          id: 60,
+          ...entidad,
+        }),
+      );
+
+      await expect(
+        service.crearIndisponibilidadAula(
+          1,
+          {
+            tipo: TipoIndisponibilidadAula.MANTENIMIENTO,
+            fechaHoraInicio: '2027-03-07T18:00:00-06:00',
+            fechaHoraFin: '2027-03-07T20:00:00-06:00',
+            motivo: 'Mantenimiento extraordinario',
+          },
+          7,
+        ),
+      ).resolves.toBeDefined();
+
+      expect(disponibilidadAulaRepository.find).not.toHaveBeenCalled();
+    });
+
     it('rechaza una fecha final anterior al inicio', async () => {
       aulaRepository.findOne.mockResolvedValue(crearAula());
 
@@ -1120,6 +1189,22 @@ describe('AulasService', () => {
       expect(resultado.motivo).toBe('Mantenimiento actualizado');
     });
 
+    it('rechaza editar una indisponibilidad si el aula está inactiva', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: false,
+        }),
+      );
+
+      await expect(
+        service.actualizarIndisponibilidadAula(1, 1, {
+          motivo: 'Mantenimiento actualizado',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(indisponibilidadAulaRepository.save).not.toHaveBeenCalled();
+    });
+
     it('inactiva una indisponibilidad sin eliminarla', async () => {
       const existente = crearIndisponibilidad();
       aulaRepository.findOne.mockResolvedValue(crearAula());
@@ -1161,6 +1246,59 @@ describe('AulasService', () => {
 
       expect(resultado.activo).toBe(true);
     });
+
+    it('rechaza reactivar una indisponibilidad si el aula está inactiva', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: false,
+        }),
+      );
+
+      indisponibilidadAulaRepository.findOne.mockResolvedValue(
+        crearIndisponibilidad({
+          activo: false,
+        }),
+      );
+
+      await expect(
+        service.cambiarEstadoIndisponibilidadAula(1, 1, true),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(indisponibilidadAulaRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('permite inactivar una indisponibilidad activa aunque el aula esté inactiva', async () => {
+      const indisponibilidad = crearIndisponibilidad({
+        activo: true,
+      });
+
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: false,
+        }),
+      );
+
+      indisponibilidadAulaRepository.findOne
+        .mockResolvedValueOnce({
+          ...indisponibilidad,
+        })
+        .mockResolvedValueOnce({
+          ...indisponibilidad,
+          activo: false,
+        });
+
+      indisponibilidadAulaRepository.save.mockImplementation(
+        async (entidad) => entidad,
+      );
+
+      const resultado = await service.cambiarEstadoIndisponibilidadAula(
+        1,
+        1,
+        false,
+      );
+
+      expect(resultado.activo).toBe(false);
+    });
   });
 
   describe('reservas extraordinarias de aulas', () => {
@@ -1189,6 +1327,42 @@ describe('AulasService', () => {
         }),
       );
       expect(resultado.titulo).toBe('Examen final EIF223');
+    });
+
+    it('permite una reserva extraordinaria fuera de la disponibilidad base semanal', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: true,
+        }),
+      );
+
+      reservaAulaRepository.find.mockResolvedValue([]);
+      indisponibilidadAulaRepository.find.mockResolvedValue([]);
+      reservaAulaRepository.save.mockImplementation(async (entidad) => ({
+        id: 50,
+        ...entidad,
+      }));
+
+      const resultado = await service.crearReservaAula(
+        1,
+        {
+          tipo: TipoReservaAula.REUNION,
+          titulo: 'Reunión extraordinaria',
+          fechaHoraInicio: '2027-03-06T18:00:00-06:00',
+          fechaHoraFin: '2027-03-06T20:00:00-06:00',
+        },
+        7,
+      );
+
+      expect(resultado).toEqual(
+        expect.objectContaining({
+          aulaId: 1,
+          titulo: 'Reunión extraordinaria',
+          activo: true,
+        }),
+      );
+
+      expect(disponibilidadAulaRepository.find).not.toHaveBeenCalled();
     });
 
     it('lista las reservas de un aula ordenadas por inicio', async () => {
@@ -1358,6 +1532,22 @@ describe('AulasService', () => {
       expect(resultado.titulo).toBe('Examen actualizado');
     });
 
+    it('rechaza editar una reserva si el aula está inactiva', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: false,
+        }),
+      );
+
+      await expect(
+        service.actualizarReservaAula(1, 1, {
+          titulo: 'Reserva modificada',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(reservaAulaRepository.save).not.toHaveBeenCalled();
+    });
+
     it('convierte una descripción vacía en null al actualizar', async () => {
       aulaRepository.findOne.mockResolvedValue(crearAula());
       const existente = crearReserva();
@@ -1466,6 +1656,52 @@ describe('AulasService', () => {
   });
 
   describe('búsqueda de aulas disponibles', () => {
+    it('busca únicamente aulas activas', async () => {
+      periodosAcademicosService.obtenerPorId.mockResolvedValue(crearPeriodo());
+
+      aulaRepository.find.mockResolvedValue([]);
+
+      await service.buscarAulasDisponibles({
+        periodoId: 1,
+        fechaHoraInicio: '2027-03-01T08:00:00-06:00',
+        fechaHoraFin: '2027-03-01T10:00:00-06:00',
+      });
+
+      expect(aulaRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            activo: true,
+          }),
+        }),
+      );
+    });
+
+    it('rechaza explícitamente un aula inactiva para asignación', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: false,
+        }),
+      );
+
+      const buscarSpy = jest.spyOn(service, 'buscarAulasDisponibles');
+
+      const resultado = await service.evaluarAulaParaAsignacion(1, {
+        periodoId: 1,
+        fechaHoraInicio: '2027-03-01T08:00:00-06:00',
+        fechaHoraFin: '2027-03-01T10:00:00-06:00',
+        cantidadEstudiantes: 30,
+      });
+
+      expect(resultado).toEqual({
+        aulaId: 1,
+        apta: false,
+        requiereAutorizacionSobrecupo: false,
+        motivo: 'AULA_INACTIVA',
+      });
+
+      expect(buscarSpy).not.toHaveBeenCalled();
+    });
+
     it('filtra aulas disponibles por tipo de mobiliario', async () => {
       periodosAcademicosService.obtenerPorId.mockResolvedValue(crearPeriodo());
 
@@ -1528,6 +1764,13 @@ describe('AulasService', () => {
       });
 
       aulaRepository.find.mockResolvedValue([aula]);
+
+      equipamientoRepository.find.mockResolvedValue([
+        crearEquipamiento({
+          id: 1,
+          activo: true,
+        }),
+      ]);
 
       indisponibilidadAulaRepository.find.mockResolvedValue([]);
 
@@ -1628,6 +1871,13 @@ describe('AulasService', () => {
 
       aulaRepository.find.mockResolvedValue([aula]);
 
+      equipamientoRepository.find.mockResolvedValue([
+        crearEquipamiento({
+          id: 1,
+          activo: true,
+        }),
+      ]);
+
       indisponibilidadAulaRepository.find.mockResolvedValue([]);
 
       reservaAulaRepository.find.mockResolvedValue([]);
@@ -1663,6 +1913,13 @@ describe('AulasService', () => {
       });
 
       aulaRepository.find.mockResolvedValue([aula]);
+
+      equipamientoRepository.find.mockResolvedValue([
+        crearEquipamiento({
+          id: 1,
+          activo: true,
+        }),
+      ]);
 
       indisponibilidadAulaRepository.find.mockResolvedValue([]);
 
@@ -1701,6 +1958,58 @@ describe('AulasService', () => {
           ],
         }),
       ).rejects.toThrow(BadRequestException);
+
+      expect(aulaRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('rechaza buscar con un equipamiento inexistente', async () => {
+      periodosAcademicosService.obtenerPorId.mockResolvedValue(crearPeriodo());
+
+      equipamientoRepository.find.mockResolvedValue([]);
+
+      await expect(
+        service.buscarAulasDisponibles({
+          periodoId: 1,
+          fechaHoraInicio: '2027-03-01T08:00:00-06:00',
+          fechaHoraFin: '2027-03-01T10:00:00-06:00',
+          equipamientos: [
+            {
+              equipamientoId: 999,
+              cantidadMinima: 1,
+            },
+          ],
+        }),
+      ).rejects.toThrow('El equipamiento solicitado con id 999 no existe.');
+
+      expect(aulaRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('rechaza buscar con un equipamiento inactivo', async () => {
+      periodosAcademicosService.obtenerPorId.mockResolvedValue(crearPeriodo());
+
+      equipamientoRepository.find.mockResolvedValue([
+        crearEquipamiento({
+          id: 1,
+          nombre: 'Proyector',
+          activo: false,
+        }),
+      ]);
+
+      await expect(
+        service.buscarAulasDisponibles({
+          periodoId: 1,
+          fechaHoraInicio: '2027-03-01T08:00:00-06:00',
+          fechaHoraFin: '2027-03-01T10:00:00-06:00',
+          equipamientos: [
+            {
+              equipamientoId: 1,
+              cantidadMinima: 1,
+            },
+          ],
+        }),
+      ).rejects.toThrow(
+        'El equipamiento solicitado "Proyector" está inactivo.',
+      );
 
       expect(aulaRepository.find).not.toHaveBeenCalled();
     });
@@ -1923,6 +2232,13 @@ describe('AulasService', () => {
   });
 
   describe('auditoría de aulas', () => {
+    const obtenerDetalleAuditoria = () => {
+      const llamadas = auditoriaAulaRepository.create.mock.calls;
+      const auditoria = llamadas[llamadas.length - 1][0];
+
+      return JSON.parse(auditoria.detalle);
+    };
+
     it('registra el usuario que creó un aula', async () => {
       aulaRepository.findOne.mockResolvedValue(null);
 
@@ -1973,6 +2289,122 @@ describe('AulasService', () => {
         order: {
           createdAt: 'DESC',
         },
+      });
+    });
+
+    it('audita antes y después al actualizar una reserva', async () => {
+      const reserva = crearReserva({ titulo: 'Examen original' });
+
+      aulaRepository.findOne.mockResolvedValue(crearAula());
+      reservaAulaRepository.findOne
+        .mockResolvedValueOnce({ ...reserva })
+        .mockResolvedValueOnce({
+          ...reserva,
+          titulo: 'Examen actualizado',
+        });
+      reservaAulaRepository.save.mockImplementation(async (entidad) => entidad);
+
+      await service.actualizarReservaAula(
+        1,
+        1,
+        { titulo: 'Examen actualizado' },
+        7,
+      );
+
+      expect(auditoriaAulaRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          aulaId: 1,
+          usuarioId: 7,
+          accion: 'ACTUALIZAR',
+          entidad: 'RESERVA',
+        }),
+      );
+      expect(obtenerDetalleAuditoria()).toMatchObject({
+        antes: { titulo: 'Examen original' },
+        despues: { titulo: 'Examen actualizado' },
+      });
+    });
+
+    it('audita antes y después al actualizar una indisponibilidad', async () => {
+      const indisponibilidad = crearIndisponibilidad({
+        motivo: 'Motivo original',
+      });
+
+      aulaRepository.findOne.mockResolvedValue(crearAula());
+      indisponibilidadAulaRepository.findOne
+        .mockResolvedValueOnce({ ...indisponibilidad })
+        .mockResolvedValueOnce({
+          ...indisponibilidad,
+          motivo: 'Motivo actualizado',
+        });
+      indisponibilidadAulaRepository.save.mockImplementation(
+        async (entidad) => entidad,
+      );
+
+      await service.actualizarIndisponibilidadAula(
+        1,
+        1,
+        { motivo: 'Motivo actualizado' },
+        7,
+      );
+
+      expect(obtenerDetalleAuditoria()).toMatchObject({
+        antes: { motivo: 'Motivo original' },
+        despues: { motivo: 'Motivo actualizado' },
+      });
+    });
+
+    it('audita antes y después al cambiar el estado de una reserva', async () => {
+      const reserva = crearReserva({ activo: true });
+
+      aulaRepository.findOne.mockResolvedValue(crearAula());
+      reservaAulaRepository.findOne
+        .mockResolvedValueOnce({ ...reserva })
+        .mockResolvedValueOnce({ ...reserva, activo: false });
+      reservaAulaRepository.save.mockImplementation(async (entidad) => entidad);
+
+      await service.cambiarEstadoReservaAula(1, 1, false, 7);
+
+      expect(obtenerDetalleAuditoria()).toEqual({
+        antes: { activo: true },
+        despues: { activo: false },
+      });
+    });
+
+    it('audita antes y después al cambiar el estado de una indisponibilidad', async () => {
+      const indisponibilidad = crearIndisponibilidad({ activo: true });
+
+      aulaRepository.findOne.mockResolvedValue(crearAula());
+      indisponibilidadAulaRepository.findOne
+        .mockResolvedValueOnce({ ...indisponibilidad })
+        .mockResolvedValueOnce({ ...indisponibilidad, activo: false });
+      indisponibilidadAulaRepository.save.mockImplementation(
+        async (entidad) => entidad,
+      );
+
+      await service.cambiarEstadoIndisponibilidadAula(1, 1, false, 7);
+
+      expect(obtenerDetalleAuditoria()).toEqual({
+        antes: { activo: true },
+        despues: { activo: false },
+      });
+    });
+
+    it('audita antes y después al cambiar el estado del equipamiento asignado', async () => {
+      const relacion = crearAulaEquipamiento({ activo: true });
+
+      aulaEquipamientoRepository.findOne
+        .mockResolvedValueOnce({ ...relacion })
+        .mockResolvedValueOnce({ ...relacion, activo: false });
+      aulaEquipamientoRepository.save.mockImplementation(
+        async (entidad) => entidad,
+      );
+
+      await service.cambiarEstadoEquipamientoAula(1, 1, false, 7);
+
+      expect(obtenerDetalleAuditoria()).toEqual({
+        antes: { activo: true },
+        despues: { activo: false },
       });
     });
   });
@@ -2134,6 +2566,79 @@ describe('AulasService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('permite editar disponibilidad del aula en BORRADOR', async () => {
+      aulaRepository.findOne.mockResolvedValue(crearAula());
+
+      periodosAcademicosService.obtenerPorId.mockResolvedValue(
+        crearPeriodo({
+          estado: EstadoPeriodoAcademico.BORRADOR,
+        }),
+      );
+
+      disponibilidadAulaRepository.find.mockResolvedValue([]);
+      disponibilidadAulaRepository.save.mockImplementation(
+        async (entidad) => ({
+          id: 50,
+          ...entidad,
+        }),
+      );
+
+      await expect(
+        service.crearDisponibilidadAula(
+          1,
+          {
+            periodoId: 1,
+            diaSemana: 1,
+            horaInicio: '08:00',
+            horaFin: '12:00',
+          },
+          7,
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it('rechaza eliminar disponibilidad de un aula inactiva', async () => {
+      aulaRepository.findOne.mockResolvedValue(
+        crearAula({
+          activo: false,
+        }),
+      );
+
+      await expect(
+        service.eliminarDisponibilidadAula(1, 1, 7),
+      ).rejects.toThrow(
+        'No se puede modificar la disponibilidad de un aula inactiva.',
+      );
+
+      expect(disponibilidadAulaRepository.delete).not.toHaveBeenCalled();
+      expect(auditoriaAulaRepository.save).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      EstadoPeriodoAcademico.EN_CURSO,
+      EstadoPeriodoAcademico.CERRADO,
+      EstadoPeriodoAcademico.CANCELADO,
+    ])(
+      'rechaza eliminar disponibilidad cuando el periodo está %s',
+      async (estado) => {
+        aulaRepository.findOne.mockResolvedValue(crearAula());
+
+        disponibilidadAulaRepository.findOne.mockResolvedValue(
+          crearDisponibilidad(),
+        );
+
+        periodosAcademicosService.obtenerPorId.mockResolvedValue(
+          crearPeriodo({ estado }),
+        );
+
+        await expect(
+          service.eliminarDisponibilidadAula(1, 1, 7),
+        ).rejects.toThrow(BadRequestException);
+
+        expect(disponibilidadAulaRepository.delete).not.toHaveBeenCalled();
+      },
+    );
 
     it('elimina un bloque en periodo editable', async () => {
       aulaRepository.findOne.mockResolvedValue(crearAula());

@@ -118,12 +118,12 @@ export class DisponibilidadProfesoresService {
     disponibilidad: DisponibilidadProfesor | null,
     periodo: PeriodoAcademico,
   ): EstadoDisponibilidad {
-    if (!disponibilidad) {
-      return EstadoDisponibilidad.PENDIENTE;
-    }
-
     if (periodo.estado !== EstadoPeriodoAcademico.EN_PREPARACION) {
       return EstadoDisponibilidad.BLOQUEADA;
+    }
+
+    if (!disponibilidad) {
+      return EstadoDisponibilidad.PENDIENTE;
     }
 
     return disponibilidad.estado;
@@ -353,7 +353,7 @@ export class DisponibilidadProfesoresService {
         registrada: false,
         profesorUsuarioId: usuarioId,
         periodoAcademicoId: periodoId,
-        estado: EstadoDisponibilidad.PENDIENTE,
+        estado: this.obtenerEstadoEfectivo(null, periodo),
         puedeEditar: this.puedeEditarDisponibilidad(periodo),
         observaciones: null,
         periodo: this.mapearPeriodo(periodo),
@@ -381,7 +381,7 @@ export class DisponibilidadProfesoresService {
         registrada: false,
         profesorUsuarioId: profesorId,
         periodoAcademicoId: periodoId,
-        estado: EstadoDisponibilidad.PENDIENTE,
+        estado: this.obtenerEstadoEfectivo(null, periodo),
         puedeEditar: false,
         periodo: this.mapearPeriodo(periodo),
         bloques: [],

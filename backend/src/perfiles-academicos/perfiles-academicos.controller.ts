@@ -56,7 +56,7 @@ export class PerfilesAcademicosController {
 
   @Get(':id')
   obtenerPorId(@Param('id', ParseIntPipe) id: number) {
-    return this.service.obtenerPorId(id);
+    return this.service.obtenerDetallePorId(id);
   }
 
   @Get(':id/areas')

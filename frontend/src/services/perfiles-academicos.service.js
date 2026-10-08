@@ -38,3 +38,33 @@ export function guardarRequisitosPerfil(id, requisitos) {
   validarApi('guardarRequisitosPerfil');
   return window.sgpa.guardarRequisitosPerfil(id, requisitos);
 }
+
+export function crearPerfil(datos) {
+  validarApi('crearPerfilAcademico');
+
+  return window.sgpa.crearPerfilAcademico(datos);
+}
+
+export function cambiarEstadoPerfil(id, activo) {
+  validarApi('cambiarEstadoPerfilAcademico');
+
+  return window.sgpa.cambiarEstadoPerfilAcademico(id, activo);
+}
+
+export function listarCursosPerfil(perfilId) {
+  validarApi('listarCursosPerfilAcademico');
+
+  return window.sgpa.listarCursosPerfilAcademico(perfilId);
+}
+
+export function asociarCursoPerfil(perfilId, cursoId) {
+  validarApi('asociarCursoPerfilAcademico');
+
+  return window.sgpa.asociarCursoPerfilAcademico(perfilId, cursoId);
+}
+
+export function desasociarCursoPerfil(perfilId, cursoId) {
+  validarApi('desasociarCursoPerfilAcademico');
+
+  return window.sgpa.desasociarCursoPerfilAcademico(perfilId, cursoId);
+}

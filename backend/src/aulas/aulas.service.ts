@@ -32,6 +32,7 @@ import { CrearIndisponibilidadAulaDto } from './dto/crear-indisponibilidad-aula.
 import { CrearReservaAulaDto } from './dto/crear-reserva-aula.dto';
 import { BuscarAulasDisponiblesDto } from './dto/buscar-aulas-disponibles.dto';
 import { ConsultarOcupacionAulaDto } from './dto/consultar-ocupacion-aula.dto';
+import { RequisitoEquipamientoAulaDto } from './dto/requisito-equipamiento-aula.dto';
 import { AulaEquipamiento } from './entities/aula-equipamiento.entity';
 import { Aula } from './entities/aula.entity';
 import { AuditoriaAula } from './entities/auditoria-aula.entity';
@@ -42,6 +43,26 @@ import { ReservaAula } from './entities/reserva-aula.entity';
 
 @Injectable()
 export class AulasService {
+  private readonly limitesRegistroPorOrigen: Record<OrigenAula, number> = {
+    [OrigenAula.UNA]: 25,
+    [OrigenAula.UNED]: 3,
+    [OrigenAula.OTRO]: 15,
+  };
+
+  private readonly maximosNumeroPorOrigen: Record<OrigenAula, number> = {
+    [OrigenAula.UNA]: 27,
+    [OrigenAula.UNED]: 3,
+    [OrigenAula.OTRO]: 15,
+  };
+
+  private validarAulaActivaParaOcupacion(aula: Aula): void {
+    if (!aula.activo) {
+      throw new BadRequestException(
+        'No se puede modificar reservas o indisponibilidades de un aula inactiva.',
+      );
+    }
+  }
+
   constructor(
     @InjectRepository(Aula)
     private readonly aulaRepository: Repository<Aula>,
@@ -87,13 +108,7 @@ export class AulasService {
   }
 
   private async validarLimiteOrigen(origen: OrigenAula): Promise<void> {
-    const limites: Record<OrigenAula, number> = {
-      [OrigenAula.UNA]: 27,
-      [OrigenAula.UNED]: 3,
-      [OrigenAula.OTRO]: 15,
-    };
-
-    const limite = limites[origen];
+    const limite = this.limitesRegistroPorOrigen[origen];
 
     const cantidadRegistrada = await this.aulaRepository.count({
       where: { origen },
@@ -120,14 +135,8 @@ export class AulasService {
   }
 
   private validarNumeroPorOrigen(codigo: string, origen: OrigenAula): void {
-    const maximos: Record<OrigenAula, number> = {
-      [OrigenAula.UNA]: 27,
-      [OrigenAula.UNED]: 3,
-      [OrigenAula.OTRO]: 15,
-    };
-
     const numero = this.obtenerNumeroEspacioDesdeCodigo(codigo);
-    const maximo = maximos[origen];
+    const maximo = this.maximosNumeroPorOrigen[origen];
 
     if (numero === null || numero < 1 || numero > maximo) {
       throw new BadRequestException(
@@ -406,6 +415,48 @@ export class AulasService {
     return false;
   }
 
+  private async validarEquipamientosBusqueda(
+    requisitos: RequisitoEquipamientoAulaDto[],
+  ): Promise<void> {
+    if (!requisitos.length) {
+      return;
+    }
+
+    const ids = requisitos.map((requisito) => requisito.equipamientoId);
+
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestException(
+        'No se puede repetir el mismo equipamiento en la búsqueda.',
+      );
+    }
+
+    const equipamientos = await this.equipamientoRepository.find({
+      where: {
+        id: In(ids),
+      },
+    });
+
+    const porId = new Map(
+      equipamientos.map((equipamiento) => [equipamiento.id, equipamiento]),
+    );
+
+    for (const id of ids) {
+      const equipamiento = porId.get(id);
+
+      if (!equipamiento) {
+        throw new BadRequestException(
+          `El equipamiento solicitado con id ${id} no existe.`,
+        );
+      }
+
+      if (!equipamiento.activo) {
+        throw new BadRequestException(
+          `El equipamiento solicitado "${equipamiento.nombre}" está inactivo.`,
+        );
+      }
+    }
+  }
+
   async buscarAulasDisponibles(dto: BuscarAulasDisponiblesDto) {
     const periodo = await this.periodosAcademicosService.obtenerPorId(
       dto.periodoId,
@@ -448,15 +499,9 @@ export class AulasService {
     const fin = this.convertirFechaHora(dto.fechaHoraFin);
     this.validarRangoIndisponibilidad(inicio, fin);
     const requisitos = dto.equipamientos ?? [];
-    const ids = new Set<number>();
-    for (const requisito of requisitos) {
-      if (ids.has(requisito.equipamientoId)) {
-        throw new BadRequestException(
-          'No se puede repetir el mismo equipamiento en la búsqueda.',
-        );
-      }
-      ids.add(requisito.equipamientoId);
-    }
+
+    await this.validarEquipamientosBusqueda(requisitos);
+
     const where: FindOptionsWhere<Aula> = { activo: true };
     if (dto.tipo !== undefined) where.tipo = dto.tipo;
     if (dto.tipoMobiliario !== undefined) {
@@ -890,7 +935,16 @@ export class AulasService {
     aulaId: number,
     dto: BuscarAulasDisponiblesDto,
   ) {
-    await this.obtenerEntidadPorId(aulaId);
+    const aulaEntidad = await this.obtenerEntidadPorId(aulaId);
+
+    if (!aulaEntidad.activo) {
+      return {
+        aulaId,
+        apta: false,
+        requiereAutorizacionSobrecupo: false,
+        motivo: 'AULA_INACTIVA',
+      };
+    }
 
     const candidatas = await this.buscarAulasDisponibles({
       ...dto,
@@ -1287,6 +1341,8 @@ export class AulasService {
       }
     }
 
+    const activoAnterior = relacion.activo;
+
     relacion.activo = activo;
     await this.aulaEquipamientoRepository.save(relacion);
 
@@ -1297,7 +1353,12 @@ export class AulasService {
       entidad: 'AULA_EQUIPAMIENTO',
       entidadId: relacion.id,
       detalle: {
-        activo,
+        antes: {
+          activo: activoAnterior,
+        },
+        despues: {
+          activo,
+        },
       },
     });
 
@@ -1330,11 +1391,7 @@ export class AulasService {
   ): Promise<IndisponibilidadAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    if (!aula.activo) {
-      throw new BadRequestException(
-        'No se puede registrar una indisponibilidad en un aula inactiva.',
-      );
-    }
+    this.validarAulaActivaParaOcupacion(aula);
 
     const inicio = this.convertirFechaHora(dto.fechaHoraInicio);
     const fin = this.convertirFechaHora(dto.fechaHoraFin);
@@ -1385,8 +1442,19 @@ export class AulasService {
     dto: ActualizarIndisponibilidadAulaDto,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
-    await this.obtenerEntidadPorId(aulaId);
+    const aula = await this.obtenerEntidadPorId(aulaId);
+
+    this.validarAulaActivaParaOcupacion(aula);
+
     const indisponibilidad = await this.obtenerIndisponibilidadAula(aulaId, id);
+
+    const antes = {
+      tipo: indisponibilidad.tipo,
+      fechaHoraInicio: indisponibilidad.fechaHoraInicio,
+      fechaHoraFin: indisponibilidad.fechaHoraFin,
+      motivo: indisponibilidad.motivo,
+      activo: indisponibilidad.activo,
+    };
 
     const inicio =
       dto.fechaHoraInicio !== undefined
@@ -1426,11 +1494,14 @@ export class AulasService {
       entidad: 'INDISPONIBILIDAD',
       entidadId: indisponibilidad.id,
       detalle: {
-        tipo: indisponibilidad.tipo,
-        fechaHoraInicio: indisponibilidad.fechaHoraInicio,
-        fechaHoraFin: indisponibilidad.fechaHoraFin,
-        motivo: indisponibilidad.motivo,
-        activo: indisponibilidad.activo,
+        antes,
+        despues: {
+          tipo: indisponibilidad.tipo,
+          fechaHoraInicio: indisponibilidad.fechaHoraInicio,
+          fechaHoraFin: indisponibilidad.fechaHoraFin,
+          motivo: indisponibilidad.motivo,
+          activo: indisponibilidad.activo,
+        },
       },
     });
 
@@ -1443,10 +1514,12 @@ export class AulasService {
     activo: boolean,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
-    await this.obtenerEntidadPorId(aulaId);
+    const aula = await this.obtenerEntidadPorId(aulaId);
     const indisponibilidad = await this.obtenerIndisponibilidadAula(aulaId, id);
 
     if (activo && !indisponibilidad.activo) {
+      this.validarAulaActivaParaOcupacion(aula);
+
       await this.validarCruceIndisponibilidad(
         aulaId,
         new Date(indisponibilidad.fechaHoraInicio),
@@ -1454,6 +1527,8 @@ export class AulasService {
         id,
       );
     }
+
+    const activoAnterior = indisponibilidad.activo;
 
     indisponibilidad.activo = activo;
     await this.indisponibilidadAulaRepository.save(indisponibilidad);
@@ -1465,7 +1540,12 @@ export class AulasService {
       entidad: 'INDISPONIBILIDAD',
       entidadId: indisponibilidad.id,
       detalle: {
-        activo: indisponibilidad.activo,
+        antes: {
+          activo: activoAnterior,
+        },
+        despues: {
+          activo: indisponibilidad.activo,
+        },
       },
     });
 
@@ -1493,9 +1573,7 @@ export class AulasService {
   ): Promise<ReservaAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    if (!aula.activo) {
-      throw new BadRequestException('No se puede reservar un aula inactiva.');
-    }
+    this.validarAulaActivaParaOcupacion(aula);
 
     const inicio = this.convertirFechaHora(dto.fechaHoraInicio);
     const fin = this.convertirFechaHora(dto.fechaHoraFin);
@@ -1545,8 +1623,20 @@ export class AulasService {
     dto: ActualizarReservaAulaDto,
     usuarioId?: number,
   ): Promise<ReservaAula> {
-    await this.obtenerEntidadPorId(aulaId);
+    const aula = await this.obtenerEntidadPorId(aulaId);
+
+    this.validarAulaActivaParaOcupacion(aula);
+
     const reserva = await this.obtenerReservaAula(aulaId, id);
+
+    const antes = {
+      tipo: reserva.tipo,
+      titulo: reserva.titulo,
+      descripcion: reserva.descripcion,
+      fechaHoraInicio: reserva.fechaHoraInicio,
+      fechaHoraFin: reserva.fechaHoraFin,
+      activo: reserva.activo,
+    };
 
     const inicio =
       dto.fechaHoraInicio !== undefined
@@ -1590,12 +1680,15 @@ export class AulasService {
       entidad: 'RESERVA',
       entidadId: reserva.id,
       detalle: {
-        tipo: reserva.tipo,
-        titulo: reserva.titulo,
-        descripcion: reserva.descripcion,
-        fechaHoraInicio: reserva.fechaHoraInicio,
-        fechaHoraFin: reserva.fechaHoraFin,
-        activo: reserva.activo,
+        antes,
+        despues: {
+          tipo: reserva.tipo,
+          titulo: reserva.titulo,
+          descripcion: reserva.descripcion,
+          fechaHoraInicio: reserva.fechaHoraInicio,
+          fechaHoraFin: reserva.fechaHoraFin,
+          activo: reserva.activo,
+        },
       },
     });
 
@@ -1612,11 +1705,7 @@ export class AulasService {
     const reserva = await this.obtenerReservaAula(aulaId, id);
 
     if (activo) {
-      if (!aula.activo) {
-        throw new BadRequestException(
-          'No se puede reactivar una reserva en un aula inactiva.',
-        );
-      }
+      this.validarAulaActivaParaOcupacion(aula);
 
       if (!reserva.activo) {
         await this.validarCruceReserva(
@@ -1628,6 +1717,8 @@ export class AulasService {
       }
     }
 
+    const activoAnterior = reserva.activo;
+
     reserva.activo = activo;
     await this.reservaAulaRepository.save(reserva);
 
@@ -1638,7 +1729,12 @@ export class AulasService {
       entidad: 'RESERVA',
       entidadId: reserva.id,
       detalle: {
-        activo: reserva.activo,
+        antes: {
+          activo: activoAnterior,
+        },
+        despues: {
+          activo: reserva.activo,
+        },
       },
     });
 
@@ -1790,6 +1886,14 @@ export class AulasService {
     }
   }
 
+  private validarAulaActivaParaDisponibilidad(aula: Aula): void {
+    if (!aula.activo) {
+      throw new BadRequestException(
+        'No se puede modificar la disponibilidad de un aula inactiva.',
+      );
+    }
+  }
+
   private async validarPeriodoDisponibilidadEditable(periodoId: number) {
     const periodo =
       await this.periodosAcademicosService.obtenerPorId(periodoId);
@@ -1892,11 +1996,7 @@ export class AulasService {
   ): Promise<DisponibilidadAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    if (!aula.activo) {
-      throw new BadRequestException(
-        'No se puede configurar disponibilidad para un aula inactiva.',
-      );
-    }
+    this.validarAulaActivaParaDisponibilidad(aula);
 
     await this.validarPeriodoDisponibilidadEditable(dto.periodoId);
 
@@ -1946,11 +2046,7 @@ export class AulasService {
   ): Promise<DisponibilidadAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    if (!aula.activo) {
-      throw new BadRequestException(
-        'No se puede modificar la disponibilidad de un aula inactiva.',
-      );
-    }
+    this.validarAulaActivaParaDisponibilidad(aula);
 
     const disponibilidad = await this.obtenerDisponibilidadAula(aulaId, id);
 
@@ -2012,7 +2108,9 @@ export class AulasService {
     id: number,
     usuarioId?: number,
   ) {
-    await this.obtenerEntidadPorId(aulaId);
+    const aula = await this.obtenerEntidadPorId(aulaId);
+
+    this.validarAulaActivaParaDisponibilidad(aula);
 
     const disponibilidad = await this.obtenerDisponibilidadAula(aulaId, id);
 

@@ -138,12 +138,12 @@ export class ProfesoresService {
     disponibilidad: DisponibilidadProfesor | undefined,
     periodo: PeriodoAcademico,
   ): EstadoDisponibilidad {
-    if (!disponibilidad) {
-      return EstadoDisponibilidad.PENDIENTE;
-    }
-
     if (periodo.estado !== EstadoPeriodoAcademico.EN_PREPARACION) {
       return EstadoDisponibilidad.BLOQUEADA;
+    }
+
+    if (!disponibilidad) {
+      return EstadoDisponibilidad.PENDIENTE;
     }
 
     return disponibilidad.estado;

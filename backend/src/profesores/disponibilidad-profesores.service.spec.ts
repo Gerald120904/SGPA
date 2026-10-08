@@ -227,6 +227,28 @@ describe('DisponibilidadProfesoresService', () => {
     expect(resultado.bloques).toEqual([]);
   });
 
+  it.each([
+    EstadoPeriodoAcademico.BORRADOR,
+    EstadoPeriodoAcademico.EN_CURSO,
+    EstadoPeriodoAcademico.CERRADO,
+    EstadoPeriodoAcademico.CANCELADO,
+  ])(
+    'devuelve BLOQUEADA sin disponibilidad cuando el periodo está %s',
+    async (estado) => {
+      const periodo = crearPeriodo({ estado });
+
+      periodoRepository.findOne.mockResolvedValue(periodo);
+      disponibilidadRepository.findOne.mockResolvedValue(null);
+
+      const resultado = await service.consultarMiDisponibilidad(10, 2);
+
+      expect(resultado.registrada).toBe(false);
+      expect(resultado.estado).toBe(EstadoDisponibilidad.BLOQUEADA);
+      expect(resultado.puedeEditar).toBe(false);
+      expect(resultado.bloques).toEqual([]);
+    },
+  );
+
   it('ordena los bloques de lunes a domingo y por hora de inicio', async () => {
     const periodo = crearPeriodo();
 
