@@ -13,6 +13,7 @@ import { ValidarImportacionPlanDto } from './dto/validar-importacion-plan.dto';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { PlanRequisito } from './entities/plan-requisito.entity';
+import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import {
   SalidaAcademica,
   TipoSalidaAcademica,
@@ -37,6 +38,8 @@ export class PlanImportacionService {
     private readonly asignaturaRepository: Repository<PlanAsignatura>,
     @InjectRepository(SalidaAcademica)
     private readonly salidaRepository: Repository<SalidaAcademica>,
+    @InjectRepository(ReglaOptativaPlan)
+    private readonly reglaOptativaRepository: Repository<ReglaOptativaPlan>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -229,6 +232,67 @@ export class PlanImportacionService {
       }
     }
     return claves;
+  }
+
+  private validarReglaOptativasImportacion(
+    filas: Fila[],
+    regla: ReglaOptativaPlan | null,
+    problemas: ProblemaImportacion[],
+  ) {
+    const optativas = filas.filter(
+      (fila) => this.mayuscula(fila.TIPO) === TipoPlanAsignatura.OPTATIVA,
+    );
+
+    if (!optativas.length) {
+      return;
+    }
+
+    if (!regla) {
+      this.agregar(
+        problemas,
+        'ERROR',
+        'REGLA_OPTATIVAS_NO_CONFIGURADA',
+        'ASIGNATURAS',
+        null,
+        'Antes de importar asignaturas OPTATIVA debe configurar la Regla de optativas del plan.',
+      );
+      return;
+    }
+
+    const configuracion = [
+      {
+        tipo: TipoOptativa.DISCIPLINARIA,
+        limite: Number(regla.cantidadDisciplinarias || 0),
+        etiqueta: 'disciplinarias / de carrera',
+      },
+      {
+        tipo: TipoOptativa.ABIERTA,
+        limite: Number(regla.cantidadAbiertas || 0),
+        etiqueta: 'abiertas',
+      },
+      {
+        tipo: TipoOptativa.SEDE,
+        limite: Number(regla.cantidadSede || 0),
+        etiqueta: 'de sede',
+      },
+    ];
+
+    for (const item of configuracion) {
+      const cantidad = optativas.filter(
+        (fila) => this.mayuscula(fila.TIPO_OPTATIVA) === item.tipo,
+      ).length;
+
+      if (cantidad > item.limite) {
+        this.agregar(
+          problemas,
+          'ERROR',
+          'LIMITE_OPTATIVAS_IMPORTACION_SUPERADO',
+          'ASIGNATURAS',
+          null,
+          `El archivo contiene ${cantidad} optativas ${item.etiqueta}, pero la regla del plan permite ${item.limite}.`,
+        );
+      }
+    }
   }
 
   private validarRequisitos(
@@ -438,10 +502,14 @@ export class PlanImportacionService {
         null,
         'No se puede importar información a un plan inactivo.',
       );
-    const [asignaturasExistentes, salidasExistentes] = await Promise.all([
-      this.asignaturaRepository.count({ where: { planEstudioId: planId } }),
-      this.salidaRepository.count({ where: { planEstudioId: planId } }),
-    ]);
+    const [asignaturasExistentes, salidasExistentes, reglaOptativas] =
+      await Promise.all([
+        this.asignaturaRepository.count({ where: { planEstudioId: planId } }),
+        this.salidaRepository.count({ where: { planEstudioId: planId } }),
+        this.reglaOptativaRepository.findOne({
+          where: { planEstudioId: planId },
+        }),
+      ]);
     if (asignaturasExistentes || salidasExistentes)
       this.agregar(
         problemas,
@@ -452,6 +520,11 @@ export class PlanImportacionService {
         'La importación completa solo puede realizarse sobre un plan sin asignaturas ni salidas académicas.',
       );
     const asignaturas = this.validarAsignaturas(dto.asignaturas, problemas);
+    this.validarReglaOptativasImportacion(
+      dto.asignaturas,
+      reglaOptativas,
+      problemas,
+    );
     this.validarRequisitos(dto.requisitos, asignaturas, problemas);
     const salidas = this.validarSalidas(dto.salidas, problemas);
     this.validarAsignaturasSalidas(

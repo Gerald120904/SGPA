@@ -1,12 +1,12 @@
-import { app, BrowserWindow, ipcMain, net, shell } from "electron";
+import { app, BrowserWindow, ipcMain, net } from "electron";
 import path from "node:path";
 import started from "electron-squirrel-startup";
 
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
-import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 
 const API_URL = "http://127.0.0.1:3000";
 let accessToken = null;
+
 
 async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
   if (!accessToken) {
@@ -78,14 +78,12 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
 registrarPlanImportacionIpc({
   ejecutarPeticionAutenticada,
 });
-registrarEstudiantesImportacionIpc({
-  ejecutarPeticionAutenticada,
-});
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
 
 ipcMain.handle("auth:login", async (_event, credenciales) => {
   try {
@@ -314,69 +312,99 @@ ipcMain.handle("roles:listar", async () => {
    PERMISOS
    ========================================================= */
 
-ipcMain.handle("permisos:catalogo", async () => {
-  const resultado = await ejecutarPeticionAutenticada("/permisos/catalogo");
+ipcMain.handle(
+  "permisos:catalogo",
+  async () => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        "/permisos/catalogo",
+      );
 
-  if (!resultado.ok) {
-    return resultado;
-  }
+    if (!resultado.ok) {
+      return resultado;
+    }
 
-  return {
-    ok: true,
-    permisos: resultado.data,
-  };
-});
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
 
-ipcMain.handle("permisos:usuario", async (_event, usuarioId) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/permisos/usuarios/${usuarioId}`,
-  );
 
-  if (!resultado.ok) {
-    return resultado;
-  }
+ipcMain.handle(
+  "permisos:usuario",
+  async (_event, usuarioId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/permisos/usuarios/${usuarioId}`,
+      );
 
-  return {
-    ok: true,
-    permisos: resultado.data,
-  };
-});
+    if (!resultado.ok) {
+      return resultado;
+    }
 
-ipcMain.handle("permisos:reemplazar", async (_event, usuarioId, permisos) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/permisos/usuarios/${usuarioId}`,
-    {
-      method: "PUT",
-      body: {
-        permisos,
-      },
-    },
-  );
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
 
-  if (!resultado.ok) {
-    return resultado;
-  }
 
-  return {
-    ok: true,
-    permisos: resultado.data,
-  };
-});
+ipcMain.handle(
+  "permisos:reemplazar",
+  async (
+    _event,
+    usuarioId,
+    permisos,
+  ) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/permisos/usuarios/${usuarioId}`,
+        {
+          method: "PUT",
+          body: {
+            permisos,
+          },
+        },
+      );
 
-ipcMain.handle("permisos:plantillas", async () => {
-  const resultado = await ejecutarPeticionAutenticada(
-    "/permisos/plantillas-roles",
-  );
+    if (!resultado.ok) {
+      return resultado;
+    }
 
-  if (!resultado.ok) {
-    return resultado;
-  }
+    return {
+      ok: true,
+      permisos: resultado.data,
+    };
+  },
+);
 
-  return {
-    ok: true,
-    plantillas: resultado.data,
-  };
-});
+
+ipcMain.handle(
+  'permisos:plantillas',
+  async () => {
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/permisos/plantillas-roles',
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      plantillas:
+        resultado.data,
+    };
+
+  },
+);
 
 /* =========================================================
    CARRERAS
@@ -419,106 +447,6 @@ ipcMain.handle("carreras:cambiar-estado", async (_event, id, activo) => {
     body: { activo },
   });
 });
-
-/* =========================================================
-   PERFILES ACADÉMICOS
-   ========================================================= */
-
-ipcMain.handle("perfiles-academicos:listar", async () => {
-  return ejecutarPeticionAutenticada("/perfiles-academicos");
-});
-
-ipcMain.handle("perfiles-academicos:obtener", async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}`);
-});
-
-ipcMain.handle("perfiles-academicos:crear", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/perfiles-academicos", {
-    method: "POST",
-    body: datos,
-  });
-});
-
-ipcMain.handle("perfiles-academicos:actualizar", async (_event, id, datos) => {
-  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}`, {
-    method: "PATCH",
-    body: datos,
-  });
-});
-
-ipcMain.handle(
-  "perfiles-academicos:cambiar-estado",
-  async (_event, id, activo) => {
-    return ejecutarPeticionAutenticada(
-      `/perfiles-academicos/${id}/estado`,
-      {
-        method: "PATCH",
-        body: { activo },
-      },
-    );
-  },
-);
-
-ipcMain.handle("perfiles-academicos:areas:listar", async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/areas`);
-});
-
-ipcMain.handle(
-  "perfiles-academicos:areas:guardar",
-  async (_event, id, areas) => {
-    return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/areas`, {
-      method: "PUT",
-      body: { areas },
-    });
-  },
-);
-
-ipcMain.handle("perfiles-academicos:requisitos:listar", async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/perfiles-academicos/${id}/requisitos`);
-});
-
-ipcMain.handle(
-  "perfiles-academicos:requisitos:guardar",
-  async (_event, id, requisitos) => {
-    return ejecutarPeticionAutenticada(
-      `/perfiles-academicos/${id}/requisitos`,
-      { method: "PUT", body: { requisitos } },
-    );
-  },
-);
-
-ipcMain.handle(
-  "perfiles-academicos:cursos:listar",
-  async (_event, perfilId) => {
-    return ejecutarPeticionAutenticada(
-      `/perfiles-academicos/${perfilId}/cursos`,
-    );
-  },
-);
-
-ipcMain.handle(
-  "perfiles-academicos:cursos:asociar",
-  async (_event, perfilId, cursoId) => {
-    return ejecutarPeticionAutenticada(
-      `/perfiles-academicos/${perfilId}/cursos/${cursoId}`,
-      {
-        method: "POST",
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  "perfiles-academicos:cursos:desasociar",
-  async (_event, perfilId, cursoId) => {
-    return ejecutarPeticionAutenticada(
-      `/perfiles-academicos/${perfilId}/cursos/${cursoId}`,
-      {
-        method: "DELETE",
-      },
-    );
-  },
-);
 
 /* =========================================================
    CURSOS
@@ -639,7 +567,10 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle("periodos:listar", async () => {
-  const resultado = await ejecutarPeticionAutenticada("/periodos-academicos");
+  const resultado =
+    await ejecutarPeticionAutenticada(
+      "/periodos-academicos",
+    );
 
   if (!resultado.ok) {
     return resultado;
@@ -651,32 +582,55 @@ ipcMain.handle("periodos:listar", async () => {
   };
 });
 
-ipcMain.handle("periodos:obtener", async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/periodos-academicos/${id}`);
-});
+ipcMain.handle(
+  "periodos:obtener",
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/periodos-academicos/${id}`,
+    );
+  },
+);
 
-ipcMain.handle("periodos:crear", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/periodos-academicos", {
-    method: "POST",
-    body: datos,
-  });
-});
+ipcMain.handle(
+  "periodos:crear",
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      "/periodos-academicos",
+      {
+        method: "POST",
+        body: datos,
+      },
+    );
+  },
+);
 
-ipcMain.handle("periodos:actualizar", async (_event, id, datos) => {
-  return ejecutarPeticionAutenticada(`/periodos-academicos/${id}`, {
-    method: "PATCH",
-    body: datos,
-  });
-});
+ipcMain.handle(
+  "periodos:actualizar",
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/periodos-academicos/${id}`,
+      {
+        method: "PATCH",
+        body: datos,
+      },
+    );
+  },
+);
 
-ipcMain.handle("periodos:cambiar-estado", async (_event, id, estado) => {
-  return ejecutarPeticionAutenticada(`/periodos-academicos/${id}/estado`, {
-    method: "PATCH",
-    body: {
-      estado,
-    },
-  });
-});
+ipcMain.handle(
+  "periodos:cambiar-estado",
+  async (_event, id, estado) => {
+    return ejecutarPeticionAutenticada(
+      `/periodos-academicos/${id}/estado`,
+      {
+        method: "PATCH",
+        body: {
+          estado,
+        },
+      },
+    );
+  },
+);
 
 /* =========================================================
    PLANES DE ESTUDIO
@@ -736,9 +690,8 @@ ipcMain.handle("plan-reglas-optativas:obtener", async (_event, planId) => {
   return {
     ok: true,
     regla: resultado.data?.regla ?? null,
-    cantidadEspaciosOptativos: Number(
-      resultado.data?.cantidadEspaciosOptativos || 0,
-    ),
+    cantidadEspaciosOptativos:
+      Number(resultado.data?.cantidadEspaciosOptativos || 0),
   };
 });
 
@@ -1068,38 +1021,60 @@ ipcMain.handle(
    PROFESORES
    ========================================================= */
 
-ipcMain.handle("profesores:listar", async (_event, filtros = {}) => {
-  const params = new URLSearchParams();
+ipcMain.handle(
+  'profesores:listar',
+  async (_event, filtros = {}) => {
+    const params = new URLSearchParams();
 
-  Object.entries(filtros).forEach(([clave, valor]) => {
-    if (valor !== undefined && valor !== null && valor !== "") {
-      params.set(clave, String(valor));
+    Object.entries(filtros).forEach(
+      ([clave, valor]) => {
+        if (
+          valor !== undefined &&
+          valor !== null &&
+          valor !== ''
+        ) {
+          params.set(
+            clave,
+            String(valor),
+          );
+        }
+      },
+    );
+
+    const query = params.toString();
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/profesores${query ? `?${query}` : ''}`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
     }
-  });
 
-  const query = params.toString();
-
-  const resultado = await ejecutarPeticionAutenticada(
-    `/profesores${query ? `?${query}` : ""}`,
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    profesores: resultado.data,
-  };
-});
-
-ipcMain.handle("profesores:obtener", async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/profesores/${id}`);
-});
+    return {
+      ok: true,
+      profesores: resultado.data,
+    };
+  },
+);
 
 ipcMain.handle(
-  "profesores:disponibilidad",
-  async (_event, profesorId, periodoId) => {
+  'profesores:obtener',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/${id}`,
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:disponibilidad',
+  async (
+    _event,
+    profesorId,
+    periodoId,
+  ) => {
     return ejecutarPeticionAutenticada(
       `/profesores/${profesorId}/disponibilidad/${periodoId}`,
     );
@@ -1111,67 +1086,17 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  "profesores:expediente-perfil",
-  async (_event, profesorId, perfilId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/perfiles/${perfilId}/expediente`,
-    );
-  },
-);
-
-ipcMain.handle(
-  "profesores:revisar-requisito-perfil",
+  'profesores:revisar-perfil',
   async (
     _event,
     profesorId,
     perfilId,
-    requisitoId,
     datos,
   ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/perfiles/${perfilId}/requisitos/${requisitoId}/revision`,
-      {
-        method: "PATCH",
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  "profesores:mi-expediente-perfil",
-  async (_event, perfilId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/perfiles/${perfilId}/expediente`,
-    );
-  },
-);
-
-ipcMain.handle(
-  "profesores:guardar-evidencias-requisito",
-  async (
-    _event,
-    perfilId,
-    requisitoId,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/perfiles/${perfilId}/requisitos/${requisitoId}/evidencias`,
-      {
-        method: "PUT",
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  "profesores:revisar-perfil",
-  async (_event, profesorId, perfilId, datos) => {
     return ejecutarPeticionAutenticada(
       `/profesores/${profesorId}/perfiles/${perfilId}/revision`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         body: datos,
       },
     );
@@ -1179,12 +1104,17 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "profesores:inactivar-perfil",
-  async (_event, profesorId, perfilId, observacion) => {
+  'profesores:inactivar-perfil',
+  async (
+    _event,
+    profesorId,
+    perfilId,
+    observacion,
+  ) => {
     return ejecutarPeticionAutenticada(
       `/profesores/${profesorId}/perfiles/${perfilId}/inactivar`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         body: {
           observacion,
         },
@@ -1194,12 +1124,17 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "profesores:revisar-atestado",
-  async (_event, profesorId, atestadoId, datos) => {
+  'profesores:revisar-atestado',
+  async (
+    _event,
+    profesorId,
+    atestadoId,
+    datos,
+  ) => {
     return ejecutarPeticionAutenticada(
       `/profesores/${profesorId}/atestados/${atestadoId}/revision`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         body: datos,
       },
     );
@@ -1210,51 +1145,88 @@ ipcMain.handle(
    PROFESORES - AUTOGESTIÓN
    ========================================================= */
 
-ipcMain.handle("profesores:mi-perfil", async () => {
-  return ejecutarPeticionAutenticada("/profesores/mi-perfil");
-});
-
-ipcMain.handle("profesores:mis-perfiles", async () => {
-  return ejecutarPeticionAutenticada("/profesores/mi-perfil/perfiles");
-});
-
-
-ipcMain.handle("profesores:perfiles-disponibles", async () => {
-  return ejecutarPeticionAutenticada(
-    "/profesores/mi-perfil/perfiles-disponibles",
-  );
-});
-
 ipcMain.handle(
-  "profesores:solicitar-perfil",
-  async (_event, perfilAcademicoId) => {
-    return ejecutarPeticionAutenticada("/profesores/mi-perfil/perfiles", {
-      method: "POST",
-      body: {
-        perfilAcademicoId,
-      },
-    });
+  'profesores:mi-perfil',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil',
+    );
   },
 );
 
-ipcMain.handle("profesores:mis-atestados", async () => {
-  return ejecutarPeticionAutenticada("/profesores/mi-perfil/atestados");
-});
-
-ipcMain.handle("profesores:crear-atestado", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/profesores/mi-perfil/atestados", {
-    method: "POST",
-    body: datos,
-  });
-});
+ipcMain.handle(
+  'profesores:mis-carreras-disponibles',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/carreras-disponibles',
+    );
+  },
+);
 
 ipcMain.handle(
-  "profesores:actualizar-atestado",
-  async (_event, atestadoId, datos) => {
+  'profesores:actualizar-mis-carreras',
+  async (_event, carreraIds) => {
     return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/atestados/${atestadoId}`,
+      '/profesores/mi-perfil/carreras',
       {
-        method: "PATCH",
+        method: 'PUT',
+        body: {
+          carreraIds,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:mis-perfiles',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/perfiles',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:perfiles-disponibles',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/perfiles-disponibles',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:solicitar-perfil',
+  async (_event, perfilAcademicoId) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/perfiles',
+      {
+        method: 'POST',
+        body: {
+          perfilAcademicoId,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:mis-atestados',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/atestados',
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:crear-atestado',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/atestados',
+      {
+        method: 'POST',
         body: datos,
       },
     );
@@ -1262,12 +1234,25 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "profesores:inactivar-mi-atestado",
+  'profesores:actualizar-atestado',
+  async (_event, atestadoId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/atestados/${atestadoId}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:inactivar-mi-atestado',
   async (_event, atestadoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-perfil/atestados/${atestadoId}/inactivar`,
       {
-        method: "PATCH",
+        method: 'PATCH',
       },
     );
   },
@@ -1277,24 +1262,22 @@ ipcMain.handle(
    PROFESORES - PROYECTOS / LABORATORIOS
    ========================================================= */
 
-ipcMain.handle("profesores:mis-proyectos", async () => {
-  return ejecutarPeticionAutenticada("/profesores/mi-perfil/proyectos");
-});
-
-ipcMain.handle("profesores:crear-proyecto", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/profesores/mi-perfil/proyectos", {
-    method: "POST",
-    body: datos,
-  });
-});
+ipcMain.handle(
+  'profesores:mis-proyectos',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-perfil/proyectos',
+    );
+  },
+);
 
 ipcMain.handle(
-  "profesores:actualizar-proyecto",
-  async (_event, proyectoId, datos) => {
+  'profesores:crear-proyecto',
+  async (_event, datos) => {
     return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/proyectos/${proyectoId}`,
+      '/profesores/mi-perfil/proyectos',
       {
-        method: "PATCH",
+        method: 'POST',
         body: datos,
       },
     );
@@ -1302,12 +1285,25 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "profesores:cambiar-estado-proyecto",
+  'profesores:actualizar-proyecto',
+  async (_event, proyectoId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/profesores/mi-perfil/proyectos/${proyectoId}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'profesores:cambiar-estado-proyecto',
   async (_event, proyectoId, activo) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-perfil/proyectos/${proyectoId}/estado`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         body: {
           activo,
         },
@@ -1320,12 +1316,17 @@ ipcMain.handle(
    PROFESORES - MI DISPONIBILIDAD
    ========================================================= */
 
-ipcMain.handle("profesores:periodos-mi-disponibilidad", async () => {
-  return ejecutarPeticionAutenticada("/profesores/mi-disponibilidad/periodos");
-});
+ipcMain.handle(
+  'profesores:periodos-mi-disponibilidad',
+  async () => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-disponibilidad/periodos',
+    );
+  },
+);
 
 ipcMain.handle(
-  "profesores:consultar-mi-disponibilidad",
+  'profesores:consultar-mi-disponibilidad',
   async (_event, periodoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-disponibilidad/${periodoId}`,
@@ -1334,24 +1335,33 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "profesores:guardar-mi-disponibilidad",
+  'profesores:guardar-mi-disponibilidad',
   async (_event, datos) => {
-    return ejecutarPeticionAutenticada("/profesores/mi-disponibilidad", {
-      method: "PUT",
-      body: datos,
-    });
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-disponibilidad',
+      {
+        method: 'PUT',
+        body: datos,
+      },
+    );
   },
 );
 
-ipcMain.handle("profesores:copiar-mi-disponibilidad", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/profesores/mi-disponibilidad/copiar", {
-    method: "POST",
-    body: datos,
-  });
-});
+ipcMain.handle(
+  'profesores:copiar-mi-disponibilidad',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/profesores/mi-disponibilidad/copiar',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
 
 ipcMain.handle(
-  "profesores:historial-mi-disponibilidad",
+  'profesores:historial-mi-disponibilidad',
   async (_event, periodoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-disponibilidad/${periodoId}/historial`,
@@ -1363,130 +1373,62 @@ ipcMain.handle(
    AULAS
    ========================================================= */
 
-ipcMain.handle("aulas:listar", async (_event, filtros = {}) => {
-  const params = new URLSearchParams();
-
-  Object.entries(filtros).forEach(([clave, valor]) => {
-    if (valor !== undefined && valor !== null && valor !== "") {
-      params.set(clave, String(valor));
-    }
-  });
-
-  const query = params.toString();
-
-  const resultado = await ejecutarPeticionAutenticada(
-    `/aulas${query ? `?${query}` : ""}`,
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    aulas: resultado.data,
-  };
-});
-
-ipcMain.handle("aulas:obtener", async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/aulas/${id}`);
-});
-
-ipcMain.handle("aulas:crear", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/aulas", {
-    method: "POST",
-    body: datos,
-  });
-});
-
-ipcMain.handle("aulas:actualizar", async (_event, id, datos) => {
-  return ejecutarPeticionAutenticada(`/aulas/${id}`, {
-    method: "PATCH",
-    body: datos,
-  });
-});
-
-ipcMain.handle("aulas:cambiar-estado", async (_event, id, activo) => {
-  return ejecutarPeticionAutenticada(`/aulas/${id}/estado`, {
-    method: "PATCH",
-    body: {
-      activo,
-    },
-  });
-});
-
-/* =========================================================
-   AULAS - EQUIPAMIENTO
-   ========================================================= */
-
-ipcMain.handle("aulas:equipamientos:listar", async () => {
-  const resultado = await ejecutarPeticionAutenticada("/aulas/equipamientos");
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    equipamientos: resultado.data,
-  };
-});
-
-ipcMain.handle("aulas:equipamientos:crear", async (_event, datos) => {
-  return ejecutarPeticionAutenticada("/aulas/equipamientos", {
-    method: "POST",
-    body: datos,
-  });
-});
-
-ipcMain.handle("aulas:equipamientos:actualizar", async (_event, id, datos) => {
-  return ejecutarPeticionAutenticada(`/aulas/equipamientos/${id}`, {
-    method: "PATCH",
-    body: datos,
-  });
-});
-
 ipcMain.handle(
-  "aulas:equipamientos:cambiar-estado",
-  async (_event, id, activo) => {
-    return ejecutarPeticionAutenticada(`/aulas/equipamientos/${id}/estado`, {
-      method: "PATCH",
-      body: {
-        activo,
+  'aulas:listar',
+  async (_event, filtros = {}) => {
+    const params =
+      new URLSearchParams();
+
+    Object.entries(filtros).forEach(
+      ([clave, valor]) => {
+        if (
+          valor !== undefined &&
+          valor !== null &&
+          valor !== ''
+        ) {
+          params.set(
+            clave,
+            String(valor),
+          );
+        }
       },
-    });
+    );
+
+    const query =
+      params.toString();
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas${query ? `?${query}` : ''}`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      aulas: resultado.data,
+    };
   },
 );
 
-ipcMain.handle("aulas:equipo-aula:listar", async (_event, aulaId) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/aulas/${aulaId}/equipamientos`,
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    equipamientos: resultado.data,
-  };
-});
-
-ipcMain.handle("aulas:equipo-aula:asignar", async (_event, aulaId, datos) => {
-  return ejecutarPeticionAutenticada(`/aulas/${aulaId}/equipamientos`, {
-    method: "POST",
-    body: datos,
-  });
-});
+ipcMain.handle(
+  'aulas:obtener',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${id}`,
+    );
+  },
+);
 
 ipcMain.handle(
-  "aulas:equipo-aula:actualizar",
-  async (_event, aulaId, equipamientoId, datos) => {
+  'aulas:crear',
+  async (_event, datos) => {
     return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/equipamientos/${equipamientoId}`,
+      '/aulas',
       {
-        method: "PATCH",
+        method: 'POST',
         body: datos,
       },
     );
@@ -1494,12 +1436,175 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "aulas:equipo-aula:cambiar-estado",
-  async (_event, aulaId, equipamientoId, activo) => {
+  'aulas:actualizar',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:cambiar-estado',
+  async (_event, id, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - EQUIPAMIENTO
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:equipamientos:listar',
+  async () => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/aulas/equipamientos',
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      equipamientos: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipamientos:crear',
+  async (_event, datos) => {
+    return ejecutarPeticionAutenticada(
+      '/aulas/equipamientos',
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipamientos:actualizar',
+  async (_event, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/equipamientos/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipamientos:cambiar-estado',
+  async (_event, id, activo) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/equipamientos/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: {
+          activo,
+        },
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/equipamientos`,
+      );
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    return {
+      ok: true,
+      equipamientos: resultado.data,
+    };
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:asignar',
+  async (_event, aulaId, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/equipamientos`,
+      {
+        method: 'POST',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:actualizar',
+  async (
+    _event,
+    aulaId,
+    equipamientoId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/equipamientos/${equipamientoId}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:desasignar',
+  async (
+    _event,
+    aulaId,
+    equipamientoId,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/equipamientos/${equipamientoId}`,
+      {
+        method: 'DELETE',
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:equipo-aula:cambiar-estado',
+  async (
+    _event,
+    aulaId,
+    equipamientoId,
+    activo,
+  ) => {
     return ejecutarPeticionAutenticada(
       `/aulas/${aulaId}/equipamientos/${equipamientoId}/estado`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         body: {
           activo,
         },
@@ -1512,23 +1617,27 @@ ipcMain.handle(
    AULAS - INDISPONIBILIDADES
    ========================================================= */
 
-ipcMain.handle("aulas:indisponibilidades:listar", async (_event, aulaId) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/aulas/${aulaId}/indisponibilidades`,
-  );
+ipcMain.handle(
+  'aulas:indisponibilidades:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/indisponibilidades`,
+      );
 
-  if (!resultado.ok) {
-    return resultado;
-  }
+    if (!resultado.ok) {
+      return resultado;
+    }
 
-  return {
-    ok: true,
-    indisponibilidades: resultado.data,
-  };
-});
+    return {
+      ok: true,
+      indisponibilidades: resultado.data,
+    };
+  },
+);
 
 ipcMain.handle(
-  "aulas:indisponibilidades:obtener",
+  'aulas:indisponibilidades:obtener',
   async (_event, aulaId, id) => {
     return ejecutarPeticionAutenticada(
       `/aulas/${aulaId}/indisponibilidades/${id}`,
@@ -1537,22 +1646,12 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "aulas:indisponibilidades:crear",
+  'aulas:indisponibilidades:crear',
   async (_event, aulaId, datos) => {
-    return ejecutarPeticionAutenticada(`/aulas/${aulaId}/indisponibilidades`, {
-      method: "POST",
-      body: datos,
-    });
-  },
-);
-
-ipcMain.handle(
-  "aulas:indisponibilidades:actualizar",
-  async (_event, aulaId, id, datos) => {
     return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/indisponibilidades/${id}`,
+      `/aulas/${aulaId}/indisponibilidades`,
       {
-        method: "PATCH",
+        method: 'POST',
         body: datos,
       },
     );
@@ -1560,12 +1659,30 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "aulas:indisponibilidades:cambiar-estado",
-  async (_event, aulaId, id, activo) => {
+  'aulas:indisponibilidades:actualizar',
+  async (_event, aulaId, id, datos) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/indisponibilidades/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+ipcMain.handle(
+  'aulas:indisponibilidades:cambiar-estado',
+  async (
+    _event,
+    aulaId,
+    id,
+    activo,
+  ) => {
     return ejecutarPeticionAutenticada(
       `/aulas/${aulaId}/indisponibilidades/${id}/estado`,
       {
-        method: "PATCH",
+        method: 'PATCH',
         body: {
           activo,
         },
@@ -1578,78 +1695,13 @@ ipcMain.handle(
    AULAS - RESERVAS EXTRAORDINARIAS
    ========================================================= */
 
-ipcMain.handle("aulas:reservas:listar", async (_event, aulaId) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/aulas/${aulaId}/reservas`,
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    reservas: resultado.data,
-  };
-});
-
-ipcMain.handle("aulas:reservas:obtener", async (_event, aulaId, id) =>
-  ejecutarPeticionAutenticada(`/aulas/${aulaId}/reservas/${id}`),
-);
-
-ipcMain.handle("aulas:reservas:crear", async (_event, aulaId, datos) =>
-  ejecutarPeticionAutenticada(`/aulas/${aulaId}/reservas`, {
-    method: "POST",
-    body: datos,
-  }),
-);
-
-ipcMain.handle("aulas:reservas:actualizar", async (_event, aulaId, id, datos) =>
-  ejecutarPeticionAutenticada(`/aulas/${aulaId}/reservas/${id}`, {
-    method: "PATCH",
-    body: datos,
-  }),
-);
-
 ipcMain.handle(
-  "aulas:reservas:cambiar-estado",
-  async (_event, aulaId, id, activo) =>
-    ejecutarPeticionAutenticada(`/aulas/${aulaId}/reservas/${id}/estado`, {
-      method: "PATCH",
-      body: { activo },
-    }),
-);
-
-/* =========================================================
-   AULAS - OCUPACIÓN
-   ========================================================= */
-
-ipcMain.handle("aulas:ocupacion", async (_event, aulaId, filtros) => {
-  const params = new URLSearchParams({
-    fechaHoraInicio: filtros.fechaHoraInicio,
-
-    fechaHoraFin: filtros.fechaHoraFin,
-  });
-
-  return ejecutarPeticionAutenticada(
-    `/aulas/${aulaId}/ocupacion?${params.toString()}`,
-  );
-});
-
-/* =========================================================
-   AULAS - DISPONIBILIDAD BASE
-   ========================================================= */
-
-ipcMain.handle(
-  "aulas:disponibilidades:listar",
-  async (_event, aulaId, periodoId) => {
-    const params = new URLSearchParams({
-      periodoId: String(periodoId),
-    });
-
-    const resultado = await ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/disponibilidades?${params.toString()}`,
-    );
+  'aulas:reservas:listar',
+  async (_event, aulaId) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/reservas`,
+      );
 
     if (!resultado.ok) {
       return resultado;
@@ -1657,41 +1709,173 @@ ipcMain.handle(
 
     return {
       ok: true,
-      disponibilidades: resultado.data,
+      reservas: resultado.data,
     };
   },
 );
 
 ipcMain.handle(
-  "aulas:disponibilidades:crear",
-  async (_event, aulaId, datos) => {
-    return ejecutarPeticionAutenticada(`/aulas/${aulaId}/disponibilidades`, {
-      method: "POST",
-      body: datos,
-    });
-  },
+  'aulas:reservas:obtener',
+  async (_event, aulaId, id) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas/${id}`,
+    ),
 );
 
 ipcMain.handle(
-  "aulas:disponibilidades:actualizar",
-  async (_event, aulaId, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/disponibilidades/${id}`,
+  'aulas:reservas:crear',
+  async (_event, aulaId, datos) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas`,
       {
-        method: "PATCH",
+        method: 'POST',
+        body: datos,
+      },
+    ),
+);
+
+ipcMain.handle(
+  'aulas:reservas:actualizar',
+  async (_event, aulaId, id, datos) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas/${id}`,
+      {
+        method: 'PATCH',
+        body: datos,
+      },
+    ),
+);
+
+ipcMain.handle(
+  'aulas:reservas:cambiar-estado',
+  async (
+    _event,
+    aulaId,
+    id,
+    activo,
+  ) =>
+    ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/reservas/${id}/estado`,
+      {
+        method: 'PATCH',
+        body: { activo },
+      },
+    ),
+);
+
+/* =========================================================
+   AULAS - OCUPACIÓN
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:ocupacion',
+  async (
+    _event,
+    aulaId,
+    filtros,
+  ) => {
+    const params =
+      new URLSearchParams({
+        fechaHoraInicio:
+          filtros.fechaHoraInicio,
+
+        fechaHoraFin:
+          filtros.fechaHoraFin,
+      });
+
+
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/ocupacion?${params.toString()}`,
+    );
+  },
+);
+
+/* =========================================================
+   AULAS - DISPONIBILIDAD BASE
+   ========================================================= */
+
+ipcMain.handle(
+  'aulas:disponibilidades:listar',
+  async (
+    _event,
+    aulaId,
+    periodoId,
+  ) => {
+    const params =
+      new URLSearchParams({
+        periodoId:
+          String(periodoId),
+      });
+
+
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        `/aulas/${aulaId}/disponibilidades?${params.toString()}`,
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      disponibilidades:
+        resultado.data,
+    };
+  },
+);
+
+
+ipcMain.handle(
+  'aulas:disponibilidades:crear',
+  async (
+    _event,
+    aulaId,
+    datos,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/disponibilidades`,
+      {
+        method: 'POST',
         body: datos,
       },
     );
   },
 );
 
+
 ipcMain.handle(
-  "aulas:disponibilidades:eliminar",
-  async (_event, aulaId, id) => {
+  'aulas:disponibilidades:actualizar',
+  async (
+    _event,
+    aulaId,
+    id,
+    datos,
+  ) => {
     return ejecutarPeticionAutenticada(
       `/aulas/${aulaId}/disponibilidades/${id}`,
       {
-        method: "DELETE",
+        method: 'PATCH',
+        body: datos,
+      },
+    );
+  },
+);
+
+
+ipcMain.handle(
+  'aulas:disponibilidades:eliminar',
+  async (
+    _event,
+    aulaId,
+    id,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/disponibilidades/${id}`,
+      {
+        method: 'DELETE',
       },
     );
   },
@@ -1701,320 +1885,60 @@ ipcMain.handle(
    AULAS - BÚSQUEDA / EVALUACIÓN
    ========================================================= */
 
-ipcMain.handle("aulas:buscar-disponibles", async (_event, criterios) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    "/aulas/buscar-disponibles",
-    {
-      method: "POST",
-      body: criterios,
-    },
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    aulas: resultado.data,
-  };
-});
-
 ipcMain.handle(
-  "aulas:evaluar-asignacion",
-  async (_event, aulaId, criterios) => {
-    return ejecutarPeticionAutenticada(`/aulas/${aulaId}/evaluar-asignacion`, {
-      method: "POST",
-      body: criterios,
-    });
+  'aulas:buscar-disponibles',
+  async (_event, criterios) => {
+    const resultado =
+      await ejecutarPeticionAutenticada(
+        '/aulas/buscar-disponibles',
+        {
+          method: 'POST',
+          body: criterios,
+        },
+      );
+
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+
+    return {
+      ok: true,
+      aulas: resultado.data,
+    };
   },
 );
+
+
+ipcMain.handle(
+  'aulas:evaluar-asignacion',
+  async (
+    _event,
+    aulaId,
+    criterios,
+  ) => {
+    return ejecutarPeticionAutenticada(
+      `/aulas/${aulaId}/evaluar-asignacion`,
+      {
+        method: 'POST',
+        body: criterios,
+      },
+    );
+  },
+);
+
 
 /* =========================================================
    AULAS - AUDITORÍA
    ========================================================= */
 
-ipcMain.handle("aulas:auditoria:listar", async (_event, aulaId) => {
-  const resultado = await ejecutarPeticionAutenticada(
-    `/aulas/${aulaId}/auditoria`,
-  );
-
-  if (!resultado.ok) {
-    return resultado;
-  }
-
-  return {
-    ok: true,
-    auditoria: resultado.data,
-  };
-});
-
-/* =========================================================
-   FORMULARIOS DE ESTUDIANTES
-   ========================================================= */
-
-console.log(
-  '[IPC] Registrando formularios-estudiantes:listar'
-);
-
-ipcMain.handle('formularios-estudiantes:listar', async () => {
-  return ejecutarPeticionAutenticada(
-    '/formularios-estudiantes'
-  );
-});
-
 ipcMain.handle(
-  'formularios-estudiantes:google-estado',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/integraciones/google/oauth/estado'
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:google-conectar',
-  async () => {
+  'aulas:auditoria:listar',
+  async (_event, aulaId) => {
     const resultado =
       await ejecutarPeticionAutenticada(
-        '/integraciones/google/oauth/iniciar',
-        {
-          method: 'POST'
-        }
-      );
-
-    const url = resultado?.data?.url || resultado?.url;
-
-    if (!url) {
-      throw new Error(
-        resultado?.message || 'No se recibió la URL de autorización de Google.'
-      );
-    }
-
-    await shell.openExternal(url);
-
-    return {
-      abierto: true
-    };
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:google-desconectar',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/integraciones/google/oauth/desconectar',
-      {
-        method: 'DELETE'
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:crear',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/formularios-estudiantes',
-      {
-        method: 'POST',
-        body: datos
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:sincronizar',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/${id}/sincronizar`,
-      {
-        method: 'POST'
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:solicitudes',
-  async (_event, filtros = {}) => {
-    const params =
-      new URLSearchParams();
-
-    if (filtros.carreraId) {
-      params.set(
-        'carreraId',
-        String(filtros.carreraId)
-      );
-    }
-
-    if (filtros.planEstudioId) {
-      params.set(
-        'planEstudioId',
-        String(filtros.planEstudioId)
-      );
-    }
-
-    const query =
-      params.toString();
-
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/solicitudes${
-        query ? `?${query}` : ''
-      }`
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:conteos-solicitudes',
-  async (_event, carreraId) => {
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/solicitudes/conteos?carreraId=${encodeURIComponent(
-        carreraId
-      )}`
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:aceptar-solicitud',
-  async (_event, respuestaId) => {
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/respuestas/${respuestaId}/aceptar`,
-      {
-        method: 'POST'
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:rechazar-solicitud',
-  async (_event, respuestaId, motivo) => {
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/respuestas/${respuestaId}/rechazar`,
-      {
-        method: 'POST',
-        body: {
-          motivo:
-            motivo?.trim() || undefined
-        }
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:cerrar',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/${id}/cerrar`,
-      {
-        method: 'POST'
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:respuestas',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/formularios-estudiantes/${id}/respuestas`
-    );
-  }
-);
-
-ipcMain.handle(
-  'formularios-estudiantes:abrir-enlace',
-  async (_event, url) => {
-    if (url) {
-      await shell.openExternal(url);
-    }
-
-    return {
-      ok: true
-    };
-  }
-);
-
-/* =========================================================
-   ESTUDIANTES
-   ========================================================= */
-
-ipcMain.handle(
-  'estudiantes:conteos-carreras',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/estudiantes/conteos/carreras'
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:conteos-planes',
-  async (_event, carreraId) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/conteos/planes?carreraId=${encodeURIComponent(
-        carreraId
-      )}`
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:listar',
-  async (_event, filtros = {}) => {
-    const params =
-      new URLSearchParams();
-
-    if (filtros.texto?.trim()) {
-      params.set(
-        'texto',
-        filtros.texto.trim()
-      );
-    }
-
-    if (filtros.carreraId) {
-      params.set(
-        'carreraId',
-        String(filtros.carreraId)
-      );
-    }
-
-    if (filtros.planEstudioId) {
-      params.set(
-        'planEstudioId',
-        String(filtros.planEstudioId)
-      );
-    }
-
-    if (filtros.periodoIngresoId) {
-      params.set(
-        'periodoIngresoId',
-        String(filtros.periodoIngresoId)
-      );
-    }
-
-    if (filtros.estado) {
-      params.set(
-        'estado',
-        filtros.estado
-      );
-    }
-
-    const query =
-      params.toString();
-
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        `/estudiantes${
-          query
-            ? `?${query}`
-            : ''
-        }`
+        `/aulas/${aulaId}/auditoria`,
       );
 
     if (!resultado.ok) {
@@ -2023,120 +1947,12 @@ ipcMain.handle(
 
     return {
       ok: true,
-      estudiantes:
-        Array.isArray(resultado.data)
-          ? resultado.data
-          : []
+      auditoria: resultado.data,
     };
-  }
+  },
 );
 
-ipcMain.handle(
-  'estudiantes:obtener',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}`
-    );
-  }
-);
 
-ipcMain.handle(
-  'estudiantes:actualizar',
-  async (_event, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}`,
-      {
-        method: 'PATCH',
-        body: datos
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:crear',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/estudiantes',
-      {
-        method: 'POST',
-        body: datos
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:cambiar-estado',
-  async (_event, id, estado) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}/estado`,
-      {
-        method: 'PATCH',
-        body: { estado }
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:cambiar-plan',
-  async (_event, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}/plan`,
-      {
-        method: 'PATCH',
-        body: datos
-      }
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:historial-academico',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}/historial-academico`
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:historial-planes',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}/historial-planes`
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:progreso',
-  async (_event, id, periodoReferenciaId) => {
-    const params =
-      new URLSearchParams({
-        periodoReferenciaId:
-          String(periodoReferenciaId)
-      });
-
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}/progreso?${params.toString()}`
-    );
-  }
-);
-
-ipcMain.handle(
-  'estudiantes:registrar-resultado',
-  async (_event, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/estudiantes/${id}/historial-academico`,
-      {
-        method: 'POST',
-        body: datos
-      }
-    );
-  }
-);
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({

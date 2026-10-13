@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -7,6 +8,7 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'equipamientos' })
+@Check('chk_equipamiento_cantidad_total', 'cantidad_total >= 0')
 export class Equipamiento {
   @PrimaryGeneratedColumn({
     type: 'int',
@@ -27,6 +29,14 @@ export class Equipamiento {
     nullable: true,
   })
   descripcion!: string | null;
+
+  @Column({
+    name: 'cantidad_total',
+    type: 'smallint',
+    unsigned: true,
+    default: 0,
+  })
+  cantidadTotal!: number;
 
   @Column({
     type: 'boolean',

@@ -157,40 +157,62 @@ export class PlanValidacionesService {
       });
     }
 
+    if (optativasActivas.length > 0 && !reglaOptativas) {
+      errores.push({
+        codigo: 'REGLA_OPTATIVAS_NO_CONFIGURADA',
+        nivel: 'ERROR',
+        mensaje:
+          'El plan contiene asignaturas optativas, pero todavía no tiene una Regla de optativas configurada.',
+      });
+    }
+
     if (reglaOptativas) {
       const cantidadDisciplinarias = optativasActivas.filter(
         (asignatura) =>
           asignatura.tipoOptativa === TipoOptativa.DISCIPLINARIA,
       ).length;
-
-      const cantidadOtrasAreas = optativasActivas.filter(
-        (asignatura) =>
-          asignatura.tipoOptativa === TipoOptativa.ABIERTA ||
-          asignatura.tipoOptativa === TipoOptativa.SEDE,
+      const cantidadAbiertas = optativasActivas.filter(
+        (asignatura) => asignatura.tipoOptativa === TipoOptativa.ABIERTA,
+      ).length;
+      const cantidadSede = optativasActivas.filter(
+        (asignatura) => asignatura.tipoOptativa === TipoOptativa.SEDE,
       ).length;
 
-      if (
-        cantidadDisciplinarias <
-        Number(reglaOptativas.minimoDisciplinariasPropias)
-      ) {
-        errores.push({
-          codigo: 'MINIMO_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDO',
-          nivel: 'ERROR',
-          mensaje: `La regla del plan exige al menos ${reglaOptativas.minimoDisciplinariasPropias} optativas disciplinarias propias y actualmente hay ${cantidadDisciplinarias}.`,
-        });
-      }
+      const validarCantidad = (
+        codigo: string,
+        etiqueta: string,
+        actual: number,
+        esperada: number,
+      ) => {
+        if (actual !== esperada) {
+          errores.push({
+            codigo,
+            nivel: 'ERROR',
+            mensaje: `La regla del plan define ${esperada} optativa${
+              esperada === 1 ? '' : 's'
+            } ${etiqueta}, pero actualmente hay ${actual}.`,
+          });
+        }
+      };
 
-      if (
-        reglaOptativas.maximoOtrasAreas !== null &&
-        reglaOptativas.maximoOtrasAreas !== undefined &&
-        cantidadOtrasAreas > Number(reglaOptativas.maximoOtrasAreas)
-      ) {
-        errores.push({
-          codigo: 'MAXIMO_OPTATIVAS_OTRAS_AREAS_SUPERADO',
-          nivel: 'ERROR',
-          mensaje: `La regla del plan permite como máximo ${reglaOptativas.maximoOtrasAreas} optativas de otras áreas y actualmente hay ${cantidadOtrasAreas}.`,
-        });
-      }
+      validarCantidad(
+        'CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA',
+        'disciplinaria(s) / de carrera',
+        cantidadDisciplinarias,
+        Number(reglaOptativas.cantidadDisciplinarias || 0),
+      );
+      validarCantidad(
+        'CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA',
+        'abierta(s)',
+        cantidadAbiertas,
+        Number(reglaOptativas.cantidadAbiertas || 0),
+      );
+      validarCantidad(
+        'CANTIDAD_OPTATIVAS_SEDE_NO_CUMPLIDA',
+        'de sede',
+        cantidadSede,
+        Number(reglaOptativas.cantidadSede || 0),
+      );
     }
 
     const codigosUsados = new Set<string>();
