@@ -1,15 +1,11 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class ActualizarEquipamientoAulaDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  cantidadTotal?: number;
-
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  cantidadDisponible?: number;
+  @Max(9999)
+  cantidadAsignada?: number;
 
   @IsOptional()
   @IsString()

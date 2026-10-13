@@ -187,6 +187,22 @@ export function actualizarEquipamientoAula(
 }
 
 
+export function desasignarEquipamientoAula(
+  aulaId,
+  equipamientoId,
+) {
+  validarApi(
+    'desasignarEquipamientoAula',
+  );
+
+  return window.sgpa
+    .desasignarEquipamientoAula(
+      aulaId,
+      equipamientoId,
+    );
+}
+
+
 export function cambiarEstadoEquipamientoAula(
   aulaId,
   equipamientoId,
@@ -483,9 +499,3 @@ export function listarAuditoriaAula(
       aulaId,
     );
 }
-
-
-
-
-
-

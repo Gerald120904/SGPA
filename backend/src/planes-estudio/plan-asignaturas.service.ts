@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Not, Repository } from 'typeorm';
+import { DataSource, Not, Repository } from 'typeorm';
 import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { ActualizarPlanAsignaturaDto } from './dto/actualizar-plan-asignatura.dto';
@@ -90,13 +90,6 @@ export class PlanAsignaturasService {
     return tipoOptativa;
   }
 
-  private esOptativaDeOtraArea(tipoOptativa?: TipoOptativa | null): boolean {
-    return (
-      tipoOptativa === TipoOptativa.ABIERTA ||
-      tipoOptativa === TipoOptativa.SEDE
-    );
-  }
-
   private async obtenerReglaOptativas(
     planId: number,
   ): Promise<ReglaOptativaPlan | null> {
@@ -107,22 +100,50 @@ export class PlanAsignaturasService {
     });
   }
 
-  private async contarOtrasAreasActivas(
+  private obtenerLimiteTipoOptativa(
+    regla: ReglaOptativaPlan,
+    tipoOptativa: TipoOptativa,
+  ): number {
+    if (tipoOptativa === TipoOptativa.DISCIPLINARIA) {
+      return Number(regla.cantidadDisciplinarias || 0);
+    }
+
+    if (tipoOptativa === TipoOptativa.ABIERTA) {
+      return Number(regla.cantidadAbiertas || 0);
+    }
+
+    return Number(regla.cantidadSede || 0);
+  }
+
+  private obtenerNombreTipoOptativa(tipoOptativa: TipoOptativa): string {
+    if (tipoOptativa === TipoOptativa.DISCIPLINARIA) {
+      return 'disciplinaria / de carrera';
+    }
+
+    if (tipoOptativa === TipoOptativa.ABIERTA) {
+      return 'abierta';
+    }
+
+    return 'de sede';
+  }
+
+  private async contarOptativasActivasPorTipo(
     planId: number,
+    tipoOptativa: TipoOptativa,
     excluirId?: number,
   ): Promise<number> {
     return this.asignaturaRepository.count({
       where: {
         planEstudioId: planId,
         tipo: TipoPlanAsignatura.OPTATIVA,
-        tipoOptativa: In([TipoOptativa.ABIERTA, TipoOptativa.SEDE]),
+        tipoOptativa,
         activo: true,
         ...(excluirId !== undefined ? { id: Not(excluirId) } : {}),
       },
     });
   }
 
-  private async validarMaximoOtrasAreas(
+  private async validarCupoOptativa(
     planId: number,
     tipo: TipoPlanAsignatura,
     tipoOptativa: TipoOptativa | null,
@@ -132,72 +153,86 @@ export class PlanAsignaturasService {
       adicionales?: number;
     } = {},
   ): Promise<void> {
-    if (
-      opciones.activo === false ||
-      tipo !== TipoPlanAsignatura.OPTATIVA ||
-      !this.esOptativaDeOtraArea(tipoOptativa)
-    ) {
+    if (opciones.activo === false || tipo !== TipoPlanAsignatura.OPTATIVA) {
       return;
+    }
+
+    if (!tipoOptativa) {
+      throw new BadRequestException(
+        'Debe indicar si la optativa es DISCIPLINARIA, ABIERTA o SEDE.',
+      );
     }
 
     const regla = await this.obtenerReglaOptativas(planId);
 
-    if (
-      !regla ||
-      regla.maximoOtrasAreas === null ||
-      regla.maximoOtrasAreas === undefined
-    ) {
-      return;
+    if (!regla) {
+      throw new ConflictException(
+        'Antes de agregar asignaturas optativas debe configurar la Regla de optativas del plan.',
+      );
     }
 
-    const actuales = await this.contarOtrasAreasActivas(
+    const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa);
+    const actuales = await this.contarOptativasActivasPorTipo(
       planId,
+      tipoOptativa,
       opciones.excluirId,
     );
     const adicionales = opciones.adicionales ?? 1;
 
-    if (actuales + adicionales > Number(regla.maximoOtrasAreas)) {
+    if (actuales + adicionales > limite) {
+      const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa);
       throw new ConflictException(
-        `El plan ya alcanzó el máximo de ${regla.maximoOtrasAreas} optativa${
-          Number(regla.maximoOtrasAreas) === 1 ? '' : 's'
-        } de otras áreas. Las optativas ABIERTA y SEDE comparten este límite.`,
+        `El plan ya alcanzó el límite de ${limite} optativa${
+          limite === 1 ? '' : 's'
+        } ${nombreTipo}. Para agregar otra debe modificar primero la Regla de optativas.`,
       );
     }
   }
 
-  private async validarMaximoOtrasAreasCarga(
+  private async validarCuposOptativasCarga(
     planId: number,
     asignaturas: PlanAsignatura[],
   ): Promise<void> {
-    const nuevasOtrasAreas = asignaturas.filter(
+    const optativas = asignaturas.filter(
       (asignatura) =>
-        asignatura.activo &&
-        asignatura.tipo === TipoPlanAsignatura.OPTATIVA &&
-        this.esOptativaDeOtraArea(asignatura.tipoOptativa),
-    ).length;
+        asignatura.activo && asignatura.tipo === TipoPlanAsignatura.OPTATIVA,
+    );
 
-    if (nuevasOtrasAreas === 0) {
+    if (!optativas.length) {
       return;
     }
 
     const regla = await this.obtenerReglaOptativas(planId);
 
-    if (
-      !regla ||
-      regla.maximoOtrasAreas === null ||
-      regla.maximoOtrasAreas === undefined
-    ) {
-      return;
+    if (!regla) {
+      throw new ConflictException(
+        'Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.',
+      );
     }
 
-    const actuales = await this.contarOtrasAreasActivas(planId);
+    for (const tipoOptativa of Object.values(TipoOptativa)) {
+      const nuevas = optativas.filter(
+        (asignatura) => asignatura.tipoOptativa === tipoOptativa,
+      ).length;
 
-    if (actuales + nuevasOtrasAreas > Number(regla.maximoOtrasAreas)) {
-      throw new ConflictException(
-        `La carga supera el máximo de ${regla.maximoOtrasAreas} optativa${
-          Number(regla.maximoOtrasAreas) === 1 ? '' : 's'
-        } de otras áreas permitido por la regla del plan.`,
+      if (!nuevas) {
+        continue;
+      }
+
+      const actuales = await this.contarOptativasActivasPorTipo(
+        planId,
+        tipoOptativa,
       );
+      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa);
+
+      if (actuales + nuevas > limite) {
+        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa);
+        throw new ConflictException(
+          `La carga supera el límite de ${limite} optativa${
+            limite === 1 ? '' : 's'
+          } ${nombreTipo} permitido por la Regla de optativas.`,
+        );
+      }
     }
   }
 
@@ -308,7 +343,7 @@ export class PlanAsignaturasService {
     const plan = await this.obtenerPlan(planId, true);
     const asignatura = await this.prepararAsignatura(plan, dto);
 
-    await this.validarMaximoOtrasAreas(
+    await this.validarCupoOptativa(
       planId,
       asignatura.tipo,
       asignatura.tipoOptativa,
@@ -340,7 +375,7 @@ export class PlanAsignaturasService {
       preparadas.push(await this.prepararAsignatura(plan, asignaturaDto));
     }
 
-    await this.validarMaximoOtrasAreasCarga(planId, preparadas);
+    await this.validarCuposOptativasCarga(planId, preparadas);
 
     const idsGuardados = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(PlanAsignatura);
@@ -440,7 +475,7 @@ export class PlanAsignaturasService {
       );
     }
 
-    await this.validarMaximoOtrasAreas(
+    await this.validarCupoOptativa(
       planId,
       tipoResultante,
       tipoOptativaResultante,
@@ -527,7 +562,7 @@ export class PlanAsignaturasService {
         asignatura.tipoOptativa,
       );
 
-      await this.validarMaximoOtrasAreas(
+      await this.validarCupoOptativa(
         planId,
         asignatura.tipo,
         tipoOptativa,

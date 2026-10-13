@@ -32,7 +32,6 @@ import { CrearIndisponibilidadAulaDto } from './dto/crear-indisponibilidad-aula.
 import { CrearReservaAulaDto } from './dto/crear-reserva-aula.dto';
 import { BuscarAulasDisponiblesDto } from './dto/buscar-aulas-disponibles.dto';
 import { ConsultarOcupacionAulaDto } from './dto/consultar-ocupacion-aula.dto';
-import { RequisitoEquipamientoAulaDto } from './dto/requisito-equipamiento-aula.dto';
 import { AulaEquipamiento } from './entities/aula-equipamiento.entity';
 import { Aula } from './entities/aula.entity';
 import { AuditoriaAula } from './entities/auditoria-aula.entity';
@@ -43,26 +42,6 @@ import { ReservaAula } from './entities/reserva-aula.entity';
 
 @Injectable()
 export class AulasService {
-  private readonly limitesRegistroPorOrigen: Record<OrigenAula, number> = {
-    [OrigenAula.UNA]: 25,
-    [OrigenAula.UNED]: 3,
-    [OrigenAula.OTRO]: 15,
-  };
-
-  private readonly maximosNumeroPorOrigen: Record<OrigenAula, number> = {
-    [OrigenAula.UNA]: 27,
-    [OrigenAula.UNED]: 3,
-    [OrigenAula.OTRO]: 15,
-  };
-
-  private validarAulaActivaParaOcupacion(aula: Aula): void {
-    if (!aula.activo) {
-      throw new BadRequestException(
-        'No se puede modificar reservas o indisponibilidades de un aula inactiva.',
-      );
-    }
-  }
-
   constructor(
     @InjectRepository(Aula)
     private readonly aulaRepository: Repository<Aula>,
@@ -108,7 +87,13 @@ export class AulasService {
   }
 
   private async validarLimiteOrigen(origen: OrigenAula): Promise<void> {
-    const limite = this.limitesRegistroPorOrigen[origen];
+    const limites: Record<OrigenAula, number> = {
+      [OrigenAula.UNA]: 27,
+      [OrigenAula.UNED]: 3,
+      [OrigenAula.OTRO]: 15,
+    };
+
+    const limite = limites[origen];
 
     const cantidadRegistrada = await this.aulaRepository.count({
       where: { origen },
@@ -135,8 +120,14 @@ export class AulasService {
   }
 
   private validarNumeroPorOrigen(codigo: string, origen: OrigenAula): void {
+    const maximos: Record<OrigenAula, number> = {
+      [OrigenAula.UNA]: 27,
+      [OrigenAula.UNED]: 3,
+      [OrigenAula.OTRO]: 15,
+    };
+
     const numero = this.obtenerNumeroEspacioDesdeCodigo(codigo);
-    const maximo = this.maximosNumeroPorOrigen[origen];
+    const maximo = maximos[origen];
 
     if (numero === null || numero < 1 || numero > maximo) {
       throw new BadRequestException(
@@ -415,48 +406,6 @@ export class AulasService {
     return false;
   }
 
-  private async validarEquipamientosBusqueda(
-    requisitos: RequisitoEquipamientoAulaDto[],
-  ): Promise<void> {
-    if (!requisitos.length) {
-      return;
-    }
-
-    const ids = requisitos.map((requisito) => requisito.equipamientoId);
-
-    if (new Set(ids).size !== ids.length) {
-      throw new BadRequestException(
-        'No se puede repetir el mismo equipamiento en la búsqueda.',
-      );
-    }
-
-    const equipamientos = await this.equipamientoRepository.find({
-      where: {
-        id: In(ids),
-      },
-    });
-
-    const porId = new Map(
-      equipamientos.map((equipamiento) => [equipamiento.id, equipamiento]),
-    );
-
-    for (const id of ids) {
-      const equipamiento = porId.get(id);
-
-      if (!equipamiento) {
-        throw new BadRequestException(
-          `El equipamiento solicitado con id ${id} no existe.`,
-        );
-      }
-
-      if (!equipamiento.activo) {
-        throw new BadRequestException(
-          `El equipamiento solicitado "${equipamiento.nombre}" está inactivo.`,
-        );
-      }
-    }
-  }
-
   async buscarAulasDisponibles(dto: BuscarAulasDisponiblesDto) {
     const periodo = await this.periodosAcademicosService.obtenerPorId(
       dto.periodoId,
@@ -499,9 +448,15 @@ export class AulasService {
     const fin = this.convertirFechaHora(dto.fechaHoraFin);
     this.validarRangoIndisponibilidad(inicio, fin);
     const requisitos = dto.equipamientos ?? [];
-
-    await this.validarEquipamientosBusqueda(requisitos);
-
+    const ids = new Set<number>();
+    for (const requisito of requisitos) {
+      if (ids.has(requisito.equipamientoId)) {
+        throw new BadRequestException(
+          'No se puede repetir el mismo equipamiento en la búsqueda.',
+        );
+      }
+      ids.add(requisito.equipamientoId);
+    }
     const where: FindOptionsWhere<Aula> = { activo: true };
     if (dto.tipo !== undefined) where.tipo = dto.tipo;
     if (dto.tipoMobiliario !== undefined) {
@@ -578,7 +533,7 @@ export class AulasService {
               relacion.activo &&
               relacion.equipamiento?.activo &&
               relacion.equipamientoId === req.equipamientoId &&
-              relacion.cantidadDisponible >= req.cantidadMinima,
+              relacion.cantidadAsignada >= req.cantidadMinima,
           ),
         ),
       )
@@ -595,23 +550,75 @@ export class AulasService {
       }));
   }
 
-  private validarCantidadesEquipamiento(
-    cantidadTotal: number,
-    cantidadDisponible: number,
-  ): void {
-    if (cantidadTotal <= 0) {
-      throw new BadRequestException('La cantidad total debe ser mayor a cero.');
-    }
-
-    if (cantidadDisponible < 0) {
+  private validarCantidadEquipamiento(cantidad: number, etiqueta: string): void {
+    if (!Number.isInteger(cantidad) || cantidad < 0) {
       throw new BadRequestException(
-        'La cantidad disponible no puede ser negativa.',
+        `${etiqueta} debe ser un número entero mayor o igual a cero.`,
+      );
+    }
+  }
+
+  private async obtenerCantidadAsignadaEquipamiento(
+    equipamientoId: number,
+    excluirRelacionId?: number,
+  ): Promise<number> {
+    const relaciones = await this.aulaEquipamientoRepository.find({
+      where: {
+        equipamientoId,
+        activo: true,
+      },
+    });
+
+    return relaciones.reduce((total, relacion) => {
+      if (excluirRelacionId !== undefined && relacion.id === excluirRelacionId) {
+        return total;
+      }
+
+      return total + Number(relacion.cantidadAsignada || 0);
+    }, 0);
+  }
+
+  private async obtenerResumenStockEquipamiento(
+    equipamiento: Equipamiento,
+    excluirRelacionId?: number,
+  ): Promise<{
+    cantidadAsignada: number;
+    cantidadDisponible: number;
+  }> {
+    const cantidadAsignada = await this.obtenerCantidadAsignadaEquipamiento(
+      equipamiento.id,
+      excluirRelacionId,
+    );
+
+    return {
+      cantidadAsignada,
+      cantidadDisponible: Math.max(
+        0,
+        Number(equipamiento.cantidadTotal || 0) - cantidadAsignada,
+      ),
+    };
+  }
+
+  private async validarStockParaAsignacion(
+    equipamiento: Equipamiento,
+    cantidadSolicitada: number,
+    excluirRelacionId?: number,
+  ): Promise<void> {
+    if (!Number.isInteger(cantidadSolicitada) || cantidadSolicitada < 1) {
+      throw new BadRequestException(
+        'La cantidad asignada debe ser un número entero mayor a cero.',
       );
     }
 
-    if (cantidadDisponible > cantidadTotal) {
-      throw new BadRequestException(
-        'La cantidad disponible no puede superar la cantidad total.',
+    const resumen = await this.obtenerResumenStockEquipamiento(
+      equipamiento,
+      excluirRelacionId,
+    );
+
+    if (cantidadSolicitada > resumen.cantidadDisponible) {
+      throw new ConflictException(
+        `No hay unidades suficientes disponibles de "${equipamiento.nombre}". ` +
+          `Disponibles: ${resumen.cantidadDisponible}; solicitadas: ${cantidadSolicitada}.`,
       );
     }
   }
@@ -935,16 +942,7 @@ export class AulasService {
     aulaId: number,
     dto: BuscarAulasDisponiblesDto,
   ) {
-    const aulaEntidad = await this.obtenerEntidadPorId(aulaId);
-
-    if (!aulaEntidad.activo) {
-      return {
-        aulaId,
-        apta: false,
-        requiereAutorizacionSobrecupo: false,
-        motivo: 'AULA_INACTIVA',
-      };
-    }
+    await this.obtenerEntidadPorId(aulaId);
 
     const candidatas = await this.buscarAulasDisponibles({
       ...dto,
@@ -1016,8 +1014,25 @@ export class AulasService {
     };
   }
 
-  async listarEquipamientos(): Promise<Equipamiento[]> {
-    return this.equipamientoRepository.find({ order: { nombre: 'ASC' } });
+  async listarEquipamientos(): Promise<
+    Array<
+      Equipamiento & {
+        cantidadAsignada: number;
+        cantidadDisponible: number;
+      }
+    >
+  > {
+    const equipamientos = await this.equipamientoRepository.find({
+      order: { nombre: 'ASC' },
+    });
+
+    return Promise.all(
+      equipamientos.map(async (equipamiento) => {
+        const resumen = await this.obtenerResumenStockEquipamiento(equipamiento);
+
+        return Object.assign(equipamiento, resumen);
+      }),
+    );
   }
 
   async obtenerEquipamientoPorId(id: number): Promise<Equipamiento> {
@@ -1037,11 +1052,13 @@ export class AulasService {
       );
     }
 
+    this.validarCantidadEquipamiento(dto.cantidadTotal, 'La cantidad total');
     await this.validarNombreEquipamientoDuplicado(nombre);
 
     const equipamiento = this.equipamientoRepository.create({
       nombre,
       descripcion,
+      cantidadTotal: dto.cantidadTotal,
       activo: true,
     });
 
@@ -1058,6 +1075,7 @@ export class AulasService {
           despues: {
             nombre: guardada.nombre,
             descripcion: guardada.descripcion,
+            cantidadTotal: guardada.cantidadTotal,
             activo: guardada.activo,
           },
         },
@@ -1075,6 +1093,11 @@ export class AulasService {
     usuarioId?: number,
   ): Promise<Equipamiento> {
     const equipamiento = await this.obtenerEquipamientoEntidadPorId(id);
+    const antes = {
+      nombre: equipamiento.nombre,
+      descripcion: equipamiento.descripcion,
+      cantidadTotal: equipamiento.cantidadTotal,
+    };
 
     if (dto.nombre !== undefined) {
       const nombre = dto.nombre.trim();
@@ -1093,6 +1116,21 @@ export class AulasService {
       equipamiento.descripcion = dto.descripcion?.trim() || null;
     }
 
+    if (dto.cantidadTotal !== undefined) {
+      this.validarCantidadEquipamiento(dto.cantidadTotal, 'La cantidad total');
+
+      const cantidadAsignada = await this.obtenerCantidadAsignadaEquipamiento(id);
+
+      if (dto.cantidadTotal < cantidadAsignada) {
+        throw new ConflictException(
+          `No puede reducir la cantidad total a ${dto.cantidadTotal} porque ` +
+            `actualmente hay ${cantidadAsignada} unidad${cantidadAsignada === 1 ? '' : 'es'} asignada${cantidadAsignada === 1 ? '' : 's'} a aulas.`,
+        );
+      }
+
+      equipamiento.cantidadTotal = dto.cantidadTotal;
+    }
+
     try {
       await this.equipamientoRepository.save(equipamiento);
 
@@ -1103,9 +1141,11 @@ export class AulasService {
         entidad: 'EQUIPAMIENTO',
         entidadId: id,
         detalle: {
+          antes,
           despues: {
             nombre: equipamiento.nombre,
             descripcion: equipamiento.descripcion,
+            cantidadTotal: equipamiento.cantidadTotal,
           },
         },
       });
@@ -1143,9 +1183,7 @@ export class AulasService {
       accion: 'CAMBIAR_ESTADO',
       entidad: 'EQUIPAMIENTO',
       entidadId: id,
-      detalle: {
-        activo,
-      },
+      detalle: { activo },
     });
 
     return this.obtenerEquipamientoEntidadPorId(id);
@@ -1155,7 +1193,7 @@ export class AulasService {
     await this.obtenerEntidadPorId(aulaId);
 
     return this.aulaEquipamientoRepository.find({
-      where: { aulaId },
+      where: { aulaId, activo: true },
       relations: { equipamiento: true },
       order: { id: 'ASC' },
     });
@@ -1184,55 +1222,32 @@ export class AulasService {
       );
     }
 
-    this.validarCantidadesEquipamiento(
-      dto.cantidadTotal,
-      dto.cantidadDisponible,
-    );
-
     const existente = await this.aulaEquipamientoRepository.findOne({
       where: { aulaId, equipamientoId: dto.equipamientoId },
     });
 
-    if (existente) {
-      if (existente.activo) {
-        throw new ConflictException(
-          'Este equipamiento ya está asignado al aula.',
-        );
-      }
-
-      existente.cantidadTotal = dto.cantidadTotal;
-      existente.cantidadDisponible = dto.cantidadDisponible;
-      existente.observaciones = dto.observaciones?.trim() || null;
-      existente.activo = true;
-
-      const guardada = await this.aulaEquipamientoRepository.save(existente);
-
-      await this.registrarAuditoria({
-        aulaId,
-        usuarioId,
-        accion: 'ASIGNAR_EQUIPAMIENTO',
-        entidad: 'AULA_EQUIPAMIENTO',
-        entidadId: guardada.id,
-        detalle: {
-          equipamientoId: guardada.equipamientoId,
-          cantidadTotal: guardada.cantidadTotal,
-          cantidadDisponible: guardada.cantidadDisponible,
-          observaciones: guardada.observaciones,
-          activo: guardada.activo,
-        },
-      });
-
-      return guardada;
+    if (existente?.activo) {
+      throw new ConflictException('Este equipamiento ya está asignado al aula.');
     }
 
-    const relacion = this.aulaEquipamientoRepository.create({
-      aulaId,
-      equipamientoId: equipamiento.id,
-      cantidadTotal: dto.cantidadTotal,
-      cantidadDisponible: dto.cantidadDisponible,
-      observaciones: dto.observaciones?.trim() || null,
-      activo: true,
-    });
+    await this.validarStockParaAsignacion(
+      equipamiento,
+      dto.cantidadAsignada,
+      existente?.id,
+    );
+
+    const ahora = new Date();
+    const relacion = existente ??
+      this.aulaEquipamientoRepository.create({
+        aulaId,
+        equipamientoId: equipamiento.id,
+      });
+
+    relacion.cantidadAsignada = dto.cantidadAsignada;
+    relacion.observaciones = dto.observaciones?.trim() || null;
+    relacion.activo = true;
+    relacion.asignadoEn = ahora;
+    relacion.retiradoEn = null;
 
     try {
       const guardada = await this.aulaEquipamientoRepository.save(relacion);
@@ -1245,19 +1260,17 @@ export class AulasService {
         entidadId: guardada.id,
         detalle: {
           equipamientoId: guardada.equipamientoId,
-          cantidadTotal: guardada.cantidadTotal,
-          cantidadDisponible: guardada.cantidadDisponible,
+          cantidadAsignada: guardada.cantidadAsignada,
           observaciones: guardada.observaciones,
+          asignadoEn: guardada.asignadoEn,
           activo: guardada.activo,
         },
       });
 
-      return guardada;
+      return this.obtenerEquipamientoAula(aulaId, equipamiento.id);
     } catch (error) {
       if (this.obtenerCodigoError(error) === 'ER_DUP_ENTRY') {
-        throw new ConflictException(
-          'Este equipamiento ya está asignado al aula.',
-        );
+        throw new ConflictException('Este equipamiento ya está asignado al aula.');
       }
 
       throw error;
@@ -1272,21 +1285,27 @@ export class AulasService {
   ): Promise<AulaEquipamiento> {
     const relacion = await this.obtenerEquipamientoAula(aulaId, equipamientoId);
 
+    if (!relacion.activo) {
+      throw new ConflictException(
+        'Este equipamiento ya no se encuentra asignado al aula.',
+      );
+    }
+
+    const equipamiento = await this.obtenerEquipamientoEntidadPorId(equipamientoId);
+    const cantidadAsignada = dto.cantidadAsignada ?? relacion.cantidadAsignada;
+
+    await this.validarStockParaAsignacion(
+      equipamiento,
+      cantidadAsignada,
+      relacion.id,
+    );
+
     const antes = {
-      cantidadTotal: relacion.cantidadTotal,
-      cantidadDisponible: relacion.cantidadDisponible,
+      cantidadAsignada: relacion.cantidadAsignada,
       observaciones: relacion.observaciones,
-      activo: relacion.activo,
     };
 
-    const cantidadTotal = dto.cantidadTotal ?? relacion.cantidadTotal;
-    const cantidadDisponible =
-      dto.cantidadDisponible ?? relacion.cantidadDisponible;
-
-    this.validarCantidadesEquipamiento(cantidadTotal, cantidadDisponible);
-
-    relacion.cantidadTotal = cantidadTotal;
-    relacion.cantidadDisponible = cantidadDisponible;
+    relacion.cantidadAsignada = cantidadAsignada;
 
     if (dto.observaciones !== undefined) {
       relacion.observaciones = dto.observaciones?.trim() || null;
@@ -1303,15 +1322,45 @@ export class AulasService {
       detalle: {
         antes,
         despues: {
-          cantidadTotal: relacion.cantidadTotal,
-          cantidadDisponible: relacion.cantidadDisponible,
+          cantidadAsignada: relacion.cantidadAsignada,
           observaciones: relacion.observaciones,
-          activo: relacion.activo,
         },
       },
     });
 
     return this.obtenerEquipamientoAula(aulaId, equipamientoId);
+  }
+
+  async desasignarEquipamientoAula(
+    aulaId: number,
+    equipamientoId: number,
+    usuarioId?: number,
+  ): Promise<AulaEquipamiento> {
+    const relacion = await this.obtenerEquipamientoAula(aulaId, equipamientoId);
+
+    if (!relacion.activo) {
+      return relacion;
+    }
+
+    relacion.activo = false;
+    relacion.retiradoEn = new Date();
+
+    await this.aulaEquipamientoRepository.save(relacion);
+
+    await this.registrarAuditoria({
+      aulaId,
+      usuarioId,
+      accion: 'DESASIGNAR_EQUIPAMIENTO',
+      entidad: 'AULA_EQUIPAMIENTO',
+      entidadId: relacion.id,
+      detalle: {
+        equipamientoId,
+        cantidadLiberada: relacion.cantidadAsignada,
+        retiradoEn: relacion.retiradoEn,
+      },
+    });
+
+    return relacion;
   }
 
   async cambiarEstadoEquipamientoAula(
@@ -1320,45 +1369,50 @@ export class AulasService {
     activo: boolean,
     usuarioId?: number,
   ): Promise<AulaEquipamiento> {
-    const relacion = await this.obtenerEquipamientoAula(aulaId, equipamientoId);
-
-    if (activo) {
-      const aula = await this.obtenerEntidadPorId(aulaId);
-
-      if (!aula.activo) {
-        throw new BadRequestException(
-          'No se puede activar equipamiento en un aula inactiva.',
-        );
-      }
-
-      const equipamiento =
-        await this.obtenerEquipamientoEntidadPorId(equipamientoId);
-
-      if (!equipamiento.activo) {
-        throw new BadRequestException(
-          'No se puede activar una asignación cuyo equipamiento está inactivo.',
-        );
-      }
+    if (!activo) {
+      return this.desasignarEquipamientoAula(
+        aulaId,
+        equipamientoId,
+        usuarioId,
+      );
     }
 
-    const activoAnterior = relacion.activo;
+    const relacion = await this.obtenerEquipamientoAula(aulaId, equipamientoId);
 
-    relacion.activo = activo;
+    if (relacion.activo) {
+      return relacion;
+    }
+
+    const aula = await this.obtenerEntidadPorId(aulaId);
+    const equipamiento = await this.obtenerEquipamientoEntidadPorId(equipamientoId);
+
+    if (!aula.activo || !equipamiento.activo) {
+      throw new BadRequestException(
+        'No se puede reactivar la asignación porque el aula o el equipamiento está inactivo.',
+      );
+    }
+
+    await this.validarStockParaAsignacion(
+      equipamiento,
+      relacion.cantidadAsignada,
+      relacion.id,
+    );
+
+    relacion.activo = true;
+    relacion.asignadoEn = new Date();
+    relacion.retiradoEn = null;
     await this.aulaEquipamientoRepository.save(relacion);
 
     await this.registrarAuditoria({
       aulaId,
       usuarioId,
-      accion: 'CAMBIAR_ESTADO_EQUIPAMIENTO',
+      accion: 'ASIGNAR_EQUIPAMIENTO',
       entidad: 'AULA_EQUIPAMIENTO',
       entidadId: relacion.id,
       detalle: {
-        antes: {
-          activo: activoAnterior,
-        },
-        despues: {
-          activo,
-        },
+        equipamientoId,
+        cantidadAsignada: relacion.cantidadAsignada,
+        reactivacion: true,
       },
     });
 
@@ -1391,7 +1445,11 @@ export class AulasService {
   ): Promise<IndisponibilidadAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    this.validarAulaActivaParaOcupacion(aula);
+    if (!aula.activo) {
+      throw new BadRequestException(
+        'No se puede registrar una indisponibilidad en un aula inactiva.',
+      );
+    }
 
     const inicio = this.convertirFechaHora(dto.fechaHoraInicio);
     const fin = this.convertirFechaHora(dto.fechaHoraFin);
@@ -1442,19 +1500,8 @@ export class AulasService {
     dto: ActualizarIndisponibilidadAulaDto,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
-    const aula = await this.obtenerEntidadPorId(aulaId);
-
-    this.validarAulaActivaParaOcupacion(aula);
-
+    await this.obtenerEntidadPorId(aulaId);
     const indisponibilidad = await this.obtenerIndisponibilidadAula(aulaId, id);
-
-    const antes = {
-      tipo: indisponibilidad.tipo,
-      fechaHoraInicio: indisponibilidad.fechaHoraInicio,
-      fechaHoraFin: indisponibilidad.fechaHoraFin,
-      motivo: indisponibilidad.motivo,
-      activo: indisponibilidad.activo,
-    };
 
     const inicio =
       dto.fechaHoraInicio !== undefined
@@ -1494,14 +1541,11 @@ export class AulasService {
       entidad: 'INDISPONIBILIDAD',
       entidadId: indisponibilidad.id,
       detalle: {
-        antes,
-        despues: {
-          tipo: indisponibilidad.tipo,
-          fechaHoraInicio: indisponibilidad.fechaHoraInicio,
-          fechaHoraFin: indisponibilidad.fechaHoraFin,
-          motivo: indisponibilidad.motivo,
-          activo: indisponibilidad.activo,
-        },
+        tipo: indisponibilidad.tipo,
+        fechaHoraInicio: indisponibilidad.fechaHoraInicio,
+        fechaHoraFin: indisponibilidad.fechaHoraFin,
+        motivo: indisponibilidad.motivo,
+        activo: indisponibilidad.activo,
       },
     });
 
@@ -1514,12 +1558,10 @@ export class AulasService {
     activo: boolean,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
-    const aula = await this.obtenerEntidadPorId(aulaId);
+    await this.obtenerEntidadPorId(aulaId);
     const indisponibilidad = await this.obtenerIndisponibilidadAula(aulaId, id);
 
     if (activo && !indisponibilidad.activo) {
-      this.validarAulaActivaParaOcupacion(aula);
-
       await this.validarCruceIndisponibilidad(
         aulaId,
         new Date(indisponibilidad.fechaHoraInicio),
@@ -1527,8 +1569,6 @@ export class AulasService {
         id,
       );
     }
-
-    const activoAnterior = indisponibilidad.activo;
 
     indisponibilidad.activo = activo;
     await this.indisponibilidadAulaRepository.save(indisponibilidad);
@@ -1540,12 +1580,7 @@ export class AulasService {
       entidad: 'INDISPONIBILIDAD',
       entidadId: indisponibilidad.id,
       detalle: {
-        antes: {
-          activo: activoAnterior,
-        },
-        despues: {
-          activo: indisponibilidad.activo,
-        },
+        activo: indisponibilidad.activo,
       },
     });
 
@@ -1573,7 +1608,9 @@ export class AulasService {
   ): Promise<ReservaAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    this.validarAulaActivaParaOcupacion(aula);
+    if (!aula.activo) {
+      throw new BadRequestException('No se puede reservar un aula inactiva.');
+    }
 
     const inicio = this.convertirFechaHora(dto.fechaHoraInicio);
     const fin = this.convertirFechaHora(dto.fechaHoraFin);
@@ -1623,20 +1660,8 @@ export class AulasService {
     dto: ActualizarReservaAulaDto,
     usuarioId?: number,
   ): Promise<ReservaAula> {
-    const aula = await this.obtenerEntidadPorId(aulaId);
-
-    this.validarAulaActivaParaOcupacion(aula);
-
+    await this.obtenerEntidadPorId(aulaId);
     const reserva = await this.obtenerReservaAula(aulaId, id);
-
-    const antes = {
-      tipo: reserva.tipo,
-      titulo: reserva.titulo,
-      descripcion: reserva.descripcion,
-      fechaHoraInicio: reserva.fechaHoraInicio,
-      fechaHoraFin: reserva.fechaHoraFin,
-      activo: reserva.activo,
-    };
 
     const inicio =
       dto.fechaHoraInicio !== undefined
@@ -1680,15 +1705,12 @@ export class AulasService {
       entidad: 'RESERVA',
       entidadId: reserva.id,
       detalle: {
-        antes,
-        despues: {
-          tipo: reserva.tipo,
-          titulo: reserva.titulo,
-          descripcion: reserva.descripcion,
-          fechaHoraInicio: reserva.fechaHoraInicio,
-          fechaHoraFin: reserva.fechaHoraFin,
-          activo: reserva.activo,
-        },
+        tipo: reserva.tipo,
+        titulo: reserva.titulo,
+        descripcion: reserva.descripcion,
+        fechaHoraInicio: reserva.fechaHoraInicio,
+        fechaHoraFin: reserva.fechaHoraFin,
+        activo: reserva.activo,
       },
     });
 
@@ -1705,7 +1727,11 @@ export class AulasService {
     const reserva = await this.obtenerReservaAula(aulaId, id);
 
     if (activo) {
-      this.validarAulaActivaParaOcupacion(aula);
+      if (!aula.activo) {
+        throw new BadRequestException(
+          'No se puede reactivar una reserva en un aula inactiva.',
+        );
+      }
 
       if (!reserva.activo) {
         await this.validarCruceReserva(
@@ -1717,8 +1743,6 @@ export class AulasService {
       }
     }
 
-    const activoAnterior = reserva.activo;
-
     reserva.activo = activo;
     await this.reservaAulaRepository.save(reserva);
 
@@ -1729,12 +1753,7 @@ export class AulasService {
       entidad: 'RESERVA',
       entidadId: reserva.id,
       detalle: {
-        antes: {
-          activo: activoAnterior,
-        },
-        despues: {
-          activo: reserva.activo,
-        },
+        activo: reserva.activo,
       },
     });
 
@@ -1886,14 +1905,6 @@ export class AulasService {
     }
   }
 
-  private validarAulaActivaParaDisponibilidad(aula: Aula): void {
-    if (!aula.activo) {
-      throw new BadRequestException(
-        'No se puede modificar la disponibilidad de un aula inactiva.',
-      );
-    }
-  }
-
   private async validarPeriodoDisponibilidadEditable(periodoId: number) {
     const periodo =
       await this.periodosAcademicosService.obtenerPorId(periodoId);
@@ -1996,7 +2007,11 @@ export class AulasService {
   ): Promise<DisponibilidadAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    this.validarAulaActivaParaDisponibilidad(aula);
+    if (!aula.activo) {
+      throw new BadRequestException(
+        'No se puede configurar disponibilidad para un aula inactiva.',
+      );
+    }
 
     await this.validarPeriodoDisponibilidadEditable(dto.periodoId);
 
@@ -2046,7 +2061,11 @@ export class AulasService {
   ): Promise<DisponibilidadAula> {
     const aula = await this.obtenerEntidadPorId(aulaId);
 
-    this.validarAulaActivaParaDisponibilidad(aula);
+    if (!aula.activo) {
+      throw new BadRequestException(
+        'No se puede modificar la disponibilidad de un aula inactiva.',
+      );
+    }
 
     const disponibilidad = await this.obtenerDisponibilidadAula(aulaId, id);
 
@@ -2108,9 +2127,7 @@ export class AulasService {
     id: number,
     usuarioId?: number,
   ) {
-    const aula = await this.obtenerEntidadPorId(aulaId);
-
-    this.validarAulaActivaParaDisponibilidad(aula);
+    await this.obtenerEntidadPorId(aulaId);
 
     const disponibilidad = await this.obtenerDisponibilidadAula(aulaId, id);
 

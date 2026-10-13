@@ -146,6 +146,20 @@ export class AulasController {
     );
   }
 
+  @Delete(':aulaId/equipamientos/:equipamientoId')
+  @Permisos(PermisoSistema.AULAS_GESTIONAR)
+  desasignarEquipamientoAula(
+    @Param('aulaId', ParseIntPipe) aulaId: number,
+    @Param('equipamientoId', ParseIntPipe) equipamientoId: number,
+    @UsuarioActualId() usuarioId: number,
+  ) {
+    return this.aulasService.desasignarEquipamientoAula(
+      aulaId,
+      equipamientoId,
+      usuarioId,
+    );
+  }
+
   @Patch(':aulaId/equipamientos/:equipamientoId/estado')
   @Permisos(PermisoSistema.AULAS_GESTIONAR)
   cambiarEstadoEquipamientoAula(

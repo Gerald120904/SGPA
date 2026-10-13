@@ -16,15 +16,9 @@ import { Equipamiento } from './equipamiento.entity';
 @Index(
   'UQ_aula_equipamientos_aula_equipamiento',
   ['aulaId', 'equipamientoId'],
-  {
-    unique: true,
-  },
+  { unique: true },
 )
-@Check('chk_aula_equipamiento_cantidad_total', 'cantidad_total > 0')
-@Check(
-  'chk_aula_equipamiento_disponibles',
-  'cantidad_disponible >= 0 AND cantidad_disponible <= cantidad_total',
-)
+@Check('chk_aula_equipamiento_cantidad_asignada', 'cantidad_asignada > 0')
 export class AulaEquipamiento {
   @PrimaryGeneratedColumn({
     type: 'int',
@@ -47,18 +41,11 @@ export class AulaEquipamiento {
   equipamientoId!: number;
 
   @Column({
-    name: 'cantidad_total',
+    name: 'cantidad_asignada',
     type: 'smallint',
     unsigned: true,
   })
-  cantidadTotal!: number;
-
-  @Column({
-    name: 'cantidad_disponible',
-    type: 'smallint',
-    unsigned: true,
-  })
-  cantidadDisponible!: number;
+  cantidadAsignada!: number;
 
   @Column({
     type: 'varchar',
@@ -70,17 +57,13 @@ export class AulaEquipamiento {
   @ManyToOne(() => Aula, (aula) => aula.equipamientos, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn({
-    name: 'aula_id',
-  })
+  @JoinColumn({ name: 'aula_id' })
   aula!: Aula;
 
   @ManyToOne(() => Equipamiento, {
     onDelete: 'RESTRICT',
   })
-  @JoinColumn({
-    name: 'equipamiento_id',
-  })
+  @JoinColumn({ name: 'equipamiento_id' })
   equipamiento!: Equipamiento;
 
   @Column({
@@ -88,6 +71,20 @@ export class AulaEquipamiento {
     default: true,
   })
   activo!: boolean;
+
+  @Column({
+    name: 'asignado_en',
+    type: 'datetime',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  asignadoEn!: Date;
+
+  @Column({
+    name: 'retirado_en',
+    type: 'datetime',
+    nullable: true,
+  })
+  retiradoEn!: Date | null;
 
   @CreateDateColumn({
     name: 'created_at',
