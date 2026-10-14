@@ -33,6 +33,9 @@ describe('PlanReglasOptativasService', () => {
   ): ReglaOptativaPlan => ({
     id: 1,
     planEstudioId: 1,
+    cantidadDisciplinarias: 2,
+    cantidadAbiertas: 1,
+    cantidadSede: 1,
     minimoDisciplinariasPropias: 2,
     maximoOtrasAreas: 2,
     planEstudio: planActivo,
@@ -62,95 +65,100 @@ describe('PlanReglasOptativasService', () => {
     jest.clearAllMocks();
   });
 
-  it('guarda una regla válida para un plan con 4 espacios OPT (mínimo 2, máximo 2)', async () => {
+  it('guarda cantidades exactas por tipo de optativa', async () => {
     const regla = crearRegla();
     planRepository.findOne.mockResolvedValue(planActivo);
     asignaturaRepository.count
-      .mockResolvedValueOnce(4)
-      .mockResolvedValueOnce(2);
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0);
     reglaRepository.findOne.mockResolvedValue(null);
     reglaRepository.save.mockResolvedValue(regla);
 
     const resultado = await service.guardar(1, {
-      minimoDisciplinariasPropias: 2,
-      maximoOtrasAreas: 2,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 1,
+      cantidadSede: 1,
     });
 
-    expect(asignaturaRepository.count).toHaveBeenCalledWith({
-      where: {
-        planEstudioId: 1,
-        tipo: TipoPlanAsignatura.OPTATIVA,
-        activo: true,
-      },
-    });
-    expect(asignaturaRepository.count).toHaveBeenCalledWith({
-      where: {
-        planEstudioId: 1,
-        tipo: TipoPlanAsignatura.OPTATIVA,
-        tipoOptativa: expect.anything(),
-        activo: true,
-      },
-    });
+    expect(asignaturaRepository.count).toHaveBeenCalledTimes(4);
     expect(reglaRepository.create).toHaveBeenCalledWith({
       planEstudioId: 1,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 1,
+      cantidadSede: 1,
       minimoDisciplinariasPropias: 2,
       maximoOtrasAreas: 2,
     });
     expect(resultado).toEqual(regla);
   });
 
-  it('rechaza configurar regla si el plan no tiene espacios OPT activos', async () => {
-    planRepository.findOne.mockResolvedValue(planActivo);
-    asignaturaRepository.count.mockResolvedValue(0);
-
-    await expect(
-      service.guardar(1, {
-        minimoDisciplinariasPropias: 2,
-        maximoOtrasAreas: 2,
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(reglaRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('rechaza si el mínimo de disciplinarias propias (5) supera los espacios OPT (4)', async () => {
-    planRepository.findOne.mockResolvedValue(planActivo);
-    asignaturaRepository.count.mockResolvedValue(4);
-
-    await expect(
-      service.guardar(1, {
-        minimoDisciplinariasPropias: 5,
-        maximoOtrasAreas: 2,
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(reglaRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('rechaza si el máximo de otras áreas (7) supera los espacios OPT (4)', async () => {
-    planRepository.findOne.mockResolvedValue(planActivo);
-    asignaturaRepository.count.mockResolvedValue(4);
-
-    await expect(
-      service.guardar(1, {
-        minimoDisciplinariasPropias: 2,
-        maximoOtrasAreas: 7,
-      }),
-    ).rejects.toThrow(BadRequestException);
-
-    expect(reglaRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('rechaza un máximo menor a las optativas de otras áreas ya registradas', async () => {
+  it('rechaza configurar regla si hay optativas sin clasificar', async () => {
     planRepository.findOne.mockResolvedValue(planActivo);
     asignaturaRepository.count
-      .mockResolvedValueOnce(4)
-      .mockResolvedValueOnce(3);
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1);
 
     await expect(
       service.guardar(1, {
-        minimoDisciplinariasPropias: 1,
-        maximoOtrasAreas: 2,
+        cantidadDisciplinarias: 2,
+        cantidadAbiertas: 1,
+        cantidadSede: 1,
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(reglaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza si la suma configurada supera 200 espacios', async () => {
+    planRepository.findOne.mockResolvedValue(planActivo);
+
+    await expect(
+      service.guardar(1, {
+        cantidadDisciplinarias: 100,
+        cantidadAbiertas: 100,
+        cantidadSede: 1,
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(reglaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza reducir disciplinarias por debajo de las ya registradas', async () => {
+    planRepository.findOne.mockResolvedValue(planActivo);
+    asignaturaRepository.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    await expect(
+      service.guardar(1, {
+        cantidadDisciplinarias: 2,
+        cantidadAbiertas: 0,
+        cantidadSede: 0,
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(reglaRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza reducir abiertas por debajo de las ya registradas', async () => {
+    planRepository.findOne.mockResolvedValue(planActivo);
+    asignaturaRepository.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    await expect(
+      service.guardar(1, {
+        cantidadDisciplinarias: 0,
+        cantidadAbiertas: 2,
+        cantidadSede: 0,
       }),
     ).rejects.toThrow(BadRequestException);
 
@@ -162,7 +170,9 @@ describe('PlanReglasOptativasService', () => {
 
     await expect(
       service.guardar(999, {
-        minimoDisciplinariasPropias: 2,
+        cantidadDisciplinarias: 2,
+        cantidadAbiertas: 1,
+        cantidadSede: 1,
       }),
     ).rejects.toThrow(NotFoundException);
 
@@ -173,7 +183,9 @@ describe('PlanReglasOptativasService', () => {
 
     await expect(
       service.guardar(1, {
-        minimoDisciplinariasPropias: 2,
+        cantidadDisciplinarias: 2,
+        cantidadAbiertas: 1,
+        cantidadSede: 1,
       }),
     ).rejects.toThrow(BadRequestException);
   });
@@ -182,13 +194,25 @@ describe('PlanReglasOptativasService', () => {
     const regla = crearRegla();
     planRepository.findOne.mockResolvedValue(planActivo);
     reglaRepository.findOne.mockResolvedValue(regla);
-    asignaturaRepository.count.mockResolvedValue(4);
+    asignaturaRepository.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0);
 
     const resultado = await service.obtener(1);
 
     expect(resultado).toEqual({
       regla,
       cantidadEspaciosOptativos: 4,
+      cantidadEspaciosConfigurados: 4,
+      conteoActual: {
+        disciplinarias: 2,
+        abiertas: 1,
+        sede: 1,
+        sinClasificar: 0,
+        total: 4,
+      },
     });
   });
 

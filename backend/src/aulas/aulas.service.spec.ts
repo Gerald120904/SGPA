@@ -134,6 +134,7 @@ describe('AulasService', () => {
     id: 1,
     nombre: 'Proyector',
     descripcion: 'Proyector multimedia',
+    cantidadTotal: 25,
     activo: true,
     createdAt: new Date('2026-09-03T00:00:00-06:00'),
     updatedAt: new Date('2026-09-03T00:00:00-06:00'),
@@ -146,10 +147,11 @@ describe('AulasService', () => {
     id: 1,
     aulaId: 1,
     equipamientoId: 1,
-    cantidadTotal: 1,
-    cantidadDisponible: 1,
+    cantidadAsignada: 1,
     observaciones: null,
     activo: true,
+    asignadoEn: new Date('2026-09-03T00:00:00-06:00'),
+    retiradoEn: null,
     aula: crearAula(),
     equipamiento: crearEquipamiento(),
     createdAt: new Date('2026-09-03T00:00:00-06:00'),
@@ -255,6 +257,7 @@ describe('AulasService', () => {
 
     indisponibilidadAulaRepository.find.mockResolvedValue([]);
     reservaAulaRepository.find.mockResolvedValue([]);
+    aulaEquipamientoRepository.find.mockResolvedValue([]);
 
     service = new AulasService(
       aulaRepository as unknown as Repository<Aula>,
@@ -408,14 +411,14 @@ describe('AulasService', () => {
     expect(aulaRepository.save).not.toHaveBeenCalled();
   });
 
-  it('rechaza crear una nueva aula UNA cuando ya existen 25', async () => {
+  it('rechaza crear una nueva aula UNA cuando ya existen 27', async () => {
     aulaRepository.findOne.mockResolvedValue(null);
-    aulaRepository.count.mockResolvedValue(25);
+    aulaRepository.count.mockResolvedValue(27);
 
     await expect(
       service.crear({
-        codigo: 'AULA-26',
-        nombre: 'Aula 26',
+        codigo: 'AULA-27-B',
+        nombre: 'Aula 27 B',
         capacidad: 30,
         tipo: TipoAula.AULA,
         tipoMobiliario: TipoMobiliarioAula.PUPITRE,
@@ -734,11 +737,13 @@ describe('AulasService', () => {
       service.crearEquipamiento({
         nombre: ' Proyector ',
         descripcion: ' Equipo multimedia ',
+        cantidadTotal: 25,
       }),
     ).resolves.toMatchObject({
       id: 1,
       nombre: 'Proyector',
       descripcion: 'Equipo multimedia',
+      cantidadTotal: 25,
       activo: true,
     });
   });
@@ -761,23 +766,21 @@ describe('AulasService', () => {
     expect(equipamientoRepository.update).not.toHaveBeenCalled();
   });
 
-  it('rechaza cantidades disponibles mayores al total', async () => {
+  it('rechaza asignar más unidades que el inventario disponible', async () => {
     aulaRepository.findOne.mockResolvedValue(crearAula());
     equipamientoRepository.findOne.mockResolvedValue({
       id: 1,
       nombre: 'Computadora',
+      cantidadTotal: 25,
       activo: true,
     });
 
     await expect(
       service.asignarEquipamientoAula(1, {
         equipamientoId: 1,
-        cantidadTotal: 25,
-        cantidadDisponible: 30,
+        cantidadAsignada: 30,
       }),
-    ).rejects.toThrow(
-      'La cantidad disponible no puede superar la cantidad total.',
-    );
+    ).rejects.toThrow('No hay unidades suficientes disponibles');
     expect(aulaEquipamientoRepository.save).not.toHaveBeenCalled();
   });
 
@@ -786,14 +789,14 @@ describe('AulasService', () => {
     equipamientoRepository.findOne.mockResolvedValue({
       id: 1,
       nombre: 'Computadora',
+      cantidadTotal: 25,
       activo: true,
     });
     aulaEquipamientoRepository.findOne.mockResolvedValue({
       id: 10,
       aulaId: 1,
       equipamientoId: 1,
-      cantidadTotal: 10,
-      cantidadDisponible: 8,
+      cantidadAsignada: 8,
       observaciones: null,
       activo: false,
     });
@@ -803,47 +806,47 @@ describe('AulasService', () => {
 
     const resultado = await service.asignarEquipamientoAula(1, {
       equipamientoId: 1,
-      cantidadTotal: 25,
-      cantidadDisponible: 22,
+      cantidadAsignada: 22,
       observaciones: ' Tres dañadas ',
     });
 
     expect(aulaEquipamientoRepository.create).not.toHaveBeenCalled();
     expect(resultado).toMatchObject({
       id: 10,
-      cantidadTotal: 25,
-      cantidadDisponible: 22,
+      cantidadAsignada: 22,
       observaciones: 'Tres dañadas',
       activo: true,
     });
   });
 
-  it('permite cero equipos disponibles sin inactivar la relación', async () => {
+  it('permite asignar todo el inventario y deja cero unidades disponibles', async () => {
     const relacion = {
       id: 10,
       aulaId: 1,
       equipamientoId: 1,
-      cantidadTotal: 1,
-      cantidadDisponible: 1,
+      cantidadAsignada: 1,
       observaciones: null,
       activo: true,
       equipamiento: { id: 1, nombre: 'Proyector', activo: true },
     };
     aulaEquipamientoRepository.findOne
       .mockResolvedValueOnce(relacion)
-      .mockResolvedValueOnce({ ...relacion, cantidadDisponible: 0 });
+      .mockResolvedValueOnce(relacion);
+    equipamientoRepository.findOne.mockResolvedValue(
+      crearEquipamiento({ cantidadTotal: 1 }),
+    );
     aulaEquipamientoRepository.save.mockImplementation(
       async (entidad) => entidad,
     );
 
     const resultado = await service.actualizarEquipamientoAula(1, 1, {
-      cantidadDisponible: 0,
+      cantidadAsignada: 1,
     });
 
     expect(aulaEquipamientoRepository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ cantidadDisponible: 0, activo: true }),
+      expect.objectContaining({ cantidadAsignada: 1, activo: true }),
     );
-    expect(resultado.cantidadDisponible).toBe(0);
+    expect(resultado.cantidadAsignada).toBe(1);
     expect(resultado.activo).toBe(true);
   });
 
@@ -854,7 +857,13 @@ describe('AulasService', () => {
     ];
     equipamientoRepository.find.mockResolvedValue(equipamientos);
 
-    await expect(service.listarEquipamientos()).resolves.toEqual(equipamientos);
+    await expect(service.listarEquipamientos()).resolves.toEqual(
+      equipamientos.map((equipamiento) => ({
+        ...equipamiento,
+        cantidadAsignada: 0,
+        cantidadDisponible: equipamiento.cantidadTotal,
+      })),
+    );
     expect(equipamientoRepository.find).toHaveBeenCalledWith({
       order: { nombre: 'ASC' },
     });
@@ -864,7 +873,7 @@ describe('AulasService', () => {
     equipamientoRepository.findOne.mockResolvedValue(crearEquipamiento());
 
     await expect(
-      service.crearEquipamiento({ nombre: 'Proyector' }),
+      service.crearEquipamiento({ nombre: 'Proyector', cantidadTotal: 1 }),
     ).rejects.toThrow(ConflictException);
     expect(equipamientoRepository.save).not.toHaveBeenCalled();
   });
@@ -872,19 +881,19 @@ describe('AulasService', () => {
   it('asigna equipamiento a un aula', async () => {
     aulaRepository.findOne.mockResolvedValue(crearAula());
     equipamientoRepository.findOne.mockResolvedValue(crearEquipamiento());
-    aulaEquipamientoRepository.findOne.mockResolvedValue(null);
     const relacion = crearAulaEquipamiento({
-      cantidadTotal: 25,
-      cantidadDisponible: 23,
+      cantidadAsignada: 23,
       observaciones: '2 en reparación',
     });
+    aulaEquipamientoRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(relacion);
     aulaEquipamientoRepository.save.mockResolvedValue(relacion);
 
     await expect(
       service.asignarEquipamientoAula(1, {
         equipamientoId: 1,
-        cantidadTotal: 25,
-        cantidadDisponible: 23,
+        cantidadAsignada: 23,
         observaciones: ' 2 en reparación ',
       }),
     ).resolves.toEqual(relacion);
@@ -892,10 +901,11 @@ describe('AulasService', () => {
     expect(aulaEquipamientoRepository.create).toHaveBeenCalledWith({
       aulaId: 1,
       equipamientoId: 1,
-      cantidadTotal: 25,
-      cantidadDisponible: 23,
+      cantidadAsignada: 23,
       observaciones: '2 en reparación',
       activo: true,
+      asignadoEn: expect.any(Date),
+      retiradoEn: null,
     });
   });
 
@@ -947,33 +957,34 @@ describe('AulasService', () => {
 
   it('actualiza las cantidades del equipamiento de un aula', async () => {
     const relacion = crearAulaEquipamiento({
-      cantidadTotal: 25,
-      cantidadDisponible: 25,
+      cantidadAsignada: 25,
     });
     aulaEquipamientoRepository.findOne
       .mockResolvedValueOnce({ ...relacion })
       .mockResolvedValueOnce({
         ...relacion,
-        cantidadDisponible: 22,
+        cantidadAsignada: 22,
         observaciones: '3 en reparación',
       });
     aulaEquipamientoRepository.save.mockImplementation(
       async (entidad) => entidad,
     );
+    equipamientoRepository.findOne.mockResolvedValue(
+      crearEquipamiento({ cantidadTotal: 25 }),
+    );
 
     const resultado = await service.actualizarEquipamientoAula(1, 1, {
-      cantidadDisponible: 22,
+      cantidadAsignada: 22,
       observaciones: '3 en reparación',
     });
 
     expect(aulaEquipamientoRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        cantidadTotal: 25,
-        cantidadDisponible: 22,
+        cantidadAsignada: 22,
         observaciones: '3 en reparación',
       }),
     );
-    expect(resultado.cantidadDisponible).toBe(22);
+    expect(resultado.cantidadAsignada).toBe(22);
   });
 
   it('permite inactivar un catálogo sin asignaciones activas', async () => {
@@ -1752,8 +1763,7 @@ describe('AulasService', () => {
           crearAulaEquipamiento({
             aulaId: 1,
             equipamientoId: 1,
-            cantidadTotal: 1,
-            cantidadDisponible: 1,
+            cantidadAsignada: 1,
             activo: true,
             equipamiento: crearEquipamiento({
               id: 1,
@@ -2390,7 +2400,7 @@ describe('AulasService', () => {
       });
     });
 
-    it('audita antes y después al cambiar el estado del equipamiento asignado', async () => {
+    it('audita las unidades liberadas al desasignar equipamiento', async () => {
       const relacion = crearAulaEquipamiento({ activo: true });
 
       aulaEquipamientoRepository.findOne
@@ -2403,8 +2413,9 @@ describe('AulasService', () => {
       await service.cambiarEstadoEquipamientoAula(1, 1, false, 7);
 
       expect(obtenerDetalleAuditoria()).toEqual({
-        antes: { activo: true },
-        despues: { activo: false },
+        equipamientoId: 1,
+        cantidadLiberada: 1,
+        retiradoEn: expect.any(String),
       });
     });
   });

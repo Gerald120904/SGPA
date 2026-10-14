@@ -8,6 +8,7 @@ import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
 import { PlanEstudio } from './entities/plan-estudio.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
+import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import { PlanImportacionService } from './plan-importacion.service';
 
 describe('PlanImportacionService', () => {
@@ -15,6 +16,7 @@ describe('PlanImportacionService', () => {
   let planRepository: { findOne: jest.Mock };
   let asignaturaRepository: { count: jest.Mock };
   let salidaRepository: { count: jest.Mock };
+  let reglaOptativaRepository: { findOne: jest.Mock };
   let dataSource: { transaction: jest.Mock };
 
   const plan = {
@@ -53,11 +55,20 @@ describe('PlanImportacionService', () => {
     planRepository = { findOne: jest.fn().mockResolvedValue(plan) };
     asignaturaRepository = { count: jest.fn().mockResolvedValue(0) };
     salidaRepository = { count: jest.fn().mockResolvedValue(0) };
+    reglaOptativaRepository = {
+      findOne: jest.fn().mockResolvedValue({
+        planEstudioId: 1,
+        cantidadDisciplinarias: 200,
+        cantidadAbiertas: 200,
+        cantidadSede: 200,
+      }),
+    };
     dataSource = { transaction: jest.fn() };
     service = new PlanImportacionService(
       planRepository as unknown as Repository<PlanEstudio>,
       asignaturaRepository as unknown as Repository<PlanAsignatura>,
       salidaRepository as unknown as Repository<SalidaAcademica>,
+      reglaOptativaRepository as unknown as Repository<ReglaOptativaPlan>,
       dataSource as unknown as DataSource,
     );
   });

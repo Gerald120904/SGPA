@@ -139,6 +139,12 @@ describe('PlanValidacionesService', () => {
     ]);
     requisitos.find.mockResolvedValue([]);
     salidas.find.mockResolvedValue([]);
+    reglasOptativas.findOne.mockResolvedValue({
+      planEstudioId: 1,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 0,
+      cantidadSede: 0,
+    });
 
     const r = await service.validar(1);
     const codigosError = r.errores.map((item) => item.codigo);
@@ -268,7 +274,7 @@ describe('PlanValidacionesService', () => {
     expect(r.valido).toBe(false);
   });
 
-  it('detecta que no se cumple el mínimo de optativas disciplinarias', async () => {
+  it('detecta que no se cumple la cantidad exacta de optativas disciplinarias', async () => {
     planes.findOne.mockResolvedValue({ id: 1 });
     asignaturas.find.mockResolvedValue([
       {
@@ -302,8 +308,9 @@ describe('PlanValidacionesService', () => {
     salidas.find.mockResolvedValue([]);
     reglasOptativas.findOne.mockResolvedValue({
       planEstudioId: 1,
-      minimoDisciplinariasPropias: 2,
-      maximoOtrasAreas: 2,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 1,
+      cantidadSede: 0,
     });
 
     const r = await service.validar(1);
@@ -311,14 +318,14 @@ describe('PlanValidacionesService', () => {
     expect(r.errores).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          codigo: 'MINIMO_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDO',
+          codigo: 'CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA',
         }),
       ]),
     );
     expect(r.valido).toBe(false);
   });
 
-  it('detecta que se supera el máximo de optativas de otras áreas', async () => {
+  it('detecta que no se cumple la cantidad exacta de optativas abiertas', async () => {
     planes.findOne.mockResolvedValue({ id: 1 });
     asignaturas.find.mockResolvedValue([
       {
@@ -365,8 +372,9 @@ describe('PlanValidacionesService', () => {
     salidas.find.mockResolvedValue([]);
     reglasOptativas.findOne.mockResolvedValue({
       planEstudioId: 1,
-      minimoDisciplinariasPropias: 0,
-      maximoOtrasAreas: 2,
+      cantidadDisciplinarias: 0,
+      cantidadAbiertas: 1,
+      cantidadSede: 1,
     });
 
     const r = await service.validar(1);
@@ -374,7 +382,7 @@ describe('PlanValidacionesService', () => {
     expect(r.errores).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          codigo: 'MAXIMO_OPTATIVAS_OTRAS_AREAS_SUPERADO',
+          codigo: 'CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA',
         }),
       ]),
     );

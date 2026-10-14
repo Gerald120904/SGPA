@@ -583,6 +583,7 @@ describe('AulasController', () => {
     const dto = {
       nombre: 'Proyector',
       descripcion: 'Proyector multimedia',
+      cantidadTotal: 25,
     };
 
     await request(app.getHttpServer())
@@ -692,8 +693,7 @@ describe('AulasController', () => {
     const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = {
       equipamientoId: 1,
-      cantidadTotal: 25,
-      cantidadDisponible: 23,
+      cantidadAsignada: 23,
       observaciones: '2 computadoras en reparación',
     };
 
@@ -765,7 +765,7 @@ describe('AulasController', () => {
     permisosAsignados.add(PermisoSistema.AULAS_GESTIONAR);
     const token = await crearToken('ASISTENTE_ESTUDIANTIL');
     const dto = {
-      cantidadDisponible: 22,
+      cantidadAsignada: 22,
       observaciones: '3 computadoras en reparación',
     };
 

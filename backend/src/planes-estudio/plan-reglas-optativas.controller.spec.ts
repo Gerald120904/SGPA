@@ -124,8 +124,9 @@ describe('PlanReglasOptativasController', () => {
     const regla = {
       id: 1,
       planEstudioId: 1,
-      minimoDisciplinariasPropias: 2,
-      maximoOtrasAreas: 2,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 1,
+      cantidadSede: 1,
     };
     reglasService.guardar.mockResolvedValue(regla);
 
@@ -133,15 +134,17 @@ describe('PlanReglasOptativasController', () => {
       .put('/planes-estudio/1/regla-optativas')
       .set('Authorization', `Bearer ${generarToken('COORDINADOR')}`)
       .send({
-        minimoDisciplinariasPropias: 2,
-        maximoOtrasAreas: 2,
+        cantidadDisciplinarias: 2,
+        cantidadAbiertas: 1,
+        cantidadSede: 1,
       })
       .expect(200);
 
     expect(response.body).toEqual(regla);
     expect(reglasService.guardar).toHaveBeenCalledWith(1, {
-      minimoDisciplinariasPropias: 2,
-      maximoOtrasAreas: 2,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 1,
+      cantidadSede: 1,
     });
   });
 
