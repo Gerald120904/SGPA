@@ -5,7 +5,7 @@ import started from "electron-squirrel-startup";
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 
-const API_URL = "http://127.0.0.1:3000";
+const API_URL = process.env.SGPA_API_URL || "http://127.0.0.1:3000";
 let accessToken = null;
 
 async function ejecutarPeticionAutenticada(ruta, opciones = {}) {

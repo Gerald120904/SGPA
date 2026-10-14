@@ -44,6 +44,10 @@ import {
 } from '../../components/DataTable.js';
 
 import {
+  StatusBadge
+} from '../../components/StatusBadge.js';
+
+import {
   FormDialog,
   habilitarCierreExterior
 } from '../../components/FormDialog.js';
@@ -78,10 +82,10 @@ export function FormulariosEstudiantesPage() {
   return `
     <section
       id="formulariosEstudiantesPage"
-      class="module-view"
+      class="module-view formularios-page"
     >
-      <div class="planes-toolbar">
-        <div>
+      <div class="formularios-toolbar">
+        <div class="formularios-toolbar-heading">
           <h2>
             Formularios de estudiantes
           </h2>
@@ -94,7 +98,10 @@ export function FormulariosEstudiantesPage() {
           <div id="estadoGoogleFormularios"></div>
         </div>
 
-        <div id="accionesFormularios"></div>
+        <div
+          id="accionesFormularios"
+          class="formularios-toolbar-actions"
+        ></div>
       </div>
 
       <div
@@ -141,27 +148,27 @@ function renderizarEstadoGoogle() {
 
   if (estadoGoogle.conectado) {
     contenedor.innerHTML = `
-      <small>
-        <strong>
-          Google conectado
-        </strong>
+      <div class="formularios-google-status formularios-google-connected">
+        <span class="formularios-google-dot" aria-hidden="true"></span>
+        <span>
+          <strong>Google conectado</strong>
         ${
           estadoGoogle.googleEmail
-            ? ` · ${escapeHtml(
-                estadoGoogle.googleEmail
-              )}`
+            ? `<small>${escapeHtml(estadoGoogle.googleEmail)}</small>`
             : ''
         }
-      </small>
+        </span>
+      </div>
     `;
 
     return;
   }
 
   contenedor.innerHTML = `
-    <small>
-      Google no conectado
-    </small>
+    <div class="formularios-google-status formularios-google-disconnected">
+      <span class="formularios-google-dot" aria-hidden="true"></span>
+      <strong>Google no conectado</strong>
+    </div>
   `;
 }
 
@@ -193,7 +200,7 @@ function renderizarAcciones() {
       <button
         id="conectarGoogleButton"
         type="button"
-        class="btn btn-secondary"
+        class="formularios-secondary-button"
       >
         <i
           data-lucide="link"
@@ -212,7 +219,7 @@ function renderizarAcciones() {
       <button
         id="desconectarGoogleButton"
         type="button"
-        class="btn btn-secondary"
+        class="formularios-secondary-button"
       >
         <i
           data-lucide="unlink"
@@ -228,7 +235,7 @@ function renderizarAcciones() {
       <button
         id="nuevoFormularioButton"
         type="button"
-        class="btn btn-primary"
+        class="formularios-primary-button"
         ${
           estadoGoogle.conectado
             ? ''
@@ -295,6 +302,21 @@ function renderizarFilaFormulario(
   const operable =
     publicado || cerrado;
 
+  const tonosEstado = {
+    PUBLICADO: 'success',
+    CERRADO: 'neutral',
+    CREANDO: 'info',
+    ERROR: 'danger'
+  };
+
+  const estadoBadge =
+    StatusBadge({
+      label: formulario.estado || 'Sin estado',
+      tone:
+        tonosEstado[formulario.estado] ||
+        'neutral'
+    });
+
   return `
     <tr
       data-formulario-id="${formulario.id}"
@@ -316,22 +338,18 @@ function renderizarFilaFormulario(
       </td>
 
       <td>
-        ${escapeHtml(
-          formulario.estado
-        )}
+        ${estadoBadge}
       </td>
 
       <td>
-        <div>
-          <strong>${total}</strong>
-          total
+        <div class="formularios-response-summary">
+          <strong>${total} respuestas</strong>
+          <small>
+            ${pendientes} pendiente${pendientes === 1 ? '' : 's'}
+            ·
+            ${revision} en revisión
+          </small>
         </div>
-
-        <small>
-          ${pendientes} pendientes
-          ·
-          ${revision} revisión
-        </small>
       </td>
 
       <td>
@@ -340,7 +358,7 @@ function renderizarFilaFormulario(
             ? `
               <button
                 type="button"
-                class="btn btn-secondary btn-sm"
+                class="formularios-secondary-button formularios-copy-button"
                 data-action="copiar-enlace"
                 data-id="${formulario.id}"
                 title="Copiar enlace para responder"
@@ -350,7 +368,7 @@ function renderizarFilaFormulario(
                   aria-hidden="true"
                 ></i>
 
-                Copiar link
+                Copiar enlace
               </button>
             `
             : '—'
@@ -358,13 +376,13 @@ function renderizarFilaFormulario(
       </td>
 
       <td>
-        <div class="table-actions" style="display: inline-flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+        <div class="formularios-table-actions">
           ${
             formulario.responderUri
               ? `
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="formularios-icon-button"
                   data-action="abrir-enlace"
                   data-id="${formulario.id}"
                   title="Abrir formulario en Google Forms"
@@ -383,7 +401,7 @@ function renderizarFilaFormulario(
               ? `
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="formularios-icon-button"
                   data-action="ver-respuestas"
                   data-id="${formulario.id}"
                   title="Ver respuestas"
@@ -402,7 +420,7 @@ function renderizarFilaFormulario(
               ? `
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="formularios-icon-button"
                   data-action="sincronizar"
                   data-id="${formulario.id}"
                   title="Sincronizar respuestas"
@@ -421,7 +439,7 @@ function renderizarFilaFormulario(
               ? `
                 <button
                   type="button"
-                  class="btn btn-secondary btn-sm"
+                  class="formularios-icon-button formularios-icon-button-danger"
                   data-action="cerrar"
                   data-id="${formulario.id}"
                   title="Cerrar formulario"
@@ -1174,6 +1192,15 @@ async function abrirNuevoFormulario() {
     return;
   }
 
+  if (carrerasDisponibles.length === 0) {
+    mostrarError({
+      titulo: 'No hay carreras activas',
+      mensaje: 'Registre o habilite una carrera antes de crear un formulario.'
+    });
+
+    return;
+  }
+
   const opcionesCarreras =
     carrerasDisponibles
       .map(
@@ -1319,9 +1346,14 @@ async function abrirNuevoFormulario() {
       'formularioPlan'
     );
 
+  let planSeleccionadoTieneCursos = false;
+  let versionConsultaPlan = 0;
+
   carreraInput?.addEventListener(
     'change',
     () => {
+      versionConsultaPlan += 1;
+      planSeleccionadoTieneCursos = false;
       const carreraId =
         Number(
           carreraInput.value
@@ -1390,14 +1422,24 @@ async function abrirNuevoFormulario() {
       const planId =
         Number(planInput.value);
 
+      const versionActual = ++versionConsultaPlan;
+
+      planSeleccionadoTieneCursos = false;
+
       if (!resumen || !planId) {
         return;
       }
 
+      const consultaSigueVigente = () =>
+        versionActual === versionConsultaPlan &&
+        planInput.isConnected &&
+        document.getElementById('formularioPlan') === planInput &&
+        Number(planInput.value) === planId;
+
       resumen.innerHTML = `
-        <small class="sgpa-field-help">
-          Consultando asignaturas del plan...
-        </small>
+        <div class="formularios-plan-preview formularios-plan-preview-loading">
+          Consultando estructura del plan...
+        </div>
       `;
 
       try {
@@ -1405,6 +1447,8 @@ async function abrirNuevoFormulario() {
           await listarPlanAsignaturas(
             planId
           );
+
+        if (!consultaSigueVigente()) return;
 
         if (!resultado?.ok) {
           throw new Error(
@@ -1420,25 +1464,104 @@ async function abrirNuevoFormulario() {
             ? resultado.asignaturas
             : [];
 
-        const reales =
-          asignaturas.filter(
-            (asignatura) =>
-              asignatura.activo === true &&
-              asignatura.cursoId !== null
+        const reales = asignaturas.filter(
+          (asignatura) =>
+            asignatura.activo === true &&
+            asignatura.cursoId != null &&
+            asignatura.curso != null
+        );
+
+        planSeleccionadoTieneCursos =
+          reales.length > 0;
+
+        const estructura =
+          new Map();
+
+        reales.forEach((asignatura) => {
+          const nivel =
+            Number(asignatura.nivel);
+          const ciclo =
+            Number(asignatura.ciclo);
+          const ciclosNivel =
+            estructura.get(nivel) ||
+            new Map();
+
+          ciclosNivel.set(
+            ciclo,
+            (ciclosNivel.get(ciclo) || 0) + 1
+          );
+          estructura.set(nivel, ciclosNivel);
+        });
+
+        const planSeleccionado =
+          planesDisponibles.find(
+            (plan) => plan.id === planId
           );
 
+        const tarjetas =
+          [...estructura.entries()]
+            .sort(([nivelA], [nivelB]) =>
+              nivelA - nivelB
+            )
+            .map(([nivel, ciclosNivel]) => `
+              <article class="formularios-plan-preview-card">
+                <h5>Año ${nivel}</h5>
+                ${[...ciclosNivel.entries()]
+                  .sort(([cicloA], [cicloB]) =>
+                    cicloA - cicloB
+                  )
+                  .map(([ciclo, cantidad]) => `
+                    <div>
+                      <span>Ciclo ${ciclo}</span>
+                      <strong>
+                        ${cantidad}
+                        curso${cantidad === 1 ? '' : 's'}
+                      </strong>
+                    </div>
+                  `)
+                  .join('')}
+              </article>
+            `)
+            .join('');
+
         resumen.innerHTML = `
-          <small class="sgpa-field-help">
-            El formulario incluirá
-            <strong>${reales.length}</strong>
-            asignaturas del plan como opciones de materias aprobadas.
-          </small>
+          <section class="formularios-plan-preview ${
+            reales.length
+              ? ''
+              : 'formularios-plan-preview-warning'
+          }">
+            <div class="formularios-plan-preview-heading">
+              <div>
+                <small>Plan seleccionado</small>
+                <strong>${escapeHtml(
+                  planSeleccionado?.nombre ||
+                  'Plan de estudio'
+                )}</strong>
+              </div>
+              <span>
+                ${reales.length} asignatura${reales.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            ${
+              reales.length
+                ? `<div class="formularios-plan-preview-grid">${tarjetas}</div>`
+                : `
+                    <p>
+                      Este plan no tiene asignaturas activas asociadas a cursos
+                      y no puede utilizarse para generar el formulario.
+                    </p>
+                  `
+            }
+          </section>
         `;
       } catch (error) {
+        if (!consultaSigueVigente()) return;
+        planSeleccionadoTieneCursos = false;
         resumen.innerHTML = `
-          <small class="sgpa-field-help">
-            No fue posible obtener la vista previa de asignaturas.
-          </small>
+          <div class="formularios-plan-preview formularios-plan-preview-warning">
+            No fue posible consultar las asignaturas de este plan.
+            Cambie el plan o intente seleccionarlo nuevamente.
+          </div>
         `;
       }
     }
@@ -1512,11 +1635,14 @@ async function abrirNuevoFormulario() {
           !titulo ||
           !descripcion ||
           !carreraId ||
-          !planEstudioId
+          !planEstudioId ||
+          !planSeleccionadoTieneCursos
         ) {
           if (errorBox) {
             errorBox.textContent =
-              'Complete el título, la descripción, la carrera y el plan de estudio.';
+              planEstudioId && !planSeleccionadoTieneCursos
+                ? 'El plan seleccionado debe incluir al menos una asignatura activa asociada a un curso.'
+                : 'Complete el título, la descripción, la carrera y el plan de estudio.';
 
             errorBox.classList.remove(
               'hidden'

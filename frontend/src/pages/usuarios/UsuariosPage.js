@@ -681,11 +681,29 @@ export async function iniciarUsuariosPage() {
       <div class="usuario-form-grid">
         <label>
           <span>Cédula</span>
-          <input name="cedula" required maxlength="20" value="${escapeHtml(usuario?.cedula || '')}">
+          <input
+            name="cedula"
+            required
+            maxlength="20"
+            autocomplete="off"
+            value="${escapeHtml(usuario?.cedula || '')}"
+          >
+          <small>Identificación única del usuario.</small>
         </label>
+
         <label>
-          <span>Correo</span>
-          <input name="correo" type="email" required maxlength="150" value="${escapeHtml(usuario?.correo || '')}">
+          <span>Correo electrónico</span>
+          <input
+            name="correo"
+            type="email"
+            required
+            maxlength="150"
+            autocomplete="email"
+            value="${escapeHtml(usuario?.correo || '')}"
+          >
+          <small>
+            Correo único para identificar la cuenta.
+          </small>
         </label>
         <label>
           <span>Nombres</span>
@@ -1143,6 +1161,14 @@ export async function iniciarUsuariosPage() {
   }
 
   pagina.addEventListener('input', (event) => {
+    if (
+      event.target.matches?.(
+        '#usuarioForm [name="cedula"], #usuarioForm [name="correo"], #usuarioForm [name="nombres"], #usuarioForm [name="apellido1"]'
+      )
+    ) {
+      event.target.setCustomValidity('');
+    }
+
     if (event.target.id !== 'usuariosBuscar') return;
     estado.filtro = event.target.value;
     renderizarTabla();
@@ -1172,8 +1198,53 @@ export async function iniciarUsuariosPage() {
       nombres: datos.get('nombres').trim(),
       apellido1: datos.get('apellido1').trim(),
       apellido2: datos.get('apellido2').trim() || null,
-      correo: datos.get('correo').trim(),
+      correo: datos.get('correo').trim().toLowerCase(),
     };
+
+    const cedulaInput = formulario.querySelector('[name="cedula"]');
+    const correoInput = formulario.querySelector('[name="correo"]');
+    const nombresInput = formulario.querySelector('[name="nombres"]');
+    const apellido1Input = formulario.querySelector('[name="apellido1"]');
+
+    cedulaInput?.setCustomValidity('');
+    correoInput?.setCustomValidity('');
+    nombresInput?.setCustomValidity('');
+    apellido1Input?.setCustomValidity('');
+
+    const otrosUsuarios = estado.usuarios.filter(
+      (existente) => Number(existente.id) !== id
+    );
+
+    const cedulaDuplicada = otrosUsuarios.some(
+      (existente) =>
+        String(existente.cedula ?? '').trim().toLocaleLowerCase('es') ===
+        usuario.cedula.toLocaleLowerCase('es')
+    );
+
+    const correoDuplicado = otrosUsuarios.some(
+      (existente) =>
+        String(existente.correo ?? '').trim().toLowerCase() === usuario.correo
+    );
+
+    if (cedulaDuplicada) {
+      cedulaInput?.setCustomValidity('La cédula ya está registrada.');
+    }
+
+    if (correoDuplicado) {
+      correoInput?.setCustomValidity('El correo ya está registrado.');
+    }
+
+    if (!usuario.cedula) {
+      cedulaInput?.setCustomValidity('La cédula es obligatoria.');
+    }
+
+    if (!usuario.nombres) {
+      nombresInput?.setCustomValidity('El nombre es obligatorio.');
+    }
+
+    if (!usuario.apellido1) {
+      apellido1Input?.setCustomValidity('El primer apellido es obligatorio.');
+    }
 
     if (!formulario.reportValidity()) return;
 

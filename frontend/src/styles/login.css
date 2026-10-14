@@ -379,12 +379,12 @@
 .saved-accounts-toggle:hover,
 .saved-accounts-toggle:focus-visible,
 .saved-accounts-toggle.is-open {
-  background: #eef4ff;
-  color: #2563eb;
+  background: #fff1f1;
+  color: #b5121b;
 }
 
 .saved-accounts-toggle:focus-visible {
-  outline: 2px solid rgba(37, 99, 235, 0.3);
+  outline: 2px solid rgba(181, 18, 27, 0.25);
   outline-offset: 1px;
 }
 
@@ -453,12 +453,10 @@
 
 .saved-account-option:hover,
 .saved-account-option:focus-visible {
-  border-color: #dbe7ff;
+  border-color: #ead1d3;
   outline: none;
 
-  background: #f5f8ff;
-
-  transform: translateX(2px);
+  background: #fff7f7;
 }
 
 .saved-account-icon {
@@ -471,8 +469,8 @@
 
   border-radius: 10px;
 
-  background: #eaf1ff;
-  color: #2563eb;
+  background: #f8e7e8;
+  color: #b5121b;
 }
 
 .saved-account-icon svg {
@@ -520,7 +518,7 @@
 
 .saved-account-option:hover .saved-account-indicator,
 .saved-account-option:focus-visible .saved-account-indicator {
-  color: #2563eb;
+  color: #b5121b;
 }
 
 /* =========================================================

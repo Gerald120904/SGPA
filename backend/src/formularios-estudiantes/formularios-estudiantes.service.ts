@@ -322,7 +322,8 @@ export class FormulariosEstudiantesService {
     });
 
     const asignaturasConCurso = planAsignaturas.filter(
-      (item) => item.cursoId !== null && item.curso !== null,
+      (item) =>
+        item.activo === true && item.cursoId !== null && item.curso !== null,
     );
 
     if (asignaturasConCurso.length === 0) {
@@ -344,6 +345,23 @@ export class FormulariosEstudiantesService {
       );
     }
 
+    const etiquetasAsignaturas = new Map<string, number>();
+    for (const asignatura of asignaturasConCurso) {
+      const etiqueta = `${asignatura.curso!.codigo} - ${asignatura.curso!.nombre}`;
+      const planAsignaturaExistente = etiquetasAsignaturas.get(etiqueta);
+
+      if (
+        planAsignaturaExistente !== undefined &&
+        planAsignaturaExistente !== asignatura.id
+      ) {
+        throw new BadRequestException(
+          `El plan contiene opciones de asignatura ambiguas con la etiqueta "${etiqueta}".`,
+        );
+      }
+
+      etiquetasAsignaturas.set(etiqueta, asignatura.id);
+    }
+
     let formulario = this.formularioRepo.create({
       titulo: dto.titulo,
       descripcion: dto.descripcion,
@@ -360,110 +378,183 @@ export class FormulariosEstudiantesService {
 
     formulario = await this.formularioRepo.save(formulario);
 
-    const opcionesPeriodo = new Map<string, number>();
+    const anios = [...new Set(periodos.map((periodo) => periodo.anio))]
+      .sort((a, b) => b - a)
+      .map(String);
+    const ciclos = [...new Set(periodos.map((periodo) => periodo.ciclo))].sort(
+      (a, b) => a - b,
+    );
+    const mapaPeriodos = Object.fromEntries(
+      periodos.map((periodo) => [
+        `${periodo.anio}:${periodo.ciclo}`,
+        periodo.id,
+      ]),
+    );
 
-    for (const periodo of periodos) {
-      const etiqueta = `${periodo.codigo} - ${periodo.nombre}`;
-      opcionesPeriodo.set(etiqueta, periodo.id);
-    }
-
-    const opcionesAsignaturas = new Map<
-      string,
-      {
-        planAsignaturaId: number;
-        cursoId: number;
-        codigo: string;
-      }
+    const grupos = new Map<
+      number,
+      Map<
+        number,
+        Map<
+          string,
+          { planAsignaturaId: number; cursoId: number; codigo: string }
+        >
+      >
     >();
 
     for (const asignatura of asignaturasConCurso) {
+      const opcionesNivel =
+        grupos.get(asignatura.nivel) ??
+        new Map<
+          number,
+          Map<
+            string,
+            { planAsignaturaId: number; cursoId: number; codigo: string }
+          >
+        >();
+      const opcionesCiclo =
+        opcionesNivel.get(asignatura.ciclo) ??
+        new Map<
+          string,
+          { planAsignaturaId: number; cursoId: number; codigo: string }
+        >();
       const curso = asignatura.curso!;
-      const etiqueta = `${curso.codigo} - ${curso.nombre}`;
-
-      if (!opcionesAsignaturas.has(etiqueta)) {
-        opcionesAsignaturas.set(etiqueta, {
-          planAsignaturaId: asignatura.id,
-          cursoId: asignatura.cursoId!,
-          codigo: curso.codigo,
-        });
-      }
+      opcionesCiclo.set(`${curso.codigo} - ${curso.nombre}`, {
+        planAsignaturaId: asignatura.id,
+        cursoId: asignatura.cursoId!,
+        codigo: curso.codigo,
+      });
+      opcionesNivel.set(asignatura.ciclo, opcionesCiclo);
+      grupos.set(asignatura.nivel, opcionesNivel);
     }
 
     const requests: forms_v1.Schema$Request[] = [
       {
         updateFormInfo: {
-          info: {
-            description: dto.descripcion,
-          },
+          info: { description: dto.descripcion },
           updateMask: 'description',
         },
       },
+    ];
+    const indicesPreguntas = new Map<string, number>();
+    const gruposMapa: Array<{
+      nivel: number;
+      ciclo: number;
+      clave: string;
+      opciones: Record<
+        string,
+        { planAsignaturaId: number; cursoId: number; codigo: string }
+      >;
+    }> = [];
+    let itemIndex = 0;
 
-      this.crearPreguntaTexto(
-        'Primer nombre',
-        true,
-        0,
-      ),
+    const agregarPregunta = (
+      clave: string,
+      request: forms_v1.Schema$Request,
+    ) => {
+      indicesPreguntas.set(clave, requests.length);
+      requests.push(request);
+      itemIndex++;
+    };
+    const agregarSeccion = (titulo: string, descripcion: string) => {
+      requests.push(this.crearSaltoSeccion(titulo, descripcion, itemIndex));
+      itemIndex++;
+    };
 
-      this.crearPreguntaTexto(
-        'Segundo nombre',
-        false,
-        1,
-      ),
+    agregarPregunta(
+      'primerNombre',
+      this.crearPreguntaTexto('Primer nombre', true, itemIndex),
+    );
+    agregarPregunta(
+      'segundoNombre',
+      this.crearPreguntaTexto('Segundo nombre', false, itemIndex),
+    );
+    agregarPregunta(
+      'primerApellido',
+      this.crearPreguntaTexto('Primer apellido', true, itemIndex),
+    );
+    agregarPregunta(
+      'segundoApellido',
+      this.crearPreguntaTexto('Segundo apellido', false, itemIndex),
+    );
+    agregarPregunta(
+      'identificacion',
+      this.crearPreguntaTexto('Número de identificación', true, itemIndex),
+    );
+    agregarPregunta(
+      'correoEstudiantil',
+      this.crearPreguntaTexto('Correo estudiantil', true, itemIndex),
+    );
+    agregarPregunta(
+      'contacto',
+      this.crearPreguntaTexto('Número de contacto', false, itemIndex),
+    );
 
-      this.crearPreguntaTexto(
-        'Primer apellido',
-        true,
-        2,
-      ),
-
-      this.crearPreguntaTexto(
-        'Segundo apellido',
-        false,
-        3,
-      ),
-
-      this.crearPreguntaTexto(
-        'Número de identificación',
-        true,
-        4,
-      ),
-
-      this.crearPreguntaTexto(
-        'Correo estudiantil',
-        true,
-        5,
-      ),
-
-      this.crearPreguntaTexto(
-        'Número de contacto',
-        false,
-        6,
-      ),
-
+    agregarSeccion(
+      'Ingreso a la carrera',
+      `Indique el año y ciclo en que inició sus estudios en esta carrera.\nCarrera: ${carrera.nombre}\nPlan: ${plan.nombre}`,
+    );
+    agregarPregunta(
+      'anioIngreso',
       this.crearPreguntaSeleccion(
-        'Período de ingreso',
+        'Año de ingreso',
         'DROP_DOWN',
-        [...opcionesPeriodo.keys()],
+        anios,
         true,
-        7,
+        itemIndex,
       ),
-
+    );
+    agregarPregunta(
+      'cicloIngreso',
       this.crearPreguntaSeleccion(
-        '¿Cuáles asignaturas ha aprobado?',
-        'CHECKBOX',
-        [...opcionesAsignaturas.keys()],
-        false,
-        8,
+        'Ciclo de ingreso',
+        'DROP_DOWN',
+        ciclos.map((ciclo) => `Ciclo ${ciclo}`),
+        true,
+        itemIndex,
       ),
+    );
 
+    for (const [nivel, ciclosNivel] of grupos) {
+      agregarSeccion(
+        `Año ${nivel}`,
+        'Seleccione únicamente las asignaturas que ya ha aprobado.',
+      );
+
+      for (const [ciclo, opciones] of ciclosNivel) {
+        const clave = `asignaturas:${nivel}:${ciclo}`;
+        gruposMapa.push({
+          nivel,
+          ciclo,
+          clave,
+          opciones: Object.fromEntries(opciones),
+        });
+        agregarPregunta(
+          clave,
+          this.crearPreguntaSeleccion(
+            `Ciclo ${ciclo}`,
+            'CHECKBOX',
+            [...opciones.keys()],
+            false,
+            itemIndex,
+          ),
+        );
+      }
+    }
+
+    agregarSeccion(
+      'Información complementaria',
+      'Agregue cualquier información optativa pertinente.',
+    );
+    agregarPregunta(
+      'optativasNoDisciplinarias',
       this.crearPreguntaTexto(
         '¿Cuál o cuáles optativas no disciplinarias ha llevado?',
         false,
-        9,
+        itemIndex,
         true,
       ),
-    ];
+    );
 
     try {
       const googleForm = await this.googleFormsClient.crearFormulario(
@@ -497,13 +588,16 @@ export class FormulariosEstudiantesService {
         );
       }
 
-      const obtenerQuestionId = (indice: number): string => {
+      const obtenerQuestionId = (clave: string): string => {
+        const requestIndex = indicesPreguntas.get(clave);
         const questionId =
-          replies[indice + 1]?.createItem?.questionId?.[0];
+          requestIndex === undefined
+            ? undefined
+            : replies[requestIndex]?.createItem?.questionId?.[0];
 
         if (!questionId) {
           throw new InternalServerErrorException(
-            `Google no devolvió el questionId de la pregunta ${indice}`,
+            `Google no devolvió el questionId de la pregunta ${clave}`,
           );
         }
 
@@ -511,46 +605,52 @@ export class FormulariosEstudiantesService {
       };
 
       const mapaPreguntas: MapaPreguntasFormulario = {
+        version: 2,
         primerNombre: {
-          questionId: obtenerQuestionId(0),
+          questionId: obtenerQuestionId('primerNombre'),
         },
 
         segundoNombre: {
-          questionId: obtenerQuestionId(1),
+          questionId: obtenerQuestionId('segundoNombre'),
         },
 
         primerApellido: {
-          questionId: obtenerQuestionId(2),
+          questionId: obtenerQuestionId('primerApellido'),
         },
 
         segundoApellido: {
-          questionId: obtenerQuestionId(3),
+          questionId: obtenerQuestionId('segundoApellido'),
         },
 
         identificacion: {
-          questionId: obtenerQuestionId(4),
+          questionId: obtenerQuestionId('identificacion'),
         },
 
         correoEstudiantil: {
-          questionId: obtenerQuestionId(5),
+          questionId: obtenerQuestionId('correoEstudiantil'),
         },
 
         contacto: {
-          questionId: obtenerQuestionId(6),
+          questionId: obtenerQuestionId('contacto'),
         },
 
-        periodoIngreso: {
-          questionId: obtenerQuestionId(7),
-          opciones: Object.fromEntries(opcionesPeriodo),
+        ingreso: {
+          anio: { questionId: obtenerQuestionId('anioIngreso') },
+          ciclo: { questionId: obtenerQuestionId('cicloIngreso') },
+          periodos: mapaPeriodos,
         },
 
         asignaturasAprobadas: {
-          questionId: obtenerQuestionId(8),
-          opciones: Object.fromEntries(opcionesAsignaturas),
+          grupos: gruposMapa.map((grupo) => ({
+            nivel: grupo.nivel,
+            ciclo: grupo.ciclo,
+            questionId: obtenerQuestionId(grupo.clave),
+            opciones: grupo.opciones,
+          })),
         },
 
         optativasNoDisciplinarias: {
-          questionId: obtenerQuestionId(9),
+          questionId: obtenerQuestionId('optativasNoDisciplinarias'),
         },
       };
 
@@ -559,16 +659,12 @@ export class FormulariosEstudiantesService {
         googleFormId,
       );
 
-      await this.googleFormsClient.publicarFormulario(
+      await this.googleFormsClient.publicarFormulario(usuarioId, googleFormId);
+
+      const formularioGoogle = await this.googleFormsClient.obtenerFormulario(
         usuarioId,
         googleFormId,
       );
-
-      const formularioGoogle =
-        await this.googleFormsClient.obtenerFormulario(
-          usuarioId,
-          googleFormId,
-        );
 
       if (!formularioGoogle.responderUri) {
         throw new InternalServerErrorException(
@@ -594,6 +690,25 @@ export class FormulariosEstudiantesService {
 
       throw error;
     }
+  }
+
+  private crearSaltoSeccion(
+    titulo: string,
+    descripcion: string,
+    indice: number,
+  ): forms_v1.Schema$Request {
+    return {
+      createItem: {
+        item: {
+          title: titulo,
+          description: descripcion,
+          pageBreakItem: {},
+        },
+        location: {
+          index: indice,
+        },
+      },
+    };
   }
 
   private crearPreguntaTexto(

@@ -108,6 +108,14 @@ import {
 
   Trash2,
 
+  Link,
+  Unlink,
+  Copy,
+  ExternalLink,
+  Inbox,
+  Lock,
+  FilePlus,
+
   Power,
 
   X,
@@ -265,6 +273,14 @@ export function renderizarIconos() {
       Pencil,
 
       Trash2,
+
+      Link,
+      Unlink,
+      Copy,
+      ExternalLink,
+      Inbox,
+      Lock,
+      FilePlus,
 
       Power,
 

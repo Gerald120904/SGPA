@@ -22,25 +22,18 @@ import { EstructuraAcademicaModule } from './estructura-academica/estructura-aca
 import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
 import { GoogleModule } from './integraciones/google/google.module';
 import { FormulariosEstudiantesModule } from './formularios-estudiantes/formularios-estudiantes.module';
+import { crearConfiguracionBaseDatos } from './config/database.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: process.env.SGPA_ENV_FILE || '.env',
     }),
     ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'mysql',
-        host: configService.get<string>('DB_HOST'),
-        port: Number(configService.get<string>('DB_PORT')),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_DATABASE'),
-        autoLoadEntities: true,
-        synchronize: true,
-      }),
+      useFactory: crearConfiguracionBaseDatos,
     }),
     UsuariosModule,
     RolesModule,

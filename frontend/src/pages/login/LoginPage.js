@@ -749,7 +749,7 @@ export function iniciarLoginPage({
       const icono = document.createElement("span");
 
       icono.className = "saved-account-icon";
-      icono.innerHTML = '<i data-lucide="mail" aria-hidden="true"></i>';
+      icono.innerHTML = '<i data-lucide="user" aria-hidden="true"></i>';
 
       const textos = document.createElement("span");
 

@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   ArrayMinSize,
   ArrayUnique,
@@ -35,6 +36,9 @@ export class CrearUsuarioDto {
   @MaxLength(100)
   apellido2?: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   @MaxLength(150)
   correo!: string;
@@ -71,5 +75,4 @@ export class CrearUsuarioDto {
   })
   carreraIds?: number[];
 }
-
 

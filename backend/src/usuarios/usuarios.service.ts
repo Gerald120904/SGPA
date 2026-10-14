@@ -34,6 +34,18 @@ export class UsuariosService {
     private readonly dataSource: DataSource,
   ) {}
 
+  private normalizarCampoRequerido(valor: string, etiqueta: string): string {
+    const normalizado = valor.trim();
+
+    if (!normalizado) {
+      throw new BadRequestException(
+        `El campo ${etiqueta} no puede estar vacío.`,
+      );
+    }
+
+    return normalizado;
+  }
+
   private serializarUsuario(usuario: Usuario) {
     const roles = (usuario.usuarioRoles ?? [])
       .filter((relacion) => relacion.rol?.activo)
@@ -157,7 +169,12 @@ export class UsuariosService {
   }
 
   async crear(dto: CrearUsuarioDto) {
-    const cedula = dto.cedula.trim();
+    const cedula = this.normalizarCampoRequerido(dto.cedula, 'cédula');
+    const nombres = this.normalizarCampoRequerido(dto.nombres, 'nombre');
+    const apellido1 = this.normalizarCampoRequerido(
+      dto.apellido1,
+      'primer apellido',
+    );
     const correo = dto.correo.trim().toLowerCase();
 
     await this.validarDuplicados(cedula, correo);
@@ -214,8 +231,8 @@ export class UsuariosService {
 
         const usuario = usuarios.create({
           cedula,
-          nombres: dto.nombres.trim(),
-          apellido1: dto.apellido1.trim(),
+          nombres,
+          apellido1,
           apellido2: dto.apellido2?.trim() || null,
           correo,
           passwordHash: await bcrypt.hash(dto.password, 10),
@@ -271,7 +288,21 @@ export class UsuariosService {
   async actualizar(id: number, dto: ActualizarUsuarioDto) {
     const usuarioActual = await this.obtenerEntidadPorId(id);
 
-    const cedula = dto.cedula?.trim();
+    const cedula =
+      dto.cedula === undefined
+        ? undefined
+        : this.normalizarCampoRequerido(dto.cedula, 'cédula');
+    const nombres =
+      dto.nombres === undefined
+        ? undefined
+        : this.normalizarCampoRequerido(dto.nombres, 'nombre');
+    const apellido1 =
+      dto.apellido1 === undefined
+        ? undefined
+        : this.normalizarCampoRequerido(
+            dto.apellido1,
+            'primer apellido',
+          );
     const correo = dto.correo?.trim().toLowerCase();
 
     await this.validarDuplicados(cedula, correo, id);
@@ -279,8 +310,8 @@ export class UsuariosService {
     const cambios: Partial<Usuario> = {};
 
     if (cedula !== undefined) cambios.cedula = cedula;
-    if (dto.nombres !== undefined) cambios.nombres = dto.nombres.trim();
-    if (dto.apellido1 !== undefined) cambios.apellido1 = dto.apellido1.trim();
+    if (nombres !== undefined) cambios.nombres = nombres;
+    if (apellido1 !== undefined) cambios.apellido1 = apellido1;
     if (dto.apellido2 !== undefined) {
       cambios.apellido2 = dto.apellido2?.trim() || null;
     }

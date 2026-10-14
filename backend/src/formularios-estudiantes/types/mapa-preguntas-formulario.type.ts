@@ -4,46 +4,49 @@ export interface OpcionAsignaturaFormulario {
   codigo: string;
 }
 
-export interface MapaPreguntasFormulario {
-  primerNombre: {
-    questionId: string;
-  };
+interface PreguntaFormulario {
+  questionId: string;
+}
 
-  segundoNombre: {
-    questionId: string;
-  };
+interface DatosPersonalesFormulario {
+  primerNombre: PreguntaFormulario;
+  segundoNombre: PreguntaFormulario;
+  primerApellido: PreguntaFormulario;
+  segundoApellido: PreguntaFormulario;
+  identificacion: PreguntaFormulario;
+  correoEstudiantil: PreguntaFormulario;
+  contacto: PreguntaFormulario;
+  optativasNoDisciplinarias: PreguntaFormulario;
+}
 
-  primerApellido: {
-    questionId: string;
-  };
-
-  segundoApellido: {
-    questionId: string;
-  };
-
-  identificacion: {
-    questionId: string;
-  };
-
-  correoEstudiantil: {
-    questionId: string;
-  };
-
-  contacto: {
-    questionId: string;
-  };
-
-  periodoIngreso: {
-    questionId: string;
+export interface MapaPreguntasFormularioV1 extends DatosPersonalesFormulario {
+  version?: 1;
+  periodoIngreso: PreguntaFormulario & {
     opciones: Record<string, number>;
   };
-
-  asignaturasAprobadas: {
-    questionId: string;
+  asignaturasAprobadas: PreguntaFormulario & {
     opciones: Record<string, OpcionAsignaturaFormulario>;
   };
+}
 
-  optativasNoDisciplinarias: {
-    questionId: string;
+export interface GrupoAsignaturasFormularioV2 {
+  nivel: number;
+  ciclo: number;
+  questionId: string;
+  opciones: Record<string, OpcionAsignaturaFormulario>;
+}
+
+export interface MapaPreguntasFormularioV2 extends DatosPersonalesFormulario {
+  version: 2;
+  ingreso: {
+    anio: PreguntaFormulario;
+    ciclo: PreguntaFormulario;
+    periodos: Record<string, number>;
+  };
+  asignaturasAprobadas: {
+    grupos: GrupoAsignaturasFormularioV2[];
   };
 }
+
+export type MapaPreguntasFormulario =
+  MapaPreguntasFormularioV1 | MapaPreguntasFormularioV2;
