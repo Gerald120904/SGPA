@@ -14,6 +14,7 @@ import {
   asignarEquipamientoAula,
   actualizarEquipamientoAula,
   cambiarEstadoEquipamientoAula,
+  desasignarEquipamientoAula,
 
   listarIndisponibilidadesAula,
   crearIndisponibilidadAula,
@@ -504,14 +505,7 @@ const ORIGENES_AULA = {
 };
 
 
-const LIMITES_REGISTRO_POR_ORIGEN = {
-  UNA: 25,
-  UNED: 3,
-  OTRO: 15,
-};
-
-
-const MAXIMOS_NUMERO_POR_ORIGEN = {
+const LIMITES_AULAS_POR_ORIGEN = {
   UNA: 27,
   UNED: 3,
   OTRO: 15,
@@ -697,7 +691,7 @@ function obtenerLimiteOrigen(
   origen,
 ) {
   return (
-    LIMITES_REGISTRO_POR_ORIGEN[
+    LIMITES_AULAS_POR_ORIGEN[
       origen
     ] ?? null
   );
@@ -708,7 +702,7 @@ function obtenerMaximoNumeroOrigen(
   origen,
 ) {
   return (
-    MAXIMOS_NUMERO_POR_ORIGEN[
+    LIMITES_AULAS_POR_ORIGEN[
       origen
     ] ?? 1
   );
@@ -1928,6 +1922,9 @@ const ACCIONES_AUDITORIA_AULA = {
   CAMBIAR_ESTADO_EQUIPAMIENTO:
     'Cambio de estado del equipamiento',
 
+  DESASIGNAR_EQUIPAMIENTO:
+    'Retiro de equipamiento del aula',
+
   CREAR_DISPONIBILIDAD:
     'Creación de disponibilidad',
 
@@ -2691,117 +2688,97 @@ function renderizarPaginacionAulas(
       totalPaginas,
     );
 
-  if (
-    totalElementos <=
-    AULAS_POR_PAGINA
-  ) {
+  if (totalElementos <= AULAS_POR_PAGINA) {
     return '';
   }
 
-  const anterior =
-    paginaAulasActual - 1;
+  const inicio =
+    (paginaAulasActual - 1) *
+      AULAS_POR_PAGINA +
+    1;
 
-  const siguiente =
-    paginaAulasActual + 1;
+  const fin =
+    Math.min(
+      paginaAulasActual *
+        AULAS_POR_PAGINA,
+      totalElementos,
+    );
 
   const paginas =
     Array.from(
       {
-        length:
-          totalPaginas,
+        length: totalPaginas,
       },
-      (_, indice) =>
-        indice + 1,
-    );
+      (_, indice) => indice + 1,
+    )
+      .map(
+        (pagina) => `
+          <button
+            type="button"
+            class="aulas-pagination-page ${
+              pagina === paginaAulasActual
+                ? 'is-active'
+                : ''
+            }"
+            data-aulas-page="${pagina}"
+            aria-label="Ir a la página ${pagina}"
+            aria-current="${
+              pagina === paginaAulasActual
+                ? 'page'
+                : 'false'
+            }"
+          >
+            ${pagina}
+          </button>
+        `,
+      )
+      .join('');
 
   return `
     <nav
       class="aulas-pagination"
       aria-label="Paginación de aulas"
     >
-      <div
-        class="aulas-pagination-controls"
-      >
+      <div class="aulas-pagination-info">
+        <span>
+          Mostrando
+          <strong>${inicio}-${fin}</strong>
+          de
+          <strong>${totalElementos}</strong>
+          aulas
+        </span>
+      </div>
 
+      <div class="aulas-pagination-controls">
         <button
           type="button"
-          class="aulas-pagination-nav"
-          data-aulas-page="${anterior}"
-          ${
-            paginaAulasActual === 1
-              ? 'disabled'
-              : ''
-          }
+          class="aulas-pagination-arrow"
+          data-aulas-page="${paginaAulasActual - 1}"
+          ${paginaAulasActual <= 1 ? 'disabled' : ''}
           aria-label="Página anterior"
         >
           <i
             data-lucide="chevron-left"
             aria-hidden="true"
           ></i>
-
-          <span>
-            Anterior
-          </span>
         </button>
 
-
-        <div
-          class="aulas-pagination-pages"
-          aria-label="Páginas disponibles"
-        >
-          ${paginas
-            .map(
-              (pagina) => `
-                <button
-                  type="button"
-                  class="
-                    aulas-pagination-page
-                    ${
-                      pagina ===
-                      paginaAulasActual
-                        ? 'is-active'
-                        : ''
-                    }
-                  "
-                  data-aulas-page="${pagina}"
-                  aria-label="Ir a la página ${pagina}"
-                  aria-current="${
-                    pagina ===
-                    paginaAulasActual
-                      ? 'page'
-                      : 'false'
-                  }"
-                >
-                  ${pagina}
-                </button>
-              `,
-            )
-            .join('')}
+        <div class="aulas-pagination-pages">
+          ${paginas}
         </div>
-
 
         <button
           type="button"
-          class="aulas-pagination-nav"
-          data-aulas-page="${siguiente}"
-          ${
-            paginaAulasActual ===
-            totalPaginas
-              ? 'disabled'
-              : ''
-          }
+          class="aulas-pagination-arrow"
+          data-aulas-page="${paginaAulasActual + 1}"
+          ${paginaAulasActual >= totalPaginas ? 'disabled' : ''}
           aria-label="Página siguiente"
         >
-          <span>
-            Siguiente
-          </span>
-
           <i
             data-lucide="chevron-right"
             aria-hidden="true"
           ></i>
         </button>
-
       </div>
     </nav>
   `;
@@ -4318,136 +4295,88 @@ async function abrirCatalogoEquipamientos() {
 
 
 function renderizarCatalogoEquipamientos() {
-  const vista =
-    document.getElementById(
-      'aulasVista',
-    );
-
+  const vista = document.getElementById('aulasVista');
 
   if (!vista) {
     return;
   }
 
+  const puedeGestionar = puedeGestionarAulas();
 
-  const puedeGestionar =
-    puedeGestionarAulas();
+  const filas = catalogoEquipamientos
+    .map(
+      (equipo) => `
+        <tr>
+          <td>
+            <strong>${escapeHtml(equipo.nombre)}</strong>
+          </td>
 
+          <td>
+            ${escapeHtml(equipo.descripcion || 'Sin descripción')}
+          </td>
 
-  const filas =
-    catalogoEquipamientos
-      .map(
-        (equipo) => `
-          <tr>
+          <td>
+            <strong>${Number(equipo.cantidadTotal || 0)}</strong>
+          </td>
 
-            <td>
-              <strong>
-                ${escapeHtml(
-                  equipo.nombre,
-                )}
-              </strong>
-            </td>
+          <td>
+            ${Number(equipo.cantidadAsignada || 0)}
+          </td>
 
+          <td>
+            <strong>${Number(equipo.cantidadDisponible || 0)}</strong>
+          </td>
 
-            <td>
-              ${escapeHtml(
-                equipo.descripcion ||
-                  'Sin descripción',
-              )}
-            </td>
+          <td>
+            <span
+              class="aulas-status ${equipo.activo ? 'is-active' : 'is-inactive'}"
+            >
+              ${equipo.activo ? 'Activo' : 'Inactivo'}
+            </span>
+          </td>
 
-
-            <td>
-              <span
-                class="
-                  aulas-status
-                  ${
-                    equipo.activo
-                      ? 'is-active'
-                      : 'is-inactive'
-                  }
-                "
-              >
-                ${
-                  equipo.activo
-                    ? 'Activo'
-                    : 'Inactivo'
-                }
-              </span>
-            </td>
-
-
-            <td>
-
-              ${
-                puedeGestionar
-                  ? `
-                    <div
-                      class="aulas-actions"
+          <td>
+            ${
+              puedeGestionar
+                ? `
+                  <div class="aulas-actions">
+                    <button
+                      type="button"
+                      class="aulas-icon-button"
+                      data-equipamiento-action="editar"
+                      data-equipamiento-id="${equipo.id}"
+                      title="Editar"
                     >
+                      <i data-lucide="pencil"></i>
+                    </button>
 
-                      <button
-                        type="button"
-                        class="aulas-icon-button"
-                        data-equipamiento-action="editar"
-                        data-equipamiento-id="${
-                          equipo.id
+                    <button
+                      type="button"
+                      class="aulas-icon-button ${
+                        equipo.activo ? 'is-danger' : 'is-success'
+                      }"
+                      data-equipamiento-action="estado"
+                      data-equipamiento-id="${equipo.id}"
+                      title="${equipo.activo ? 'Inactivar' : 'Activar'}"
+                    >
+                      <i
+                        data-lucide="${
+                          equipo.activo ? 'circle-pause' : 'circle-check'
                         }"
-                        title="Editar"
-                      >
-                        <i
-                          data-lucide="pencil"
-                        ></i>
-                      </button>
-
-
-                      <button
-                        type="button"
-                        class="
-                          aulas-icon-button
-                          ${
-                            equipo.activo
-                              ? 'is-danger'
-                              : 'is-success'
-                          }
-                        "
-                        data-equipamiento-action="estado"
-                        data-equipamiento-id="${
-                          equipo.id
-                        }"
-                        title="${
-                          equipo.activo
-                            ? 'Inactivar'
-                            : 'Activar'
-                        }"
-                      >
-                        <i
-                          data-lucide="${
-                            equipo.activo
-                              ? 'circle-pause'
-                              : 'circle-check'
-                          }"
-                        ></i>
-                      </button>
-
-                    </div>
-                  `
-                  : '—'
-              }
-
-            </td>
-
-          </tr>
-        `,
-      )
-      .join('');
-
+                      ></i>
+                    </button>
+                  </div>
+                `
+                : '—'
+            }
+          </td>
+        </tr>
+      `,
+    )
+    .join('');
 
   vista.innerHTML = `
-
-    <div
-      class="aulas-detail-header"
-    >
-
+    <div class="aulas-detail-header">
       <button
         id="volverCatalogoAulas"
         class="aulas-back-button"
@@ -4457,18 +4386,13 @@ function renderizarCatalogoEquipamientos() {
         Volver
       </button>
 
-
       <div>
-        <h2>
-          Catálogo de equipamiento
-        </h2>
-
+        <h2>Catálogo de equipamiento</h2>
         <p>
-          Tipos de equipos disponibles
-          para asignar a las aulas.
+          Controle las existencias institucionales y consulte cuántas unidades
+          están asignadas o disponibles.
         </p>
       </div>
-
 
       ${
         puedeGestionar
@@ -4484,58 +4408,33 @@ function renderizarCatalogoEquipamientos() {
           `
           : ''
       }
-
     </div>
-
 
     ${DataTable({
       columns: [
         'Equipamiento',
         'Descripción',
+        'Total institucional',
+        'Asignados',
+        'Disponibles',
         'Estado',
         'Acciones',
       ],
-
       rows: filas,
-
-      emptyMessage:
-        'No existen equipamientos registrados.',
-
-      ariaLabel:
-        'Catálogo de equipamientos',
+      emptyMessage: 'No existen equipamientos registrados.',
+      ariaLabel: 'Catálogo de equipamientos',
     })}
-
   `;
 
+  document
+    .getElementById('volverCatalogoAulas')
+    ?.addEventListener('click', iniciarAulasPage);
 
   document
-    .getElementById(
-      'volverCatalogoAulas',
-    )
-    ?.addEventListener(
-      'click',
-      iniciarAulasPage,
-    );
+    .getElementById('nuevoEquipamientoButton')
+    ?.addEventListener('click', () => abrirFormularioEquipamiento());
 
-
-  document
-    .getElementById(
-      'nuevoEquipamientoButton',
-    )
-    ?.addEventListener(
-      'click',
-      () => {
-        abrirFormularioEquipamiento();
-      },
-    );
-
-
-  vista.addEventListener(
-    'click',
-    manejarAccionCatalogoEquipamiento,
-  );
-
-
+  vista.addEventListener('click', manejarAccionCatalogoEquipamiento);
   renderizarIconos();
 }
 
@@ -4543,208 +4442,174 @@ function renderizarCatalogoEquipamientos() {
 function abrirFormularioEquipamiento(
   equipamiento = null,
 ) {
-  if (
-    !validarGestionAulas()
-  ) {
+  if (!validarGestionAulas()) {
     return;
   }
 
-  const dialog =
-    document.getElementById(
-      'aulaDialog',
-    );
+  const dialog = document.getElementById('aulaDialog');
+  const content = document.getElementById('aulaDialogContent');
 
-  const content =
-    document.getElementById(
-      'aulaDialogContent',
-    );
-
-
-  if (
-    !dialog ||
-    !content
-  ) {
+  if (!dialog || !content) {
     return;
   }
 
+  const editando = Boolean(equipamiento);
 
-  const editando =
-    Boolean(equipamiento);
-
-
-  content.innerHTML =
-    FormDialog({
-
-      formId:
-        'equipamientoForm',
-
-      title:
-        editando
-          ? 'Editar equipamiento'
-          : 'Nuevo equipamiento',
-
-      description:
-        'Defina un tipo de equipamiento que podrá asignarse a las aulas.',
-
-      body: `
-
-        <label
-          class="sgpa-form-wide"
+  content.innerHTML = FormDialog({
+    formId: 'equipamientoForm',
+    title: editando ? 'Editar equipamiento' : 'Nuevo equipamiento',
+    description:
+      'El catálogo define las existencias institucionales. Las aulas únicamente consumen unidades de este inventario.',
+    body: `
+      <label class="sgpa-form-wide">
+        <span>Nombre</span>
+        <input
+          id="equipamientoNombre"
+          type="text"
+          maxlength="80"
+          value="${escapeHtml(equipamiento?.nombre || '')}"
+          required
         >
-          <span>
-            Nombre
-          </span>
+        <small class="sgpa-field-help">
+          Máximo 80 caracteres.
+        </small>
+      </label>
 
-          <input
-            id="equipamientoNombre"
-            type="text"
-            maxlength="100"
-            value="${escapeHtml(
-              equipamiento?.nombre ||
-                '',
-            )}"
-            required
-          >
-        </label>
-
-
-        <label
-          class="sgpa-form-wide"
+      <label>
+        <span>Cantidad total institucional</span>
+        <input
+          id="equipamientoCantidadTotal"
+          type="text"
+          inputmode="numeric"
+          maxlength="4"
+          pattern="[0-9]{1,4}"
+          value="${Number(equipamiento?.cantidadTotal ?? 0)}"
+          autocomplete="off"
+          required
         >
-          <span>
-            Descripción
-          </span>
+        <small class="sgpa-field-help">
+          Unidades que posee actualmente la Universidad. Máximo 4 dígitos.
+        </small>
+      </label>
 
-          <textarea
-            id="equipamientoDescripcion"
-            rows="4"
-            maxlength="500"
-          >${escapeHtml(
-            equipamiento
-              ?.descripcion || '',
-          )}</textarea>
-        </label>
-
-      `,
-
-      errorId:
-        'equipamientoFormError',
-
-      cancelButtonId:
-        'cancelarEquipamiento',
-
-      submitButtonId:
-        'guardarEquipamiento',
-
-      submitText:
+      ${
         editando
-          ? 'Guardar cambios'
-          : 'Crear equipamiento',
+          ? `
+            <div class="aulas-equipment-stock-summary">
+              <span>
+                Asignadas actualmente:
+                <strong>${Number(equipamiento?.cantidadAsignada || 0)}</strong>
+              </span>
+              <span>
+                Disponibles:
+                <strong>${Number(equipamiento?.cantidadDisponible || 0)}</strong>
+              </span>
+            </div>
+          `
+          : ''
+      }
 
-    });
-
+      <label class="sgpa-form-wide">
+        <span>Descripción</span>
+        <textarea
+          id="equipamientoDescripcion"
+          rows="4"
+          maxlength="300"
+        >${escapeHtml(equipamiento?.descripcion || '')}</textarea>
+        <small class="sgpa-field-help">
+          Máximo 300 caracteres.
+        </small>
+      </label>
+    `,
+    errorId: 'equipamientoFormError',
+    cancelButtonId: 'cancelarEquipamiento',
+    submitButtonId: 'guardarEquipamiento',
+    submitText: editando ? 'Guardar cambios' : 'Crear equipamiento',
+  });
 
   dialog.showModal();
-
-
-  habilitarCierreExterior(
-    dialog,
-  );
-
+  habilitarCierreExterior(dialog);
 
   document
-    .getElementById(
-      'cancelarEquipamiento',
-    )
-    ?.addEventListener(
-      'click',
-      () => dialog.close(),
-    );
-
+    .getElementById('cancelarEquipamiento')
+    ?.addEventListener('click', () => dialog.close());
 
   document
-    .getElementById(
-      'equipamientoForm',
-    )
-    ?.addEventListener(
-      'submit',
-      async (event) => {
+    .getElementById('equipamientoCantidadTotal')
+    ?.addEventListener('input', (event) => {
+      event.currentTarget.value = String(event.currentTarget.value || '')
+        .replace(/\D/g, '')
+        .slice(0, 4);
+    });
 
-        event.preventDefault();
+  document
+    .getElementById('equipamientoForm')
+    ?.addEventListener('submit', async (event) => {
+      event.preventDefault();
 
+      const cantidadTotal = Number(
+        document.getElementById('equipamientoCantidadTotal')?.value,
+      );
 
-        const datos = {
-          nombre:
-            document
-              .getElementById(
-                'equipamientoNombre',
-              )
-              ?.value
-              ?.trim(),
+      if (
+        !Number.isInteger(cantidadTotal) ||
+        cantidadTotal < 0 ||
+        cantidadTotal > 9999
+      ) {
+        mostrarError({
+          titulo: 'Cantidad inválida',
+          mensaje:
+            'La cantidad total debe ser un número entero entre 0 y 9999.',
+        });
+        return;
+      }
 
-          descripcion:
-            document
-              .getElementById(
-                'equipamientoDescripcion',
-              )
-              ?.value
-              ?.trim() || '',
-        };
+      if (
+        editando &&
+        cantidadTotal < Number(equipamiento?.cantidadAsignada || 0)
+      ) {
+        mostrarError({
+          titulo: 'Cantidad insuficiente',
+          mensaje:
+            `Actualmente hay ${Number(equipamiento?.cantidadAsignada || 0)} unidades asignadas a aulas. ` +
+            'Primero debe retirar o reducir esas asignaciones.',
+        });
+        return;
+      }
 
+      const datos = {
+        nombre: document.getElementById('equipamientoNombre')?.value?.trim(),
+        descripcion:
+          document.getElementById('equipamientoDescripcion')?.value?.trim() || '',
+        cantidadTotal,
+      };
 
-        try {
+      try {
+        const resultado = editando
+          ? await actualizarEquipamiento(equipamiento.id, datos)
+          : await crearEquipamiento(datos);
 
-          const resultado =
-            editando
-              ? await actualizarEquipamiento(
-                  equipamiento.id,
-                  datos,
-                )
-              : await crearEquipamiento(
-                  datos,
-                );
-
-
-          if (!resultado?.ok) {
-            throw new Error(
-              resultado?.message ||
-                'No fue posible guardar el equipamiento.',
-            );
-          }
-
-
-          dialog.close();
-
-
-          mostrarExito({
-            titulo:
-              editando
-                ? 'Equipamiento actualizado'
-                : 'Equipamiento creado',
-
-            mensaje:
-              'La información fue guardada correctamente.',
-          });
-
-
-          await abrirCatalogoEquipamientos();
-
-        } catch (error) {
-
-          mostrarError({
-            titulo:
-              'No se pudo guardar',
-
-            mensaje:
-              error?.message ||
-              'No fue posible guardar el equipamiento.',
-          });
-
+        if (!resultado?.ok) {
+          throw new Error(
+            resultado?.message || 'No fue posible guardar el equipamiento.',
+          );
         }
 
-      },
-    );
+        dialog.close();
 
+        mostrarExito({
+          titulo: editando ? 'Equipamiento actualizado' : 'Equipamiento creado',
+          mensaje: 'La información fue guardada correctamente.',
+        });
+
+        await abrirCatalogoEquipamientos();
+      } catch (error) {
+        mostrarError({
+          titulo: 'No se pudo guardar',
+          mensaje: error?.message || 'No fue posible guardar el equipamiento.',
+        });
+      }
+    });
 
   renderizarIconos();
 }
@@ -5458,9 +5323,11 @@ async function abrirDetalleAula(
               }
 
 
-              await cambiarEstadoEquipamientoDelAula(
-                relacion,
-              );
+              if (
+                boton.dataset.aulaEquipoAction === 'desasignar'
+              ) {
+                await desasignarEquipamientoDelAula(relacion);
+              }
 
             },
           );
@@ -5704,171 +5571,83 @@ function renderizarEquipamientoDelAula(
   if (!equipamientos.length) {
     return `
       <p class="aulas-muted">
-        Esta aula no tiene equipamiento
-        registrado.
+        Esta aula no tiene equipamiento asignado actualmente.
       </p>
     `;
   }
 
-
   return `
-    <div
-      class="aulas-equipment-list"
-    >
-
+    <div class="aulas-equipment-list">
       ${equipamientos
         .map(
           (relacion) => `
-            <article
-              class="aulas-equipment-item"
-            >
-
-              <div
-                class="aulas-equipment-main"
-              >
-
+            <article class="aulas-equipment-item">
+              <div class="aulas-equipment-main">
                 <div>
-
                   <strong>
-                    ${escapeHtml(
-                      relacion
-                        .equipamiento
-                        ?.nombre ||
-                        'Equipamiento',
-                    )}
+                    ${escapeHtml(relacion.equipamiento?.nombre || 'Equipamiento')}
                   </strong>
-
                   <span>
                     ${
-                      relacion
-                        .equipamiento
-                        ?.descripcion
-                        ? escapeHtml(
-                            relacion
-                              .equipamiento
-                              .descripcion,
-                          )
+                      relacion.equipamiento?.descripcion
+                        ? escapeHtml(relacion.equipamiento.descripcion)
                         : 'Sin descripción'
                     }
                   </span>
-
                 </div>
 
-
-                <span
-                  class="
-                    aulas-status
-                    ${
-                      relacion.activo
-                        ? 'is-active'
-                        : 'is-inactive'
-                    }
-                  "
-                >
-                  ${
-                    relacion.activo
-                      ? 'Activo'
-                      : 'Inactivo'
-                  }
-                </span>
-
+                <span class="aulas-status is-active">Asignado</span>
               </div>
 
-
-              <div
-                class="aulas-equipment-counts"
-              >
-
+              <div class="aulas-equipment-counts">
                 <div>
-                  <span>Total</span>
-
-                  <strong>
-                    ${relacion.cantidadTotal}
-                  </strong>
+                  <span>Cantidad asignada</span>
+                  <strong>${Number(relacion.cantidadAsignada || 0)}</strong>
                 </div>
 
-
                 <div>
-                  <span>Disponibles</span>
-
-                  <strong>
-                    ${relacion.cantidadDisponible}
-                  </strong>
+                  <span>Asignado desde</span>
+                  <strong>${formatearFechaHora(relacion.asignadoEn)}</strong>
                 </div>
-
               </div>
-
 
               ${
                 relacion.observaciones
-                  ? `
-                    <p
-                      class="aulas-equipment-note"
-                    >
-                      ${escapeHtml(
-                        relacion
-                          .observaciones,
-                      )}
-                    </p>
-                  `
+                  ? `<p class="aulas-equipment-note">${escapeHtml(
+                      relacion.observaciones,
+                    )}</p>`
                   : ''
               }
-
 
               ${
                 puedeGestionarAulas()
                   ? `
-                    <div
-                      class="aulas-actions"
-                      style="margin-top: 12px;"
-                    >
-
+                    <div class="aulas-actions" style="margin-top: 12px;">
                       <button
                         type="button"
                         class="aulas-secondary-button"
                         data-aula-equipo-action="editar"
-                        data-equipamiento-id="${
-                          relacion
-                            .equipamientoId
-                        }"
+                        data-equipamiento-id="${relacion.equipamientoId}"
                       >
-                        Editar cantidades
+                        Editar asignación
                       </button>
-
 
                       <button
                         type="button"
-                        class="
-                          aulas-secondary-button
-                          ${
-                            relacion.activo
-                              ? 'is-danger'
-                              : 'is-success'
-                          }
-                        "
-                        data-aula-equipo-action="estado"
-                        data-equipamiento-id="${
-                          relacion
-                            .equipamientoId
-                        }"
+                        class="aulas-secondary-button is-danger"
+                        data-aula-equipo-action="desasignar"
+                        data-equipamiento-id="${relacion.equipamientoId}"
                       >
-                        ${
-                          relacion.activo
-                            ? 'Inactivar'
-                            : 'Reactivar'
-                        }
+                        Quitar del aula
                       </button>
-
                     </div>
                   `
                   : ''
               }
-
             </article>
           `,
         )
         .join('')}
-
     </div>
   `;
 }
@@ -5877,476 +5656,271 @@ function renderizarEquipamientoDelAula(
 function abrirFormularioEquipamientoAula(
   relacion = null,
 ) {
-  if (
-    !validarGestionAulas()
-  ) {
+  if (!validarGestionAulas() || !aulaDetalleActual) {
     return;
   }
 
-  if (!aulaDetalleActual) {
-    return;
-  }
-
-
-  const dialog =
-    document.getElementById(
-      'aulaDialog',
-    );
-
-  const content =
-    document.getElementById(
-      'aulaDialogContent',
-    );
-
+  const dialog = document.getElementById('aulaDialog');
+  const content = document.getElementById('aulaDialogContent');
 
   if (!dialog || !content) {
     return;
   }
 
+  const editando = Boolean(relacion);
+  const idsAsignados = new Set(
+    equipamientoAulaActual
+      .filter((item) => item.activo !== false)
+      .map((item) => item.equipamientoId),
+  );
 
-  const editando =
-    Boolean(relacion);
+  const disponibles = catalogoEquipamientos.filter(
+    (equipo) =>
+      equipo.activo &&
+      Number(equipo.cantidadDisponible || 0) > 0 &&
+      !idsAsignados.has(equipo.id),
+  );
 
-
-  const idsAsignados =
-    new Set(
-      equipamientoAulaActual
-        .filter(
-          (item) =>
-            item.activo,
-        )
-        .map(
-          (item) =>
-            item.equipamientoId,
-        ),
-    );
-
-
-  const disponibles =
-    catalogoEquipamientos.filter(
-      (equipo) =>
-        equipo.activo &&
-        !idsAsignados.has(
-          equipo.id,
-        ),
-    );
-
-
-  if (
-    !editando &&
-    !disponibles.length
-  ) {
+  if (!editando && !disponibles.length) {
     mostrarError({
-      titulo:
-        'Sin equipamiento disponible',
-
+      titulo: 'Sin equipamiento disponible',
       mensaje:
-        'No existen equipamientos activos pendientes de asignar a esta aula.',
+        'No existen equipos con unidades disponibles pendientes de asignar a esta aula.',
     });
-
     return;
   }
 
+  const equipoActual = editando
+    ? catalogoEquipamientos.find(
+        (equipo) => equipo.id === relacion.equipamientoId,
+      )
+    : null;
 
-  content.innerHTML =
-    FormDialog({
+  const maximoInicial = editando
+    ? Number(equipoActual?.cantidadDisponible || 0) +
+      Number(relacion?.cantidadAsignada || 0)
+    : 1;
 
-      formId:
-        'equipamientoAulaForm',
-
-      title:
+  content.innerHTML = FormDialog({
+    formId: 'equipamientoAulaForm',
+    title: editando ? 'Editar asignación de equipamiento' : 'Asignar equipamiento',
+    description:
+      'La cantidad asignada se descuenta automáticamente de las existencias disponibles del catálogo.',
+    body: `
+      ${
         editando
-          ? 'Editar equipamiento del aula'
-          : 'Asignar equipamiento',
+          ? `
+            <div class="sgpa-form-wide aulas-equipment-assignment-title">
+              <strong>${escapeHtml(relacion.equipamiento?.nombre || '')}</strong>
+              <small>
+                Máximo utilizable en esta aula: ${maximoInicial} unidad${
+                  maximoInicial === 1 ? '' : 'es'
+                }.
+              </small>
+            </div>
+          `
+          : `
+            <label class="sgpa-form-wide">
+              <span>Equipamiento</span>
+              <select id="equipoAulaId" required>
+                <option value="" selected disabled>Seleccione...</option>
+                ${disponibles
+                  .map(
+                    (equipo) => `
+                      <option
+                        value="${equipo.id}"
+                        data-disponibles="${Number(equipo.cantidadDisponible || 0)}"
+                      >
+                        ${escapeHtml(equipo.nombre)} · ${Number(
+                          equipo.cantidadDisponible || 0,
+                        )} disponible${
+                          Number(equipo.cantidadDisponible || 0) === 1 ? '' : 's'
+                        }
+                      </option>
+                    `,
+                  )
+                  .join('')}
+              </select>
+            </label>
+          `
+      }
 
-      body: `
-
-        ${
-          editando
-            ? `
-              <div
-                class="sgpa-form-wide"
-              >
-                <strong>
-                  ${escapeHtml(
-                    relacion
-                      .equipamiento
-                      ?.nombre || '',
-                  )}
-                </strong>
-              </div>
-            `
-            : `
-              <label
-                class="sgpa-form-wide"
-              >
-                <span>
-                  Equipamiento
-                </span>
-
-                <select
-                  id="equipoAulaId"
-                  required
-                >
-
-                  <option
-                    value=""
-                    selected
-                    disabled
-                  >
-                    Seleccione...
-                  </option>
-
-                  ${disponibles
-                    .map(
-                      (equipo) => `
-                        <option
-                          value="${equipo.id}"
-                        >
-                          ${escapeHtml(
-                            equipo.nombre,
-                          )}
-                        </option>
-                      `,
-                    )
-                    .join('')}
-
-                </select>
-              </label>
-            `
-        }
-
-
-        <label>
-          <span>
-            Cantidad total
-          </span>
-
-          <input
-            id="equipoCantidadTotal"
-            type="number"
-            min="1"
-            value="${
-              relacion
-                ?.cantidadTotal ||
-              1
-            }"
-            required
-          >
-        </label>
-
-
-        <label>
-          <span>
-            Cantidad disponible
-          </span>
-
-          <input
-            id="equipoCantidadDisponible"
-            type="number"
-            min="0"
-            value="${
-              relacion
-                ?.cantidadDisponible ??
-              1
-            }"
-            required
-          >
-        </label>
-
-
-        <label
-          class="sgpa-form-wide"
+      <label>
+        <span>Cantidad asignada</span>
+        <input
+          id="equipoCantidadAsignada"
+          type="number"
+          min="1"
+          max="${maximoInicial}"
+          step="1"
+          value="${Number(relacion?.cantidadAsignada || 1)}"
+          required
         >
-          <span>
-            Observaciones
-          </span>
+        <small id="equipoCantidadAyuda" class="sgpa-field-help">
+          ${
+            editando
+              ? `Puede asignar hasta ${maximoInicial} unidades considerando la asignación actual.`
+              : 'Seleccione un equipamiento para consultar las unidades disponibles.'
+          }
+        </small>
+      </label>
 
-          <textarea
-            id="equipoAulaObservaciones"
-            maxlength="500"
-            rows="3"
-          >${escapeHtml(
-            relacion
-              ?.observaciones || '',
-          )}</textarea>
-        </label>
-
-      `,
-
-      errorId:
-        'equipamientoAulaError',
-
-      cancelButtonId:
-        'cancelarEquipamientoAula',
-
-      submitButtonId:
-        'guardarEquipamientoAula',
-
-      submitText:
-        editando
-          ? 'Guardar cambios'
-          : 'Asignar',
-
-    });
-
+      <label class="sgpa-form-wide">
+        <span>Observaciones</span>
+        <textarea
+          id="equipoAulaObservaciones"
+          maxlength="500"
+          rows="3"
+        >${escapeHtml(relacion?.observaciones || '')}</textarea>
+      </label>
+    `,
+    errorId: 'equipamientoAulaError',
+    cancelButtonId: 'cancelarEquipamientoAula',
+    submitButtonId: 'guardarEquipamientoAula',
+    submitText: editando ? 'Guardar cambios' : 'Asignar',
+  });
 
   dialog.showModal();
+  habilitarCierreExterior(dialog);
 
+  const selectEquipo = document.getElementById('equipoAulaId');
+  const cantidadInput = document.getElementById('equipoCantidadAsignada');
+  const ayuda = document.getElementById('equipoCantidadAyuda');
 
-  habilitarCierreExterior(
-    dialog,
-  );
+  selectEquipo?.addEventListener('change', () => {
+    const opcion = selectEquipo.selectedOptions?.[0];
+    const disponiblesEquipo = Number(opcion?.dataset?.disponibles || 0);
 
+    if (cantidadInput) {
+      cantidadInput.max = String(disponiblesEquipo);
+      cantidadInput.value = disponiblesEquipo > 0 ? '1' : '0';
+    }
+
+    if (ayuda) {
+      ayuda.textContent = `Disponibles actualmente: ${disponiblesEquipo} unidad${
+        disponiblesEquipo === 1 ? '' : 'es'
+      }.`;
+    }
+  });
 
   document
-    .getElementById(
-      'cancelarEquipamientoAula',
-    )
-    ?.addEventListener(
-      'click',
-      () => dialog.close(),
-    );
-
+    .getElementById('cancelarEquipamientoAula')
+    ?.addEventListener('click', () => dialog.close());
 
   document
-    .getElementById(
-      'equipamientoAulaForm',
-    )
-    ?.addEventListener(
-      'submit',
-      async (event) => {
+    .getElementById('equipamientoAulaForm')
+    ?.addEventListener('submit', async (event) => {
+      event.preventDefault();
 
-        event.preventDefault();
+      const cantidadAsignada = Number(cantidadInput?.value);
+      const maximo = Number(cantidadInput?.max || 0);
 
+      if (
+        !Number.isInteger(cantidadAsignada) ||
+        cantidadAsignada < 1 ||
+        cantidadAsignada > maximo
+      ) {
+        mostrarError({
+          titulo: 'Cantidad inválida',
+          mensaje: `La cantidad asignada debe estar entre 1 y ${maximo}.`,
+        });
+        return;
+      }
 
-        const cantidadTotal =
-          Number(
-            document
-              .getElementById(
-                'equipoCantidadTotal',
-              )
-              ?.value,
+      const datos = {
+        cantidadAsignada,
+        observaciones:
+          document.getElementById('equipoAulaObservaciones')?.value?.trim() || '',
+      };
+
+      try {
+        const resultado = editando
+          ? await actualizarEquipamientoAula(
+              aulaDetalleActual.id,
+              relacion.equipamientoId,
+              datos,
+            )
+          : await asignarEquipamientoAula(aulaDetalleActual.id, {
+              equipamientoId: Number(selectEquipo?.value),
+              ...datos,
+            });
+
+        if (!resultado?.ok) {
+          throw new Error(
+            resultado?.message || 'No fue posible guardar el equipamiento.',
           );
-
-
-        const cantidadDisponible =
-          Number(
-            document
-              .getElementById(
-                'equipoCantidadDisponible',
-              )
-              ?.value,
-          );
-
-
-        if (
-          cantidadTotal < 1 ||
-          cantidadDisponible < 0 ||
-          cantidadDisponible >
-            cantidadTotal
-        ) {
-          mostrarError({
-            titulo:
-              'Cantidades inválidas',
-
-            mensaje:
-              'La cantidad disponible debe estar entre 0 y la cantidad total.',
-          });
-
-          return;
         }
 
+        dialog.close();
 
-        const datos = {
-          cantidadTotal,
-          cantidadDisponible,
+        mostrarExito({
+          titulo: editando ? 'Asignación actualizada' : 'Equipamiento asignado',
+          mensaje:
+            'Las existencias institucionales se actualizaron automáticamente.',
+        });
 
-          observaciones:
-            document
-              .getElementById(
-                'equipoAulaObservaciones',
-              )
-              ?.value
-              ?.trim() || '',
-        };
-
-
-        try {
-
-          let resultado;
-
-
-          if (editando) {
-
-            resultado =
-              await actualizarEquipamientoAula(
-                aulaDetalleActual.id,
-                relacion
-                  .equipamientoId,
-                datos,
-              );
-
-          } else {
-
-            resultado =
-              await asignarEquipamientoAula(
-                aulaDetalleActual.id,
-                {
-                  equipamientoId:
-                    Number(
-                      document
-                        .getElementById(
-                          'equipoAulaId',
-                        )
-                        ?.value,
-                    ),
-
-                  ...datos,
-                },
-              );
-
-          }
-
-
-          if (!resultado?.ok) {
-            throw new Error(
-              resultado?.message ||
-                'No fue posible guardar el equipamiento.',
-            );
-          }
-
-
-          dialog.close();
-
-
-          mostrarExito({
-            titulo:
-              editando
-                ? 'Equipamiento actualizado'
-                : 'Equipamiento asignado',
-
-            mensaje:
-              'La información del aula fue actualizada correctamente.',
-          });
-
-
-          await abrirDetalleAula(
-            aulaDetalleActual.id,
-          );
-
-        } catch (error) {
-
-          mostrarError({
-            titulo:
-              'No se pudo guardar',
-
-            mensaje:
-              error?.message ||
-              'No fue posible actualizar el equipamiento.',
-          });
-
-        }
-
-      },
-    );
-
+        await abrirDetalleAula(aulaDetalleActual.id);
+      } catch (error) {
+        mostrarError({
+          titulo: 'No se pudo guardar',
+          mensaje: error?.message || 'No fue posible actualizar el equipamiento.',
+        });
+      }
+    });
 
   renderizarIconos();
 }
 
 
-async function cambiarEstadoEquipamientoDelAula(
+async function desasignarEquipamientoDelAula(
   relacion,
 ) {
-  if (
-    !validarGestionAulas()
-  ) {
+  if (!validarGestionAulas() || !aulaDetalleActual) {
     return;
   }
 
-  const activo =
-    !relacion.activo;
+  const nombre = relacion.equipamiento?.nombre || 'este equipamiento';
+  const cantidad = Number(relacion.cantidadAsignada || 0);
 
-
-  const confirmado =
-    await confirmarAccion({
-
-      titulo:
-        activo
-          ? 'Reactivar equipamiento'
-          : 'Inactivar equipamiento',
-
-      mensaje:
-        `¿Desea ${
-          activo
-            ? 'reactivar'
-            : 'inactivar'
-        } "${
-          relacion.equipamiento
-            ?.nombre
-        }" en esta aula?`,
-
-      textoConfirmar:
-        activo
-          ? 'Reactivar'
-          : 'Inactivar',
-
-      peligro:
-        !activo,
-
-    });
-
+  const confirmado = await confirmarAccion({
+    titulo: 'Quitar equipamiento del aula',
+    mensaje:
+      `¿Desea retirar "${nombre}" de esta aula? ` +
+      `Las ${cantidad} unidad${cantidad === 1 ? '' : 'es'} asignada${
+        cantidad === 1 ? '' : 's'
+      } volverán al inventario disponible.`,
+    textoConfirmar: 'Quitar del aula',
+    peligro: true,
+  });
 
   if (!confirmado) {
     return;
   }
 
-
   try {
-
-    const resultado =
-      await cambiarEstadoEquipamientoAula(
-        aulaDetalleActual.id,
-        relacion.equipamientoId,
-        activo,
-      );
-
+    const resultado = await desasignarEquipamientoAula(
+      aulaDetalleActual.id,
+      relacion.equipamientoId,
+    );
 
     if (!resultado?.ok) {
       throw new Error(
-        resultado?.message ||
-          'No fue posible cambiar el estado.',
+        resultado?.message || 'No fue posible retirar el equipamiento.',
       );
     }
 
-
     mostrarExito({
-      titulo:
-        activo
-          ? 'Equipamiento reactivado'
-          : 'Equipamiento inactivado',
-
+      titulo: 'Equipamiento retirado',
       mensaje:
-        'El estado fue actualizado correctamente.',
+        'La asignación fue cerrada y las unidades volvieron a estar disponibles.',
     });
 
-
-    await abrirDetalleAula(
-      aulaDetalleActual.id,
-    );
-
+    await abrirDetalleAula(aulaDetalleActual.id);
   } catch (error) {
-
     mostrarError({
-      titulo:
-        'No se pudo cambiar el estado',
-
-      mensaje:
-        error?.message ||
-        'No fue posible actualizar el equipamiento.',
+      titulo: 'No se pudo retirar',
+      mensaje: error?.message || 'No fue posible retirar el equipamiento.',
     });
-
   }
 }
 
@@ -6358,11 +5932,6 @@ async function cambiarEstadoEquipamientoDelAula(
 function renderizarIndisponibilidades(
   indisponibilidades,
 ) {
-  const aulaActiva =
-    Boolean(
-      aulaDetalleActual?.activo,
-    );
-
   if (
     !indisponibilidades.length
   ) {
@@ -6483,48 +6052,39 @@ function renderizarIndisponibilidades(
                       class="aulas-actions"
                     >
 
-                      ${
-                        aulaActiva
-                          ? `
-                            <button
-                              type="button"
-                              class="aulas-secondary-button"
-                              data-indisponibilidad-action="editar"
-                              data-indisponibilidad-id="${item.id}"
-                            >
-                              Editar
-                            </button>
-                          `
-                          : ''
-                      }
+                      <button
+                        type="button"
+                        class="aulas-secondary-button"
+                        data-indisponibilidad-action="editar"
+                        data-indisponibilidad-id="${
+                          item.id
+                        }"
+                      >
+                        Editar
+                      </button>
 
 
-                      ${
-                        item.activo ||
-                        aulaActiva
-                          ? `
-                            <button
-                              type="button"
-                              class="
-                                aulas-secondary-button
-                                ${
-                                  item.activo
-                                    ? 'is-danger'
-                                    : 'is-success'
-                                }
-                              "
-                              data-indisponibilidad-action="estado"
-                              data-indisponibilidad-id="${item.id}"
-                            >
-                              ${
-                                item.activo
-                                  ? 'Inactivar'
-                                  : 'Reactivar'
-                              }
-                            </button>
-                          `
-                          : ''
-                      }
+                      <button
+                        type="button"
+                        class="
+                          aulas-secondary-button
+                          ${
+                            item.activo
+                              ? 'is-danger'
+                              : 'is-success'
+                          }
+                        "
+                        data-indisponibilidad-action="estado"
+                        data-indisponibilidad-id="${
+                          item.id
+                        }"
+                      >
+                        ${
+                          item.activo
+                            ? 'Inactivar'
+                            : 'Reactivar'
+                        }
+                      </button>
 
                     </div>
                   `
@@ -7022,11 +6582,6 @@ async function cambiarEstadoIndisponibilidad(
 function renderizarReservasAula(
   reservas,
 ) {
-  const aulaActiva =
-    Boolean(
-      aulaDetalleActual?.activo,
-    );
-
   if (!reservas.length) {
     return `
       <p class="aulas-muted">
@@ -7151,48 +6706,39 @@ function renderizarReservasAula(
                       class="aulas-actions"
                     >
 
-                      ${
-                        aulaActiva
-                          ? `
-                            <button
-                              type="button"
-                              class="aulas-secondary-button"
-                              data-reserva-action="editar"
-                              data-reserva-id="${reserva.id}"
-                            >
-                              Editar
-                            </button>
-                          `
-                          : ''
-                      }
+                      <button
+                        type="button"
+                        class="aulas-secondary-button"
+                        data-reserva-action="editar"
+                        data-reserva-id="${
+                          reserva.id
+                        }"
+                      >
+                        Editar
+                      </button>
 
 
-                      ${
-                        reserva.activo ||
-                        aulaActiva
-                          ? `
-                            <button
-                              type="button"
-                              class="
-                                aulas-secondary-button
-                                ${
-                                  reserva.activo
-                                    ? 'is-danger'
-                                    : 'is-success'
-                                }
-                              "
-                              data-reserva-action="estado"
-                              data-reserva-id="${reserva.id}"
-                            >
-                              ${
-                                reserva.activo
-                                  ? 'Inactivar'
-                                  : 'Reactivar'
-                              }
-                            </button>
-                          `
-                          : ''
-                      }
+                      <button
+                        type="button"
+                        class="
+                          aulas-secondary-button
+                          ${
+                            reserva.activo
+                              ? 'is-danger'
+                              : 'is-success'
+                          }
+                        "
+                        data-reserva-action="estado"
+                        data-reserva-id="${
+                          reserva.id
+                        }"
+                      >
+                        ${
+                          reserva.activo
+                            ? 'Inactivar'
+                            : 'Reactivar'
+                        }
+                      </button>
 
                     </div>
                   `
@@ -11538,7 +11084,7 @@ function renderizarResultadosBusquedaAulas() {
               )
               .map(
                 (relacion) =>
-                  `${relacion.equipamiento.nombre} (${relacion.cantidadDisponible})`,
+                  `${relacion.equipamiento.nombre} (${relacion.cantidadAsignada})`,
               );
 
 
@@ -11822,18 +11368,13 @@ async function evaluarAulaDisponible(
 
     if (!evaluacion.apta) {
 
-      const mensaje =
-        evaluacion.motivo ===
-        'AULA_INACTIVA'
-          ? 'El aula se encuentra inactiva y no puede utilizarse para asignaciones.'
-          : 'El aula ya no está disponible o no cumple todos los requisitos indicados.';
-
       mostrarError({
 
         titulo:
           'Aula no apta',
 
-        mensaje,
+        mensaje:
+          'El aula ya no está disponible o no cumple todos los requisitos indicados.',
 
       });
 

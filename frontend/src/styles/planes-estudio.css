@@ -3003,7 +3003,7 @@
 
 .plan-optative-current-status {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -3039,10 +3039,15 @@
 }
 
 .plan-optative-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   padding: 13px;
   border: 1px solid #eaecf0;
   border-radius: 10px;
   background: #fbfcfd;
+}
+
+.plan-optative-fields label {
+  min-width: 0;
 }
 
 .plan-optative-empty-rule {
@@ -3095,7 +3100,8 @@
 @media (max-width: 800px) {
   .plan-optative-overview,
   .plan-optative-kind-grid,
-  .plan-optative-current-status {
+  .plan-optative-current-status,
+  .plan-optative-fields {
     grid-template-columns: 1fr;
   }
 }

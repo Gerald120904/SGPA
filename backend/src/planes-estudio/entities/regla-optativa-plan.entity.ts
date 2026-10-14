@@ -27,6 +27,34 @@ export class ReglaOptativaPlan {
   planEstudioId!: number;
 
   @Column({
+    name: 'cantidad_disciplinarias',
+    type: 'smallint',
+    unsigned: true,
+    default: 0,
+  })
+  cantidadDisciplinarias!: number;
+
+  @Column({
+    name: 'cantidad_abiertas',
+    type: 'smallint',
+    unsigned: true,
+    default: 0,
+  })
+  cantidadAbiertas!: number;
+
+  @Column({
+    name: 'cantidad_sede',
+    type: 'smallint',
+    unsigned: true,
+    default: 0,
+  })
+  cantidadSede!: number;
+
+  /*
+   * Campos legados conservados por compatibilidad con datos/versiones
+   * anteriores. La lógica nueva utiliza las tres cantidades anteriores.
+   */
+  @Column({
     name: 'minimo_disciplinarias_propias',
     type: 'smallint',
     unsigned: true,

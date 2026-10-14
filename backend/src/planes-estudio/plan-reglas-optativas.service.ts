@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { GuardarReglaOptativaPlanDto } from './dto/guardar-regla-optativa-plan.dto';
@@ -44,6 +44,41 @@ export class PlanReglasOptativasService {
     return plan;
   }
 
+  private async contarPorTipo(planId: number, tipoOptativa: TipoOptativa) {
+    return this.asignaturaRepository.count({
+      where: {
+        planEstudioId: planId,
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa,
+        activo: true,
+      },
+    });
+  }
+
+  private async obtenerConteoActual(planId: number) {
+    const [disciplinarias, abiertas, sede, sinClasificar] = await Promise.all([
+      this.contarPorTipo(planId, TipoOptativa.DISCIPLINARIA),
+      this.contarPorTipo(planId, TipoOptativa.ABIERTA),
+      this.contarPorTipo(planId, TipoOptativa.SEDE),
+      this.asignaturaRepository.count({
+        where: {
+          planEstudioId: planId,
+          tipo: TipoPlanAsignatura.OPTATIVA,
+          tipoOptativa: IsNull(),
+          activo: true,
+        },
+      }),
+    ]);
+
+    return {
+      disciplinarias,
+      abiertas,
+      sede,
+      sinClasificar,
+      total: disciplinarias + abiertas + sede + sinClasificar,
+    };
+  }
+
   async contarEspaciosOptativos(planId: number): Promise<number> {
     return this.asignaturaRepository.count({
       where: {
@@ -54,35 +89,39 @@ export class PlanReglasOptativasService {
     });
   }
 
-
-  private async contarOtrasAreas(planId: number): Promise<number> {
-    return this.asignaturaRepository.count({
-      where: {
-        planEstudioId: planId,
-        tipo: TipoPlanAsignatura.OPTATIVA,
-        tipoOptativa: In([TipoOptativa.ABIERTA, TipoOptativa.SEDE]),
-        activo: true,
-      },
-    });
-  }
-
   async obtener(planId: number): Promise<{
     regla: ReglaOptativaPlan | null;
     cantidadEspaciosOptativos: number;
+    cantidadEspaciosConfigurados: number;
+    conteoActual: {
+      disciplinarias: number;
+      abiertas: number;
+      sede: number;
+      sinClasificar: number;
+      total: number;
+    };
   }> {
     await this.obtenerPlan(planId);
 
-    const [regla, cantidadEspaciosOptativos] = await Promise.all([
+    const [regla, conteoActual] = await Promise.all([
       this.reglaRepository.findOne({
         where: { planEstudioId: planId },
         relations: { planEstudio: true },
       }),
-      this.contarEspaciosOptativos(planId),
+      this.obtenerConteoActual(planId),
     ]);
+
+    const cantidadEspaciosConfigurados = regla
+      ? Number(regla.cantidadDisciplinarias || 0) +
+        Number(regla.cantidadAbiertas || 0) +
+        Number(regla.cantidadSede || 0)
+      : 0;
 
     return {
       regla,
-      cantidadEspaciosOptativos,
+      cantidadEspaciosOptativos: conteoActual.total,
+      cantidadEspaciosConfigurados,
+      conteoActual,
     };
   }
 
@@ -92,56 +131,61 @@ export class PlanReglasOptativasService {
   ): Promise<ReglaOptativaPlan> {
     await this.obtenerPlan(planId, true);
 
-    const cantidadEspacios = await this.contarEspaciosOptativos(planId);
+    const totalConfigurado =
+      dto.cantidadDisciplinarias + dto.cantidadAbiertas + dto.cantidadSede;
 
-    if (cantidadEspacios === 0) {
+    if (totalConfigurado > 200) {
       throw new BadRequestException(
-        'El plan de estudio no contiene espacios optativos activos para configurar una regla.',
+        'La suma de espacios optativos no puede superar 200.',
       );
     }
 
-    if (dto.minimoDisciplinariasPropias > cantidadEspacios) {
+    const conteo = await this.obtenerConteoActual(planId);
+
+    if (conteo.sinClasificar > 0) {
       throw new BadRequestException(
-        `El mínimo de optativas disciplinarias propias (${dto.minimoDisciplinariasPropias}) no puede ser mayor a la cantidad de espacios optativos (${cantidadEspacios}).`,
+        'Existen asignaturas optativas sin clasificar. Clasifíquelas antes de modificar la regla.',
       );
     }
 
-    if (
-      dto.maximoOtrasAreas !== undefined &&
-      dto.maximoOtrasAreas !== null &&
-      dto.maximoOtrasAreas > cantidadEspacios
-    ) {
+    if (conteo.disciplinarias > dto.cantidadDisciplinarias) {
       throw new BadRequestException(
-        `El máximo de optativas de otras áreas (${dto.maximoOtrasAreas}) no puede ser mayor a la cantidad de espacios optativos (${cantidadEspacios}).`,
+        `El plan ya tiene ${conteo.disciplinarias} optativas disciplinarias activas. No puede fijar un límite de ${dto.cantidadDisciplinarias}.`,
       );
     }
 
-    if (
-      dto.maximoOtrasAreas !== undefined &&
-      dto.maximoOtrasAreas !== null
-    ) {
-      const cantidadOtrasAreas = await this.contarOtrasAreas(planId);
+    if (conteo.abiertas > dto.cantidadAbiertas) {
+      throw new BadRequestException(
+        `El plan ya tiene ${conteo.abiertas} optativas abiertas activas. No puede fijar un límite de ${dto.cantidadAbiertas}.`,
+      );
+    }
 
-      if (cantidadOtrasAreas > dto.maximoOtrasAreas) {
-        throw new BadRequestException(
-          `El plan ya tiene ${cantidadOtrasAreas} optativas de otras áreas activas. No se puede fijar un máximo menor a esa cantidad.`,
-        );
-      }
+    if (conteo.sede > dto.cantidadSede) {
+      throw new BadRequestException(
+        `El plan ya tiene ${conteo.sede} optativas de sede activas. No puede fijar un límite de ${dto.cantidadSede}.`,
+      );
     }
 
     let regla = await this.reglaRepository.findOne({
       where: { planEstudioId: planId },
     });
 
+    const datos = {
+      cantidadDisciplinarias: dto.cantidadDisciplinarias,
+      cantidadAbiertas: dto.cantidadAbiertas,
+      cantidadSede: dto.cantidadSede,
+      // Compatibilidad con el esquema anterior.
+      minimoDisciplinariasPropias: dto.cantidadDisciplinarias,
+      maximoOtrasAreas: dto.cantidadAbiertas + dto.cantidadSede,
+    };
+
     if (!regla) {
       regla = this.reglaRepository.create({
         planEstudioId: planId,
-        minimoDisciplinariasPropias: dto.minimoDisciplinariasPropias,
-        maximoOtrasAreas: dto.maximoOtrasAreas ?? null,
+        ...datos,
       });
     } else {
-      regla.minimoDisciplinariasPropias = dto.minimoDisciplinariasPropias;
-      regla.maximoOtrasAreas = dto.maximoOtrasAreas ?? null;
+      Object.assign(regla, datos);
     }
 
     return this.reglaRepository.save(regla);
@@ -157,6 +201,14 @@ export class PlanReglasOptativasService {
     if (!regla) {
       throw new NotFoundException(
         'Regla de optativas no encontrada para este plan.',
+      );
+    }
+
+    const cantidadOptativas = await this.contarEspaciosOptativos(planId);
+
+    if (cantidadOptativas > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar la regla mientras existan asignaturas optativas activas en el plan.',
       );
     }
 

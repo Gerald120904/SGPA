@@ -2670,187 +2670,78 @@
 .aulas-pagination {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-
-  margin-top: 16px;
-
-  padding: 12px 14px;
-
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 10px 12px;
   border: 1px solid #e4e7ec;
-  border-radius: 11px;
-
+  border-radius: 10px;
   background: #ffffff;
-
-  box-shadow:
-    0 1px 2px
-    rgba(16, 24, 40, 0.025);
 }
 
+.aulas-pagination-info {
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.4;
+}
 
-.aulas-pagination-controls {
-  display: flex;
+.aulas-pagination-info strong {
+  color: #344054;
+  font-weight: 700;
+}
+
+.aulas-pagination-controls,
+.aulas-pagination-pages {
+  display: inline-flex;
   align-items: center;
-
-  gap: 8px;
+  gap: 4px;
 }
 
-
-/* =========================================================
-   ANTERIOR / SIGUIENTE
-   ========================================================= */
-
-.aulas-pagination-nav {
-  min-height: 34px;
-
+.aulas-pagination-arrow,
+.aulas-pagination-page {
+  min-width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
-  gap: 5px;
-
-  padding: 0 10px;
-
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-
-  background: #ffffff;
-
-  color: #475467;
-
-  cursor: pointer;
-
-  font: inherit;
-  font-size: 10px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #667085;
+  font-family: inherit;
+  font-size: 11px;
   font-weight: 650;
-
+  cursor: pointer;
   transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
-
-.aulas-pagination-nav svg {
-  width: 14px;
-  height: 14px;
+.aulas-pagination-arrow:hover:not(:disabled),
+.aulas-pagination-page:hover {
+  border-color: #eaecf0;
+  background: #f8f9fb;
+  color: #344054;
 }
 
-
-.aulas-pagination-nav:not(:disabled):hover {
-  border-color:
-    rgba(
-      207,
-      32,
-      41,
-      0.28
-    );
-
-  background:
-    rgba(
-      207,
-      32,
-      41,
-      0.055
-    );
-
-  color: #cf2029;
-
-  transform:
-    translateY(-1px);
+.aulas-pagination-page.is-active {
+  border-color: rgba(181, 18, 27, 0.2);
+  background: rgba(181, 18, 27, 0.06);
+  color: #b5121b;
 }
 
-
-.aulas-pagination-nav:disabled {
-  opacity: 0.38;
-
+.aulas-pagination-arrow:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
-
-/* =========================================================
-   NÚMEROS
-   ========================================================= */
-
-.aulas-pagination-pages {
-  display: flex;
-  align-items: center;
-
-  gap: 5px;
+.aulas-pagination-arrow svg {
+  width: 15px;
+  height: 15px;
 }
 
-
-.aulas-pagination-page {
-  width: 34px;
-  height: 34px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 0;
-
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-
-  background: #ffffff;
-
-  color: #667085;
-
-  cursor: pointer;
-
-  font: inherit;
-  font-size: 10.5px;
-  font-weight: 700;
-
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-
-.aulas-pagination-page:hover {
-  border-color:
-    rgba(
-      207,
-      32,
-      41,
-      0.25
-    );
-
-  background:
-    rgba(
-      207,
-      32,
-      41,
-      0.05
-    );
-
-  color: #cf2029;
-
-  transform:
-    translateY(-1px);
-}
-
-
-.aulas-pagination-page.is-active {
-  border-color: #cf2029;
-
-  background: #cf2029;
-
-  color: #ffffff;
-
-  box-shadow:
-    0 3px 7px
-    rgba(
-      207,
-      32,
-      41,
-      0.15
-    );
-}
 /* =========================================================
    SELECTOR DE HORA COMPACTO
    ========================================================= */
@@ -2950,4 +2841,50 @@
   .aulas-datetime-compact {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* =========================================================
+   EQUIPAMIENTO - INVENTARIO INSTITUCIONAL
+   ========================================================= */
+
+.aulas-equipment-stock-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 11px 12px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: #fafbfc;
+  color: #667085;
+  font-size: 10px;
+}
+
+.aulas-equipment-stock-summary strong {
+  color: #344054;
+  font-weight: 700;
+}
+
+.aulas-equipment-assignment-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+
+.aulas-equipment-assignment-title strong {
+  color: #344054;
+  font-size: 11px;
+}
+
+.aulas-equipment-assignment-title small,
+.sgpa-field-help {
+  color: #98a2b3;
+  font-size: 9px;
+  line-height: 1.4;
 }
