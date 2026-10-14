@@ -8,6 +8,7 @@ import {
   User,
   UserCog,
   UserPlus,
+  UserRound,
 
   LockKeyhole,
 
@@ -31,6 +32,7 @@ import {
   ChevronDown,
 
   ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
 
   /* =======================================================
@@ -42,17 +44,22 @@ import {
 
   BookOpen,
   BookMarked,
+  BookPlus,
 
   Briefcase,
 
   DoorOpen,
+  MonitorCog,
 
   CalendarDays,
+  Calendar,
+  CalendarX,
 
   LineChart,
 
   ClipboardList,
   FileText,
+  FileCheck,
 
   /* =======================================================
      PLANES DE ESTUDIO
@@ -60,10 +67,12 @@ import {
 
    Split,
    Globe,
+   MapPin,
    MapPinned,
 
   Blocks,
   Layers,
+  Layers3,
 
   SquareArrowRightExit,
 
@@ -129,6 +138,7 @@ import {
 
   CircleX,
   CircleAlert,
+  AlertCircle,
 
   TriangleAlert,
 
@@ -147,6 +157,9 @@ import {
   Info,
 
   RefreshCw,
+  RotateCcw,
+
+  History,
 
   Circle
 
@@ -170,6 +183,7 @@ export function renderizarIconos() {
       User,
       UserCog,
       UserPlus,
+      UserRound,
 
       LockKeyhole,
 
@@ -193,6 +207,7 @@ export function renderizarIconos() {
       ChevronLeft,
       ChevronDown,
 
+      ArrowRight,
       ArrowUpRight,
 
 
@@ -205,17 +220,22 @@ export function renderizarIconos() {
 
       BookOpen,
       BookMarked,
+      BookPlus,
 
       Briefcase,
 
       DoorOpen,
+      MonitorCog,
 
       CalendarDays,
+      Calendar,
+      CalendarX,
 
       LineChart,
 
       ClipboardList,
       FileText,
+      FileCheck,
 
 
       /* ===================================================
@@ -224,10 +244,12 @@ export function renderizarIconos() {
 
       Split,
       Globe,
+      MapPin,
       MapPinned,
 
       Blocks,
       Layers,
+      Layers3,
 
       SquareArrowRightExit,
 
@@ -295,6 +317,7 @@ export function renderizarIconos() {
 
       CircleX,
       CircleAlert,
+      AlertCircle,
 
       TriangleAlert,
 
@@ -314,6 +337,9 @@ export function renderizarIconos() {
       Info,
 
       RefreshCw,
+      RotateCcw,
+
+      History,
 
       Circle
 
