@@ -435,6 +435,22 @@ describe('UsuariosService', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
+  it('rechaza campos requeridos compuestos solo por espacios al crear', async () => {
+    await expect(
+      service.crear({
+        cedula: '   ',
+        nombres: 'Usuario',
+        apellido1: 'Prueba',
+        correo: 'usuario@sgpa.local',
+        password: 'ClaveSegura123',
+        roles: [RolSistema.PROFESOR],
+      }),
+    ).rejects.toThrow('El campo cédula no puede estar vacío.');
+
+    expect(usuarioRepository.findOne).not.toHaveBeenCalled();
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
   it('rechaza crear con un rol inexistente o inactivo', async () => {
     usuarioRepository.findOne.mockResolvedValue(null);
     txRolRepository.find.mockResolvedValue([]);
@@ -471,6 +487,18 @@ describe('UsuariosService', () => {
       nombres: 'Nuevo Nombre',
       correo: 'nuevo@sgpa.local',
     });
+  });
+
+  it('rechaza vaciar un campo requerido al actualizar', async () => {
+    usuarioRepository.findOne.mockResolvedValueOnce(crearUsuario());
+
+    await expect(
+      service.actualizar(1, {
+        nombres: '   ',
+      }),
+    ).rejects.toThrow('El campo nombre no puede estar vacío.');
+
+    expect(usuarioRepository.update).not.toHaveBeenCalled();
   });
 
   it('actualiza las carreras asociadas a un usuario profesor', async () => {

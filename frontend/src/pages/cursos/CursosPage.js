@@ -231,38 +231,55 @@ function obtenerCursosFiltrados() {
       "cursosEstado",
     )?.value || "TODOS";
 
-  return obtenerCursosCarrera().filter(
-    (curso) => {
-      const coincideBusqueda =
-        !busqueda ||
-        [
-          curso.codigo,
-          curso.nombre,
-          curso.descripcion,
-        ]
-          .filter(Boolean)
-          .some((valor) =>
-            String(valor)
-              .toLowerCase()
-              .includes(busqueda),
-          );
+  return obtenerCursosCarrera()
+    .filter(
+      (curso) => {
+        const coincideBusqueda =
+          !busqueda ||
+          [
+            curso.codigo,
+            curso.nombre,
+            curso.descripcion,
+          ]
+            .filter(Boolean)
+            .some((valor) =>
+              String(valor)
+                .toLowerCase()
+                .includes(busqueda),
+            );
 
-      let coincideEstado = true;
+        let coincideEstado = true;
 
-      if (estado === "ACTIVOS") {
-        coincideEstado =
-          curso.activo === true;
-      }
+        if (estado === "ACTIVOS") {
+          coincideEstado =
+            curso.activo === true;
+        }
 
-      if (estado === "INACTIVOS") {
-        coincideEstado =
-          curso.activo === false;
-      }
+        if (estado === "INACTIVOS") {
+          coincideEstado =
+            curso.activo === false;
+        }
 
-      return (
-        coincideBusqueda &&
-        coincideEstado
-      );
+        return (
+          coincideBusqueda &&
+          coincideEstado
+        );
+      },
+    )
+    .sort(compararCursosPorEstadoYCodigo);
+}
+
+export function compararCursosPorEstadoYCodigo(a, b) {
+  if (a.activo !== b.activo) {
+    return a.activo === true ? -1 : 1;
+  }
+
+  return String(a.codigo ?? '').localeCompare(
+    String(b.codigo ?? ''),
+    'es',
+    {
+      numeric: true,
+      sensitivity: 'base',
     },
   );
 }

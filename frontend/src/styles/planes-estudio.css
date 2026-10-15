@@ -1015,7 +1015,7 @@
   position: relative;
   width: 30px;
   height: 0;
-  border-top: 2px solid var(--una-red, #cf2029);
+  border-top: 2.5px solid #2563eb;
 }
 
 .malla-legend-line::after {
@@ -1027,12 +1027,17 @@
   height: 0;
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
-  border-left: 5px solid var(--una-red, #cf2029);
+  border-left: 5px solid #2563eb;
 }
 
 .malla-legend-dashed {
   border-top-style: dashed;
-  opacity: 0.75;
+  border-top-color: #d97706;
+  opacity: 1;
+}
+
+.malla-legend-dashed::after {
+  border-left-color: #d97706;
 }
 
 .malla-selection-summary {
@@ -1296,7 +1301,9 @@
     border-color 180ms ease,
     box-shadow 180ms ease,
     transform 180ms ease,
-    background-color 180ms ease;
+    background-color 180ms ease,
+    opacity 180ms ease,
+    filter 180ms ease;
 }
 
 .malla-card-decoration {
@@ -1388,14 +1395,14 @@
 }
 
 .malla-card-relations .malla-requirement-badge {
-  background: rgba(207, 32, 41, 0.075);
-  color: #b71922;
+  background: rgba(37, 99, 235, 0.09);
+  color: #1d4ed8;
 }
 
 .malla-card-relations .malla-coreq-badge {
-  border: 1px dashed rgba(207, 32, 41, 0.22);
-  background: rgba(207, 32, 41, 0.035);
-  color: #b71922;
+  border: 1px dashed rgba(217, 119, 6, 0.42);
+  background: rgba(217, 119, 6, 0.07);
+  color: #b45309;
 }
 
 .malla-card-no-relations {
@@ -1479,27 +1486,73 @@
 }
 
 .malla-card.is-route {
-  border-color: #cf2029;
-  background: #fffafa;
   box-shadow:
-    0 0 0 1px rgba(207, 32, 41, 0.08),
-    0 5px 14px rgba(16, 24, 40, 0.045);
+    0 0 0 3px rgba(16, 24, 40, 0.07),
+    0 10px 22px rgba(16, 24, 40, 0.13);
+}
+
+/* El contorno crece visualmente sin transformar la tarjeta ni mover
+   los bordes donde terminan las flechas SVG. */
+.malla-card.is-route:hover,
+.malla-card.is-selected:hover {
+  transform: none;
 }
 
 .malla-card.is-route .malla-card-hover-line {
   width: 100%;
 }
 
-.malla-card.is-route .malla-card-decoration {
-  background: rgba(207, 32, 41, 0.10);
+.malla-card.is-route.is-requirement {
+  border-color: #2563eb;
+  background: #f8faff;
+  box-shadow:
+    0 0 0 3px rgba(37, 99, 235, 0.17),
+    0 10px 22px rgba(37, 99, 235, 0.14);
+}
+
+.malla-card.is-route.is-requirement .malla-card-hover-line {
+  background: #2563eb;
+}
+
+.malla-card.is-route.is-requirement .malla-card-decoration {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.malla-card.is-route.is-corequisite {
+  border-color: #d97706;
+  border-style: dashed;
+  background: #fffbf5;
+  box-shadow:
+    0 0 0 3px rgba(217, 119, 6, 0.18),
+    0 10px 22px rgba(217, 119, 6, 0.14);
+}
+
+.malla-card.is-route.is-corequisite .malla-card-hover-line {
+  background: #d97706;
+}
+
+.malla-card.is-route.is-corequisite .malla-card-decoration {
+  background: rgba(217, 119, 6, 0.1);
 }
 
 .malla-card.is-selected {
   border-color: #b5121b;
   background: #fff7f7;
   box-shadow:
-    0 0 0 2px rgba(207, 32, 41, 0.13),
-    0 8px 18px rgba(16, 24, 40, 0.055);
+    0 0 0 3px rgba(207, 32, 41, 0.19),
+    0 10px 22px rgba(207, 32, 41, 0.13);
+}
+
+.malla-card.is-muted {
+  opacity: 0.46;
+  filter: grayscale(0.8);
+  background: #f3f4f6;
+}
+
+.malla-card.is-muted:hover,
+.malla-card.is-muted:focus-visible {
+  opacity: 0.76;
+  filter: grayscale(0.35);
 }
 
 .malla-card.is-selected .malla-card-hover-line {
@@ -1541,7 +1594,7 @@
 .malla-connection-halo {
   fill: none;
   stroke: rgba(255, 255, 255, 0.96);
-  stroke-width: 3.4;
+  stroke-width: 6.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
@@ -1549,28 +1602,54 @@
 
 .malla-connection {
   fill: none;
-  stroke: #cf2029;
-  stroke-width: 1.35;
+  stroke-width: 2.5;
   stroke-linecap: round;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+  animation: malla-connection-in 190ms ease-out both;
 }
 
-.malla-connection-coreq {
-  stroke: #cf2029;
-  stroke-width: 1.3;
-  stroke-dasharray: 5 4;
-  opacity: 1;
+.malla-connection.is-requirement {
+  stroke: #2563eb;
 }
 
-.malla-arrow-head,
-.malla-arrow-head-coreq {
-  fill: none;
-  stroke: #cf2029;
-  stroke-width: 1.15;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
+.malla-connection.is-corequisite {
+  stroke: #d97706;
+}
+
+.malla-connection.is-corequisite {
+  stroke-dasharray: 8 6;
+}
+
+.malla-arrow-head {
+  stroke: none;
+}
+
+.malla-arrow-head.is-requirement {
+  fill: #2563eb;
+}
+
+.malla-arrow-head.is-corequisite {
+  fill: #d97706;
+}
+
+@keyframes malla-connection-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .malla-connection {
+    animation: none;
+  }
+
+  .malla-card {
+    transition: none;
+  }
 }
 
 @media (max-width: 1100px) {

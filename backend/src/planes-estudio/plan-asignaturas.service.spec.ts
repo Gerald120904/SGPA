@@ -92,6 +92,13 @@ describe('PlanAsignaturasService', () => {
     };
     planRepository = { findOne: jest.fn() };
     reglaOptativaRepository = { findOne: jest.fn() };
+    reglaOptativaRepository.findOne.mockResolvedValue({
+      planEstudioId: 1,
+      cantidadDisciplinarias: 200,
+      cantidadAbiertas: 200,
+      cantidadSede: 200,
+    });
+    asignaturaRepository.count.mockResolvedValue(0);
     transactionRepository = { save: jest.fn() };
     dataSource = {
       transaction: jest.fn(async (callback) =>
@@ -267,6 +274,9 @@ describe('PlanAsignaturasService', () => {
     reglaOptativaRepository.findOne.mockResolvedValue({
       id: 1,
       planEstudioId: 1,
+      cantidadDisciplinarias: 2,
+      cantidadAbiertas: 2,
+      cantidadSede: 0,
       minimoDisciplinariasPropias: 2,
       maximoOtrasAreas: 2,
     });
@@ -313,7 +323,14 @@ describe('PlanAsignaturasService', () => {
     });
 
     expect(resultado.tipoOptativa).toBe(TipoOptativa.DISCIPLINARIA);
-    expect(asignaturaRepository.count).not.toHaveBeenCalled();
+    expect(asignaturaRepository.count).toHaveBeenCalledWith({
+      where: {
+        planEstudioId: 1,
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: TipoOptativa.DISCIPLINARIA,
+        activo: true,
+      },
+    });
   });
 
   it('permite crear múltiples asignaturas GENERALES con el mismo código dentro del plan', async () => {

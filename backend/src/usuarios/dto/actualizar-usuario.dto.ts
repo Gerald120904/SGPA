@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
@@ -35,6 +36,9 @@ export class ActualizarUsuarioDto {
   apellido2?: string | null;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   @IsEmail()
   @MaxLength(150)
   correo?: string;
@@ -50,4 +54,3 @@ export class ActualizarUsuarioDto {
   })
   carreraIds?: number[];
 }
-

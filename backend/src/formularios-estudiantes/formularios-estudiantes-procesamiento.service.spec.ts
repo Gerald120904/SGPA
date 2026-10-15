@@ -16,6 +16,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     find: jest.Mock;
     findOne: jest.Mock;
     save: jest.Mock;
+    createQueryBuilder: jest.Mock;
   };
   let periodoRepo: {
     findOne: jest.Mock;

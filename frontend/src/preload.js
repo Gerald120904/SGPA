@@ -56,6 +56,42 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("carreras:actualizar", id, datos),
   cambiarEstadoCarrera: (id, activo) =>
     ipcRenderer.invoke("carreras:cambiar-estado", id, activo),
+  listarPerfilesAcademicos: () =>
+    ipcRenderer.invoke("perfiles-academicos:listar"),
+  obtenerPerfilAcademico: (id) =>
+    ipcRenderer.invoke("perfiles-academicos:obtener", id),
+  crearPerfilAcademico: (datos) =>
+    ipcRenderer.invoke("perfiles-academicos:crear", datos),
+  actualizarPerfilAcademico: (id, datos) =>
+    ipcRenderer.invoke("perfiles-academicos:actualizar", id, datos),
+  cambiarEstadoPerfilAcademico: (id, activo) =>
+    ipcRenderer.invoke("perfiles-academicos:cambiar-estado", id, activo),
+  listarAreasPerfil: (id) =>
+    ipcRenderer.invoke("perfiles-academicos:areas:listar", id),
+  guardarAreasPerfil: (id, areas) =>
+    ipcRenderer.invoke("perfiles-academicos:areas:guardar", id, areas),
+  listarRequisitosPerfil: (id) =>
+    ipcRenderer.invoke("perfiles-academicos:requisitos:listar", id),
+  guardarRequisitosPerfil: (id, requisitos) =>
+    ipcRenderer.invoke(
+      "perfiles-academicos:requisitos:guardar",
+      id,
+      requisitos,
+    ),
+  listarCursosPerfilAcademico: (perfilId) =>
+    ipcRenderer.invoke("perfiles-academicos:cursos:listar", perfilId),
+  asociarCursoPerfilAcademico: (perfilId, cursoId) =>
+    ipcRenderer.invoke(
+      "perfiles-academicos:cursos:asociar",
+      perfilId,
+      cursoId,
+    ),
+  desasociarCursoPerfilAcademico: (perfilId, cursoId) =>
+    ipcRenderer.invoke(
+      "perfiles-academicos:cursos:desasociar",
+      perfilId,
+      cursoId,
+    ),
   listarCursos: () => ipcRenderer.invoke("cursos:listar"),
   listarAsignaturasDisponiblesCurso: (filtros) =>
     ipcRenderer.invoke("cursos:asignaturas-disponibles", filtros),
@@ -178,6 +214,14 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("plan-importacion:ejecutar", planId, datos),
   guardarPlantillaExcelPlan: () =>
     ipcRenderer.invoke("plan-importacion:guardar-plantilla"),
+  seleccionarExcelEstudiantes: () =>
+    ipcRenderer.invoke("estudiantes-importacion:seleccionar-excel"),
+  guardarPlantillaExcelEstudiantes: () =>
+    ipcRenderer.invoke("estudiantes-importacion:guardar-plantilla"),
+  validarImportacionEstudiantes: (contexto, datos) =>
+    ipcRenderer.invoke("estudiantes-importacion:validar", contexto, datos),
+  ejecutarImportacionEstudiantes: (contexto, datos) =>
+    ipcRenderer.invoke("estudiantes-importacion:ejecutar", contexto, datos),
   listarBloquesPlan: (planId) =>
     ipcRenderer.invoke("bloques-plan:listar", planId),
   crearBloquePlan: (planId, datos) =>
@@ -206,6 +250,42 @@ contextBridge.exposeInMainWorld("sgpa", {
       'profesores:disponibilidad',
       profesorId,
       periodoId,
+    ),
+
+  obtenerExpedientePerfilProfesor: (profesorId, perfilId) =>
+    ipcRenderer.invoke(
+      "profesores:expediente-perfil",
+      profesorId,
+      perfilId,
+    ),
+
+  revisarRequisitoPerfilProfesor: (
+    profesorId,
+    perfilId,
+    requisitoId,
+    datos,
+  ) =>
+    ipcRenderer.invoke(
+      "profesores:revisar-requisito-perfil",
+      profesorId,
+      perfilId,
+      requisitoId,
+      datos,
+    ),
+
+  obtenerMiExpedientePerfilProfesor: (perfilId) =>
+    ipcRenderer.invoke("profesores:mi-expediente-perfil", perfilId),
+
+  guardarEvidenciasRequisitoProfesor: (
+    perfilId,
+    requisitoId,
+    datos,
+  ) =>
+    ipcRenderer.invoke(
+      "profesores:guardar-evidencias-requisito",
+      perfilId,
+      requisitoId,
+      datos,
     ),
 
   revisarPerfilProfesor: (
@@ -666,4 +746,66 @@ contextBridge.exposeInMainWorld("sgpa", {
       'aulas:auditoria:listar',
       aulaId,
     ),
+
+  listarFormulariosEstudiantes: () =>
+    ipcRenderer.invoke('formularios-estudiantes:listar'),
+  obtenerEstadoGoogleFormularios: () =>
+    ipcRenderer.invoke('formularios-estudiantes:google-estado'),
+  conectarGoogleFormularios: () =>
+    ipcRenderer.invoke('formularios-estudiantes:google-conectar'),
+  desconectarGoogleFormularios: () =>
+    ipcRenderer.invoke('formularios-estudiantes:google-desconectar'),
+  crearFormularioEstudiantes: (datos) =>
+    ipcRenderer.invoke('formularios-estudiantes:crear', datos),
+  sincronizarFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke('formularios-estudiantes:sincronizar', id),
+  listarSolicitudesFormularios: (filtros) =>
+    ipcRenderer.invoke('formularios-estudiantes:solicitudes', filtros),
+  contarSolicitudesPorPlan: (carreraId) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:conteos-solicitudes',
+      carreraId,
+    ),
+  aceptarSolicitudFormulario: (respuestaId) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:aceptar-solicitud',
+      respuestaId,
+    ),
+  rechazarSolicitudFormulario: (respuestaId, motivo) =>
+    ipcRenderer.invoke(
+      'formularios-estudiantes:rechazar-solicitud',
+      respuestaId,
+      motivo,
+    ),
+  cerrarFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke('formularios-estudiantes:cerrar', id),
+  listarRespuestasFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke('formularios-estudiantes:respuestas', id),
+  abrirEnlaceFormularioEstudiantes: (url) =>
+    ipcRenderer.invoke('formularios-estudiantes:abrir-enlace', url),
+
+  contarEstudiantesPorCarrera: () =>
+    ipcRenderer.invoke('estudiantes:conteos-carreras'),
+  contarEstudiantesPorPlan: (carreraId) =>
+    ipcRenderer.invoke('estudiantes:conteos-planes', carreraId),
+  listarEstudiantes: (filtros = {}) =>
+    ipcRenderer.invoke('estudiantes:listar', filtros),
+  obtenerEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:obtener', id),
+  actualizarEstudiante: (id, datos) =>
+    ipcRenderer.invoke('estudiantes:actualizar', id, datos),
+  crearEstudiante: (datos) =>
+    ipcRenderer.invoke('estudiantes:crear', datos),
+  cambiarEstadoEstudiante: (id, estado) =>
+    ipcRenderer.invoke('estudiantes:cambiar-estado', id, estado),
+  cambiarPlanEstudiante: (id, datos) =>
+    ipcRenderer.invoke('estudiantes:cambiar-plan', id, datos),
+  obtenerHistorialAcademicoEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:historial-academico', id),
+  obtenerHistorialPlanesEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:historial-planes', id),
+  obtenerProgresoEstudiante: (id, periodoReferenciaId) =>
+    ipcRenderer.invoke('estudiantes:progreso', id, periodoReferenciaId),
+  registrarResultadoAcademicoEstudiante: (id, datos) =>
+    ipcRenderer.invoke('estudiantes:registrar-resultado', id, datos),
 });

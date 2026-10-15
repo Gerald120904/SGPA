@@ -1250,6 +1250,15 @@ function compararAulasPorNumero(
 }
 
 
+export function compararAulasPorEstadoYNumero(a, b) {
+  if (a.activo !== b.activo) {
+    return a.activo === true ? -1 : 1;
+  }
+
+  return compararAulasPorNumero(a, b);
+}
+
+
 const TIPOS_INDISPONIBILIDAD = {
   MANTENIMIENTO:
     'Mantenimiento',
@@ -2653,7 +2662,7 @@ function renderizarAulas() {
 
   renderizarListaAulas(
     contenido,
-    filtradas,
+    [...filtradas].sort(compararAulasPorEstadoYNumero),
   );
 }
 

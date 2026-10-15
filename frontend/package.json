@@ -7,6 +7,9 @@
   "private": true,
   "scripts": {
     "start": "electron-forge start",
+    "test": "node --test",
+    "test:contracts": "node --test test/ipc-contract.test.mjs",
+    "test:pbi": "node --test test/pbi-ordering.test.mjs",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
