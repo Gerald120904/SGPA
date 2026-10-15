@@ -4,6 +4,8 @@
 
 .periodos-page {
   width: 100%;
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .periodos-toolbar {
@@ -19,6 +21,15 @@
   color: #1d2939;
   font-size: 24px;
   font-weight: 700;
+}
+
+.periodos-toolbar > div:first-child {
+  min-width: 0;
+}
+
+.periodos-primary-button {
+  flex: none;
+  white-space: nowrap;
 }
 
 .periodos-toolbar p {
@@ -71,6 +82,7 @@
 .periodos-search {
   min-height: 44px;
   flex: 1;
+  min-width: 0;
 
   display: flex;
   align-items: center;
@@ -121,6 +133,31 @@
    TABLA
    ========================================================= */
 
+.periodos-content .sgpa-data-table {
+  min-width: 980px;
+  table-layout: fixed;
+  font-size: 14px;
+}
+
+.periodos-content .sgpa-data-table th {
+  font-size: 11.5px;
+}
+
+.periodos-content .sgpa-status-badge {
+  font-size: 12px;
+}
+
+.periodos-content .sgpa-data-table th:nth-child(1),
+.periodos-content .sgpa-data-table td:nth-child(1) { width: 11%; }
+.periodos-content .sgpa-data-table th:nth-child(2),
+.periodos-content .sgpa-data-table td:nth-child(2) { width: 17%; }
+.periodos-content .sgpa-data-table th:nth-child(3),
+.periodos-content .sgpa-data-table td:nth-child(3) { width: 23%; }
+.periodos-content .sgpa-data-table th:nth-child(4),
+.periodos-content .sgpa-data-table td:nth-child(4) { width: 14%; }
+.periodos-content .sgpa-data-table th:nth-child(5),
+.periodos-content .sgpa-data-table td:nth-child(5) { width: 35%; }
+
 .periodos-code {
   color: #1f2937;
 }
@@ -140,6 +177,14 @@
 .periodos-name small,
 .periodos-dates small {
   color: #7a8493;
+  font-size: 12px;
+}
+
+.periodos-name,
+.periodos-dates {
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 
@@ -150,8 +195,9 @@
 .periodos-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .periodos-icon-button {
@@ -201,14 +247,18 @@
 .periodos-transition-wrapper {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.25rem;
+  min-width: 0;
+  text-align: center;
 }
 
 .periodos-transition-reason {
   max-width: 12rem;
   font-size: 0.75rem;
+  line-height: 1.35;
   opacity: 0.75;
+  white-space: normal;
 }
 
 .periodos-transition-button:disabled {
@@ -267,14 +317,94 @@
    RESPONSIVE
    ========================================================= */
 
-@media (max-width: 800px) {
+@container (max-width: 760px) {
   .periodos-toolbar,
   .periodos-filters {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .periodos-primary-button {
+    align-self: flex-start;
+  }
+
   .periodos-select {
     min-height: 44px;
+  }
+
+  .periodos-content .sgpa-table-shell {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .periodos-content .sgpa-table-scroll {
+    overflow: visible;
+  }
+
+  .periodos-content .sgpa-data-table,
+  .periodos-content .sgpa-data-table tbody,
+  .periodos-content .sgpa-data-table tr {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .periodos-content .sgpa-data-table thead {
+    display: none;
+  }
+
+  .periodos-content .sgpa-data-table tbody tr {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px solid rgba(207, 32, 41, 0.24);
+    border-radius: 12px;
+    background: #ffffff;
+  }
+
+  .periodos-content .sgpa-data-table td {
+    display: grid;
+    grid-template-columns: minmax(90px, 32%) minmax(0, 1fr);
+    gap: 10px;
+    width: 100% !important;
+    padding: 10px 0;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+
+  .periodos-content .sgpa-data-table td::before {
+    content: attr(data-label);
+    color: #b5121b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .periodos-content .sgpa-data-table tbody tr:hover td:first-child::before {
+    content: attr(data-label);
+    position: static;
+    width: auto;
+    background: none;
+  }
+
+  .periodos-content .sgpa-data-table td:last-child {
+    display: block !important;
+    text-align: left !important;
+    white-space: normal;
+  }
+
+  .periodos-content .sgpa-data-table td:last-child::before {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .periodos-content .periodos-actions {
+    justify-content: flex-start;
+  }
+
+  .periodos-content .periodos-transition-wrapper {
+    align-items: flex-start;
+    text-align: left;
   }
 }

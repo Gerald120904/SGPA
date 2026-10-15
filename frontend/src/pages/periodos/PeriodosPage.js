@@ -552,7 +552,7 @@ function renderizarPeriodos() {
           return `
             <tr>
 
-              <td>
+              <td data-label="Código">
                 <strong
                   class="periodos-code"
                 >
@@ -563,7 +563,7 @@ function renderizarPeriodos() {
               </td>
 
 
-              <td>
+              <td data-label="Periodo">
 
                 <div
                   class="periodos-name"
@@ -593,7 +593,7 @@ function renderizarPeriodos() {
               </td>
 
 
-              <td>
+              <td data-label="Fechas">
 
                 <div
                   class="periodos-dates"
@@ -621,7 +621,7 @@ function renderizarPeriodos() {
               </td>
 
 
-              <td>
+              <td data-label="Estado">
 
                 ${StatusBadge({
                   label:
@@ -637,7 +637,7 @@ function renderizarPeriodos() {
               </td>
 
 
-              <td>
+              <td data-label="Acciones">
 
                 <div
                   class="periodos-actions"
