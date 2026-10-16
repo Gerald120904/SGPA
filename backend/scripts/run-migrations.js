@@ -3,31 +3,41 @@ const dotenv = require('dotenv');
 const { ConfigService } = require('@nestjs/config');
 const { DataSource, MigrationExecutor } = require('typeorm');
 
-const QA004_MIGRATION = 'AddOptativeRuleCounts2026101500000';
+const ALLOWED_MIGRATIONS = new Set([
+  'AddOptativeRuleCounts2026101500000',
+  'AddAulaEquipmentInventory2026101600000',
+]);
 
 function migrationName(migration) {
   if (typeof migration === 'function') return migration.name;
   return migration?.name;
 }
 
-function assertQa004OnlyConfigured(migrations) {
+function assertQa004Qa005Configured(migrations) {
   const names = Array.isArray(migrations) ? migrations.map(migrationName) : [];
 
-  if (names.length !== 1 || names[0] !== QA004_MIGRATION) {
+  if (
+    names.length !== ALLOWED_MIGRATIONS.size ||
+    new Set(names).size !== ALLOWED_MIGRATIONS.size ||
+    names.some((name) => !ALLOWED_MIGRATIONS.has(name))
+  ) {
     throw new Error(
       `Migraciones configuradas inesperadas (${names.join(', ') || 'ninguna'}); ` +
-        `solo se permite ${QA004_MIGRATION}.`,
+        `solo se permiten ${[...ALLOWED_MIGRATIONS].join(' y ')}.`,
     );
   }
 }
 
-function assertOnlyQa004Pending(migrations) {
+function assertOnlyQa004Qa005Pending(migrations) {
   const names = migrations.map(migrationName);
 
-  if (names.length > 1 || names.some((name) => name !== QA004_MIGRATION)) {
+  if (
+    names.some((name) => !ALLOWED_MIGRATIONS.has(name)) ||
+    new Set(names).size !== names.length
+  ) {
     throw new Error(
       `Migraciones pendientes inesperadas (${names.join(', ') || 'ninguna'}); ` +
-        `solo se permite ${QA004_MIGRATION}.`,
+        `solo se permiten ${[...ALLOWED_MIGRATIONS].join(' y ')}.`,
     );
   }
 }
@@ -73,13 +83,13 @@ async function main() {
 
   const { crearConfiguracionBaseDatos } = require('../dist/config/database.config');
   const options = crearConfiguracionBaseDatos(new ConfigService(process.env));
-  assertQa004OnlyConfigured(options.migrations);
+  assertQa004Qa005Configured(options.migrations);
   const dataSource = new DataSource({ ...options, synchronize: false });
 
   try {
     await dataSource.initialize();
     const pending = await new MigrationExecutor(dataSource).getPendingMigrations();
-    assertOnlyQa004Pending(pending);
+    assertOnlyQa004Qa005Pending(pending);
 
     if (pending.length === 0) {
       console.log('No hay migraciones pendientes.');
@@ -87,13 +97,15 @@ async function main() {
     }
 
     const executed = await dataSource.runMigrations({ transaction: 'each' });
+    const executedNames = executed.map((item) => item.name);
     if (
-      executed.length !== 1 ||
-      executed[0].name !== QA004_MIGRATION
+      executedNames.length !== pending.length ||
+      executedNames.some((name) => !ALLOWED_MIGRATIONS.has(name)) ||
+      executedNames.some((name, index) => name !== pending[index]?.name)
     ) {
       throw new Error(
-        `Ejecución inesperada (${executed.map((item) => item.name).join(', ') || 'ninguna'}); ` +
-          `solo se permite ${QA004_MIGRATION}.`,
+        `Ejecución inesperada (${executedNames.join(', ') || 'ninguna'}); ` +
+          `solo se permiten ${[...ALLOWED_MIGRATIONS].join(' y ')}.`,
       );
     }
     console.log(`Migraciones aplicadas: ${executed.map((item) => item.name).join(', ')}`);
@@ -109,4 +121,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = { assertOnlyQa004Pending, assertQa004OnlyConfigured };
+module.exports = {
+  assertOnlyQa004Qa005Pending,
+  assertQa004Qa005Configured,
+};

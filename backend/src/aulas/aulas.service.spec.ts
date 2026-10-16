@@ -816,7 +816,12 @@ describe('AulasService', () => {
       cantidadAsignada: 22,
       observaciones: 'Tres dañadas',
       activo: true,
+      asignadoEn: expect.any(Date),
+      retiradoEn: null,
     });
+    expect(aulaEquipamientoRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 10, cantidadAsignada: 22 }),
+    );
   });
 
   it('permite asignar todo el inventario y deja cero unidades disponibles', async () => {
