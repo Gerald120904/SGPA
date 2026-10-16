@@ -67,7 +67,24 @@ export class AuthGuard implements CanActivate {
 
     const usuario = await this.usuarioRepository.findOne({
       where: { id: sub },
-      select: { id: true, activo: true },
+      relations: {
+        usuarioRoles: {
+          rol: true,
+        },
+      },
+      select: {
+        id: true,
+        activo: true,
+        usuarioRoles: {
+          usuarioId: true,
+          rolId: true,
+          rol: {
+            id: true,
+            nombre: true,
+            activo: true,
+          },
+        },
+      },
     });
 
     if (!usuario) {
@@ -78,7 +95,19 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    request['user'] = payload as Express.Request['user'];
+    const rolesVigentes = (usuario.usuarioRoles ?? [])
+      .filter((ur) => ur.rol && ur.rol.activo === true)
+      .map((ur) => ur.rol.nombre);
+
+    if (rolesVigentes.length === 0) {
+      throw new UnauthorizedException('Usuario sin roles asignados o activos');
+    }
+
+    request['user'] = {
+      ...payload,
+      sub,
+      roles: Array.from(new Set(rolesVigentes)),
+    } as Express.Request['user'];
 
     return true;
   }

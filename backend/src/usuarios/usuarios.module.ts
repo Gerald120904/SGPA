@@ -9,6 +9,7 @@ import { SecurityModule } from '../auth/security.module';
 import { Rol } from '../roles/entities/rol.entity';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
+import { PermisosModule } from '../permisos/permisos.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { Carrera } from '../carreras/entities/carrera.entity';
       Carrera,
     ]),
     SecurityModule,
+    PermisosModule,
   ],
   controllers: [UsuariosController],
   providers: [UsuariosService],

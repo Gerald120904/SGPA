@@ -51,6 +51,11 @@ describe('EstudiantesController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
             })),
           },
         },
@@ -68,8 +73,11 @@ describe('EstudiantesController', () => {
     await app.init();
   });
 
+  let rolesActuales: string[] = ['COORDINADOR'];
+
   beforeEach(() => {
     jest.clearAllMocks();
+    rolesActuales = ['COORDINADOR'];
     service.listar.mockResolvedValue([]);
     service.crear.mockResolvedValue({ id: 7 });
     service.obtenerProgreso.mockResolvedValue({ resumen: {} });
@@ -77,8 +85,14 @@ describe('EstudiantesController', () => {
 
   afterAll(async () => app.close());
 
-  const token = (roles: string[] = []) =>
-    jwt.signAsync({ sub: 3, correo: 'gestor@una.cr', roles });
+  const token = (roles?: string[]) => {
+    if (roles !== undefined && roles.length > 0) {
+      rolesActuales = roles;
+    } else {
+      rolesActuales = ['COORDINADOR'];
+    }
+    return jwt.signAsync({ sub: 3, correo: 'gestor@una.cr', roles: rolesActuales });
+  };
 
   it('requiere autenticación', async () => {
     await request(app.getHttpServer()).get('/estudiantes').expect(401);

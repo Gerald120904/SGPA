@@ -56,6 +56,11 @@ describe('EstructuraAcademicaController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
             })),
           },
         },
@@ -92,11 +97,14 @@ describe('EstructuraAcademicaController', () => {
     await app.close();
   });
 
+  let rolesActuales: string[] = ['COORDINADOR'];
+
   async function crearToken(roles: string[], sub = 1) {
+    rolesActuales = roles && roles.length > 0 ? roles : ['COORDINADOR'];
     return jwtService.signAsync({
       sub,
       correo: 'admin@sgpa.local',
-      roles,
+      roles: rolesActuales,
     });
   }
 

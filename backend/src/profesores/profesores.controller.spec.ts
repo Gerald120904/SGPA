@@ -86,6 +86,11 @@ describe('ProfesoresController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
             })),
           },
         },
@@ -117,6 +122,7 @@ describe('ProfesoresController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rolesActuales = ['ADMIN_GLOBAL'];
     permisosAsignados.clear();
 
     profesoresService.listar.mockResolvedValue([]);
@@ -168,11 +174,14 @@ describe('ProfesoresController', () => {
     await app.close();
   });
 
+  let rolesActuales: string[] = ['ADMIN_GLOBAL'];
+
   async function crearToken(roles: string[], sub = 10) {
+    rolesActuales = roles && roles.length > 0 ? roles : ['ADMIN_GLOBAL'];
     return jwtService.signAsync({
       sub,
       correo: 'usuario@sgpa.local',
-      roles,
+      roles: rolesActuales,
     });
   }
 

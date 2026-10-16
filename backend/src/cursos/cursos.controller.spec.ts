@@ -60,6 +60,13 @@ describe('CursosController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
             })),
           },
         },
@@ -105,7 +112,10 @@ describe('CursosController', () => {
     await app.close();
   });
 
+  let rolActual = 'ADMIN_GLOBAL';
+
   async function crearToken(rol: string) {
+    rolActual = rol;
     return jwtService.signAsync({
       sub: 1,
       correo: 'usuario@sgpa.local',

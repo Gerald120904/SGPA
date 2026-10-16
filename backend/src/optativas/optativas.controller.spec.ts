@@ -50,6 +50,13 @@ describe('OptativasController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
             })),
           },
         },
@@ -82,12 +89,16 @@ describe('OptativasController', () => {
     jest.clearAllMocks();
   });
 
-  const generarToken = (rol: RolSistema = RolSistema.ADMIN_GLOBAL) =>
-    jwtService.sign({
+  let rolActual: RolSistema = RolSistema.ADMIN_GLOBAL;
+
+  const generarToken = (rol: RolSistema = RolSistema.ADMIN_GLOBAL) => {
+    rolActual = rol;
+    return jwtService.sign({
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
     });
+  };
 
   it('GET /optativas - lista las optativas', async () => {
     optativasService.listar.mockResolvedValue([]);

@@ -95,4 +95,42 @@ describe('PermisosGuard', () => {
       ForbiddenException,
     );
   });
+
+  it('no otorga bypass si ADMIN_GLOBAL fue revocado y solo conserva rol PROFESOR', async () => {
+    reflector.getAllAndOverride.mockReturnValue([
+      PermisoSistema.PERFILES_DOCENTES_VALIDAR,
+    ]);
+    // ADMIN_GLOBAL ya no está en los roles activos tras ser sincronizado por AuthGuard
+    permisosService.usuarioTienePermisos.mockResolvedValue(false);
+
+    const context = crearContexto({
+      sub: 1,
+      roles: [RolSistema.PROFESOR],
+    });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(1, [
+      PermisoSistema.PERFILES_DOCENTES_VALIDAR,
+    ]);
+  });
+
+  it('permite acceso si ADMIN_GLOBAL fue revocado pero el usuario posee permisos específicos asignados', async () => {
+    reflector.getAllAndOverride.mockReturnValue([
+      PermisoSistema.PROFESORES_VER,
+    ]);
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+
+    const context = crearContexto({
+      sub: 1,
+      roles: [RolSistema.PROFESOR],
+    });
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(1, [
+      PermisoSistema.PROFESORES_VER,
+    ]);
+  });
 });

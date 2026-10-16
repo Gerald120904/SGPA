@@ -42,10 +42,20 @@ describe('UsuariosController', () => {
         {
           provide: getRepositoryToken(Usuario),
           useValue: {
-            findOne: jest.fn().mockImplementation(async ({ where }) => ({
-              id: where?.id ?? 1,
-              activo: true,
-            })),
+            findOne: jest.fn().mockImplementation(async ({ where }) => {
+              const rol = where?.id === 1 ? 'ADMIN_GLOBAL' : 'COORDINADOR';
+              return {
+                id: where?.id ?? 1,
+                activo: true,
+                usuarioRoles: [
+                  {
+                    usuarioId: where?.id ?? 1,
+                    rolId: where?.id === 1 ? 1 : 2,
+                    rol: { id: where?.id === 1 ? 1 : 2, nombre: rol, activo: true },
+                  },
+                ],
+              };
+            }),
           },
         },
         {

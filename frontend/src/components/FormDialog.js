@@ -2,6 +2,8 @@ import {
   escapeHtml
 } from '../utils/html.js';
 
+import { logoUnaUrl } from '../utils/brand-assets.js';
+
 
 /* =========================================================
    LISTENERS DE CIERRE EXTERIOR
@@ -278,7 +280,7 @@ export function FormDialog({
       <div class="sgpa-form-brand">
 
         <img
-          src="/Logo-UNA-Rojo_FondoTransparente.png"
+          src="${logoUnaUrl}"
           alt="Universidad Nacional de Costa Rica"
           class="sgpa-form-logo"
           draggable="false"

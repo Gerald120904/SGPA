@@ -104,7 +104,7 @@ describe('AuthGuard', () => {
     });
   });
 
-  describe('validación del estado en base de datos', () => {
+  describe('validación de estado y roles en base de datos (QA-002 y QA-003)', () => {
     it('lanza UnauthorizedException si el usuario no existe en la base de datos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
         sub: 999,
@@ -118,10 +118,12 @@ describe('AuthGuard', () => {
       await expect(guard.canActivate(context)).rejects.toThrow(
         new UnauthorizedException('Usuario inexistente o no autorizado'),
       );
-      expect(usuarioRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 999 },
-        select: { id: true, activo: true },
-      });
+      expect(usuarioRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 999 },
+          relations: { usuarioRoles: { rol: true } },
+        }),
+      );
     });
 
     it('lanza UnauthorizedException si la cuenta del usuario está inactiva', async () => {
@@ -133,6 +135,13 @@ describe('AuthGuard', () => {
       usuarioRepository.findOne.mockResolvedValue({
         id: 15,
         activo: false,
+        usuarioRoles: [
+          {
+            usuarioId: 15,
+            rolId: 2,
+            rol: { id: 2, nombre: 'COORDINADOR', activo: true },
+          },
+        ],
       });
 
       const context = crearContexto('Bearer token-usuario-desactivado');
@@ -140,54 +149,171 @@ describe('AuthGuard', () => {
       await expect(guard.canActivate(context)).rejects.toThrow(
         new UnauthorizedException('Usuario inactivo'),
       );
-      expect(usuarioRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 15 },
-        select: { id: true, activo: true },
-      });
     });
 
-    it('permite el acceso si el usuario existe y está activo, asignando request.user', async () => {
-      const payload = {
-        sub: 1,
-        correo: 'admin@sgpa.local',
-        roles: ['ADMIN_GLOBAL'],
-      };
-      jwtService.verifyAsync.mockResolvedValue(payload);
+    it('lanza UnauthorizedException si el usuario no tiene ningún rol asignado en base de datos', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 20,
+        correo: 'sinroles@sgpa.local',
+        roles: ['COORDINADOR'],
+      });
       usuarioRepository.findOne.mockResolvedValue({
-        id: 1,
+        id: 20,
         activo: true,
+        usuarioRoles: [],
       });
 
-      const context = crearContexto('Bearer token-valido');
+      const context = crearContexto('Bearer token-roles-eliminados');
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        new UnauthorizedException('Usuario sin roles asignados o activos'),
+      );
+    });
+
+    it('lanza UnauthorizedException si todos los roles asignados al usuario están inactivos', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 21,
+        correo: 'rolesinactivos@sgpa.local',
+        roles: ['COORDINADOR'],
+      });
+      usuarioRepository.findOne.mockResolvedValue({
+        id: 21,
+        activo: true,
+        usuarioRoles: [
+          {
+            usuarioId: 21,
+            rolId: 2,
+            rol: { id: 2, nombre: 'COORDINADOR', activo: false },
+          },
+        ],
+      });
+
+      const context = crearContexto('Bearer token-rol-desactivado');
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        new UnauthorizedException('Usuario sin roles asignados o activos'),
+      );
+    });
+
+    it('reemplaza los roles antiguos del token por los roles reales vigentes de la base de datos', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 5,
+        correo: 'usuario@sgpa.local',
+        roles: ['ADMIN_GLOBAL', 'COORDINADOR'],
+      });
+      usuarioRepository.findOne.mockResolvedValue({
+        id: 5,
+        activo: true,
+        usuarioRoles: [
+          {
+            usuarioId: 5,
+            rolId: 3,
+            rol: { id: 3, nombre: 'PROFESOR', activo: true },
+          },
+        ],
+      });
+
+      const context = crearContexto('Bearer token-con-roles-viejos');
       const request = context.switchToHttp().getRequest();
 
       const resultado = await guard.canActivate(context);
 
       expect(resultado).toBe(true);
-      expect(request.user).toEqual(payload);
-      expect(usuarioRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 1 },
-        select: { id: true, activo: true },
-      });
+      expect(request.user.roles).toEqual(['PROFESOR']);
+      expect(request.user.roles).not.toContain('ADMIN_GLOBAL');
+      expect(request.user.roles).not.toContain('COORDINADOR');
     });
 
-    it('consulta únicamente campos id y activo sin relaciones pesadas', async () => {
+    it('soporta usuarios con múltiples roles activos simultáneos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
-        sub: 42,
-        correo: 'usuario@sgpa.local',
+        sub: 8,
+        correo: 'multirrol@sgpa.local',
         roles: ['PROFESOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
-        id: 42,
+        id: 8,
         activo: true,
+        usuarioRoles: [
+          {
+            usuarioId: 8,
+            rolId: 3,
+            rol: { id: 3, nombre: 'PROFESOR', activo: true },
+          },
+          {
+            usuarioId: 8,
+            rolId: 2,
+            rol: { id: 2, nombre: 'COORDINADOR', activo: true },
+          },
+        ],
       });
 
-      const context = crearContexto('Bearer token-valido');
-      await guard.canActivate(context);
+      const context = crearContexto('Bearer token-multirrol');
+      const request = context.switchToHttp().getRequest();
 
-      const queryParams = usuarioRepository.findOne.mock.calls[0][0];
-      expect(queryParams.select).toEqual({ id: true, activo: true });
-      expect(queryParams.relations).toBeUndefined();
+      const resultado = await guard.canActivate(context);
+
+      expect(resultado).toBe(true);
+      expect(request.user.roles).toEqual(['PROFESOR', 'COORDINADOR']);
+    });
+
+    it('revoca privilegios de ADMIN_GLOBAL inmediatamente al ser retirado en base de datos', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 1,
+        correo: 'exadmin@sgpa.local',
+        roles: ['ADMIN_GLOBAL'],
+      });
+      usuarioRepository.findOne.mockResolvedValue({
+        id: 1,
+        activo: true,
+        usuarioRoles: [
+          {
+            usuarioId: 1,
+            rolId: 3,
+            rol: { id: 3, nombre: 'PROFESOR', activo: true },
+          },
+        ],
+      });
+
+      const context = crearContexto('Bearer token-admin-revocado');
+      const request = context.switchToHttp().getRequest();
+
+      const resultado = await guard.canActivate(context);
+
+      expect(resultado).toBe(true);
+      expect(request.user.roles).toEqual(['PROFESOR']);
+      expect(request.user.roles.includes('ADMIN_GLOBAL')).toBe(false);
+    });
+
+    it('excluye roles inactivos cuando el usuario tiene roles mixtos', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 12,
+        correo: 'mixto@sgpa.local',
+        roles: ['COORDINADOR', 'PROFESOR'],
+      });
+      usuarioRepository.findOne.mockResolvedValue({
+        id: 12,
+        activo: true,
+        usuarioRoles: [
+          {
+            usuarioId: 12,
+            rolId: 2,
+            rol: { id: 2, nombre: 'COORDINADOR', activo: false },
+          },
+          {
+            usuarioId: 12,
+            rolId: 3,
+            rol: { id: 3, nombre: 'PROFESOR', activo: true },
+          },
+        ],
+      });
+
+      const context = crearContexto('Bearer token-rol-mixto');
+      const request = context.switchToHttp().getRequest();
+
+      const resultado = await guard.canActivate(context);
+
+      expect(resultado).toBe(true);
+      expect(request.user.roles).toEqual(['PROFESOR']);
     });
   });
 });

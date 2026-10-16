@@ -54,6 +54,13 @@ describe('PlanReglasOptativasController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
             })),
           },
         },
@@ -100,12 +107,16 @@ describe('PlanReglasOptativasController', () => {
     );
   });
 
-  const generarToken = (rol: string = 'ADMIN_GLOBAL') =>
-    jwtService.sign({
+  let rolActual = 'ADMIN_GLOBAL';
+
+  const generarToken = (rol: string = 'ADMIN_GLOBAL') => {
+    rolActual = rol;
+    return jwtService.sign({
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
     });
+  };
 
   it('GET /planes-estudio/:planId/regla-optativas - obtiene la regla del plan con PLANES_ESTUDIO_VER', async () => {
     const data = {

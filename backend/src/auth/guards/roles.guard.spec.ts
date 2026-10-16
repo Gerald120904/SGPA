@@ -66,4 +66,28 @@ describe('RolesGuard', () => {
       ForbiddenException,
     );
   });
+
+  it('deniega acceso cuando el rol requerido fue revocado y el usuario conserva otros roles', () => {
+    // Endpoint requiere COORDINADOR, pero al usuario le revocaron COORDINADOR y solo conserva PROFESOR
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.COORDINADOR]);
+
+    expect(() =>
+      guard.canActivate(crearContexto([RolSistema.PROFESOR])),
+    ).toThrow(ForbiddenException);
+  });
+
+  it('permite acceso al rol legítimo conservado tras la revocación de otro rol', () => {
+    // Endpoint requiere PROFESOR, el usuario perdió COORDINADOR pero conserva PROFESOR
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.PROFESOR]);
+
+    expect(guard.canActivate(crearContexto([RolSistema.PROFESOR]))).toBe(true);
+  });
+
+  it('deniega acceso si la lista de roles del usuario está vacía (todos los roles fueron revocados)', () => {
+    reflector.getAllAndOverride.mockReturnValue([RolSistema.PROFESOR]);
+
+    expect(() => guard.canActivate(crearContexto([]))).toThrow(
+      ForbiddenException,
+    );
+  });
 });

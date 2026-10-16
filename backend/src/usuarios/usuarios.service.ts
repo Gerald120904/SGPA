@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
@@ -14,7 +15,13 @@ import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { UsuarioRol } from './entities/usuario-rol.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
-import { obtenerPermisosPredeterminadosPorRoles } from '../permisos/constants/plantillas-permisos.constant';
+import { UsuarioPermisoExcepcion } from '../permisos/entities/usuario-permiso-excepcion.entity';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import {
+  obtenerPermisosPredeterminadosPorRoles,
+  PERMISOS_PREDETERMINADOS_POR_ROL,
+} from '../permisos/constants/plantillas-permisos.constant';
+import { PermisosService } from '../permisos/permisos.service';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
 
@@ -32,6 +39,8 @@ export class UsuariosService {
     @InjectRepository(Carrera)
     private readonly carreraRepository: Repository<Carrera>,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly permisosService?: PermisosService,
   ) {}
 
   private normalizarCampoRequerido(valor: string, etiqueta: string): string {
@@ -253,16 +262,76 @@ export class UsuariosService {
           ),
         );
 
-        if (permisosFinales.length > 0) {
-          await permisosRepository.save(
-            permisosFinales.map((permiso) =>
-              permisosRepository.create({
-                usuarioId: guardado.id,
-                permiso,
-                activo: true,
-              }),
-            ),
+        if (this.permisosService?.esPoliticaOpcionBActiva()) {
+          if (dto.permisos && !dto.roles.includes(RolSistema.ADMIN_GLOBAL)) {
+            const basePlantilla = new Set<PermisoSistema>();
+            for (const r of roles) {
+              for (
+                const p of PERMISOS_PREDETERMINADOS_POR_ROL[
+                  r.nombre as RolSistema
+                ] || []
+              ) {
+                basePlantilla.add(p);
+              }
+            }
+            const deseados = new Set(dto.permisos);
+            const excepcionesPorCrear: UsuarioPermisoExcepcion[] = [];
+            let repoExc: Repository<UsuarioPermisoExcepcion> | null = null;
+            try {
+              repoExc = manager.getRepository(UsuarioPermisoExcepcion);
+            } catch {
+              repoExc = null;
+            }
+
+            if (repoExc) {
+              for (const p of basePlantilla) {
+                if (!deseados.has(p)) {
+                  excepcionesPorCrear.push(
+                    repoExc.create({
+                      usuarioId: guardado.id,
+                      permiso: p,
+                      tipo: 'DENEGAR',
+                      motivo: 'Exclusión inicial al crear usuario',
+                      asignadoPorUsuarioId: null,
+                    }),
+                  );
+                }
+              }
+              for (const p of deseados) {
+                if (!basePlantilla.has(p)) {
+                  excepcionesPorCrear.push(
+                    repoExc.create({
+                      usuarioId: guardado.id,
+                      permiso: p,
+                      tipo: 'CONCEDER',
+                      motivo: 'Concesión inicial al crear usuario',
+                      asignadoPorUsuarioId: null,
+                    }),
+                  );
+                }
+              }
+              if (excepcionesPorCrear.length > 0) {
+                await repoExc.save(excepcionesPorCrear);
+              }
+            }
+          }
+          await this.permisosService?.sincronizarDobleEscritura(
+            manager,
+            guardado.id,
+            new Set(permisosFinales),
           );
+        } else {
+          if (permisosFinales.length > 0) {
+            await permisosRepository.save(
+              permisosFinales.map((permiso) =>
+                permisosRepository.create({
+                  usuarioId: guardado.id,
+                  permiso,
+                  activo: true,
+                }),
+              ),
+            );
+          }
         }
 
         if (carrerasValidadas.length > 0) {
@@ -410,12 +479,29 @@ export class UsuariosService {
     }
 
     try {
-      await this.usuarioRolRepository.save(
-        this.usuarioRolRepository.create({
-          usuarioId: id,
-          rolId: rol.id,
-        }),
-      );
+      if (this.permisosService?.esPoliticaOpcionBActiva()) {
+        await this.dataSource.transaction(async (manager) => {
+          const usuarioRolRepo = manager.getRepository(UsuarioRol);
+          await usuarioRolRepo.save(
+            usuarioRolRepo.create({
+              usuarioId: id,
+              rolId: rol.id,
+            }),
+          );
+
+          await this.permisosService?.sincronizarPermisosUsuarioEnTransaccion(
+            manager,
+            id,
+          );
+        });
+      } else {
+        await this.usuarioRolRepository.save(
+          this.usuarioRolRepository.create({
+            usuarioId: id,
+            rolId: rol.id,
+          }),
+        );
+      }
     } catch (error) {
       this.relanzarErrorPersistencia(error);
     }
@@ -462,6 +548,13 @@ export class UsuariosService {
         await profesorCarreras.delete({
           profesorUsuarioId: id,
         });
+      }
+
+      if (this.permisosService?.esPoliticaOpcionBActiva()) {
+        await this.permisosService?.sincronizarPermisosUsuarioEnTransaccion(
+          manager,
+          id,
+        );
       }
     });
 
