@@ -6,10 +6,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { EstadoPerfilProfesor } from '../perfiles-academicos/constants/estado-perfil-profesor.constant';
 import { EstadoCumplimientoRequisito } from './constants/estado-cumplimiento-requisito.constant';
 import { EstadoAtestadoProfesor } from './constants/estado-atestado-profesor.constant';
@@ -76,6 +78,15 @@ describe('ProfesoresController', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
+          },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+            })),
           },
         },
         {

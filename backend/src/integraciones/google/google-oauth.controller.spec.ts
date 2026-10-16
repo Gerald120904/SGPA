@@ -13,6 +13,8 @@ import { RolSistema } from '../../auth/constants/roles.constants';
 
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Usuario } from '../../usuarios/entities/usuario.entity';
 
 describe('GoogleOauthController', () => {
   let controller: GoogleOauthController;
@@ -59,6 +61,15 @@ describe('GoogleOauthController', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue('test-jwt-secret'),
+          },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+            })),
           },
         },
         Reflector,

@@ -2,9 +2,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
@@ -45,6 +47,15 @@ describe('PeriodosAcademicosController', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
+          },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+            })),
           },
         },
         {
