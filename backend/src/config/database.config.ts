@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { AddOptativeRuleCounts2026101500000 } from '../migrations/2026101500000-AddOptativeRuleCounts';
 
 const TEST_DATABASE = 'sgpa_test';
 
@@ -49,6 +50,8 @@ export function crearConfiguracionBaseDatos(
     database,
     autoLoadEntities: true,
     synchronize,
+    migrations: [AddOptativeRuleCounts2026101500000],
+    migrationsRun: false,
   };
 }
 

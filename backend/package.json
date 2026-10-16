@@ -19,6 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:db:prepare": "npm run build && node scripts/prepare-test-schema.js",
+    "db:migrate:apply": "npm run build && node scripts/run-migrations.js --apply",
     "seed:test": "npm run build && node scripts/seed-test-data.js",
     "test:integration:sgpa": "node scripts/run-integration-audit.js",
     "start:test": "npm run build && node scripts/run-test-backend.js",
