@@ -569,25 +569,5 @@ describe('SGPA-QA-003: Pruebas Unitarias de la Política Opción B', () => {
     });
   });
 
-  /**
-   * Identificación clara de pruebas pendientes de implementación física / BD
-   * según requerimiento 7 del usuario.
-   */
-  describe('8. Pruebas Pendientes de Integración en Base de Datos (Marcadas como pendientes)', () => {
-    it.todo(
-      '[PENDIENTE MIGRACIÓN] La tabla usuario_permiso_excepciones persiste restricciones UNIQUE (usuario_id, permiso)',
-    );
-
-    it.todo(
-      '[PENDIENTE MIGRACIÓN] TypeORM UsuarioPermisoExcepcion actualiza correctamente la entidad en MySQL',
-    );
-
-    it.todo(
-      '[PENDIENTE MIGRACIÓN] PermisosService.reemplazarPermisos ejecuta el cálculo diferencial y persiste en usuario_permiso_excepciones dentro de una transacción',
-    );
-
-    it.todo(
-      '[PENDIENTE MIGRACIÓN] PermisosGuard resuelve permisos con la tabla de excepciones tras ejecutar la migración autorizada por el Product Owner',
-    );
-  });
+  // Persistencia MySQL real: permisos-opcion-b.mysql.integration.spec.ts.
 });
