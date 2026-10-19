@@ -295,7 +295,7 @@ export class PlanAsignaturasService {
       curso: null,
       nivel: dto.nivel,
       ciclo: dto.ciclo,
-      orden: dto.orden,
+      orden: dto.orden ?? 0,
       creditos: dto.creditos,
       horasTeoria: dto.horasTeoria ?? null,
       horasPractica: dto.horasPractica ?? null,
@@ -352,7 +352,24 @@ export class PlanAsignaturasService {
       },
     );
 
-    const guardada = await this.asignaturaRepository.save(asignatura);
+    const guardada = await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(PlanEstudio).findOne({
+        where: { id: planId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const repository = manager.getRepository(PlanAsignatura);
+      const [ultima] = await repository.find({
+        where: { planEstudioId: planId, nivel: dto.nivel, ciclo: dto.ciclo },
+        order: { orden: 'DESC' },
+        take: 1,
+      });
+      const siguiente = Number(ultima?.orden || 0) + 1;
+      if (siguiente > 200) {
+        throw new ConflictException('El ciclo alcanzó el orden máximo permitido.');
+      }
+      asignatura.orden = siguiente;
+      return repository.save(asignatura);
+    });
     return this.obtenerAsignatura(planId, guardada.id);
   }
 
@@ -372,6 +389,10 @@ export class PlanAsignaturasService {
     const preparadas: PlanAsignatura[] = [];
 
     for (const asignaturaDto of dto.asignaturas) {
+      if (!Number.isInteger(asignaturaDto.orden) ||
+          asignaturaDto.orden! < 1 || asignaturaDto.orden! > 200) {
+        throw new BadRequestException('La carga masiva requiere el orden de cada asignatura.');
+      }
       preparadas.push(await this.prepararAsignatura(plan, asignaturaDto));
     }
 

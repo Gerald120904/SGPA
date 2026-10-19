@@ -301,6 +301,7 @@ let reglaOptativasPlan = {
 let planSeleccionado = null;
 let instanciaActual = 0;
 let vistaDetallePlan = "LISTA";
+let vistaPapeleraPlan = false;
 let observerMalla = null;
 let frameDibujoMalla = null;
 let mallaAsignaturaSeleccionadaId = null;
@@ -1115,6 +1116,7 @@ async function alternarEstado(plan) {
 
 async function abrirDetallePlan(plan) {
   vistaDetallePlan = "LISTA";
+  vistaPapeleraPlan = false;
   mallaAsignaturaSeleccionadaId = null;
   nivelPaginaPlan = 1;
   planSeleccionado = plan;
@@ -1227,6 +1229,7 @@ function volverListadoPlanes() {
   observerMalla?.disconnect();
   observerMalla = null;
   vistaDetallePlan = "LISTA";
+  vistaPapeleraPlan = false;
   mallaAsignaturaSeleccionadaId = null;
   nivelPaginaPlan = 1;
   planSeleccionado = null;
@@ -1380,6 +1383,21 @@ function obtenerAsignaturasVisibles() {
   return asignaturasPlan;
 }
 
+export function separarAsignaturasPlan(asignaturas) {
+  return {
+    activas: asignaturas.filter((asignatura) => asignatura.activo !== false),
+    papelera: asignaturas.filter((asignatura) => asignatura.activo === false),
+  };
+}
+
+export function ordenarAsignaturasMalla(asignaturas) {
+  return asignaturas.slice().sort(
+    (a, b) =>
+      Number(b.activo !== false) - Number(a.activo !== false) ||
+      Number(a.orden) - Number(b.orden),
+  );
+}
+
 function agruparAsignaturas(asignaturas = obtenerAsignaturasVisibles()) {
   const grupos = new Map();
 
@@ -1400,7 +1418,7 @@ function agruparAsignaturas(asignaturas = obtenerAsignaturasVisibles()) {
   return Array.from(grupos.values())
     .map((grupo) => ({
       ...grupo,
-      asignaturas: grupo.asignaturas.sort((a, b) => a.orden - b.orden),
+      asignaturas: ordenarAsignaturasMalla(grupo.asignaturas),
     }))
     .sort((a, b) => a.nivel - b.nivel || a.ciclo - b.ciclo);
 }
@@ -1885,15 +1903,39 @@ function renderizarPaginacionNiveles() {
 }
 
 function renderizarListaAsignaturas() {
-  const asignaturas = obtenerAsignaturasVisibles();
+  const { activas, papelera } = separarAsignaturasPlan(obtenerAsignaturasVisibles());
   nivelPaginaPlan = normalizarNivelPaginaPlan(nivelPaginaPlan);
 
   return `
     <div class="plan-level-list-page">
-      <div class="plan-levels">
-        ${renderizarNivelAcademico(nivelPaginaPlan, asignaturas)}
-      </div>
-      ${renderizarPaginacionNiveles()}
+      <button id="togglePapeleraPlanButton" class="sgpa-form-secondary" type="button"
+        aria-pressed="${vistaPapeleraPlan}">
+        ${vistaPapeleraPlan ? "Volver a asignaturas activas" : `Papelera (${papelera.length})`}
+      </button>
+      ${vistaPapeleraPlan
+        ? `<div class="plan-levels">
+            ${papelera.length
+              ? papelera
+                  .slice()
+                  .sort((a, b) =>
+                    Number(a.nivel) - Number(b.nivel) ||
+                    Number(a.ciclo) - Number(b.ciclo) ||
+                    Number(a.orden) - Number(b.orden))
+                  .map((asignatura) => `
+                    <section class="plan-cycle">
+                      <header class="plan-cycle-header">
+                        <h4>${escapeHtml(obtenerNombreAnioNivel(asignatura.nivel))} ·
+                          ${escapeHtml(obtenerNombreCiclo(asignatura.ciclo))}</h4>
+                      </header>
+                      ${renderizarAsignaturaLista(asignatura)}
+                    </section>`)
+                  .join("")
+              : '<div class="planes-message">La papelera está vacía.</div>'}
+          </div>`
+        : `<div class="plan-levels">
+            ${renderizarNivelAcademico(nivelPaginaPlan, activas)}
+          </div>
+          ${renderizarPaginacionNiveles()}`}
     </div>
   `;
 }
@@ -2779,7 +2821,15 @@ function renderizarEstadoGeneralRevision(validacion) {
 
 function formatearCodigoValidacion(codigo) {
   const nombres = {
+    ASIGNATURA_SIN_NOMBRE: "Asignatura sin nombre curricular",
+    ASIGNATURA_SIN_CODIGO: "Asignatura sin código curricular",
+    CODIGO_ASIGNATURA_DUPLICADO: "Código curricular duplicado",
     HORAS_NO_COINCIDEN: "Horas inconsistentes",
+    OPTATIVA_SIN_CLASIFICAR: "Optativa sin clasificar",
+    REGLA_OPTATIVAS_NO_CONFIGURADA: "Regla de optativas no configurada",
+    CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA: "Cantidad de optativas disciplinarias",
+    CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA: "Cantidad de optativas abiertas",
+    CANTIDAD_OPTATIVAS_SEDE_NO_CUMPLIDA: "Cantidad de optativas de sede",
     CURSO_DUPLICADO: "Curso duplicado",
     REQUISITO_POSTERIOR: "Requisito posterior",
     REQUISITO_INACTIVO: "Requisito inactivo",
@@ -2791,14 +2841,53 @@ function formatearCodigoValidacion(codigo) {
   return nombres[codigo] || codigo?.replaceAll("_", " ") || "Validación";
 }
 
-function renderizarItemRevision(item, tipo) {
+function obtenerSugerenciaRevision(codigo) {
+  const sugerencias = {
+    ASIGNATURA_SIN_NOMBRE: "Revise el nombre curricular registrado para esta asignatura.",
+    ASIGNATURA_SIN_CODIGO: "Revise el código curricular registrado para esta asignatura.",
+    CODIGO_ASIGNATURA_DUPLICADO: "Revise los códigos de las asignaturas activas del plan y corrija el duplicado.",
+    HORAS_NO_COINCIDEN: "Compare las horas totales con la suma de teoría, práctica, laboratorio, gira y estudio independiente.",
+    OPTATIVA_SIN_CLASIFICAR: "Clasifique la optativa como disciplinaria, abierta o de sede.",
+    REGLA_OPTATIVAS_NO_CONFIGURADA: "Revise la cantidad y clasificación de optativas activas y configure la regla del plan.",
+    CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA: "Compare la cantidad disciplinaria configurada con las asignaturas optativas activas de esa clasificación.",
+    CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA: "Compare la cantidad abierta configurada con las asignaturas optativas activas de esa clasificación.",
+    CANTIDAD_OPTATIVAS_SEDE_NO_CUMPLIDA: "Compare la cantidad de sede configurada con las asignaturas optativas activas de esa clasificación.",
+    REQUISITO_INACTIVO: "Revise el estado de la asignatura y de la relación de requisito asociada.",
+    REQUISITO_POSTERIOR: "Revise la ubicación por nivel y ciclo del requisito y la relación registrada.",
+    CICLO_REQUISITOS: "Revise las relaciones de requisitos del plan y elimine la dependencia circular.",
+    SALIDA_SIN_ASIGNATURAS: "Revise las materias activas asociadas a esta salida académica.",
+    CREDITOS_SALIDA_NO_COINCIDEN: "Compare los créditos requeridos con los créditos de las materias activas asociadas.",
+  };
+
+  return sugerencias[codigo] || "Revise la regla académica indicada y los datos relacionados en el plan.";
+}
+
+export function obtenerContextoItemRevision(
+  item,
+  asignaturas = asignaturasPlan,
+  salidas = salidasAcademicas,
+) {
+  const asignatura = item.asignaturaId
+    ? asignaturas.find((registro) => Number(registro.id) === Number(item.asignaturaId))
+    : null;
+  const salida = item.salidaId
+    ? salidas.find((registro) => Number(registro.id) === Number(item.salidaId))
+    : null;
+  return asignatura
+    ? obtenerDatosAsignatura(asignatura).nombre
+    : salida?.nombre || null;
+}
+
+export function renderizarItemRevision(item, tipo, contexto = obtenerContextoItemRevision(item)) {
   const esError = tipo === "ERROR";
   return `
     <article class="plan-review-item ${esError ? "is-error" : "is-warning"}">
       <div class="plan-review-item-icon"><i data-lucide="${esError ? "circle-x" : "triangle-alert"}"></i></div>
       <div class="plan-review-item-content">
         <strong>${escapeHtml(formatearCodigoValidacion(item.codigo))}</strong>
+        ${contexto ? `<small>Elemento relacionado: ${escapeHtml(contexto)}</small>` : ""}
         <p>${escapeHtml(item.mensaje || "Inconsistencia detectada.")}</p>
+        <p class="plan-review-item-guidance"><strong>Qué revisar:</strong> ${escapeHtml(obtenerSugerenciaRevision(item.codigo))}</p>
       </div>
     </article>`;
 }
@@ -3463,20 +3552,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
   const cicloInicial = editando
     ? Number(asignatura.ciclo || 1)
     : Number(valoresIniciales.ciclo || 1);
-  const asignaturasMismoCiclo = asignaturasPlan.filter(
-    (item) =>
-      Number(item.nivel) === nivelInicial &&
-      Number(item.ciclo) === cicloInicial,
-  );
-
-  const ordenSugerido = asignaturasMismoCiclo.length
-    ? Math.max(
-        ...asignaturasMismoCiclo.map((item) => Number(item.orden || 0)),
-      ) + 1
-    : 1;
-  const ordenInicial = editando
-    ? Number(asignatura.orden || 1)
-    : ordenSugerido;
+  const ordenInicial = editando ? Number(asignatura.orden || 1) : null;
 
   const reglaOptativas = obtenerReglaOptativasActual();
   const excluirIdCupo = editando && asignatura?.activo !== false
@@ -3557,7 +3633,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
         >
       </label>
 
-      <label>
+      ${editando ? `<label>
         <span>Orden</span>
         <input
           id="asignaturaOrden"
@@ -3567,7 +3643,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
           value="${ordenInicial}"
           required
         >
-      </label>
+      </label>` : ""}
 
       <label class="sgpa-form-wide">
         <span>Tipo</span>
@@ -3971,9 +4047,9 @@ async function guardarAsignatura(asignatura, cerrar) {
   const creditos = Number(
     document.getElementById("asignaturaCreditos")?.value,
   );
-  const orden = Number(
-    document.getElementById("asignaturaOrden")?.value,
-  );
+  const orden = editando
+    ? Number(document.getElementById("asignaturaOrden")?.value)
+    : undefined;
 
   if (
     !Number.isInteger(creditos) ||
@@ -3987,11 +4063,11 @@ async function guardarAsignatura(asignatura, cerrar) {
     return;
   }
 
-  if (
+  if (editando && (
     !Number.isInteger(orden) ||
     orden < 1 ||
     orden > MAX_ORDEN_ASIGNATURA
-  ) {
+  )) {
     errorBox.textContent =
       `El orden debe estar entre 1 y ${MAX_ORDEN_ASIGNATURA}.`;
     errorBox.classList.remove("hidden");
@@ -4029,7 +4105,7 @@ async function guardarAsignatura(asignatura, cerrar) {
     nivel: Number(document.getElementById("asignaturaNivel")?.value),
     ciclo: Number(document.getElementById("asignaturaCiclo")?.value),
     creditos,
-    orden,
+    ...(editando ? { orden } : {}),
     tipo,
     tipoOptativa: tipo === "OPTATIVA" ? tipoOptativa : null,
   };
@@ -4301,6 +4377,12 @@ function conectarEventosDetallePlan(contenedor) {
           return;
         }
         vistaDetallePlan = vista;
+        renderizarDetallePlan();
+        return;
+      }
+
+      if (target.closest("#togglePapeleraPlanButton")) {
+        vistaPapeleraPlan = !vistaPapeleraPlan;
         renderizarDetallePlan();
         return;
       }
@@ -5226,6 +5308,35 @@ async function guardarRequisitosRapidos() {
   }
 }
 
+function actualizarListaRequisitos(asignatura) {
+  const lista = document.querySelector("#requisitoForm .plan-requirements-list");
+  const contador = document.querySelector("#requisitoForm .plan-requirements-count");
+  if (!lista || !contador) return;
+
+  const relaciones = obtenerRequisitosDeAsignatura(asignatura.id);
+  const filas = relaciones.map((relacion) => {
+    const requisito = asignaturasPlan.find(
+      (item) => Number(item.id) === Number(relacion.requisitoAsignaturaId),
+    ) || relacion.requisitoAsignatura;
+    const datos = requisito
+      ? obtenerDatosAsignatura(requisito)
+      : { codigo: "", nombre: "Asignatura no disponible" };
+    return `
+      <article class="plan-requirement-row">
+        <div class="plan-requirement-row-info">
+          <span class="plan-requirement-type ${relacion.tipo === "CORREQUISITO" ? "plan-requirement-coreq" : ""}">
+            ${relacion.tipo === "CORREQUISITO" ? "Correquisito" : "Requisito"}
+          </span>
+          <strong>${datos.codigo ? `${escapeHtml(datos.codigo)} - ` : ""}${escapeHtml(datos.nombre)}</strong>
+        </div>
+        ${puedeGestionarPlanes() ? `<button class="plan-requirement-delete" data-eliminar-requisito="${relacion.id}" type="button" aria-label="Quitar ${escapeHtml(datos.nombre)}"><i data-lucide="trash-2" aria-hidden="true"></i><span>Quitar</span></button>` : ""}
+      </article>`;
+  });
+  lista.innerHTML = filas.length ? filas.join("") : `<div class="plan-requirements-empty plan-requirements-empty-modern">Sin relaciones académicas.</div>`;
+  contador.textContent = String(relaciones.length);
+  renderizarIconos();
+}
+
 function abrirFormularioRequisitos(asignatura) {
   const dialog = document.getElementById("asignaturaDialog");
   const content = document.getElementById("asignaturaDialogContent");
@@ -5439,13 +5550,14 @@ function abrirFormularioRequisitos(asignatura) {
         await agregarRequisitoFrontend(asignatura);
       });
 
-    document.querySelectorAll("[data-eliminar-requisito]").forEach((button) => {
-      button.addEventListener("click", async () => {
+    document.querySelector("#requisitoForm .plan-requirements-list")?.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-eliminar-requisito]");
+      if (button) {
         await eliminarRequisitoFrontend(
           Number(button.dataset.eliminarRequisito),
           asignatura,
         );
-      });
+      }
     });
   }
 }
@@ -5489,9 +5601,15 @@ async function agregarRequisitoFrontend(asignatura) {
       );
     }
 
-    await recargarRequisitosPlan();
+    await recargarRequisitosPlan({ preservarDialogo: true });
     const actualizada = obtenerAsignaturaPorId(asignatura.id) || asignatura;
-    abrirFormularioRequisitos(actualizada);
+    actualizarListaRequisitos(actualizada);
+    button.focus();
+    mostrarExito({
+      titulo: "Relación agregada",
+      mensaje: "El requisito o correquisito se registró correctamente.",
+      duracion: 2500,
+    });
   } catch (error) {
     const actualErrorBox = document.getElementById("requisitosFormError");
     if (actualErrorBox) {
@@ -5552,9 +5670,10 @@ async function eliminarRequisitoFrontend(relacionId, asignatura) {
       );
     }
 
-    await recargarRequisitosPlan();
+    await recargarRequisitosPlan({ preservarDialogo: true });
     const actualizada = obtenerAsignaturaPorId(asignatura.id) || asignatura;
-    abrirFormularioRequisitos(actualizada);
+    actualizarListaRequisitos(actualizada);
+    document.getElementById("requisitoAsignatura")?.focus();
   } catch (error) {
     const errorBox = document.getElementById("requisitosFormError");
 
@@ -5570,12 +5689,13 @@ async function eliminarRequisitoFrontend(relacionId, asignatura) {
   }
 }
 
-async function recargarRequisitosPlan() {
+async function recargarRequisitosPlan({ preservarDialogo = false } = {}) {
   if (!planSeleccionado) {
     return;
   }
 
-  const resultado = await listarPlanRequisitos(planSeleccionado.id);
+  const planId = planSeleccionado.id;
+  const resultado = await listarPlanRequisitos(planId);
 
   if (!resultado?.ok) {
     throw new Error(
@@ -5587,6 +5707,18 @@ async function recargarRequisitosPlan() {
     ? resultado.requisitos
     : [];
   await recargarResumenPlan();
+  const dialog = document.getElementById("asignaturaDialog");
+  if (preservarDialogo && dialog?.open) {
+    if (!dialog.dataset.requisitosDetallePendiente) {
+      dialog.dataset.requisitosDetallePendiente = "true";
+      dialog.addEventListener("close", () => {
+        if (dialog.isConnected && planSeleccionado?.id === planId) {
+          renderizarDetallePlan();
+        }
+      }, { once: true });
+    }
+    return;
+  }
   renderizarDetallePlan();
 }
 

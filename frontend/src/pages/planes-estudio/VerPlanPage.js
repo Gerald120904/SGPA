@@ -479,23 +479,6 @@ export function VerPlanPage({
             title: "Revisar consistencia del plan",
           })}
 
-          ${
-            puedeGestionar
-              ? renderizarHerramienta({
-                  id: "importarExcelPlanButton",
-                  icono: "import",
-                  texto: "Importar",
-                  title: "Importar plan desde Excel",
-                })
-              : ""
-          }
-
-          ${renderizarHerramienta({
-            id: "plantillaExcelPlanButton",
-            icono: "book-marked",
-            texto: "Plantilla",
-            title: "Descargar plantilla",
-          })}
         </div>
       </section>
 

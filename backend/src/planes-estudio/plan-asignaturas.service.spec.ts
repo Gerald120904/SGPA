@@ -25,7 +25,7 @@ describe('PlanAsignaturasService', () => {
   };
   let planRepository: { findOne: jest.Mock };
   let reglaOptativaRepository: { findOne: jest.Mock };
-  let transactionRepository: { save: jest.Mock };
+  let transactionRepository: { save: jest.Mock; find: jest.Mock };
   let dataSource: { transaction: jest.Mock };
 
   const carrera = {
@@ -99,11 +99,15 @@ describe('PlanAsignaturasService', () => {
       cantidadSede: 200,
     });
     asignaturaRepository.count.mockResolvedValue(0);
-    transactionRepository = { save: jest.fn() };
+    transactionRepository = {
+      save: jest.fn((...args) => asignaturaRepository.save(...args)),
+      find: jest.fn().mockResolvedValue([]),
+    };
     dataSource = {
       transaction: jest.fn(async (callback) =>
         callback({
-          getRepository: jest.fn().mockReturnValue(transactionRepository),
+          getRepository: jest.fn((entity) =>
+            entity === PlanEstudio ? planRepository : transactionRepository),
         }),
       ),
     };
@@ -179,6 +183,41 @@ describe('PlanAsignaturasService', () => {
       }),
     );
     expect(resultado).toEqual(guardada);
+  });
+
+  it('calcula el orden bajo bloqueo del plan e ignora el orden recibido', async () => {
+    planRepository.findOne.mockResolvedValue(plan);
+    asignaturaRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(crearAsignatura({ orden: 5 }));
+    transactionRepository.find.mockResolvedValue([
+      crearAsignatura({ orden: 4 }),
+    ]);
+    asignaturaRepository.save.mockImplementation(async (asignatura) => ({
+      ...asignatura,
+      id: 10,
+    }));
+    await service.crear(1, {
+      nivel: 1,
+      ciclo: 1,
+      orden: 99,
+      creditos: 3,
+      tipo: TipoPlanAsignatura.OBLIGATORIA,
+      codigoReferencia: 'EIF300',
+      nombreReferencia: 'Curso nuevo',
+    });
+    expect(planRepository.findOne).toHaveBeenCalledWith({
+      where: { id: 1 },
+      lock: { mode: 'pessimistic_write' },
+    });
+    expect(transactionRepository.find).toHaveBeenCalledWith({
+      where: { planEstudioId: 1, nivel: 1, ciclo: 1 },
+      order: { orden: 'DESC' },
+      take: 1,
+    });
+    expect(transactionRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ orden: 5 }),
+    );
   });
 
   it('rechaza un código duplicado para asignaturas OBLIGATORIAS dentro del mismo plan', async () => {
