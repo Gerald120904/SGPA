@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { TipoReservaAula } from '../constants/tipo-reserva-aula.constant';
+import { fechaHoraInstitucionalTransformer } from '../fecha-hora-institucional.transformer';
 import { Aula } from './aula.entity';
 
 @Entity({ name: 'reservas_aulas' })
@@ -55,12 +56,14 @@ export class ReservaAula {
   @Column({
     name: 'fecha_hora_inicio',
     type: 'datetime',
+    transformer: fechaHoraInstitucionalTransformer,
   })
   fechaHoraInicio!: Date;
 
   @Column({
     name: 'fecha_hora_fin',
     type: 'datetime',
+    transformer: fechaHoraInstitucionalTransformer,
   })
   fechaHoraFin!: Date;
 
