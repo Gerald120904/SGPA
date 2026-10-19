@@ -91,6 +91,13 @@ describe('RolesController', () => {
   });
 
   it('responde 200 para ADMIN_GLOBAL', async () => {
+    const rolesOficiales = [
+      { id: 9, nombre: 'ADMIN_GLOBAL', activo: true },
+      { id: 11, nombre: 'COORDINADOR', activo: true },
+      { id: 12, nombre: 'PROFESOR', activo: true },
+      { id: 13, nombre: 'ASISTENTE_ESTUDIANTIL', activo: true },
+    ];
+    rolesService.listar.mockResolvedValueOnce(rolesOficiales);
     const token = await jwtService.signAsync({
       sub: 1,
       correo: 'admin@sgpa.local',
@@ -100,7 +107,7 @@ describe('RolesController', () => {
     await request(app.getHttpServer())
       .get('/roles')
       .set('Authorization', `Bearer ${token}`)
-      .expect(200, []);
+      .expect(200, rolesOficiales);
 
     expect(rolesService.listar).toHaveBeenCalledTimes(1);
   });

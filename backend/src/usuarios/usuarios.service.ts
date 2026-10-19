@@ -4,10 +4,13 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { DataSource, In, Repository } from 'typeorm';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { DataSource, In, MoreThan, Repository } from 'typeorm';
+import { MailService } from '../mail/mail.service';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Rol } from '../roles/entities/rol.entity';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
@@ -24,6 +27,7 @@ import {
 import { PermisosService } from '../permisos/permisos.service';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
+import { InvitacionOutboxService } from './invitacion-outbox.service';
 
 @Injectable()
 export class UsuariosService {
@@ -41,6 +45,10 @@ export class UsuariosService {
     private readonly dataSource: DataSource,
     @Optional()
     private readonly permisosService?: PermisosService,
+    @Optional()
+    private readonly mailService?: MailService,
+    @Optional()
+    private readonly invitaciones?: InvitacionOutboxService,
   ) {}
 
   private normalizarCampoRequerido(valor: string, etiqueta: string): string {
@@ -177,7 +185,54 @@ export class UsuariosService {
     return this.serializarUsuario(usuario);
   }
 
-  async crear(dto: CrearUsuarioDto) {
+  private origenInvitacion(): URL {
+    if (!this.mailService || !this.invitaciones) {
+      throw new BadRequestException('El servicio de invitaciones no está disponible.');
+    }
+    const esProduccion = process.env.NODE_ENV === 'production';
+    const base = process.env.SGPA_INVITATION_BASE_URL ||
+      (esProduccion ? '' : `http://127.0.0.1:${process.env.PORT || 3000}`);
+    try {
+      const origen = new URL(base);
+      const hostname = origen.hostname.toLowerCase().replace(/\.$/, '');
+      const esLocal = hostname === 'localhost' || hostname === '[::1]' ||
+        hostname.endsWith('.localhost') || /^127\./.test(hostname);
+      if (origen.username || origen.password || origen.search || origen.hash ||
+        (esProduccion && esLocal) ||
+        (origen.protocol !== 'https:' &&
+          (esProduccion || origen.protocol !== 'http:' || !esLocal))) {
+        throw new Error('Origen inseguro');
+      }
+      return new URL('/auth/invitacion', origen);
+    } catch {
+      throw new BadRequestException('Configure una URL pública HTTPS para las invitaciones.');
+    }
+  }
+
+  async crearConInvitacion(dto: CrearUsuarioDto) {
+    const url = this.origenInvitacion();
+    await this.invitaciones!.verificarDestino();
+    const token = randomBytes(32).toString('hex');
+    url.hash = new URLSearchParams({
+      correo: dto.correo.trim().toLowerCase(),
+      token,
+    }).toString();
+    return this.crear(
+      { ...dto, password: randomBytes(32).toString('hex') },
+      { tokenHash: createHash('sha256').update(token).digest('hex'),
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        url: url.toString() },
+    );
+  }
+
+  async crear(
+    dto: CrearUsuarioDto,
+    invitacion?: { tokenHash: string; expiresAt: Date; url: string },
+  ) {
+    if (!dto.password) {
+      throw new BadRequestException('La contraseña es obligatoria.');
+    }
+    const password = dto.password;
     const cedula = this.normalizarCampoRequerido(dto.cedula, 'cédula');
     const nombres = this.normalizarCampoRequerido(dto.nombres, 'nombre');
     const apellido1 = this.normalizarCampoRequerido(
@@ -244,11 +299,11 @@ export class UsuariosService {
           apellido1,
           apellido2: dto.apellido2?.trim() || null,
           correo,
-          passwordHash: await bcrypt.hash(dto.password, 10),
-          activo: true,
+          passwordHash: await bcrypt.hash(password, 10),
+          activo: !invitacion,
           ultimoAcceso: null,
-          passwordResetTokenHash: null,
-          passwordResetExpiresAt: null,
+          passwordResetTokenHash: invitacion?.tokenHash ?? null,
+          passwordResetExpiresAt: invitacion?.expiresAt ?? null,
         });
 
         const guardado = await usuarios.save(usuario);
@@ -345,13 +400,41 @@ export class UsuariosService {
           );
         }
 
+        if (invitacion) await this.invitaciones!.crearPendiente(
+          manager, guardado.id, invitacion.tokenHash,
+          invitacion.url, invitacion.expiresAt,
+        );
         return guardado.id;
       });
     } catch (error) {
       this.relanzarErrorPersistencia(error);
     }
 
+    if (invitacion) {
+      const enviado = await this.invitaciones!.procesarUsuario(usuarioId);
+      if (enviado !== 'ENVIADA') {
+        throw new ServiceUnavailableException(
+          'Usuario inactivo registrado; la invitación requiere recuperación administrativa.',
+        );
+      }
+    }
     return this.obtenerPorId(usuarioId);
+  }
+
+  async reintentarInvitacion(id: number) {
+    const origen = this.origenInvitacion();
+    const estado = await this.invitaciones!.rotarYReintentar(id, origen);
+    if (estado !== 'ENVIADA') {
+      throw new ServiceUnavailableException(
+        'La invitación requiere una nueva revisión administrativa.',
+      );
+    }
+    return { estado };
+  }
+
+  async obtenerEstadoInvitacion(id: number) {
+    await this.obtenerEntidadPorId(id);
+    return this.invitaciones!.obtenerEstado(id);
   }
 
   async actualizar(id: number, dto: ActualizarUsuarioDto) {
@@ -443,7 +526,13 @@ export class UsuariosService {
   }
 
   async cambiarEstado(id: number, activo: boolean, usuarioActualId: number) {
-    await this.obtenerEntidadPorId(id);
+    const usuario = await this.obtenerEntidadPorId(id);
+
+    if (activo && !usuario.activo && usuario.passwordResetTokenHash) {
+      throw new BadRequestException(
+        'La cuenta debe completar su invitación antes de activarse.',
+      );
+    }
 
     if (id === usuarioActualId && !activo) {
       throw new BadRequestException('No puede desactivar su propia cuenta.');
@@ -609,6 +698,39 @@ export class UsuariosService {
       passwordResetTokenHash: null,
       passwordResetExpiresAt: null,
     });
+  }
+
+  async aceptarInvitacion(correo: string, token: string, password: string) {
+    const error = new BadRequestException('Invitación inválida o expirada.');
+    if (!/^[a-f0-9]{64}$/.test(token)) throw error;
+    const usuario = await this.buscarPorCorreo(correo.trim().toLowerCase());
+    if (!usuario || usuario.activo || !usuario.passwordResetTokenHash ||
+        !usuario.passwordResetExpiresAt ||
+        usuario.passwordResetExpiresAt.getTime() <= Date.now()) {
+      throw error;
+    }
+    const esperado = Buffer.from(usuario.passwordResetTokenHash, 'hex');
+    const recibido = Buffer.from(createHash('sha256').update(token).digest('hex'), 'hex');
+    if (esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) {
+      throw error;
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    const resultado = await this.usuarioRepository.update(
+      {
+        id: usuario.id,
+        activo: false,
+        passwordResetTokenHash: usuario.passwordResetTokenHash,
+        passwordResetExpiresAt: MoreThan(new Date()),
+      },
+      {
+        passwordHash,
+        activo: true,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+      },
+    );
+    if (resultado.affected !== 1) throw error;
+    return { message: 'Contraseña establecida. Ya puede iniciar sesión.' };
   }
 
   async limpiarRecuperacionPassword(id: number): Promise<void> {

@@ -10,6 +10,9 @@ import { Rol } from '../roles/entities/rol.entity';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { PermisosModule } from '../permisos/permisos.module';
+import { MailModule } from '../mail/mail.module';
+import { InvitacionOutbox } from './entities/invitacion-outbox.entity';
+import { InvitacionOutboxService } from './invitacion-outbox.service';
 
 @Module({
   imports: [
@@ -20,12 +23,14 @@ import { PermisosModule } from '../permisos/permisos.module';
       Rol,
       ProfesorCarrera,
       Carrera,
+      InvitacionOutbox,
     ]),
     SecurityModule,
     PermisosModule,
+    MailModule,
   ],
   controllers: [UsuariosController],
-  providers: [UsuariosService],
+  providers: [UsuariosService, InvitacionOutboxService],
   exports: [UsuariosService],
 })
 export class UsuariosModule {}

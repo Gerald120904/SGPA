@@ -10,6 +10,7 @@ import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
 import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
+import { AceptarInvitacionDto } from './dto/aceptar-invitacion.dto';
 import { MailService } from '../mail/mail.service';
 import { RolSistema, ROLES_SISTEMA } from './constants/roles.constants';
 import { PermisosService } from '../permisos/permisos.service';
@@ -177,6 +178,14 @@ export class AuthService {
     return {
       message: 'La contraseña se actualizó correctamente.',
     };
+  }
+
+  async aceptarInvitacion(dto: AceptarInvitacionDto) {
+    return this.usuariosService.aceptarInvitacion(
+      dto.correo,
+      dto.token,
+      dto.password,
+    );
   }
 
   async perfil(usuarioId: number) {

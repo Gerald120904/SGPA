@@ -16,7 +16,9 @@ describe('UsuariosController', () => {
   const usuariosService = {
     listar: jest.fn(),
     obtenerPorId: jest.fn(),
-    crear: jest.fn(),
+    crearConInvitacion: jest.fn(),
+    obtenerEstadoInvitacion: jest.fn(),
+    reintentarInvitacion: jest.fn(),
     actualizar: jest.fn(),
     cambiarEstado: jest.fn(),
     asignarRol: jest.fn(),
@@ -81,7 +83,9 @@ describe('UsuariosController', () => {
     jest.clearAllMocks();
     usuariosService.listar.mockResolvedValue([]);
     usuariosService.obtenerPorId.mockResolvedValue({ id: 2 });
-    usuariosService.crear.mockResolvedValue({ id: 2 });
+    usuariosService.crearConInvitacion.mockResolvedValue({ id: 2 });
+    usuariosService.obtenerEstadoInvitacion.mockResolvedValue({ estado: 'PENDIENTE' });
+    usuariosService.reintentarInvitacion.mockResolvedValue({ estado: 'ENVIADA' });
     usuariosService.actualizar.mockResolvedValue({ id: 2 });
     usuariosService.cambiarEstado.mockResolvedValue({ id: 2 });
     usuariosService.asignarRol.mockResolvedValue({ id: 2 });
@@ -142,7 +146,6 @@ describe('UsuariosController', () => {
       nombres: 'Usuario',
       apellido1: 'Prueba',
       correo: 'usuario@sgpa.local',
-      password: 'ClaveSegura123',
       roles: ['PROFESOR'],
     };
 
@@ -152,7 +155,36 @@ describe('UsuariosController', () => {
       .send(dto)
       .expect(201, { id: 2 });
 
-    expect(usuariosService.crear).toHaveBeenCalledWith(dto);
+    expect(usuariosService.crearConInvitacion).toHaveBeenCalledWith(dto);
+  });
+
+  it('muestra una invitación pendiente sin afirmar que fue enviada', async () => {
+    const token = await jwtService.signAsync({
+      sub: 1, correo: 'admin@sgpa.local', roles: ['ADMIN_GLOBAL'],
+    });
+    await request(app.getHttpServer())
+      .get('/usuarios/2/invitacion')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200, { estado: 'PENDIENTE' });
+    expect(usuariosService.obtenerEstadoInvitacion).toHaveBeenCalledWith(2);
+  });
+
+  it('reintenta una invitación solo para ADMIN_GLOBAL', async () => {
+    const admin = await jwtService.signAsync({
+      sub: 1, correo: 'admin@sgpa.local', roles: ['ADMIN_GLOBAL'],
+    });
+    const coordinador = await jwtService.signAsync({
+      sub: 2, correo: 'coord@sgpa.local', roles: ['COORDINADOR'],
+    });
+    await request(app.getHttpServer())
+      .post('/usuarios/2/invitacion/reintentar')
+      .set('Authorization', `Bearer ${coordinador}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/usuarios/2/invitacion/reintentar')
+      .set('Authorization', `Bearer ${admin}`)
+      .expect(201, { estado: 'ENVIADA' });
+    expect(usuariosService.reintentarInvitacion).toHaveBeenCalledTimes(1);
   });
 
   it('consulta el detalle de un usuario', async () => {
@@ -226,7 +258,7 @@ describe('UsuariosController', () => {
       })
       .expect(400);
 
-    expect(usuariosService.crear).not.toHaveBeenCalled();
+    expect(usuariosService.crearConInvitacion).not.toHaveBeenCalled();
   });
 
   it('envía el usuario autenticado al cambiar estado', async () => {

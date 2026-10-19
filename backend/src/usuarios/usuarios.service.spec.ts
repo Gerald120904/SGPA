@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'node:crypto';
 import { DataSource, Repository } from 'typeorm';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Rol } from '../roles/entities/rol.entity';
@@ -120,6 +121,15 @@ describe('UsuariosService', () => {
     save: jest.Mock;
     delete: jest.Mock;
   };
+  const mailService = { enviarInvitacion: jest.fn() };
+  const invitaciones = {
+    verificarDestino: jest.fn(),
+    crearPendiente: jest.fn(),
+    procesarId: jest.fn(),
+    procesarUsuario: jest.fn(),
+    rotarYReintentar: jest.fn(),
+    obtenerEstado: jest.fn(),
+  };
 
   beforeEach(() => {
     usuarioRepository = {
@@ -183,6 +193,13 @@ describe('UsuariosService', () => {
     dataSource = {
       transaction: jest.fn((callback) => callback(manager)),
     };
+    mailService.enviarInvitacion.mockReset().mockResolvedValue(undefined);
+    invitaciones.verificarDestino.mockReset().mockResolvedValue(undefined);
+    invitaciones.crearPendiente.mockReset().mockResolvedValue(undefined);
+    invitaciones.procesarId.mockReset().mockResolvedValue('ENVIADA');
+    invitaciones.procesarUsuario.mockReset().mockResolvedValue('ENVIADA');
+    invitaciones.rotarYReintentar.mockReset().mockResolvedValue('ENVIADA');
+    invitaciones.obtenerEstado.mockReset();
 
     service = new UsuariosService(
       usuarioRepository as unknown as Repository<Usuario>,
@@ -191,6 +208,9 @@ describe('UsuariosService', () => {
       profesorCarreraRepository as unknown as Repository<ProfesorCarrera>,
       carreraRepository as unknown as Repository<Carrera>,
       dataSource as unknown as DataSource,
+      undefined,
+      mailService as never,
+      invitaciones as never,
     );
   });
 
@@ -283,6 +303,158 @@ describe('UsuariosService', () => {
     ).resolves.toBe(true);
     expect(usuarioGuardado.correo).toBe('admin@sgpa.local');
     expect(resultado).not.toHaveProperty('passwordHash');
+  });
+
+  it('crea una cuenta inactiva e invita con token hash sin contraseña administrativa', async () => {
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(crearUsuario({ activo: false }));
+    txRolRepository.find.mockResolvedValue([rolAdmin]);
+    txUsuarioRepository.save.mockImplementation(async (usuario) => ({ ...usuario, id: 1 }));
+
+    const resultado = await service.crearConInvitacion({
+      cedula: '222222222',
+      nombres: 'Invitada',
+      apellido1: 'Prueba',
+      correo: 'invitada@sgpa.local',
+      roles: [RolSistema.ADMIN_GLOBAL],
+    });
+
+    const guardado = txUsuarioRepository.save.mock.calls[0][0];
+    const enlace = invitaciones.crearPendiente.mock.calls[0][3] as string;
+    const token = new URLSearchParams(new URL(enlace).hash.slice(1)).get('token')!;
+    expect(guardado.activo).toBe(false);
+    expect(guardado.passwordResetTokenHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(guardado.passwordResetTokenHash).not.toBe(token);
+    expect(guardado.passwordResetExpiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(resultado).not.toHaveProperty('passwordHash');
+    expect(resultado).not.toHaveProperty('passwordResetTokenHash');
+    expect(invitaciones.procesarUsuario).toHaveBeenCalledWith(1);
+    expect(mailService.enviarInvitacion).not.toHaveBeenCalled();
+  });
+
+  it('si falla el correo, la transacción de alta falla sin entregar cuenta activa', async () => {
+    usuarioRepository.findOne.mockResolvedValue(null);
+    txRolRepository.find.mockResolvedValue([rolAdmin]);
+    txUsuarioRepository.save.mockImplementation(async (usuario) => ({ ...usuario, id: 1 }));
+    invitaciones.procesarUsuario.mockResolvedValue('INCIERTA');
+    await expect(service.crearConInvitacion({
+      cedula: '222222222',
+      nombres: 'Invitada',
+      apellido1: 'Prueba',
+      correo: 'invitada@sgpa.local',
+      roles: [RolSistema.ADMIN_GLOBAL],
+    })).rejects.toThrow('requiere recuperación administrativa');
+    expect(txUsuarioRepository.save.mock.calls[0][0].activo).toBe(false);
+    expect(invitaciones.crearPendiente).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['http://127.0.0.1:3000', 'production'],
+    ['https://127.0.0.2:3000', 'production'],
+    ['https://localhost:3000', 'production'],
+    ['https://a.localhost:3000', 'production'],
+    ['', 'production'],
+    ['http://sgpa.universidad.test', 'production'],
+    ['http://sgpa.universidad.test', 'development'],
+    ['https://usuario:clave@sgpa.universidad.test', 'production'],
+    ['https://sgpa.universidad.test/?token=previo', 'production'],
+  ])('rechaza origen inseguro %s en %s sin persistir ni enviar', async (base, entorno) => {
+    const anteriorEntorno = process.env.NODE_ENV;
+    const anteriorBase = process.env.SGPA_INVITATION_BASE_URL;
+    try {
+      process.env.NODE_ENV = entorno;
+      process.env.SGPA_INVITATION_BASE_URL = base;
+      await expect(service.crearConInvitacion({
+        cedula: '222222222',
+        nombres: 'Invitada',
+        apellido1: 'Prueba',
+        correo: 'invitada@sgpa.local',
+        roles: [RolSistema.ADMIN_GLOBAL],
+      })).rejects.toThrow('Configure una URL');
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(invitaciones.crearPendiente).not.toHaveBeenCalled();
+    } finally {
+      if (anteriorEntorno === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = anteriorEntorno;
+      if (anteriorBase === undefined) delete process.env.SGPA_INVITATION_BASE_URL;
+      else process.env.SGPA_INVITATION_BASE_URL = anteriorBase;
+    }
+  });
+
+  it('permite URL HTTPS remota y conserva el token fuera de la respuesta', async () => {
+    const anteriorEntorno = process.env.NODE_ENV;
+    const anteriorBase = process.env.SGPA_INVITATION_BASE_URL;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.SGPA_INVITATION_BASE_URL = 'https://sgpa.universidad.test/app';
+      usuarioRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(crearUsuario({ activo: false }));
+      txRolRepository.find.mockResolvedValue([rolAdmin]);
+      txUsuarioRepository.save.mockImplementation(async (usuario) => ({ ...usuario, id: 1 }));
+
+      const resultado = await service.crearConInvitacion({
+        cedula: '222222222',
+        nombres: 'Invitada',
+        apellido1: 'Prueba',
+        correo: 'invitada@sgpa.local',
+        roles: [RolSistema.ADMIN_GLOBAL],
+      });
+      const enlace = invitaciones.crearPendiente.mock.calls[0][3] as string;
+      expect(new URL(enlace).origin).toBe('https://sgpa.universidad.test');
+      expect(new URL(enlace).pathname).toBe('/auth/invitacion');
+      expect(enlace).toContain('#correo=');
+      expect(enlace).toContain('&token=');
+      expect(JSON.stringify(resultado)).not.toContain('token');
+      expect(JSON.stringify(resultado)).not.toContain('password');
+    } finally {
+      if (anteriorEntorno === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = anteriorEntorno;
+      if (anteriorBase === undefined) delete process.env.SGPA_INVITATION_BASE_URL;
+      else process.env.SGPA_INVITATION_BASE_URL = anteriorBase;
+    }
+  });
+
+  it('acepta una invitación una sola vez y activa con contraseña propia', async () => {
+    const token = 'a'.repeat(64);
+    const hash = createHash('sha256').update(token).digest('hex');
+    usuarioRepository.findOne.mockResolvedValue(crearUsuario({
+      activo: false,
+      passwordResetTokenHash: hash,
+      passwordResetExpiresAt: new Date(Date.now() + 60_000),
+    }));
+    usuarioRepository.update.mockResolvedValueOnce({ affected: 1 });
+    await expect(service.aceptarInvitacion('admin@sgpa.local', token, 'ClavePropia123')).resolves.toHaveProperty('message');
+    const cambios = usuarioRepository.update.mock.calls[0][1];
+    expect(cambios).toMatchObject({
+      activo: true,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    });
+    await expect(bcrypt.compare('ClavePropia123', cambios.passwordHash)).resolves.toBe(true);
+    usuarioRepository.update.mockResolvedValueOnce({ affected: 0 });
+    await expect(service.aceptarInvitacion('admin@sgpa.local', token, 'ClavePropia123')).rejects.toThrow('Invitación inválida');
+  });
+
+  it('rechaza invitaciones caducadas o con token diferente sin activar la cuenta', async () => {
+    const token = 'a'.repeat(64);
+    const hash = createHash('sha256').update(token).digest('hex');
+    usuarioRepository.findOne.mockResolvedValueOnce(crearUsuario({
+      activo: false,
+      passwordResetTokenHash: hash,
+      passwordResetExpiresAt: new Date(Date.now() - 60_000),
+    })).mockResolvedValueOnce(crearUsuario({
+      activo: false,
+      passwordResetTokenHash: hash,
+      passwordResetExpiresAt: new Date(Date.now() + 60_000),
+    }));
+
+    await expect(service.aceptarInvitacion('admin@sgpa.local', token, 'ClavePropia123')).rejects.toThrow('Invitación inválida');
+    await expect(service.aceptarInvitacion('admin@sgpa.local', 'b'.repeat(64), 'ClavePropia123')).rejects.toThrow('Invitación inválida');
+    expect(usuarioRepository.update).not.toHaveBeenCalled();
   });
 
   it('rechaza crear carreras docentes sin incluir el rol PROFESOR', async () => {

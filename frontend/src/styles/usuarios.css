@@ -401,6 +401,41 @@
   margin-top: 16px;
 }
 
+.usuario-invitacion-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 18px 0;
+  padding: 12px 14px;
+  border: 1px solid #d0d5dd;
+  border-left: 4px solid var(--una-red, #cf2029);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.usuario-invitacion-banner svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--una-red, #cf2029);
+  margin-top: 2px;
+}
+
+.usuario-invitacion-banner strong {
+  display: block;
+  color: #1d2939;
+  font-size: 13px;
+  font-weight: 650;
+  margin-bottom: 2px;
+}
+
+.usuario-invitacion-banner p {
+  margin: 0;
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .usuario-form input:not([type='checkbox']):not([type='radio']),
 .usuario-form select {
   width: 100%;

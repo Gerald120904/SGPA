@@ -100,6 +100,15 @@ function obtenerRoles(usuario) {
     .filter((rol) => rol?.nombre);
 }
 
+export function nombreVisibleRol(nombre) {
+  return {
+    ADMIN_GLOBAL: 'Administrador global',
+    COORDINADOR: 'Coordinador',
+    PROFESOR: 'Profesor',
+    ASISTENTE_ESTUDIANTIL: 'Asistente estudiantil',
+  }[nombre] || nombre;
+}
+
 function mensajeResultado(resultado, mensajePredeterminado) {
   if (resultado?.ok) {
     return resultado;
@@ -509,7 +518,7 @@ export async function iniciarUsuariosPage() {
         usuario.cedula,
         obtenerNombreCompleto(usuario),
         usuario.correo,
-        ...obtenerRoles(usuario).map((rol) => rol.nombre),
+        ...obtenerRoles(usuario).map((rol) => nombreVisibleRol(rol.nombre)),
       ].join(' ').toLowerCase();
 
       return texto.includes(termino);
@@ -522,7 +531,7 @@ export async function iniciarUsuariosPage() {
             <span
               class="usuarios-role-badge"
               title="${escapeHtml(rol.descripcion || rol.nombre)}"
-            >${escapeHtml(rol.nombre)}</span>
+            >${escapeHtml(nombreVisibleRol(rol.nombre))}</span>
           `).join('')
         : '<span class="usuarios-no-role">Sin rol asignado</span>';
 
@@ -686,9 +695,10 @@ export async function iniciarUsuariosPage() {
             required
             maxlength="20"
             autocomplete="off"
+            placeholder="Ej: 501230456 o 1-1111-1111"
             value="${escapeHtml(usuario?.cedula || '')}"
           >
-          <small>Identificación única del usuario.</small>
+          <small>Identificación única del usuario (sin espacios).</small>
         </label>
 
         <label>
@@ -699,23 +709,41 @@ export async function iniciarUsuariosPage() {
             required
             maxlength="150"
             autocomplete="email"
+            placeholder="Ej: usuario@una.cr"
             value="${escapeHtml(usuario?.correo || '')}"
           >
           <small>
-            Correo único para identificar la cuenta.
+            Correo institucional para la cuenta y notificaciones.
           </small>
         </label>
         <label>
           <span>Nombres</span>
-          <input name="nombres" required maxlength="100" value="${escapeHtml(usuario?.nombres || '')}">
+          <input
+            name="nombres"
+            required
+            maxlength="100"
+            placeholder="Nombre o nombres"
+            value="${escapeHtml(usuario?.nombres || '')}"
+          >
         </label>
         <label>
           <span>Primer apellido</span>
-          <input name="apellido1" required maxlength="100" value="${escapeHtml(usuario?.apellido1 || '')}">
+          <input
+            name="apellido1"
+            required
+            maxlength="100"
+            placeholder="Primer apellido"
+            value="${escapeHtml(usuario?.apellido1 || '')}"
+          >
         </label>
         <label class="usuario-form-full">
           <span>Segundo apellido</span>
-          <input name="apellido2" maxlength="100" value="${escapeHtml(usuario?.apellido2 || '')}">
+          <input
+            name="apellido2"
+            maxlength="100"
+            placeholder="Segundo apellido (opcional)"
+            value="${escapeHtml(usuario?.apellido2 || '')}"
+          >
         </label>
       </div>
     `;
@@ -752,8 +780,8 @@ export async function iniciarUsuariosPage() {
               </h4>
 
               <p>
-                Este usuario posee el rol
-                ADMIN_GLOBAL.
+                Este usuario posee el rol de
+                ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))}.
               </p>
 
             </div>
@@ -778,10 +806,7 @@ export async function iniciarUsuariosPage() {
               </strong>
 
               <p>
-                ADMIN_GLOBAL no necesita
-                permisos granulares individuales.
-                El backend le concede acceso
-                administrativo automáticamente.
+                El ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))} cuenta con acceso administrativo total en el sistema y no requiere permisos granulares individuales.
               </p>
 
             </div>
@@ -887,11 +912,13 @@ export async function iniciarUsuariosPage() {
 
         ${camposUsuario()}
 
-        <label class="usuario-password-field">
-          <span>Contraseña temporal</span>
-          <input name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password">
-          <small>Debe contener entre 8 y 128 caracteres.</small>
-        </label>
+        <div class="usuario-invitacion-banner">
+          <i data-lucide="mail" aria-hidden="true"></i>
+          <div>
+            <strong>Invitación por correo electrónico</strong>
+            <p>No se requiere contraseña temporal. Al crear la cuenta se enviará una invitación segura para que el usuario configure su acceso.</p>
+          </div>
+        </div>
 
         <fieldset class="usuario-role-options">
           <legend>Roles iniciales</legend>
@@ -899,7 +926,7 @@ export async function iniciarUsuariosPage() {
             <label>
               <input type="checkbox" name="roles" value="${escapeHtml(rol.nombre)}">
               <span>
-                <strong>${escapeHtml(rol.nombre)}</strong>
+                <strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
                 <small>${escapeHtml(rol.descripcion || '')}</small>
               </span>
             </label>
@@ -1000,13 +1027,13 @@ export async function iniciarUsuariosPage() {
             ${rolesUsuario.length
               ? rolesUsuario.map((rol) => `
                   <span class="usuarios-role-badge is-removable">
-                    ${escapeHtml(rol.nombre)}
+                    ${escapeHtml(nombreVisibleRol(rol.nombre))}
                     <button
                       type="button"
                       data-action="revocar-rol"
                       data-user-id="${usuario.id}"
                       data-role-id="${rol.id ?? ''}"
-                      aria-label="Revocar ${escapeHtml(rol.nombre)}"
+                      aria-label="Revocar ${escapeHtml(nombreVisibleRol(rol.nombre))}"
                       ${rol.id == null ? 'disabled' : ''}
                     >×</button>
                   </span>
@@ -1018,7 +1045,7 @@ export async function iniciarUsuariosPage() {
             <select id="rolParaAsignar" ${rolesDisponibles.length ? '' : 'disabled'}>
               ${rolesDisponibles.length
                 ? rolesDisponibles.map((rol) => `
-                    <option value="${escapeHtml(rol.nombre)}">${escapeHtml(rol.nombre)}</option>
+                    <option value="${escapeHtml(rol.nombre)}">${escapeHtml(nombreVisibleRol(rol.nombre))}</option>
                   `).join('')
                 : '<option>Todos los roles están asignados</option>'}
             </select>
@@ -1163,7 +1190,7 @@ export async function iniciarUsuariosPage() {
   pagina.addEventListener('input', (event) => {
     if (
       event.target.matches?.(
-        '#usuarioForm [name="cedula"], #usuarioForm [name="correo"], #usuarioForm [name="nombres"], #usuarioForm [name="apellido1"]'
+        '#usuarioForm [name="cedula"], #usuarioForm [name="correo"], #usuarioForm [name="nombres"], #usuarioForm [name="apellido1"], #usuarioForm [name="apellido2"]'
       )
     ) {
       event.target.setCustomValidity('');
@@ -1194,22 +1221,28 @@ export async function iniciarUsuariosPage() {
     const id = Number(formulario.dataset.userId);
 
     const usuario = {
-      cedula: datos.get('cedula').trim(),
-      nombres: datos.get('nombres').trim(),
-      apellido1: datos.get('apellido1').trim(),
-      apellido2: datos.get('apellido2').trim() || null,
-      correo: datos.get('correo').trim().toLowerCase(),
+      cedula: (datos.get('cedula') || '').trim(),
+      nombres: (datos.get('nombres') || '').trim(),
+      apellido1: (datos.get('apellido1') || '').trim(),
+      apellido2: (datos.get('apellido2') || '').trim() || null,
+      correo: (datos.get('correo') || '').trim().toLowerCase(),
     };
 
     const cedulaInput = formulario.querySelector('[name="cedula"]');
     const correoInput = formulario.querySelector('[name="correo"]');
     const nombresInput = formulario.querySelector('[name="nombres"]');
     const apellido1Input = formulario.querySelector('[name="apellido1"]');
+    const apellido2Input = formulario.querySelector('[name="apellido2"]');
 
     cedulaInput?.setCustomValidity('');
     correoInput?.setCustomValidity('');
     nombresInput?.setCustomValidity('');
     apellido1Input?.setCustomValidity('');
+    apellido2Input?.setCustomValidity('');
+
+    const cedulaRegex = /^[a-zA-Z0-9-]+$/;
+    const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
+    const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const otrosUsuarios = estado.usuarios.filter(
       (existente) => Number(existente.id) !== id
@@ -1226,24 +1259,41 @@ export async function iniciarUsuariosPage() {
         String(existente.correo ?? '').trim().toLowerCase() === usuario.correo
     );
 
-    if (cedulaDuplicada) {
+    // Validaciones de cédula
+    if (!usuario.cedula) {
+      cedulaInput?.setCustomValidity('La cédula es obligatoria.');
+    } else if (!cedulaRegex.test(usuario.cedula)) {
+      cedulaInput?.setCustomValidity('La cédula solo debe contener letras, números o guiones (sin espacios ni caracteres especiales).');
+    } else if (cedulaDuplicada) {
       cedulaInput?.setCustomValidity('La cédula ya está registrada.');
     }
 
-    if (correoDuplicado) {
+    // Validaciones de correo
+    if (!usuario.correo) {
+      correoInput?.setCustomValidity('El correo electrónico es obligatorio.');
+    } else if (!correoRegex.test(usuario.correo)) {
+      correoInput?.setCustomValidity('Ingrese un correo electrónico válido (ejemplo: usuario@una.cr).');
+    } else if (correoDuplicado) {
       correoInput?.setCustomValidity('El correo ya está registrado.');
     }
 
-    if (!usuario.cedula) {
-      cedulaInput?.setCustomValidity('La cédula es obligatoria.');
-    }
-
+    // Validaciones de nombre
     if (!usuario.nombres) {
       nombresInput?.setCustomValidity('El nombre es obligatorio.');
+    } else if (!nombreRegex.test(usuario.nombres)) {
+      nombresInput?.setCustomValidity('El nombre solo debe contener letras y espacios válidos.');
     }
 
+    // Validaciones de primer apellido
     if (!usuario.apellido1) {
       apellido1Input?.setCustomValidity('El primer apellido es obligatorio.');
+    } else if (!nombreRegex.test(usuario.apellido1)) {
+      apellido1Input?.setCustomValidity('El primer apellido solo debe contener letras.');
+    }
+
+    // Validaciones de segundo apellido (opcional)
+    if (usuario.apellido2 && !nombreRegex.test(usuario.apellido2)) {
+      apellido2Input?.setCustomValidity('El segundo apellido solo debe contener letras.');
     }
 
     if (!formulario.reportValidity()) return;
@@ -1281,7 +1331,6 @@ export async function iniciarUsuariosPage() {
         mensajeResultado(
           await crearUsuario({
             ...usuario,
-            password: datos.get('password'),
             roles,
             permisos: roles.includes(ROLES.ADMIN_GLOBAL)
               ? []
@@ -1290,7 +1339,7 @@ export async function iniciarUsuariosPage() {
           }),
           'No fue posible crear el usuario.',
         );
-        mostrarFeedback('Usuario creado correctamente.');
+        mostrarFeedback('Usuario creado. Se envió la invitación a su correo.');
       }
 
 
