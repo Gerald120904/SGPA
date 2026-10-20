@@ -17,6 +17,17 @@ test('el diálogo jerárquico ofrece todos los módulos integrados por carrera',
   ]) assert.match(dialogo, new RegExp(`'${permiso}'`));
 });
 
+test('el selector general conserva el contrato de guardado por carrera', () => {
+  const inicio = usuarios.indexOf('function renderizarDialogoJerarquia');
+  const fin = usuarios.indexOf('function renderizarDialogoEdicion', inicio);
+  const dialogo = usuarios.slice(inicio, fin);
+  assert.match(dialogo, /Seleccionar todos los permisos de esta carrera/);
+  assert.match(dialogo, /name="jerarquia-todos-permisos"/);
+  assert.match(usuarios, /carreraId: Number\(campo\.dataset\.carreraId\)/);
+  assert.match(usuarios, /\[name="jerarquia-permiso"\]:checked/);
+  assert.match(usuarios, /configurarCoordinadorJerarquia\(Number\(formulario\.dataset\.userId\), carreras\)/);
+});
+
 test('los formularios de estudiantes jerárquicos usan el catálogo de períodos autorizado', () => {
   assert.match(estudiantes, /async function listarPeriodosParaEstudiantes\(\)/);
   assert.match(estudiantes, /async function abrirNuevoEstudiante[\s\S]*?await listarPeriodosParaEstudiantes\(\)/);

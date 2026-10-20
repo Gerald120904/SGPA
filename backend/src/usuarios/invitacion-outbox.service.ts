@@ -32,20 +32,19 @@ export class InvitacionOutboxService {
   ) {}
 
   async verificarDestino(): Promise<void> {
-    if (
-      process.env.DB_SYNCHRONIZE === 'true' ||
-      process.env.DB_DATABASE !== 'sgpa_test'
-    ) {
+    const permitidas = new Set(['sgpa', 'sgpa_test']);
+    const dbEnv = process.env.DB_DATABASE?.trim();
+    if (process.env.DB_SYNCHRONIZE === 'true' || !dbEnv || !permitidas.has(dbEnv)) {
       throw new ServiceUnavailableException(
-        'Invitaciones habilitadas solo en sgpa_test sin sincronización.',
+        'Invitaciones habilitadas solo en sgpa y sgpa_test sin sincronización.',
       );
     }
     const [fila] = (await this.dataSource.query('SELECT DATABASE() AS db')) as [
       { db: string },
     ];
-    if (fila?.db !== 'sgpa_test') {
+    if (!fila?.db || !permitidas.has(fila.db) || fila.db !== dbEnv) {
       throw new ServiceUnavailableException(
-        'El destino de invitaciones no es sgpa_test.',
+        'El destino de invitaciones no coincide con una base autorizada.',
       );
     }
   }

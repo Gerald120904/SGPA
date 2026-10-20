@@ -289,6 +289,40 @@ function obtenerCodigosPermisos(
   );
 }
 
+export function obtenerEstadoSeleccionPermisosCarrera(
+  permisos,
+) {
+  const editables = Array.from(
+    permisos || [],
+  ).filter(
+    (permiso) => !permiso.disabled,
+  );
+  const seleccionados = editables.filter(
+    (permiso) => permiso.checked,
+  ).length;
+
+  return {
+    checked:
+      editables.length > 0 &&
+      seleccionados === editables.length,
+    indeterminate:
+      seleccionados > 0 &&
+      seleccionados < editables.length,
+    disabled: editables.length === 0,
+  };
+}
+
+export function establecerSeleccionPermisosCarrera(
+  permisos,
+  seleccionado,
+) {
+  Array.from(permisos || [])
+    .filter((permiso) => !permiso.disabled)
+    .forEach((permiso) => {
+      permiso.checked = Boolean(seleccionado);
+    });
+}
+
 export async function iniciarUsuariosPage() {
   const pagina = document.getElementById('usuariosPage');
 
@@ -1034,6 +1068,10 @@ export async function iniciarUsuariosPage() {
                   ${asignadas.has(Number(carrera.id)) ? 'checked' : ''}>
                   ${escapeHtml(carrera.nombre)} (${escapeHtml(carrera.codigo)})</label>
               </legend>
+              <label class="usuarios-alcance-seleccionar-todos">
+                <input type="checkbox" name="jerarquia-todos-permisos">
+                <span>Seleccionar todos los permisos de esta carrera</span>
+              </label>
               <div class="usuarios-alcance-permisos">
                 ${estado.permisosCatalogo.filter((permiso) =>
                   [
@@ -1065,8 +1103,25 @@ export async function iniciarUsuariosPage() {
           `).join('')}</ul>` : '<p>Sin cambios registrados.</p>'}
         </section>
       </form>`;
+    dialogoContenido
+      .querySelectorAll('.usuarios-alcance')
+      .forEach(actualizarSeleccionTodosPermisosCarrera);
     renderizarIconos();
     if (!dialogo.open) dialogo.showModal();
+  }
+
+  function actualizarSeleccionTodosPermisosCarrera(campo) {
+    const selector = campo?.querySelector(
+      '[name="jerarquia-todos-permisos"]',
+    );
+    if (!selector) return;
+
+    const estadoSeleccion = obtenerEstadoSeleccionPermisosCarrera(
+      campo.querySelectorAll('[name="jerarquia-permiso"]'),
+    );
+    selector.checked = estadoSeleccion.checked;
+    selector.indeterminate = estadoSeleccion.indeterminate;
+    selector.disabled = estadoSeleccion.disabled;
   }
 
   function renderizarDialogoEdicion(
@@ -1283,6 +1338,49 @@ export async function iniciarUsuariosPage() {
   });
 
   pagina.addEventListener('change', (event) => {
+    const campoCarrera = event.target.closest?.(
+      '#jerarquiaForm .usuarios-alcance',
+    );
+
+    if (
+      campoCarrera &&
+      event.target.name === 'jerarquia-todos-permisos'
+    ) {
+      establecerSeleccionPermisosCarrera(
+        campoCarrera.querySelectorAll('[name="jerarquia-permiso"]'),
+        event.target.checked,
+      );
+
+      if (event.target.checked) {
+        const carrera = campoCarrera.querySelector(
+          '[name="jerarquia-carrera"]',
+        );
+        if (carrera && !carrera.disabled) {
+          carrera.checked = true;
+        }
+      }
+
+      actualizarSeleccionTodosPermisosCarrera(campoCarrera);
+      return;
+    }
+
+    if (
+      campoCarrera &&
+      event.target.name === 'jerarquia-permiso'
+    ) {
+      if (event.target.checked) {
+        const carrera = campoCarrera.querySelector(
+          '[name="jerarquia-carrera"]',
+        );
+        if (carrera && !carrera.disabled) {
+          carrera.checked = true;
+        }
+      }
+
+      actualizarSeleccionTodosPermisosCarrera(campoCarrera);
+      return;
+    }
+
     if (
       event.target.name === 'roles' &&
       dialogo?.open &&

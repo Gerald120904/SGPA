@@ -22,6 +22,9 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
 ];
 
+export type EstadoConexionGoogle =
+  'CONECTADO' | 'REQUIERE_REAUTENTICACION' | 'DESCONECTADO';
+
 @Injectable()
 export class GoogleOauthService {
   private readonly logger = new Logger(GoogleOauthService.name);
@@ -36,8 +39,12 @@ export class GoogleOauthService {
 
   private getOAuth2Client(): OAuth2Client {
     const clientId = this.configService.get<string>('GOOGLE_OAUTH_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('GOOGLE_OAUTH_CLIENT_SECRET');
-    const redirectUri = this.configService.get<string>('GOOGLE_OAUTH_REDIRECT_URI');
+    const clientSecret = this.configService.get<string>(
+      'GOOGLE_OAUTH_CLIENT_SECRET',
+    );
+    const redirectUri = this.configService.get<string>(
+      'GOOGLE_OAUTH_REDIRECT_URI',
+    );
 
     if (!clientId || !clientSecret || !redirectUri) {
       throw new InternalServerErrorException(
@@ -49,7 +56,9 @@ export class GoogleOauthService {
   }
 
   private getEncryptionKey(): Buffer {
-    const rawKey = this.configService.get<string>('GOOGLE_TOKEN_ENCRYPTION_KEY');
+    const rawKey = this.configService.get<string>(
+      'GOOGLE_TOKEN_ENCRYPTION_KEY',
+    );
     if (!rawKey) {
       throw new InternalServerErrorException(
         'GOOGLE_TOKEN_ENCRYPTION_KEY no configurada en las variables de entorno',
@@ -70,7 +79,11 @@ export class GoogleOauthService {
 
   private cifrar(valor: string): string {
     const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', this.getEncryptionKey(), iv);
+    const cipher = crypto.createCipheriv(
+      'aes-256-gcm',
+      this.getEncryptionKey(),
+      iv,
+    );
     let encrypted = cipher.update(valor, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const authTag = cipher.getAuthTag().toString('hex');
@@ -80,12 +93,18 @@ export class GoogleOauthService {
   private descifrar(valorCifrado: string): string {
     const parts = valorCifrado.split('.');
     if (parts.length !== 3) {
-      throw new InternalServerErrorException('Formato de token cifrado inválido');
+      throw new InternalServerErrorException(
+        'Formato de token cifrado inválido',
+      );
     }
     const [ivHex, authTagHex, encryptedHex] = parts;
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', this.getEncryptionKey(), iv);
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      this.getEncryptionKey(),
+      iv,
+    );
     decipher.setAuthTag(authTag);
     let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
@@ -183,9 +202,16 @@ export class GoogleOauthService {
 
     const refreshToken = tokens.refresh_token;
 
-    if (!refreshToken && !conexion?.refreshTokenCifrado) {
+    const requiereReautenticacion = Boolean(
+      conexion && !conexion.activo && conexion.refreshTokenCifrado,
+    );
+
+    if (
+      !refreshToken &&
+      (!conexion?.refreshTokenCifrado || requiereReautenticacion)
+    ) {
       throw new BadRequestException(
-        'Google no devolvió un token de actualización. Vuelva a iniciar la autorización.',
+        'Google no devolvió un token de actualización nuevo. Revoca el acceso de SGPA en tu cuenta de Google y vuelve a conectarla.',
       );
     }
 
@@ -269,18 +295,40 @@ export class GoogleOauthService {
 
   async obtenerEstado(usuarioId: number): Promise<{
     conectado: boolean;
+    requiereReautenticacion: boolean;
+    estado: EstadoConexionGoogle;
     googleEmail: string | null;
     conectadoAt: Date | null;
   }> {
     const conexion = await this.googleConexionRepo.findOne({
-      where: { usuarioId, activo: true },
+      where: { usuarioId },
     });
 
+    const conectado = Boolean(conexion?.activo && conexion.refreshTokenCifrado);
+    const requiereReautenticacion = Boolean(
+      conexion && !conexion.activo && conexion.refreshTokenCifrado,
+    );
+    const estado: EstadoConexionGoogle = conectado
+      ? 'CONECTADO'
+      : requiereReautenticacion
+        ? 'REQUIERE_REAUTENTICACION'
+        : 'DESCONECTADO';
+
     return {
-      conectado: Boolean(conexion && conexion.refreshTokenCifrado),
+      conectado,
+      requiereReautenticacion,
+      estado,
       googleEmail: conexion?.googleEmail ?? null,
       conectadoAt: conexion?.conectadoAt ?? null,
     };
+  }
+
+  async puedeSincronizarAutomaticamente(usuarioId: number): Promise<boolean> {
+    const conexion = await this.googleConexionRepo.findOne({
+      where: { usuarioId, activo: true },
+    });
+
+    return Boolean(conexion?.refreshTokenCifrado);
   }
 
   async obtenerClienteAutorizado(usuarioId: number): Promise<OAuth2Client> {
@@ -298,7 +346,45 @@ export class GoogleOauthService {
     const client = this.getOAuth2Client();
     client.setCredentials({ refresh_token: refreshToken });
 
+    try {
+      await client.getAccessToken();
+    } catch (error) {
+      if (!this.esInvalidGrant(error)) {
+        throw error;
+      }
+
+      // Se conserva cifrado para distinguirlo de una desconexión voluntaria.
+      conexion.activo = false;
+      await this.googleConexionRepo.save(conexion);
+
+      throw new BadRequestException(
+        'La autorización de Google expiró o fue revocada. Vuelve a conectar Google.',
+      );
+    }
+
     return client;
+  }
+
+  private esInvalidGrant(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    const candidate = error as {
+      code?: unknown;
+      response?: { data?: unknown };
+    };
+    const responseData = candidate.response?.data;
+
+    if (
+      responseData &&
+      typeof responseData === 'object' &&
+      'error' in responseData
+    ) {
+      return (responseData as { error?: unknown }).error === 'invalid_grant';
+    }
+
+    return candidate.code === 'invalid_grant';
   }
 
   async desconectar(usuarioId: number): Promise<void> {
@@ -307,7 +393,9 @@ export class GoogleOauthService {
     });
 
     if (!conexion) {
-      throw new NotFoundException('No se encontró una conexión de Google para este usuario');
+      throw new NotFoundException(
+        'No se encontró una conexión de Google para este usuario',
+      );
     }
 
     if (conexion.refreshTokenCifrado) {
@@ -316,7 +404,10 @@ export class GoogleOauthService {
         const client = this.getOAuth2Client();
         await client.revokeToken(refreshToken);
       } catch (err) {
-        this.logger.warn('No se pudo revocar el token en Google directamente', err);
+        this.logger.warn(
+          'No se pudo revocar el token en Google directamente',
+          err,
+        );
       }
     }
 

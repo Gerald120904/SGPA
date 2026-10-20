@@ -6,6 +6,7 @@ const { DataSource, MigrationExecutor } = require('typeorm');
 const ALLOWED_MIGRATIONS = new Set([
   'AddOptativeRuleCounts2026101500000',
   'AddAulaEquipmentInventory2026101600000',
+  'AddInvitationOutbox2026101700000',
   'AddHierarchicalAccess2026101900000',
 ]);
 

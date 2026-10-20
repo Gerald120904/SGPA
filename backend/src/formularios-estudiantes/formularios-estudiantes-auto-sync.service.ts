@@ -1,13 +1,11 @@
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Interval } from '@nestjs/schedule';
 import { Repository } from 'typeorm';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
+import { GoogleOauthService } from '../integraciones/google/google-oauth.service';
 
 @Injectable()
 export class FormulariosEstudiantesAutoSyncService {
@@ -22,6 +20,8 @@ export class FormulariosEstudiantesAutoSyncService {
     private readonly formularioRepository: Repository<FormularioEstudiante>,
 
     private readonly syncService: FormulariosEstudiantesSyncService,
+
+    private readonly googleOauthService: GoogleOauthService,
   ) {}
 
   @Interval(60_000)
@@ -41,6 +41,15 @@ export class FormulariosEstudiantesAutoSyncService {
 
       for (const formulario of formularios) {
         try {
+          const puedeSincronizar =
+            await this.googleOauthService.puedeSincronizarAutomaticamente(
+              formulario.creadoPorUsuarioId,
+            );
+
+          if (!puedeSincronizar) {
+            continue;
+          }
+
           await this.sincronizarFormulario(formulario);
         } catch (error) {
           this.logger.warn(
@@ -58,8 +67,7 @@ export class FormulariosEstudiantesAutoSyncService {
   private async sincronizarFormulario(
     formulario: FormularioEstudiante,
   ): Promise<void> {
-    const resultado =
-      await this.syncService.sincronizarFormulario(formulario);
+    const resultado = await this.syncService.sincronizarFormulario(formulario);
 
     if (resultado.nuevas > 0) {
       this.logger.log(

@@ -9,9 +9,9 @@ export class AddInvitationOutbox2026101700000 implements MigrationInterface {
     const [identidad] = (await queryRunner.query(
       'SELECT DATABASE() AS db',
     )) as [{ db: string }];
-    if (identidad.db !== 'sgpa_test') {
+    if (identidad.db !== 'sgpa_test' && identidad.db !== 'sgpa') {
       throw new Error(
-        'Migración de invitaciones bloqueada fuera de sgpa_test.',
+        'Migración de invitaciones bloqueada fuera de sgpa o sgpa_test.',
       );
     }
     if (await queryRunner.hasTable(NOMBRE)) {
@@ -82,8 +82,8 @@ export class AddInvitationOutbox2026101700000 implements MigrationInterface {
     const [identidad] = (await queryRunner.query(
       'SELECT DATABASE() AS db',
     )) as [{ db: string }];
-    if (identidad.db !== 'sgpa_test')
-      throw new Error('Reversión bloqueada fuera de sgpa_test.');
+    if (identidad.db !== 'sgpa_test' && identidad.db !== 'sgpa')
+      throw new Error('Reversión bloqueada fuera de sgpa o sgpa_test.');
     if (!(await queryRunner.hasTable(NOMBRE))) return;
     const [conteo] = (await queryRunner.query(
       `SELECT COUNT(*) AS total FROM ${NOMBRE}`,

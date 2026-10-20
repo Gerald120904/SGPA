@@ -73,6 +73,8 @@ let planesDisponibles = [];
 
 let estadoGoogle = {
   conectado: false,
+  requiereReautenticacion: false,
+  estado: 'DESCONECTADO',
   googleEmail: null
 };
 
@@ -160,6 +162,20 @@ function renderizarEstadoGoogle() {
 
   if (!contenedor) return;
 
+  if (estadoGoogle.requiereReautenticacion) {
+    contenedor.innerHTML = `
+      <div class="formularios-google-status formularios-google-disconnected">
+        <span class="formularios-google-dot" aria-hidden="true"></span>
+        <span>
+          <strong>Google requiere reconexión</strong>
+          <small>La autorización expiró o fue revocada.</small>
+        </span>
+      </div>
+    `;
+
+    return;
+  }
+
   if (estadoGoogle.conectado) {
     contenedor.innerHTML = `
       <div class="formularios-google-status formularios-google-connected">
@@ -220,7 +236,11 @@ function renderizarAcciones() {
           data-lucide="link"
           aria-hidden="true"
         ></i>
-        Conectar Google
+        ${
+          estadoGoogle.requiereReautenticacion
+            ? 'Volver a conectar Google'
+            : 'Conectar Google'
+        }
       </button>
     `);
   }
@@ -1086,6 +1106,8 @@ async function desconectarGoogle() {
 
     estadoGoogle = {
       conectado: false,
+      requiereReautenticacion: false,
+      estado: 'DESCONECTADO',
       googleEmail: null
     };
 
@@ -1838,6 +1860,16 @@ function registrarActualizacionAlVolver() {
               googleData?.conectado
             ),
 
+          requiereReautenticacion:
+            Boolean(
+              googleData?.requiereReautenticacion ||
+              googleData?.estado === 'REQUIERE_REAUTENTICACION'
+            ),
+
+          estado:
+            googleData?.estado ??
+            'DESCONECTADO',
+
           googleEmail:
             googleData?.googleEmail ??
             null
@@ -1888,6 +1920,16 @@ export async function iniciarFormulariosEstudiantesPage() {
     estadoGoogle = {
       conectado:
         Boolean(googleData?.conectado),
+
+      requiereReautenticacion:
+        Boolean(
+          googleData?.requiereReautenticacion ||
+          googleData?.estado === 'REQUIERE_REAUTENTICACION'
+        ),
+
+      estado:
+        googleData?.estado ??
+        'DESCONECTADO',
 
       googleEmail:
         googleData?.googleEmail ?? null

@@ -16,12 +16,19 @@ describe('migración aislada de invitaciones', () => {
     runner.hasTable.mockResolvedValue(false);
   });
 
-  it('rechaza el destino principal antes de alterar el esquema', async () => {
-    runner.query.mockResolvedValue([{ db: 'sgpa' }]);
+  it('rechaza bases no autorizadas antes de alterar el esquema', async () => {
+    runner.query.mockResolvedValue([{ db: 'otra_base' }]);
     await expect(
       migration.up(runner as unknown as QueryRunner),
-    ).rejects.toThrow('fuera de sgpa_test');
+    ).rejects.toThrow('fuera de sgpa o sgpa_test');
     expect(runner.createTable).not.toHaveBeenCalled();
+  });
+
+  it('permite crear la tabla en la base principal sgpa', async () => {
+    runner.query.mockResolvedValue([{ db: 'sgpa' }]);
+    await migration.up(runner as unknown as QueryRunner);
+    expect(runner.createTable).toHaveBeenCalledTimes(1);
+    expect(runner.createTable.mock.calls[0][0].name).toBe('invitacion_outbox');
   });
 
   it('crea la tabla una sola vez en el destino autorizado', async () => {
