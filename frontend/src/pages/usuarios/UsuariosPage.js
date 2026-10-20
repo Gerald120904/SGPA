@@ -18,6 +18,7 @@ import {
   listarCarreras,
 } from '../../services/carreras.service.js';
 import { ROLES } from '../../config/permissions.js';
+import { obtenerCoordinadorJerarquia, configurarCoordinadorJerarquia, listarAuditoriaJerarquia } from '../../services/jerarquia.service.js';
 
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
@@ -469,6 +470,11 @@ export async function iniciarUsuariosPage() {
         roles,
       );
 
+    const porCarrera = roles.includes(ROLES.COORDINADOR) ||
+      roles.includes(ROLES.ASISTENTE_ESTUDIANTIL);
+    dialogoContenido.querySelector('#permisosCreacionSection')
+      ?.classList.toggle('hidden', porCarrera);
+
     dialogoContenido
       .querySelectorAll(
         'input[name="permisos"]',
@@ -476,7 +482,7 @@ export async function iniciarUsuariosPage() {
       .forEach(
         (input) => {
           input.checked =
-            sugeridos.has(
+            !porCarrera && sugeridos.has(
               input.value,
             );
         },
@@ -560,6 +566,14 @@ export async function iniciarUsuariosPage() {
               >
                 <i data-lucide="pencil" aria-hidden="true"></i>
               </button>
+              ${roles.some((rol) => rol.nombre === ROLES.COORDINADOR) ? `
+                <button class="usuarios-icon-button" type="button"
+                  data-action="configurar-jerarquia" data-user-id="${usuario.id}"
+                  aria-label="Configurar carreras y permisos de ${escapeHtml(obtenerNombreCompleto(usuario))}"
+                  title="Carreras y permisos por carrera">
+                  <i data-lucide="shield-check" aria-hidden="true"></i>
+                </button>
+              ` : ''}
               <button
                 class="usuarios-icon-button ${usuario.activo ? 'is-danger' : 'is-success'}"
                 type="button"
@@ -753,6 +767,14 @@ export async function iniciarUsuariosPage() {
     usuario,
     permisosUsuario,
   ) {
+    if (obtenerRoles(usuario).some((rol) =>
+      rol.nombre === ROLES.COORDINADOR || rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL)) {
+      return `<section class="usuario-permission-manager">
+        <h4>Permisos por carrera</h4>
+        <p>Utilice el botón de escudo en la lista de usuarios para configurar el alcance del coordinador.
+          Los permisos de asistentes se administran desde Asistentes y solicitudes.</p>
+      </section>`;
+    }
     const asignados =
       obtenerCodigosPermisos(
         permisosUsuario,
@@ -766,6 +788,7 @@ export async function iniciarUsuariosPage() {
     if (esAdmin) {
       return `
         <section
+          id="permisosCreacionSection"
           class="usuario-permission-manager"
         >
 
@@ -984,6 +1007,64 @@ export async function iniciarUsuariosPage() {
       </form>
     `;
 
+    renderizarIconos();
+    if (!dialogo.open) dialogo.showModal();
+  }
+
+  function renderizarDialogoJerarquia(usuario, configuracion, auditoria = []) {
+    const asignadas = new Map((configuracion.carreras || []).map((c) => [Number(c.carreraId), new Set(c.permisos || [])]));
+    dialogoContenido.innerHTML = `
+      <form id="jerarquiaForm" class="usuario-form" data-user-id="${usuario.id}">
+        <div class="usuario-dialog-header">
+          <div>
+            <h3>Carreras y permisos de ${escapeHtml(obtenerNombreCompleto(usuario))}</h3>
+            <p>Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.</p>
+          </div>
+          <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="usuario-dialog-feedback hidden" role="status"></div>
+        <div class="usuarios-alcances">
+          ${estado.carreras.map((carrera) => {
+            const permisos = asignadas.get(Number(carrera.id)) || new Set();
+            return `<fieldset class="usuarios-alcance" data-carrera-id="${carrera.id}">
+              <legend>
+                <label><input type="checkbox" name="jerarquia-carrera" value="${carrera.id}"
+                  ${asignadas.has(Number(carrera.id)) ? 'checked' : ''}>
+                  ${escapeHtml(carrera.nombre)} (${escapeHtml(carrera.codigo)})</label>
+              </legend>
+              <div class="usuarios-alcance-permisos">
+                ${estado.permisosCatalogo.filter((permiso) =>
+                  [
+                    'ESTUDIANTES_VER',
+                    'ESTUDIANTES_GESTIONAR',
+                    'CURSOS_VER',
+                    'CURSOS_GESTIONAR',
+                    'PLANES_ESTUDIO_VER',
+                    'PLANES_ESTUDIO_GESTIONAR',
+                    'OPTATIVAS_VER',
+                    'OPTATIVAS_GESTIONAR',
+                  ].includes(permiso)).map((permiso) => `
+                  <label><input type="checkbox" name="jerarquia-permiso" value="${escapeHtml(permiso)}"
+                    ${permisos.has(permiso) ? 'checked' : ''}>
+                    ${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</label>
+                `).join('')}
+              </div>
+            </fieldset>`;
+          }).join('')}
+        </div>
+        <div class="usuario-dialog-actions">
+          <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
+          <button class="usuarios-primary-button" type="submit">Guardar alcance</button>
+        </div>
+        <section class="usuarios-auditoria">
+          <h4>Historial reciente</h4>
+          ${auditoria.length ? `<ul>${auditoria.map((item) => `
+            <li>${escapeHtml(item.accion)} · ${escapeHtml(new Date(item.createdAt).toLocaleString('es-CR'))}</li>
+          `).join('')}</ul>` : '<p>Sin cambios registrados.</p>'}
+        </section>
+      </form>`;
     renderizarIconos();
     if (!dialogo.open) dialogo.showModal();
   }
@@ -1339,7 +1420,9 @@ export async function iniciarUsuariosPage() {
           }),
           'No fue posible crear el usuario.',
         );
-        mostrarFeedback('Usuario creado. Se envió la invitación a su correo.');
+        mostrarFeedback(roles.includes(ROLES.COORDINADOR)
+          ? 'Coordinador creado. Configure sus carreras y permisos con el botón de escudo.'
+          : 'Usuario creado. Se envió la invitación a su correo.');
       }
 
 
@@ -1347,6 +1430,32 @@ export async function iniciarUsuariosPage() {
       await cargarUsuarios(false);
     } catch (error) {
       mostrarFeedback(error.message, 'error');
+      boton.disabled = false;
+    }
+  });
+
+  pagina.addEventListener('submit', async (event) => {
+    if (event.target.id !== 'jerarquiaForm') return;
+    event.preventDefault();
+    const formulario = event.target;
+    const boton = formulario.querySelector('[type="submit"]');
+    const carreras = [...formulario.querySelectorAll('.usuarios-alcance')]
+      .filter((campo) => campo.querySelector('[name="jerarquia-carrera"]')?.checked)
+      .map((campo) => ({
+        carreraId: Number(campo.dataset.carreraId),
+        permisos: [...campo.querySelectorAll('[name="jerarquia-permiso"]:checked')].map((input) => input.value),
+      }));
+    try {
+      boton.disabled = true;
+      mensajeResultado(
+        await configurarCoordinadorJerarquia(Number(formulario.dataset.userId), carreras),
+        'No fue posible guardar el alcance del coordinador.',
+      );
+      dialogo.close();
+      mostrarFeedback('Carreras y permisos actualizados.');
+    } catch (error) {
+      mostrarFeedback(error.message, 'error');
+    } finally {
       boton.disabled = false;
     }
   });
@@ -1367,6 +1476,25 @@ export async function iniciarUsuariosPage() {
       try {
         boton.disabled = true;
         await abrirEdicion(id);
+      } catch (error) {
+        mostrarFeedback(error.message, 'error');
+      } finally {
+        boton.disabled = false;
+      }
+      return;
+    }
+
+    if (accion === 'configurar-jerarquia') {
+      try {
+        boton.disabled = true;
+        const [configuracion, auditoria] = await Promise.all([
+          obtenerCoordinadorJerarquia(id),
+          listarAuditoriaJerarquia(id),
+        ]);
+        const datos = mensajeResultado(configuracion, 'No fue posible consultar el alcance.');
+        if (!sigueActiva()) return;
+        const usuario = estado.usuarios.find((item) => Number(item.id) === id);
+        renderizarDialogoJerarquia(usuario, datos.data, auditoria.ok ? auditoria.data : []);
       } catch (error) {
         mostrarFeedback(error.message, 'error');
       } finally {

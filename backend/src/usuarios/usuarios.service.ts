@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { DataSource, In, MoreThan, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Rol } from '../roles/entities/rol.entity';
@@ -28,6 +28,9 @@ import { PermisosService } from '../permisos/permisos.service';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { InvitacionOutboxService } from './invitacion-outbox.service';
+import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
+import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
+import { SolicitudCambio } from './entities/solicitud-cambio.entity';
 
 @Injectable()
 export class UsuariosService {
@@ -209,7 +212,7 @@ export class UsuariosService {
     }
   }
 
-  async crearConInvitacion(dto: CrearUsuarioDto) {
+  async crearConInvitacion(dto: CrearUsuarioDto, despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>) {
     const url = this.origenInvitacion();
     await this.invitaciones!.verificarDestino();
     const token = randomBytes(32).toString('hex');
@@ -222,12 +225,14 @@ export class UsuariosService {
       { tokenHash: createHash('sha256').update(token).digest('hex'),
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         url: url.toString() },
+      despuesDeCrear,
     );
   }
 
   async crear(
     dto: CrearUsuarioDto,
     invitacion?: { tokenHash: string; expiresAt: Date; url: string },
+    despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>,
   ) {
     if (!dto.password) {
       throw new BadRequestException('La contraseña es obligatoria.');
@@ -249,7 +254,9 @@ export class UsuariosService {
       );
     }
 
-    const permisosFinales = dto.roles.includes(RolSistema.ADMIN_GLOBAL)
+    const cuentaJerarquica = dto.roles.includes(RolSistema.COORDINADOR) ||
+      dto.roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL);
+    const permisosFinales = dto.roles.includes(RolSistema.ADMIN_GLOBAL) || cuentaJerarquica
       ? []
       : (dto.permisos ?? obtenerPermisosPredeterminadosPorRoles(dto.roles));
 
@@ -318,7 +325,7 @@ export class UsuariosService {
         );
 
         if (this.permisosService?.esPoliticaOpcionBActiva()) {
-          if (dto.permisos && !dto.roles.includes(RolSistema.ADMIN_GLOBAL)) {
+          if (cuentaJerarquica || (dto.permisos && !dto.roles.includes(RolSistema.ADMIN_GLOBAL))) {
             const basePlantilla = new Set<PermisoSistema>();
             for (const r of roles) {
               for (
@@ -329,7 +336,7 @@ export class UsuariosService {
                 basePlantilla.add(p);
               }
             }
-            const deseados = new Set(dto.permisos);
+            const deseados = new Set(permisosFinales);
             const excepcionesPorCrear: UsuarioPermisoExcepcion[] = [];
             let repoExc: Repository<UsuarioPermisoExcepcion> | null = null;
             try {
@@ -400,6 +407,7 @@ export class UsuariosService {
           );
         }
 
+        await despuesDeCrear?.(manager, guardado.id);
         if (invitacion) await this.invitaciones!.crearPendiente(
           manager, guardado.id, invitacion.tokenHash,
           invitacion.url, invitacion.expiresAt,
@@ -534,11 +542,61 @@ export class UsuariosService {
       );
     }
 
+    if (activo && !usuario.activo && this.usuarioTieneRol(usuario, RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      throw new BadRequestException('La reactivacion de asistentes requiere restablecer su dependencia jerarquica.');
+    }
+
     if (id === usuarioActualId && !activo) {
       throw new BadRequestException('No puede desactivar su propia cuenta.');
     }
 
-    await this.usuarioRepository.update(id, { activo });
+    if (!activo && this.usuarioTieneRol(usuario, RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+        await manager.getRepository(Usuario).update(id, { activo: false });
+        await manager.getRepository(DependenciaUsuario).update(
+          { asistenteId: id, activo: true },
+          { activo: false, desactivadoEn: new Date(), motivoDesactivacion: 'Desactivación operativa del asistente' },
+        );
+        await manager.getRepository(SolicitudCambio).update(
+          { solicitanteId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId, objetivoUsuarioId: id,
+          accion: 'DESACTIVAR_ASISTENTE', detalle: { asistenteId: id },
+        });
+      });
+    } else if (!activo && this.usuarioTieneRol(usuario, RolSistema.COORDINADOR)) {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+        const dependencias = manager.getRepository(DependenciaUsuario);
+        const relacionadas = await dependencias.find({ where: { coordinadorId: id, activo: true } });
+        const asistentes = relacionadas.map((rel) => rel.asistenteId);
+        if (asistentes.length) {
+          await manager.getRepository(Usuario).update({ id: In(asistentes) }, { activo: false });
+          for (const relacion of relacionadas) {
+            relacion.activo = false;
+            relacion.desactivadoEn = new Date();
+            relacion.motivoDesactivacion = 'Desactivación operativa del coordinador responsable';
+          }
+          await dependencias.save(relacionadas);
+        }
+        await manager.getRepository(SolicitudCambio).update(
+          { coordinadorId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(Usuario).update(id, { activo: false });
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId,
+          objetivoUsuarioId: id,
+          accion: 'DESACTIVAR_COORDINADOR',
+          detalle: { asistentesDesactivados: asistentes },
+        });
+      });
+    } else {
+      await this.usuarioRepository.update(id, { activo });
+    }
     return this.obtenerPorId(id);
   }
 
@@ -625,6 +683,7 @@ export class UsuariosService {
     }
 
     await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
       const relaciones = manager.getRepository(UsuarioRol);
       const profesorCarreras = manager.getRepository(ProfesorCarrera);
 
@@ -636,6 +695,46 @@ export class UsuariosService {
       if (relacion.rol.nombre === RolSistema.PROFESOR) {
         await profesorCarreras.delete({
           profesorUsuarioId: id,
+        });
+      }
+
+      if (relacion.rol.nombre === RolSistema.COORDINADOR) {
+        const dependencias = manager.getRepository(DependenciaUsuario);
+        const relacionadas = await dependencias.find({ where: { coordinadorId: id, activo: true } });
+        const asistentes = relacionadas.map((rel) => rel.asistenteId);
+        if (asistentes.length) {
+          await manager.getRepository(Usuario).update({ id: In(asistentes) }, { activo: false });
+          for (const rel of relacionadas) {
+            rel.activo = false;
+            rel.desactivadoEn = new Date();
+            rel.motivoDesactivacion = 'Revocación del rol de coordinador responsable';
+          }
+          await dependencias.save(relacionadas);
+        }
+        await manager.getRepository(SolicitudCambio).update(
+          { coordinadorId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId,
+          objetivoUsuarioId: id,
+          accion: 'REVOCAR_COORDINADOR',
+          detalle: { asistentesDesactivados: asistentes },
+        });
+      }
+
+      if (relacion.rol.nombre === RolSistema.ASISTENTE_ESTUDIANTIL) {
+        await manager.getRepository(DependenciaUsuario).update(
+          { asistenteId: id, activo: true },
+          { activo: false, desactivadoEn: new Date(), motivoDesactivacion: 'Revocación del rol de asistente' },
+        );
+        await manager.getRepository(SolicitudCambio).update(
+          { solicitanteId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId, objetivoUsuarioId: id,
+          accion: 'REVOCAR_ASISTENTE', detalle: { asistenteId: id },
         });
       }
 

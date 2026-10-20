@@ -6,8 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { createHash } from 'node:crypto';
 import {
   DataSource,
+  EntityManager,
   FindOptionsWhere,
   In,
   Like,
@@ -16,6 +18,8 @@ import {
 } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { TipoRequisito } from '../planes-estudio/constants/tipo-requisito.constant';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
@@ -54,20 +58,26 @@ export class EstudiantesService {
     private readonly periodoRepository: Repository<PeriodoAcademico>,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
     private readonly dataSource: DataSource,
+    private readonly alcanceJerarquico: AlcanceJerarquicoService,
   ) {}
 
   async listar(usuarioId: number, filtros: FiltrarEstudiantesDto) {
-    const carreraIds =
-      await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(
-        usuarioId,
-      );
+    const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
+    const carreraIds = tipo
+      ? await this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuarioId)
+      : await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(usuarioId);
+    const carrerasLegibles = tipo
+      ? (await Promise.all(carreraIds.map(async (id) =>
+          (await this.alcanceJerarquico.puedeEjecutar(usuarioId, PermisoSistema.ESTUDIANTES_VER, id)) ? id : null,
+        ))).filter((id): id is number => id !== null)
+      : carreraIds;
     if (
-      !carreraIds.length ||
-      (filtros.carreraId && !carreraIds.includes(filtros.carreraId))
+      !carrerasLegibles.length ||
+      (filtros.carreraId && !carrerasLegibles.includes(filtros.carreraId))
     )
       return [];
     const base: FindOptionsWhere<Estudiante> = {
-      carreraId: filtros.carreraId ?? In(carreraIds),
+      carreraId: filtros.carreraId ?? In(carrerasLegibles),
       ...(filtros.planEstudioId && { planEstudioId: filtros.planEstudioId }),
       ...(filtros.periodoIngresoId && {
         periodoIngresoId: filtros.periodoIngresoId,
@@ -93,10 +103,12 @@ export class EstudiantesService {
   }
 
   async contarPorCarrera(usuarioId: number) {
-    const carreraIdsPermitidas =
-      await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(
-        usuarioId,
-      );
+    const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
+    const carreraIdsPermitidas = tipo
+      ? (await Promise.all((await this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuarioId))
+          .map(async (id) => (await this.alcanceJerarquico.puedeEjecutar(usuarioId, PermisoSistema.ESTUDIANTES_VER, id)) ? id : null)))
+          .filter((id): id is number => id !== null)
+      : await this.estructuraAcademicaService.obtenerCarreraIdsConAlcance(usuarioId);
 
     if (!carreraIdsPermitidas.length) {
       return [];
@@ -144,6 +156,7 @@ export class EstudiantesService {
   }
 
   async crear(usuarioId: number, dto: CrearEstudianteDto) {
+    await this.validarEscrituraJerarquica(usuarioId, dto.carreraId);
     const cedula = this.normalizarRequerido(dto.cedula, 'La cédula');
     const nombres = this.normalizarRequerido(dto.nombres, 'Los nombres');
     const apellido1 = this.normalizarRequerido(
@@ -178,23 +191,84 @@ export class EstudiantesService {
     }
   }
 
+  /** Ejecuta una propuesta aprobada dentro de la transacción que bloquea la solicitud. */
+  async crearDesdeSolicitud(coordinadorId: number, dto: CrearEstudianteDto, manager: EntityManager): Promise<number> {
+    await this.validarEscrituraJerarquica(coordinadorId, dto.carreraId);
+    await this.validarDatosAcademicos(coordinadorId, dto.carreraId, dto.planEstudioId, dto.periodoIngresoId);
+    const cedula = this.normalizarRequerido(dto.cedula, 'La cédula');
+    const nombres = this.normalizarRequerido(dto.nombres, 'Los nombres');
+    const apellido1 = this.normalizarRequerido(dto.apellido1, 'El primer apellido');
+    const correoInstitucional = dto.correoInstitucional.trim().toLowerCase();
+    await this.validarDuplicados(cedula, correoInstitucional);
+    const repo = manager.getRepository(Estudiante);
+    try {
+      const guardado = await repo.save(repo.create({
+        cedula, nombres, apellido1, apellido2: dto.apellido2?.trim() || null,
+        correoInstitucional, telefono: dto.telefono?.trim() || null,
+        carreraId: dto.carreraId, planEstudioId: dto.planEstudioId,
+        periodoIngresoId: dto.periodoIngresoId, estado: EstadoEstudiante.ACTIVO,
+      }));
+      return guardado.id;
+    } catch (error) {
+      this.relanzarDuplicado(error);
+    }
+  }
+
   async actualizar(
     usuarioId: number,
     id: number,
     dto: ActualizarEstudianteDto,
   ) {
-    const estudiante = await this.obtenerPorId(usuarioId, id);
+    await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(Estudiante);
+      const estudiante = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+      await this.validarAlcance(usuarioId, estudiante.carreraId);
+      await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+      await this.aplicarActualizacion(estudiante, dto, repo);
+    });
+    return this.obtenerPorId(usuarioId, id);
+  }
+
+  huellaEstudiante(estudiante: Estudiante): string {
+    return createHash('sha256').update(JSON.stringify({
+      id: estudiante.id, cedula: estudiante.cedula, nombres: estudiante.nombres,
+      apellido1: estudiante.apellido1, apellido2: estudiante.apellido2,
+      correoInstitucional: estudiante.correoInstitucional, telefono: estudiante.telefono,
+      carreraId: estudiante.carreraId, planEstudioId: estudiante.planEstudioId,
+      periodoIngresoId: estudiante.periodoIngresoId, estado: estudiante.estado,
+      updatedAt: estudiante.updatedAt ? new Date(estudiante.updatedAt).toISOString() : null,
+    })).digest('hex');
+  }
+
+  async actualizarDesdeSolicitud(coordinadorId: number, id: number, carreraId: number,
+    dto: ActualizarEstudianteDto, huellaOriginal: string, manager: EntityManager): Promise<number> {
+    const repo = manager.getRepository(Estudiante);
+    const estudiante = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+    if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+    if (estudiante.carreraId !== carreraId || this.huellaEstudiante(estudiante) !== huellaOriginal) {
+      throw new ConflictException('El estudiante cambió desde que se envió la solicitud.');
+    }
+    await this.validarAlcance(coordinadorId, carreraId);
+    await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    await this.aplicarActualizacion(estudiante, dto, repo);
+    return id;
+  }
+
+  private async aplicarActualizacion(estudiante: Estudiante, dto: ActualizarEstudianteDto,
+    repo: Repository<Estudiante>): Promise<void> {
+    const id = estudiante.id;
     const cedula =
       dto.cedula === undefined
         ? undefined
         : this.normalizarRequerido(dto.cedula, 'La cédula');
     const correo = dto.correoInstitucional?.trim().toLowerCase();
     if (cedula && cedula !== estudiante.cedula) {
-      await this.validarDuplicados(cedula, undefined, id);
+      await this.validarDuplicados(cedula, undefined, id, repo);
       estudiante.cedula = cedula;
     }
     if (correo && correo !== estudiante.correoInstitucional) {
-      await this.validarDuplicados(undefined, correo, id);
+      await this.validarDuplicados(undefined, correo, id, repo);
       estudiante.correoInstitucional = correo;
     }
     if (dto.nombres !== undefined)
@@ -209,18 +283,38 @@ export class EstudiantesService {
     if (dto.telefono !== undefined)
       estudiante.telefono = dto.telefono?.trim() || null;
     try {
-      await this.estudianteRepository.save(estudiante);
-      return this.obtenerPorId(usuarioId, id);
+      await repo.save(estudiante);
     } catch (error) {
       this.relanzarDuplicado(error);
     }
   }
 
   async cambiarEstado(usuarioId: number, id: number, estado: EstadoEstudiante) {
-    const estudiante = await this.obtenerPorId(usuarioId, id);
-    estudiante.estado = estado;
-    await this.estudianteRepository.save(estudiante);
+    await this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(Estudiante);
+      const estudiante = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+      await this.validarAlcance(usuarioId, estudiante.carreraId);
+      await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+      estudiante.estado = estado;
+      await repo.save(estudiante);
+    });
     return this.obtenerPorId(usuarioId, id);
+  }
+
+  async cambiarEstadoDesdeSolicitud(coordinadorId: number, id: number, carreraId: number,
+    estado: EstadoEstudiante, huellaOriginal: string, manager: EntityManager): Promise<number> {
+    const repo = manager.getRepository(Estudiante);
+    const estudiante = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+    if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+    if (estudiante.carreraId !== carreraId || this.huellaEstudiante(estudiante) !== huellaOriginal) {
+      throw new ConflictException('El estudiante cambió desde que se envió la solicitud.');
+    }
+    await this.validarAlcance(coordinadorId, carreraId);
+    await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    estudiante.estado = estado;
+    await repo.save(estudiante);
+    return id;
   }
 
   async listarHistorialAcademico(usuarioId: number, estudianteId: number) {
@@ -243,6 +337,7 @@ export class EstudiantesService {
     dto: RegistrarResultadoAcademicoDto,
   ) {
     const estudiante = await this.obtenerPorId(usuarioId, estudianteId);
+    await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
     const asignatura = await this.planAsignaturaRepository.findOne({
       where: { id: dto.planAsignaturaId },
     });
@@ -280,6 +375,68 @@ export class EstudiantesService {
     );
   }
 
+  async registrarResultadoDesdeSolicitud(
+    coordinadorId: number,
+    estudianteId: number,
+    carreraId: number,
+    dto: RegistrarResultadoAcademicoDto,
+    huellaOriginal: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    const repo = manager.getRepository(Estudiante);
+    const estudiante = await repo.findOne({
+      where: { id: estudianteId },
+      relations: { periodoIngreso: true },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+    if (estudiante.carreraId !== carreraId || this.huellaEstudiante(estudiante) !== huellaOriginal) {
+      throw new ConflictException('El estudiante cambió desde que se envió la solicitud.');
+    }
+    await this.validarAlcance(coordinadorId, carreraId);
+    await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+
+    const planAsignaturaRepo = manager.getRepository(PlanAsignatura);
+    const asignatura = await planAsignaturaRepo.findOne({
+      where: { id: dto.planAsignaturaId },
+    });
+    if (
+      !asignatura ||
+      !asignatura.activo ||
+      asignatura.planEstudioId !== estudiante.planEstudioId
+    ) {
+      throw new BadRequestException(
+        'La asignatura no existe, está inactiva o no pertenece al plan actual del estudiante.',
+      );
+    }
+    const periodoRepo = manager.getRepository(PeriodoAcademico);
+    const periodo = await periodoRepo.findOne({
+      where: { id: dto.periodoId },
+    });
+    if (!periodo) {
+      throw new BadRequestException('El período académico no existe.');
+    }
+    this.validarPeriodoDesdeIngreso(
+      periodo,
+      estudiante.periodoIngreso,
+      'El período del resultado académico',
+    );
+    const historialRepo = manager.getRepository(HistorialAcademicoEstudiante);
+    const guardado = await historialRepo.save(
+      historialRepo.create({
+        estudianteId,
+        planAsignaturaId: dto.planAsignaturaId,
+        periodoId: dto.periodoId,
+        resultado: dto.resultado,
+        origenAcademico: dto.origenAcademico,
+        fuenteRegistro: FuenteRegistroAcademico.MANUAL,
+        observaciones: dto.observaciones?.trim() || null,
+        registradoPorUsuarioId: coordinadorId,
+      }),
+    );
+    return guardado.id;
+  }
+
   async listarHistorialPlanes(usuarioId: number, estudianteId: number) {
     await this.obtenerPorId(usuarioId, estudianteId);
     const historial = await this.historialPlanRepository.find({
@@ -301,6 +458,7 @@ export class EstudiantesService {
     dto: CambiarPlanEstudianteDto,
   ) {
     const estudiante = await this.obtenerPorId(usuarioId, estudianteId);
+    await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
     if (estudiante.planEstudioId === dto.planNuevoId)
       throw new ConflictException('El estudiante ya pertenece a ese plan.');
     const planNuevo = await this.planRepository.findOne({
@@ -310,9 +468,8 @@ export class EstudiantesService {
     if (!planNuevo.activo)
       throw new BadRequestException('El nuevo plan se encuentra inactivo.');
     if (planNuevo.carreraId !== estudiante.carreraId) {
-      throw new BadRequestException(
-        'El nuevo plan no pertenece a la carrera del estudiante.',
-      );
+      await this.validarAlcance(usuarioId, planNuevo.carreraId);
+      await this.validarEscrituraJerarquica(usuarioId, planNuevo.carreraId);
     }
     const periodoCambio = await this.periodoRepository.findOne({
       where: { id: dto.periodoCambioId },
@@ -340,9 +497,96 @@ export class EstudiantesService {
       );
       await estudiantes.update(estudianteId, {
         planEstudioId: dto.planNuevoId,
+        carreraId: planNuevo.carreraId,
       });
     });
     return this.obtenerPorId(usuarioId, estudianteId);
+  }
+
+  async cambiarPlanDesdeSolicitud(
+    coordinadorId: number,
+    id: number,
+    carreraId: number,
+    dto: CambiarPlanEstudianteDto,
+    huellaOriginal: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    const repo = manager.getRepository(Estudiante);
+    const estudiante = await repo.findOne({
+      where: { id },
+      relations: { periodoIngreso: true },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+    if (estudiante.carreraId !== carreraId || this.huellaEstudiante(estudiante) !== huellaOriginal) {
+      throw new ConflictException('El estudiante cambió desde que se envió la solicitud.');
+    }
+    await this.validarAlcance(coordinadorId, carreraId);
+    await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    if (estudiante.planEstudioId === dto.planNuevoId) {
+      throw new ConflictException('El estudiante ya pertenece a ese plan.');
+    }
+    const planRepo = manager.getRepository(PlanEstudio);
+    const planNuevo = await planRepo.findOne({ where: { id: dto.planNuevoId } });
+    if (!planNuevo) throw new BadRequestException('El nuevo plan no existe.');
+    if (!planNuevo.activo) throw new BadRequestException('El nuevo plan se encuentra inactivo.');
+    if (planNuevo.carreraId !== estudiante.carreraId) {
+      await this.validarAlcance(coordinadorId, planNuevo.carreraId);
+      await this.validarEscrituraJerarquica(coordinadorId, planNuevo.carreraId);
+    }
+    const periodoRepo = manager.getRepository(PeriodoAcademico);
+    const periodoCambio = await periodoRepo.findOne({ where: { id: dto.periodoCambioId } });
+    if (!periodoCambio) throw new BadRequestException('El período de cambio no existe.');
+    this.validarPeriodoDesdeIngreso(
+      periodoCambio,
+      estudiante.periodoIngreso,
+      'El período del cambio de plan',
+    );
+    const historiales = manager.getRepository(HistorialPlanEstudiante);
+    await historiales.save(
+      historiales.create({
+        estudianteId: id,
+        planAnteriorId: estudiante.planEstudioId,
+        planNuevoId: dto.planNuevoId,
+        periodoCambioId: dto.periodoCambioId,
+        motivo: dto.motivo?.trim() || null,
+        cambiadoPorUsuarioId: coordinadorId,
+      }),
+    );
+    estudiante.planEstudioId = dto.planNuevoId;
+    if (planNuevo.carreraId !== estudiante.carreraId) {
+      estudiante.carreraId = planNuevo.carreraId;
+    }
+    await repo.save(estudiante);
+    return id;
+  }
+
+  async validarDelegacionCompleta(
+    coordinadorId: number,
+    asistenteId: number,
+    carreraId: number,
+  ): Promise<void> {
+    const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(coordinadorId);
+    if (tipo === 'COORDINADOR') {
+      const coordOk = await this.alcanceJerarquico.puedeEjecutar(
+        coordinadorId,
+        PermisoSistema.ESTUDIANTES_GESTIONAR,
+        carreraId,
+      );
+      if (!coordOk) {
+        throw new ForbiddenException('Coordinador sin permiso sobre la carrera.');
+      }
+    }
+    const asisOk = await this.alcanceJerarquico.puedeEjecutar(
+      asistenteId,
+      PermisoSistema.ESTUDIANTES_GESTIONAR,
+      carreraId,
+    );
+    if (!asisOk) {
+      throw new ForbiddenException(
+        'Asistente sin delegación para gestionar estudiantes en esta carrera.',
+      );
+    }
   }
 
   async obtenerProgreso(
@@ -583,6 +827,12 @@ export class EstudiantesService {
   }
 
   private async validarAlcance(usuarioId: number, carreraId: number) {
+    if (await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId)) {
+      if (!(await this.alcanceJerarquico.puedeEjecutar(usuarioId, PermisoSistema.ESTUDIANTES_VER, carreraId))) {
+        throw new ForbiddenException('No posee permiso para consultar estudiantes de esta carrera.');
+      }
+      return;
+    }
     if (
       !(await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
         usuarioId,
@@ -592,6 +842,17 @@ export class EstudiantesService {
       throw new ForbiddenException(
         'No posee alcance académico sobre la carrera del estudiante.',
       );
+    }
+  }
+
+  private async validarEscrituraJerarquica(usuarioId: number, carreraId: number) {
+    const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
+    if (tipo === 'ASISTENTE_ESTUDIANTIL') {
+      throw new ForbiddenException('La escritura del asistente requiere una solicitud aprobada.');
+    }
+    if (tipo === 'COORDINADOR' &&
+      !(await this.alcanceJerarquico.puedeEjecutar(usuarioId, PermisoSistema.ESTUDIANTES_GESTIONAR, carreraId))) {
+      throw new ForbiddenException('No posee permiso para gestionar estudiantes de esta carrera.');
     }
   }
 
@@ -633,11 +894,12 @@ export class EstudiantesService {
     cedula?: string,
     correoInstitucional?: string,
     excluirId?: number,
+    repo: Repository<Estudiante> = this.estudianteRepository,
   ) {
     const id = excluirId ? Not(excluirId) : undefined;
     if (
       cedula &&
-      (await this.estudianteRepository.findOne({
+      (await repo.findOne({
         where: { cedula, ...(id && { id }) },
       }))
     ) {
@@ -645,7 +907,7 @@ export class EstudiantesService {
     }
     if (
       correoInstitucional &&
-      (await this.estudianteRepository.findOne({
+      (await repo.findOne({
         where: { correoInstitucional, ...(id && { id }) },
       }))
     ) {

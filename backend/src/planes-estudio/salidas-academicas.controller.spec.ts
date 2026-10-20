@@ -13,6 +13,7 @@ import { PermisosService } from '../permisos/permisos.service';
 import { TipoSalidaAcademica } from './entities/salida-academica.entity';
 import { SalidasAcademicasController } from './salidas-academicas.controller';
 import { SalidasAcademicasService } from './salidas-academicas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('SalidasAcademicasController', () => {
   const jwtSecret = 'salidas-academicas-test-secret';
@@ -41,6 +42,7 @@ describe('SalidasAcademicasController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },

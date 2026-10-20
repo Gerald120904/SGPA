@@ -13,6 +13,7 @@ import { PermisosService } from '../permisos/permisos.service';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
 import { PlanRequisitosController } from './plan-requisitos.controller';
 import { PlanRequisitosService } from './plan-requisitos.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanRequisitosController', () => {
   const jwtSecret = 'plan-requisitos-test-secret';
@@ -39,6 +40,7 @@ describe('PlanRequisitosController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },

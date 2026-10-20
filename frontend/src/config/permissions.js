@@ -183,6 +183,10 @@ export function puedeAcceder(
     return true;
   }
 
+  if (modulo === 'mis-asistentes') {
+    return roles.includes(ROLES.COORDINADOR) || roles.includes(ROLES.ASISTENTE_ESTUDIANTIL);
+  }
+
 
   /*
    * Superusuario.
@@ -204,6 +208,11 @@ export function puedeAcceder(
     modulo === 'usuarios'
   ) {
     return false;
+  }
+
+  if (modulo === 'cursos' && Array.isArray(permisos) &&
+    permisos.includes(PERMISOS.CURSOS_GESTIONAR)) {
+    return true;
   }
 
 

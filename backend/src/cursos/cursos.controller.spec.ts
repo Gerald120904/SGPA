@@ -172,7 +172,7 @@ describe('CursosController', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200, { id: 1 });
 
-    expect(cursosService.obtenerPorId).toHaveBeenCalledWith(1);
+    expect(cursosService.obtenerPorId).toHaveBeenCalledWith(1, 1);
   });
 
   it('responde 403 al consultar asignaturas disponibles sin CURSOS_GESTIONAR', async () => {
@@ -203,7 +203,7 @@ describe('CursosController', () => {
       planId: 2,
       nivel: 1,
       ciclo: 2,
-    });
+    }, 1);
   });
 
   it('responde 403 al crear un curso sin CURSOS_GESTIONAR', async () => {
@@ -239,7 +239,7 @@ describe('CursosController', () => {
         id: 1,
       });
 
-    expect(cursosService.crear).toHaveBeenCalledWith(dto);
+    expect(cursosService.crear).toHaveBeenCalledWith(dto, 1);
   });
 
   it('rechaza crear un curso sin planAsignaturaId', async () => {
@@ -331,7 +331,7 @@ describe('CursosController', () => {
         id: 1,
       });
 
-    expect(cursosService.actualizar).toHaveBeenCalledWith(1, dto);
+    expect(cursosService.actualizar).toHaveBeenCalledWith(1, dto, 1);
   });
 
   it('rechaza modificar manualmente el código de un curso', async () => {
@@ -376,7 +376,7 @@ describe('CursosController', () => {
         id: 1,
       });
 
-    expect(cursosService.cambiarEstado).toHaveBeenCalledWith(1, false);
+    expect(cursosService.cambiarEstado).toHaveBeenCalledWith(1, false, 1);
   });
 
   it('rechaza estado que no sea boolean', async () => {

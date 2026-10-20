@@ -8,6 +8,8 @@ import { App } from 'supertest/types';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { TipoOptativa } from './constants/tipo-optativa.constant';
 import { OptativasController } from './optativas.controller';
@@ -24,6 +26,10 @@ describe('OptativasController', () => {
     cambiarEstado: jest.fn(),
   };
 
+  const permisosService = {
+    usuarioTienePermisos: jest.fn().mockResolvedValue(true),
+  };
+
   let app: INestApplication<App>;
   let jwtService: JwtService;
 
@@ -38,6 +44,11 @@ describe('OptativasController', () => {
       providers: [
         AuthGuard,
         RolesGuard,
+        PermisosGuard,
+        {
+          provide: PermisosService,
+          useValue: permisosService,
+        },
         {
           provide: ConfigService,
           useValue: {
@@ -122,7 +133,7 @@ describe('OptativasController', () => {
       .expect(200);
 
     expect(response.body).toEqual(optativa);
-    expect(optativasService.obtenerPorId).toHaveBeenCalledWith(1);
+    expect(optativasService.obtenerPorId).toHaveBeenCalledWith(1, 1);
   });
 
   it('POST /optativas - crea una optativa', async () => {
@@ -141,12 +152,15 @@ describe('OptativasController', () => {
       .expect(201);
 
     expect(response.body).toEqual(nueva);
-    expect(optativasService.crear).toHaveBeenCalledWith({
-      codigo: 'EIF472',
-      nombre: 'Seguridad Informática',
-      tipo: TipoOptativa.DISCIPLINARIA,
-      carreraOrigenId: 1,
-    });
+    expect(optativasService.crear).toHaveBeenCalledWith(
+      {
+        codigo: 'EIF472',
+        nombre: 'Seguridad Informática',
+        tipo: TipoOptativa.DISCIPLINARIA,
+        carreraOrigenId: 1,
+      },
+      1,
+    );
   });
 
   it('PATCH /optativas/:id - actualiza una optativa', async () => {
@@ -162,9 +176,13 @@ describe('OptativasController', () => {
       .expect(200);
 
     expect(response.body).toEqual(actualizada);
-    expect(optativasService.actualizar).toHaveBeenCalledWith(1, {
-      tipo: TipoOptativa.ABIERTA,
-    });
+    expect(optativasService.actualizar).toHaveBeenCalledWith(
+      1,
+      {
+        tipo: TipoOptativa.ABIERTA,
+      },
+      1,
+    );
   });
 
   it('PATCH /optativas/:id/estado - cambia el estado de una optativa', async () => {
@@ -180,6 +198,6 @@ describe('OptativasController', () => {
       .expect(200);
 
     expect(response.body).toEqual(actualizada);
-    expect(optativasService.cambiarEstado).toHaveBeenCalledWith(1, false);
+    expect(optativasService.cambiarEstado).toHaveBeenCalledWith(1, false, 1);
   });
 });

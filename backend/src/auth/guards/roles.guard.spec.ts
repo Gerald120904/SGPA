@@ -33,6 +33,17 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(crearContexto())).toBe(true);
   });
 
+  it('cierra rutas sin decorador de roles a cuentas jerarquicas', () => {
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    const context = {
+      getHandler: jest.fn(), getClass: jest.fn().mockReturnValue(class OtroController {}),
+      switchToHttp: () => ({ getRequest: () => ({
+        user: { roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true },
+      }) }),
+    } as unknown as ExecutionContext;
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+  });
+
   it('permite un usuario con un rol autorizado', () => {
     reflector.getAllAndOverride.mockReturnValue([RolSistema.ADMIN_GLOBAL]);
 

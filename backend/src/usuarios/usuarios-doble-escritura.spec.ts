@@ -11,6 +11,9 @@ import { PermisosService } from '../permisos/permisos.service';
 import { UsuariosService } from './usuarios.service';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
+import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
+import { SolicitudCambio } from './entities/solicitud-cambio.entity';
+import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
 
 describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)', () => {
   let usuariosService: UsuariosService;
@@ -221,6 +224,15 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
               save: async (d: any) => d,
               delete: async () => {},
             };
+          }
+          if (entity === DependenciaUsuario) {
+            return { find: async () => [], save: async (items: any) => items };
+          }
+          if (entity === SolicitudCambio) {
+            return { update: async () => ({ affected: 0 }) };
+          }
+          if (entity === AuditoriaJerarquia) {
+            return { save: async (item: any) => item };
           }
           throw new Error(`Repositorio no mockeado para ${entity?.name}`);
         }),

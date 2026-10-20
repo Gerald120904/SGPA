@@ -7,12 +7,13 @@ const { assertOnlyQa004Qa005Pending, assertQa004Qa005Configured } =
 describe('runner de migraciones QA-004 y QA-005', () => {
   const qa004 = { name: 'AddOptativeRuleCounts2026101500000' };
   const qa005 = { name: 'AddAulaEquipmentInventory2026101600000' };
+  const jerarquia = { name: 'AddHierarchicalAccess2026101900000' };
   const ajena = { name: 'MigrationUnexpected2026101400000' };
 
   it('acepta únicamente QA-004 y QA-005 configuradas y pendientes', () => {
-    expect(() => assertQa004Qa005Configured([qa004, qa005])).not.toThrow();
+    expect(() => assertQa004Qa005Configured([qa004, qa005, jerarquia])).not.toThrow();
     expect(() => assertOnlyQa004Qa005Pending([qa005])).not.toThrow();
-    expect(() => assertOnlyQa004Qa005Pending([qa004, qa005])).not.toThrow();
+    expect(() => assertOnlyQa004Qa005Pending([qa004, qa005, jerarquia])).not.toThrow();
     expect(() => assertOnlyQa004Qa005Pending([])).not.toThrow();
   });
 

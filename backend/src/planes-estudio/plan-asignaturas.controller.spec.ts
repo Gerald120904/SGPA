@@ -14,6 +14,7 @@ import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { PlanAsignaturasController } from './plan-asignaturas.controller';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanAsignaturasController', () => {
   const jwtSecret = 'plan-asignaturas-test-secret';
@@ -42,6 +43,7 @@ describe('PlanAsignaturasController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },

@@ -492,7 +492,7 @@ export function CursosTabla({
             </button>
 
             ${
-              puedeGestionar
+              (curso.puedeGestionarGlobal ?? puedeGestionar)
                 ? `
                   <button
                     class="cursos-icon-button"

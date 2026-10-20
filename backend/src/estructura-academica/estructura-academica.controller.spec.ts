@@ -108,7 +108,7 @@ describe('EstructuraAcademicaController', () => {
     });
   }
 
-  it('GET /estructura-academica/areas - permite a COORDINADOR', async () => {
+  it('GET /estructura-academica/areas - permite a COORDINADOR legacy', async () => {
     const token = await crearToken(['COORDINADOR']);
 
     await request(app.getHttpServer())

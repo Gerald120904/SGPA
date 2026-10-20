@@ -394,4 +394,121 @@ describe('OptativasService', () => {
     expect(optativaRepository.save).toHaveBeenCalled();
     expect(resultado.carreraOrigenId).toBe(2);
   });
+
+  describe('Jerarquía y alcance por carrera', () => {
+    let alcance: {
+      tipoCuentaJerarquica: jest.Mock;
+      obtenerCarrerasAutorizadas: jest.Mock;
+      puedeEjecutar: jest.Mock;
+      puedeAdministrarAsistente: jest.Mock;
+    };
+    let serviceJerarquico: OptativasService;
+
+    beforeEach(() => {
+      alcance = {
+        tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR'),
+        obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([1]),
+        puedeEjecutar: jest.fn().mockResolvedValue(true),
+        puedeAdministrarAsistente: jest.fn().mockResolvedValue(true),
+      };
+      serviceJerarquico = new OptativasService(
+        optativaRepository as unknown as Repository<CursoOptativo>,
+        cursoRepository as unknown as Repository<Curso>,
+        carreraRepository as unknown as Repository<Carrera>,
+        alcance as any,
+      );
+    });
+
+    it('un coordinador solo puede consultar optativas disciplinarias de su carrera', async () => {
+      const optativaAjena = crearCursoOptativo({ carreraOrigenId: 99 });
+      optativaRepository.findOne.mockResolvedValue(optativaAjena);
+
+      await expect(serviceJerarquico.obtenerPorId(1, 10)).rejects.toThrow(
+        'Optativa disciplinaria fuera de las carreras autorizadas.',
+      );
+    });
+
+    it('un asistente no puede escribir directamente y debe enviar propuesta', async () => {
+      alcance.tipoCuentaJerarquica.mockResolvedValue('ASISTENTE_ESTUDIANTIL');
+
+      await expect(
+        serviceJerarquico.crear(
+          {
+            codigo: 'OPT-1',
+            nombre: 'Optativa 1',
+            tipo: TipoOptativa.DISCIPLINARIA,
+            carreraOrigenId: 1,
+          },
+          20,
+        ),
+      ).rejects.toThrow('La escritura del asistente requiere una propuesta aprobada.');
+    });
+
+    it('un coordinador no puede gestionar optativas abiertas institucionales directamente', async () => {
+      await expect(
+        serviceJerarquico.crear(
+          {
+            codigo: 'OPT-1',
+            nombre: 'Optativa Institucional',
+            tipo: TipoOptativa.ABIERTA,
+          },
+          10,
+        ),
+      ).rejects.toThrow('Solo el administrador global puede gestionar optativas institucionales.');
+    });
+
+    it('crearDesdeSolicitud persiste la optativa atómicamente en la transacción', async () => {
+      const manager = {
+        getRepository: jest.fn().mockImplementation((entity) => {
+          if (entity === Carrera) {
+            return { findOne: jest.fn().mockResolvedValue(carreraInformatica) };
+          }
+          if (entity === Curso) {
+            return {
+              findOne: jest.fn().mockResolvedValue(null),
+              create: jest.fn((d) => d),
+              save: jest.fn(async (d) => ({ id: 50, ...d })),
+            };
+          }
+          if (entity === CursoOptativo) {
+            return {
+              findOne: jest.fn().mockResolvedValue(null),
+              create: jest.fn((d) => d),
+              save: jest.fn(async (d) => ({ id: 100, ...d })),
+            };
+          }
+          return null;
+        }),
+      };
+
+      const creada = await serviceJerarquico.crearDesdeSolicitud(manager as any, 1, {
+        codigo: 'OPT-100',
+        nombre: 'Criptografía',
+        tipo: TipoOptativa.DISCIPLINARIA,
+      });
+
+      expect(creada.id).toBe(100);
+      expect(creada.carreraOrigenId).toBe(1);
+    });
+
+    it('actualizarDesdeSolicitud detecta cambios concurrentes mediante huella', async () => {
+      const optativa = crearCursoOptativo({ updatedAt: new Date('2026-01-01') });
+      const manager = {
+        getRepository: jest.fn().mockReturnValue({
+          findOne: jest.fn().mockResolvedValue(optativa),
+          save: jest.fn(async (d) => d),
+        }),
+      };
+
+      await expect(
+        serviceJerarquico.actualizarDesdeSolicitud(
+          manager as any,
+          1,
+          1,
+          { descripcion: 'Nueva desc' },
+          'huella-desactualizada',
+        ),
+      ).rejects.toThrow('La optativa fue modificada después de registrar la propuesta.');
+    });
+  });
 });

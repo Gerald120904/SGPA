@@ -12,6 +12,7 @@ import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { PlanReglasOptativasController } from './plan-reglas-optativas.controller';
 import { PlanReglasOptativasService } from './plan-reglas-optativas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanReglasOptativasController', () => {
   const jwtSecret = 'test-secret';
@@ -42,6 +43,7 @@ describe('PlanReglasOptativasController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: {

@@ -19,12 +19,12 @@ describe('PermisosGuard', () => {
     );
   });
 
-  function crearContexto(user: any): ExecutionContext {
+  function crearContexto(user: any, method?: string, clase?: string): ExecutionContext {
     return {
       getHandler: jest.fn(),
-      getClass: jest.fn(),
+      getClass: jest.fn().mockReturnValue(clase ? { name: clase } : undefined),
       switchToHttp: jest.fn().mockReturnValue({
-        getRequest: jest.fn().mockReturnValue({ user }),
+        getRequest: jest.fn().mockReturnValue({ user, method }),
       }),
     } as unknown as ExecutionContext;
   }
@@ -35,6 +35,14 @@ describe('PermisosGuard', () => {
 
     const result = await guard.canActivate(context);
     expect(result).toBe(true);
+  });
+
+  it('cierra rutas sin decorador de permiso a cuentas jerarquicas', async () => {
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    const context = crearContexto({
+      sub: 2, roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true,
+    });
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
   });
 
   it('lanza ForbiddenException si no hay usuario en request', async () => {
@@ -78,6 +86,16 @@ describe('PermisosGuard', () => {
     expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(10, [
       PermisoSistema.ATESTADOS_VALIDAR,
     ]);
+  });
+
+  it('gestionar Cursos permite su lectura jerárquica, sin habilitar escritura del asistente', async () => {
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.CURSOS_VER]);
+    permisosService.usuarioTienePermisos.mockImplementation(async (_id, permisos) =>
+      permisos[0] === PermisoSistema.CURSOS_GESTIONAR);
+    const user = { sub: 3, roles: [RolSistema.ASISTENTE_ESTUDIANTIL], jerarquiaConfigurada: true };
+    await expect(guard.canActivate(crearContexto(user, 'GET', 'CursosController'))).resolves.toBe(true);
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.CURSOS_GESTIONAR]);
+    await expect(guard.canActivate(crearContexto(user, 'POST', 'CursosController'))).rejects.toThrow(ForbiddenException);
   });
 
   it('lanza ForbiddenException si el usuario no posee los permisos requeridos', async () => {

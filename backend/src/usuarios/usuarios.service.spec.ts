@@ -103,6 +103,7 @@ describe('UsuariosService', () => {
   let txUsuarioRepository: {
     create: jest.Mock;
     save: jest.Mock;
+    findOne: jest.Mock;
   };
   let txUsuarioRolRepository: {
     create: jest.Mock;
@@ -160,6 +161,7 @@ describe('UsuariosService', () => {
     txUsuarioRepository = {
       create: jest.fn((datos) => datos),
       save: jest.fn(),
+      findOne: jest.fn().mockResolvedValue({ id: 1 }),
     };
     txUsuarioRolRepository = {
       create: jest.fn((datos) => datos),
@@ -501,7 +503,7 @@ describe('UsuariosService', () => {
     expect(txUsuarioPermisoRepository.save).not.toHaveBeenCalled();
   });
 
-  it('crea COORDINADOR sin permisos y aplica la plantilla sugerida', async () => {
+  it('crea COORDINADOR sin permisos generales hasta configurar carreras', async () => {
     const usuarioCreado = crearUsuario();
     usuarioRepository.findOne
       .mockResolvedValueOnce(null)
@@ -522,42 +524,10 @@ describe('UsuariosService', () => {
       roles: [RolSistema.COORDINADOR],
     });
 
-    expect(txUsuarioPermisoRepository.save).toHaveBeenCalledTimes(1);
-    const permisosGuardados = txUsuarioPermisoRepository.save.mock.calls[0][0];
-    expect(permisosGuardados.length).toBeGreaterThan(0);
-    expect(
-      permisosGuardados.some(
-        (p: { permiso: PermisoSistema }) =>
-          p.permiso === PermisoSistema.PERIODOS_VER,
-      ),
-    ).toBe(true);
-    expect(
-      permisosGuardados.some(
-        (p: { permiso: PermisoSistema }) =>
-          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_VER,
-      ),
-    ).toBe(true);
-    expect(
-      permisosGuardados.some(
-        (p: { permiso: PermisoSistema }) =>
-          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_CREAR,
-      ),
-    ).toBe(true);
-    expect(
-      permisosGuardados.some(
-        (p: { permiso: PermisoSistema }) =>
-          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
-      ),
-    ).toBe(true);
-    expect(
-      permisosGuardados.some(
-        (p: { permiso: PermisoSistema }) =>
-          p.permiso === PermisoSistema.FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS,
-      ),
-    ).toBe(true);
+    expect(txUsuarioPermisoRepository.save).not.toHaveBeenCalled();
   });
 
-  it('crea COORDINADOR con permisos específicos y guarda solo los indicados', async () => {
+  it('no concede permisos generales enviados al crear COORDINADOR', async () => {
     const usuarioCreado = crearUsuario();
     usuarioRepository.findOne
       .mockResolvedValueOnce(null)
@@ -579,15 +549,7 @@ describe('UsuariosService', () => {
       permisos: [PermisoSistema.PERIODOS_VER],
     });
 
-    expect(txUsuarioPermisoRepository.save).toHaveBeenCalledTimes(1);
-    const permisosGuardados = txUsuarioPermisoRepository.save.mock.calls[0][0];
-    expect(permisosGuardados).toEqual([
-      {
-        usuarioId: 4,
-        permiso: PermisoSistema.PERIODOS_VER,
-        activo: true,
-      },
-    ]);
+    expect(txUsuarioPermisoRepository.save).not.toHaveBeenCalled();
   });
 
   it('rechaza una cédula duplicada antes de crear', async () => {
@@ -747,6 +709,15 @@ describe('UsuariosService', () => {
       activo: false,
     });
     expect(resultado.activo).toBe(false);
+  });
+
+  it('impide reactivar un asistente cuya dependencia fue desactivada', async () => {
+    usuarioRepository.findOne.mockResolvedValue(crearUsuario({
+      id: 4, activo: false,
+      usuarioRoles: [{ usuarioId: 4, rolId: 4, rol: rolEstudiante } as UsuarioRol],
+    }));
+    await expect(service.cambiarEstado(4, true, 1)).rejects.toThrow(BadRequestException);
+    expect(usuarioRepository.update).not.toHaveBeenCalled();
   });
 
   it('impide asignar un rol duplicado', async () => {

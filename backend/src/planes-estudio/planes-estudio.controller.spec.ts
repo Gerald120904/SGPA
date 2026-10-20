@@ -13,6 +13,7 @@ import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { PlanesEstudioController } from './planes-estudio.controller';
 import { PlanesEstudioService } from './planes-estudio.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanesEstudioController', () => {
   const jwtSecret = 'planes-estudio-controller-test-secret';
@@ -40,6 +41,7 @@ describe('PlanesEstudioController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
@@ -121,7 +123,7 @@ describe('PlanesEstudioController', () => {
       .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
       .expect(200, []);
 
-    expect(service.listar).toHaveBeenCalledTimes(1);
+    expect(service.listar).toHaveBeenCalledWith(1);
     expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
@@ -132,7 +134,7 @@ describe('PlanesEstudioController', () => {
       .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200, []);
 
-    expect(service.listar).toHaveBeenCalledTimes(1);
+    expect(service.listar).toHaveBeenCalledWith(1);
   });
 
   it('responde 403 sin PLANES_ESTUDIO_VER', async () => {

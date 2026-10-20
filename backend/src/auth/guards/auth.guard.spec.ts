@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
+import { DependenciaUsuario } from '../../usuarios/entities/dependencia-usuario.entity';
 import { AuthGuard } from './auth.guard';
 
 describe('AuthGuard', () => {
@@ -10,6 +11,7 @@ describe('AuthGuard', () => {
   let jwtService: { verifyAsync: jest.Mock };
   let configService: { get: jest.Mock };
   let usuarioRepository: { findOne: jest.Mock };
+  let dependenciaRepository: { findOne: jest.Mock };
 
   const jwtSecret = 'test-secret';
 
@@ -23,12 +25,31 @@ describe('AuthGuard', () => {
     usuarioRepository = {
       findOne: jest.fn(),
     };
+    dependenciaRepository = { findOne: jest.fn() };
 
     guard = new AuthGuard(
       jwtService as unknown as JwtService,
       configService as unknown as ConfigService,
       usuarioRepository as unknown as Repository<Usuario>,
+      dependenciaRepository as unknown as Repository<DependenciaUsuario>,
     );
+  });
+
+  it('mantiene el bloqueo jerarquico tras revocar la ultima carrera del coordinador', async () => {
+    jwtService.verifyAsync.mockResolvedValue({ sub: 2, correo: 'coord@sgpa.local' });
+    usuarioRepository.findOne.mockResolvedValue({
+      id: 2, activo: true,
+      usuarioRoles: [{ rol: { nombre: 'COORDINADOR', activo: true } }],
+    });
+    guard = new AuthGuard(
+      jwtService as unknown as JwtService,
+      configService as unknown as ConfigService,
+      usuarioRepository as unknown as Repository<Usuario>,
+      dependenciaRepository as unknown as Repository<DependenciaUsuario>,
+    );
+    const context = crearContexto('Bearer token-coordinador');
+    await guard.canActivate(context);
+    expect(context.switchToHttp().getRequest().user.jerarquiaConfigurada).toBe(true);
   });
 
   function crearContexto(authHeader?: string): ExecutionContext {
@@ -105,6 +126,18 @@ describe('AuthGuard', () => {
   });
 
   describe('validación de estado y roles en base de datos (QA-002 y QA-003)', () => {
+    it('rechaza un token anterior cuando el asistente perdió su dependencia', async () => {
+      jwtService.verifyAsync.mockResolvedValue({ sub: 3, correo: 'asistente@una.cr', roles: ['ASISTENTE_ESTUDIANTIL'] });
+      usuarioRepository.findOne.mockResolvedValue({ id: 3, activo: true,
+        usuarioRoles: [{ rol: { nombre: 'ASISTENTE_ESTUDIANTIL', activo: true } }] });
+      const dependencias = { findOne: jest.fn().mockResolvedValue(null) };
+      guard = new AuthGuard(jwtService as unknown as JwtService,
+        configService as unknown as ConfigService,
+        usuarioRepository as unknown as Repository<Usuario>,
+        dependencias as unknown as Repository<DependenciaUsuario>);
+      await expect(guard.canActivate(crearContexto('Bearer token-anterior')))
+        .rejects.toThrow(UnauthorizedException);
+    });
     it('lanza UnauthorizedException si el usuario no existe en la base de datos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
         sub: 999,

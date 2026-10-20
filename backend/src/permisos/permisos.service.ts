@@ -1,5 +1,6 @@
 import {
   Injectable,
+  ConflictException,
   InternalServerErrorException,
   NotFoundException,
   Optional,
@@ -19,6 +20,7 @@ import {
 } from './constants/plantillas-permisos.constant';
 import { UsuarioPermiso } from './entities/usuario-permiso.entity';
 import { UsuarioPermisoExcepcion } from './entities/usuario-permiso-excepcion.entity';
+import { PermisoCarrera } from './entities/permiso-carrera.entity';
 
 @Injectable()
 export class PermisosService {
@@ -36,6 +38,9 @@ export class PermisosService {
     @Optional()
     @InjectRepository(UsuarioPermisoExcepcion)
     private readonly usuarioPermisoExcepcionRepository?: Repository<UsuarioPermisoExcepcion>,
+    @Optional()
+    @InjectRepository(PermisoCarrera)
+    private readonly permisoCarreraRepository?: Repository<PermisoCarrera>,
   ) {}
 
   activarPoliticaOpcionB(activa = true): void {
@@ -99,6 +104,16 @@ export class PermisosService {
 
     if (rolesActivos.includes(RolSistema.ADMIN_GLOBAL)) {
       return new Set(PERMISOS_SISTEMA);
+    }
+
+    if (this.permisoCarreraRepository && rolesActivos.some((rol) =>
+      rol === RolSistema.COORDINADOR || rol === RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      const porCarrera = await this.permisoCarreraRepository.find({ where: { usuarioId, activo: true } });
+      const efectivos = new Set<PermisoSistema>(porCarrera.map((p) => p.permiso));
+      if (rolesActivos.includes(RolSistema.PROFESOR)) {
+        for (const p of PERMISOS_PREDETERMINADOS_POR_ROL[RolSistema.PROFESOR]) efectivos.add(p);
+      }
+      return efectivos;
     }
 
     const base = new Set<PermisoSistema>();
@@ -261,6 +276,13 @@ export class PermisosService {
       efectivos = new Set();
     } else if (rolesActivos.includes(RolSistema.ADMIN_GLOBAL)) {
       efectivos = new Set(PERMISOS_SISTEMA);
+    } else if (this.permisoCarreraRepository && rolesActivos.some((rol) =>
+      rol === RolSistema.COORDINADOR || rol === RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      const porCarrera = await manager.getRepository(PermisoCarrera).find({ where: { usuarioId, activo: true } });
+      efectivos = new Set<PermisoSistema>(porCarrera.map((p) => p.permiso));
+      if (rolesActivos.includes(RolSistema.PROFESOR)) {
+        for (const p of PERMISOS_PREDETERMINADOS_POR_ROL[RolSistema.PROFESOR]) efectivos.add(p);
+      }
     } else {
       const base = new Set<PermisoSistema>();
       for (const rol of rolesActivos) {
@@ -336,6 +358,11 @@ export class PermisosService {
     const rolesActivos = (usuario.usuarioRoles || [])
       .filter((rel) => rel.rol && rel.rol.activo)
       .map((rel) => rel.rol.nombre as RolSistema);
+
+    if (this.permisoCarreraRepository &&
+      rolesActivos.some((rol) => rol === RolSistema.COORDINADOR || rol === RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      throw new ConflictException('Los permisos jerárquicos deben configurarse por carrera.');
+    }
 
     return this.dataSource.transaction(async (manager) => {
       const repoLegacy = manager.getRepository(UsuarioPermiso);

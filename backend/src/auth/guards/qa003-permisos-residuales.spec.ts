@@ -57,6 +57,7 @@ describe('QA-003 Fase 3 — Análisis de Permisos Residuales', () => {
       jwtService as unknown as JwtService,
       configService as unknown as ConfigService,
       usuarioRepository as unknown as Repository<Usuario>,
+      { findOne: jest.fn() } as any,
     );
     rolesGuard = new RolesGuard(reflector as unknown as Reflector);
     permisosGuard = new PermisosGuard(

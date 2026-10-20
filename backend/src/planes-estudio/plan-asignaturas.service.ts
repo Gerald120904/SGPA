@@ -5,7 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Not, Repository } from 'typeorm';
+import { createHash } from 'node:crypto';
+import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { ActualizarPlanAsignaturaDto } from './dto/actualizar-plan-asignatura.dto';
@@ -596,5 +597,370 @@ export class PlanAsignaturasService {
 
     await this.asignaturaRepository.update(id, { activo });
     return this.obtenerAsignatura(planId, id);
+  }
+
+  huellaAsignatura(asignatura: PlanAsignatura): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          id: asignatura.id,
+          planEstudioId: asignatura.planEstudioId,
+          nivel: asignatura.nivel,
+          ciclo: asignatura.ciclo,
+          orden: asignatura.orden,
+          creditos: asignatura.creditos,
+          horasTeoria: asignatura.horasTeoria,
+          horasPractica: asignatura.horasPractica,
+          horasLaboratorio: asignatura.horasLaboratorio,
+          horasGira: asignatura.horasGira,
+          horasEstudioIndependiente: asignatura.horasEstudioIndependiente,
+          horasTotales: asignatura.horasTotales,
+          horasDocente: asignatura.horasDocente,
+          tipo: asignatura.tipo,
+          tipoOptativa: asignatura.tipoOptativa,
+          codigoReferencia: asignatura.codigoReferencia,
+          nombreReferencia: asignatura.nombreReferencia,
+          activo: asignatura.activo,
+          cursoId: asignatura.cursoId,
+          updatedAt: asignatura.updatedAt ? new Date(asignatura.updatedAt).toISOString() : null,
+        }),
+      )
+      .digest('hex');
+  }
+
+  async obtenerAsignaturaParaSolicitud(planId: number, id: number): Promise<PlanAsignatura> {
+    return this.obtenerAsignatura(planId, id);
+  }
+
+  async crearDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    dto: CrearPlanAsignaturaDto,
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asignaturaRepo = manager.getRepository(PlanAsignatura);
+    const reglaRepo = manager.getRepository(ReglaOptativaPlan);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const codigoReferencia = dto.codigoReferencia.trim().toUpperCase();
+    const nombreReferencia = dto.nombreReferencia.trim();
+    if (!codigoReferencia) throw new BadRequestException('El código de la asignatura es obligatorio.');
+    if (!nombreReferencia) throw new BadRequestException('El nombre de la asignatura es obligatorio.');
+
+    if (dto.tipo !== TipoPlanAsignatura.OPTATIVA && dto.tipo !== TipoPlanAsignatura.GENERAL) {
+      const existente = await asignaturaRepo.findOne({
+        where: { planEstudioId: planId, codigoReferencia },
+      });
+      if (existente) {
+        throw new ConflictException('Ya existe una asignatura con ese código en este plan de estudio.');
+      }
+    }
+
+    const tipoOptativa = this.normalizarTipoOptativa(dto.tipo, dto.tipoOptativa);
+
+    if (dto.tipo === TipoPlanAsignatura.OPTATIVA) {
+      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
+      if (!regla) {
+        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
+      }
+      const actuales = await asignaturaRepo.count({
+        where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tipoOptativa!, activo: true },
+      });
+      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa!);
+      if (actuales >= limite) {
+        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa!);
+        throw new ConflictException(`Se alcanzó el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
+      }
+    }
+
+    const [ultima] = await asignaturaRepo.find({
+      where: { planEstudioId: planId, nivel: dto.nivel, ciclo: dto.ciclo },
+      order: { orden: 'DESC' },
+      take: 1,
+    });
+    const siguiente = Number(ultima?.orden || 0) + 1;
+    if (siguiente > 200) {
+      throw new ConflictException('El ciclo alcanzó el orden máximo permitido.');
+    }
+
+    const nueva = asignaturaRepo.create({
+      planEstudioId: planId,
+      cursoId: null,
+      curso: null,
+      nivel: dto.nivel,
+      ciclo: dto.ciclo,
+      orden: siguiente,
+      creditos: dto.creditos,
+      horasTeoria: dto.horasTeoria ?? null,
+      horasPractica: dto.horasPractica ?? null,
+      horasLaboratorio: dto.horasLaboratorio ?? null,
+      horasGira: dto.horasGira ?? null,
+      horasEstudioIndependiente: dto.horasEstudioIndependiente ?? null,
+      horasTotales: dto.horasTotales ?? null,
+      horasDocente: dto.horasDocente ?? null,
+      observacionHoras: dto.observacionHoras?.trim() || null,
+      tipo: dto.tipo,
+      tipoOptativa,
+      codigoReferencia,
+      nombreReferencia,
+      activo: true,
+    });
+
+    const guardada = await asignaturaRepo.save(nueva);
+    return guardada.id;
+  }
+
+  async actualizarDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    id: number,
+    dto: ActualizarPlanAsignaturaDto,
+    huellaOriginal: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asignaturaRepo = manager.getRepository(PlanAsignatura);
+    const reglaRepo = manager.getRepository(ReglaOptativaPlan);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const asignatura = await asignaturaRepo.findOne({
+      where: { id, planEstudioId: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!asignatura) throw new NotFoundException('Asignatura del plan no encontrada.');
+
+    if (this.huellaAsignatura(asignatura) !== huellaOriginal) {
+      throw new ConflictException('La asignatura del plan cambió desde que se envió la solicitud.');
+    }
+
+    this.validarIdentidadAsignaturaVinculada(asignatura, dto);
+
+    const tipoResultante = dto.tipo ?? asignatura.tipo;
+    const tipoOptativaResultante = this.normalizarTipoOptativa(
+      tipoResultante,
+      dto.tipoOptativa !== undefined ? dto.tipoOptativa : asignatura.tipoOptativa,
+    );
+    const codigoResultante =
+      dto.codigoReferencia !== undefined
+        ? (dto.codigoReferencia?.trim().toUpperCase() ?? '')
+        : (asignatura.codigoReferencia?.trim().toUpperCase() ?? '');
+
+    if (dto.codigoReferencia !== undefined || dto.tipo !== undefined) {
+      if (!codigoResultante) throw new BadRequestException('La asignatura debe tener un código.');
+      if (tipoResultante !== TipoPlanAsignatura.OPTATIVA && tipoResultante !== TipoPlanAsignatura.GENERAL) {
+        const existente = await asignaturaRepo.findOne({
+          where: { planEstudioId: planId, codigoReferencia: codigoResultante },
+        });
+        if (existente && existente.id !== id) {
+          throw new ConflictException('Ya existe una asignatura con ese código en este plan de estudio.');
+        }
+      }
+    }
+
+    if (tipoResultante === TipoPlanAsignatura.OPTATIVA && asignatura.activo) {
+      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
+      if (!regla) {
+        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
+      }
+      const actuales = await asignaturaRepo.count({
+        where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tipoOptativaResultante!, activo: true, id: Not(id) },
+      });
+      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativaResultante!);
+      if (actuales >= limite) {
+        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativaResultante!);
+        throw new ConflictException(`Se alcanzó el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
+      }
+    }
+
+    if (dto.nivel !== undefined) asignatura.nivel = dto.nivel;
+    if (dto.ciclo !== undefined) asignatura.ciclo = dto.ciclo;
+    if (dto.orden !== undefined) asignatura.orden = dto.orden;
+    if (dto.creditos !== undefined) asignatura.creditos = dto.creditos;
+    if (dto.horasTeoria !== undefined) asignatura.horasTeoria = dto.horasTeoria;
+    if (dto.horasPractica !== undefined) asignatura.horasPractica = dto.horasPractica;
+    if (dto.horasLaboratorio !== undefined) asignatura.horasLaboratorio = dto.horasLaboratorio;
+    if (dto.horasGira !== undefined) asignatura.horasGira = dto.horasGira;
+    if (dto.horasEstudioIndependiente !== undefined) asignatura.horasEstudioIndependiente = dto.horasEstudioIndependiente;
+    if (dto.horasTotales !== undefined) asignatura.horasTotales = dto.horasTotales;
+    if (dto.horasDocente !== undefined) asignatura.horasDocente = dto.horasDocente;
+    if (dto.observacionHoras !== undefined) asignatura.observacionHoras = dto.observacionHoras?.trim() || null;
+    if (dto.tipo !== undefined) asignatura.tipo = dto.tipo;
+    asignatura.tipoOptativa = tipoOptativaResultante;
+    if (dto.codigoReferencia !== undefined) asignatura.codigoReferencia = codigoResultante;
+    if (dto.nombreReferencia !== undefined) {
+      const nombre = dto.nombreReferencia?.trim() ?? '';
+      if (!nombre) throw new BadRequestException('El nombre de la asignatura no puede estar vacío.');
+      asignatura.nombreReferencia = nombre;
+    }
+
+    await asignaturaRepo.save(asignatura);
+    return id;
+  }
+
+  async cambiarEstadoDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    id: number,
+    activo: boolean,
+    huellaOriginal: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asignaturaRepo = manager.getRepository(PlanAsignatura);
+    const reglaRepo = manager.getRepository(ReglaOptativaPlan);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const asignatura = await asignaturaRepo.findOne({
+      where: { id, planEstudioId: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!asignatura) throw new NotFoundException('Asignatura del plan no encontrada.');
+
+    if (this.huellaAsignatura(asignatura) !== huellaOriginal) {
+      throw new ConflictException('La asignatura del plan cambió desde que se envió la solicitud.');
+    }
+
+    if (activo && asignatura.tipo === TipoPlanAsignatura.OPTATIVA) {
+      const tipoOptativa = this.normalizarTipoOptativa(asignatura.tipo, asignatura.tipoOptativa);
+      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
+      if (!regla) {
+        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
+      }
+      const actuales = await asignaturaRepo.count({
+        where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tipoOptativa!, activo: true, id: Not(id) },
+      });
+      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa!);
+      if (actuales >= limite) {
+        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa!);
+        throw new ConflictException(`Se alcanzó el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
+      }
+    }
+
+    asignatura.activo = activo;
+    await asignaturaRepo.save(asignatura);
+    return id;
+  }
+
+  async cargaMasivaDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    dto: CargaMasivaPlanAsignaturasDto,
+    manager: EntityManager,
+  ): Promise<{ total: number }> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asignaturaRepo = manager.getRepository(PlanAsignatura);
+    const reglaRepo = manager.getRepository(ReglaOptativaPlan);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const codigos = dto.asignaturas.map((item) => item.codigoReferencia.trim().toUpperCase());
+    if (new Set(codigos).size !== codigos.length) {
+      throw new BadRequestException('La carga contiene el mismo código de asignatura más de una vez.');
+    }
+
+    const preparadas: PlanAsignatura[] = [];
+    for (const item of dto.asignaturas) {
+      if (!Number.isInteger(item.orden) || item.orden! < 1 || item.orden! > 200) {
+        throw new BadRequestException('La carga masiva requiere el orden de cada asignatura.');
+      }
+      const codRef = item.codigoReferencia.trim().toUpperCase();
+      const nomRef = item.nombreReferencia.trim();
+      if (!codRef) throw new BadRequestException('El código de la asignatura es obligatorio.');
+      if (!nomRef) throw new BadRequestException('El nombre de la asignatura es obligatorio.');
+
+      if (item.tipo !== TipoPlanAsignatura.OPTATIVA && item.tipo !== TipoPlanAsignatura.GENERAL) {
+        const existente = await asignaturaRepo.findOne({
+          where: { planEstudioId: planId, codigoReferencia: codRef },
+        });
+        if (existente) {
+          throw new ConflictException('Ya existe una asignatura con ese código en este plan de estudio.');
+        }
+      }
+
+      const tipoOpt = this.normalizarTipoOptativa(item.tipo, item.tipoOptativa);
+      preparadas.push(
+        asignaturaRepo.create({
+          planEstudioId: planId,
+          cursoId: null,
+          curso: null,
+          nivel: item.nivel,
+          ciclo: item.ciclo,
+          orden: item.orden,
+          creditos: item.creditos,
+          horasTeoria: item.horasTeoria ?? null,
+          horasPractica: item.horasPractica ?? null,
+          horasLaboratorio: item.horasLaboratorio ?? null,
+          horasGira: item.horasGira ?? null,
+          horasEstudioIndependiente: item.horasEstudioIndependiente ?? null,
+          horasTotales: item.horasTotales ?? null,
+          horasDocente: item.horasDocente ?? null,
+          observacionHoras: item.observacionHoras?.trim() || null,
+          tipo: item.tipo,
+          tipoOptativa: tipoOpt,
+          codigoReferencia: codRef,
+          nombreReferencia: nomRef,
+          activo: true,
+        }),
+      );
+    }
+
+    const optativas = preparadas.filter((asig) => asig.tipo === TipoPlanAsignatura.OPTATIVA);
+    if (optativas.length > 0) {
+      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
+      if (!regla) {
+        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
+      }
+      for (const tOpt of Object.values(TipoOptativa)) {
+        const nuevas = optativas.filter((asig) => asig.tipoOptativa === tOpt).length;
+        if (!nuevas) continue;
+        const actuales = await asignaturaRepo.count({
+          where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tOpt, activo: true },
+        });
+        const limite = this.obtenerLimiteTipoOptativa(regla, tOpt);
+        if (actuales + nuevas > limite) {
+          const nombreTipo = this.obtenerNombreTipoOptativa(tOpt);
+          throw new ConflictException(`La carga supera el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
+        }
+      }
+    }
+
+    await asignaturaRepo.save(preparadas);
+    return { total: preparadas.length };
   }
 }

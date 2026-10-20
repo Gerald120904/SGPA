@@ -332,6 +332,91 @@ ipcMain.handle("usuarios:revocar-rol", async (_event, usuarioId, rolId) => {
   });
 });
 
+ipcMain.handle('jerarquia:mis-carreras', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/mis-carreras'));
+
+ipcMain.handle('jerarquia:mis-alcances', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/mis-alcances'));
+
+ipcMain.handle('jerarquia:catalogo-estudiantes', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/catalogo-estudiantes'));
+
+ipcMain.handle('jerarquia:coordinador', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/coordinadores/${id}`));
+
+ipcMain.handle('jerarquia:configurar-coordinador', async (_event, id, carreras) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/coordinadores/${id}`, {
+    method: 'PUT', body: { carreras },
+  }));
+
+ipcMain.handle('jerarquia:asistentes', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/asistentes'));
+
+ipcMain.handle('jerarquia:asistente', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/asistentes/${id}`));
+
+ipcMain.handle('jerarquia:crear-asistente', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/asistentes', {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('jerarquia:configurar-asistente', async (_event, id, carreras) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/asistentes/${id}`, {
+    method: 'PUT', body: { carreras },
+  }));
+
+ipcMain.handle('jerarquia:auditoria', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/auditoria/${id}`));
+
+ipcMain.handle('jerarquia:catalogo-cursos', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/catalogo-cursos'));
+ipcMain.handle('jerarquia:catalogo-planes', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/catalogo-planes'));
+
+ipcMain.handle('solicitudes:proponer-estudiante', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/estudiantes', {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('solicitudes:proponer-actualizacion-estudiante', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/estudiantes/${id}/actualizar`, {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('solicitudes:proponer-estado-estudiante', async (_event, id, estado) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/estudiantes/${id}/estado`, {
+    method: 'POST', body: { estado },
+  }));
+
+ipcMain.handle('solicitudes:proponer-cambio-plan-estudiante', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/estudiantes/${id}/plan`, {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('solicitudes:proponer-resultado-estudiante', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/estudiantes/${id}/historial-academico`, {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('solicitudes:proponer-importacion-estudiantes', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/estudiantes/importacion', {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('solicitudes:propias', async () =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/mis-solicitudes'));
+
+ipcMain.handle('solicitudes:pendientes', async () =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/pendientes'));
+
+ipcMain.handle('solicitudes:aprobar', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/aprobar`, { method: 'POST' }));
+
+ipcMain.handle('solicitudes:rechazar', async (_event, id, motivo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/rechazar`, {
+    method: 'POST', body: { motivo },
+  }));
+
 ipcMain.handle("roles:listar", async () => {
   return ejecutarPeticionAutenticada("/roles");
 });
@@ -648,6 +733,57 @@ ipcMain.handle("cursos:cambiar-estado", async (_event, id, activo) => {
     body: { activo },
   });
 });
+
+ipcMain.handle('solicitudes:proponer-curso', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/cursos', { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-actualizacion-curso', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/cursos/${id}/actualizar`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-estado-curso', async (_event, id, activo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/cursos/${id}/estado`, { method: 'POST', body: { activo } }));
+ipcMain.handle('solicitudes:proponer-requisito-curso', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/cursos/${id}/requisitos`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-eliminar-requisito-curso', async (_event, id, relacionId) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/cursos/${id}/requisitos/${relacionId}/eliminar`, { method: 'POST' }));
+ipcMain.handle('solicitudes:proponer-plan', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/planes-estudio', { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-actualizacion-plan', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${id}/actualizar`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-estado-plan', async (_event, id, activo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${id}/estado`, { method: 'POST', body: { activo } }));
+ipcMain.handle('solicitudes:proponer-asignatura-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/asignaturas`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-actualizacion-asignatura-plan', async (_event, planId, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/asignaturas/${id}/actualizar`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-estado-asignatura-plan', async (_event, planId, id, activo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/asignaturas/${id}/estado`, { method: 'POST', body: { activo } }));
+ipcMain.handle('solicitudes:proponer-carga-masiva-asignaturas-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/asignaturas/carga-masiva`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-requisito-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/requisitos`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-eliminar-requisito-plan', async (_event, planId, id) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/requisitos/${id}/eliminar`, { method: 'POST' }));
+ipcMain.handle('solicitudes:proponer-carga-masiva-requisitos-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/requisitos/carga-masiva`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-salida-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/salidas-academicas`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-actualizacion-salida-plan', async (_event, planId, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/salidas-academicas/${id}/actualizar`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-estado-salida-plan', async (_event, planId, id, activo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/salidas-academicas/${id}/estado`, { method: 'POST', body: { activo } }));
+ipcMain.handle('solicitudes:proponer-asignar-asignaturas-salida-plan', async (_event, planId, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/salidas-academicas/${id}/asignaturas`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-guardar-regla-optativa-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/regla-optativas`, { method: 'PUT', body: datos }));
+ipcMain.handle('solicitudes:proponer-eliminar-regla-optativa-plan', async (_event, planId) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/regla-optativas/eliminar`, { method: 'POST' }));
+ipcMain.handle('solicitudes:proponer-importar-plan', async (_event, planId, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/importacion`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-optativa', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/optativas', { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-actualizacion-optativa', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/optativas/${id}/actualizar`, { method: 'POST', body: datos }));
+ipcMain.handle('solicitudes:proponer-estado-optativa', async (_event, id, activo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/optativas/${id}/estado`, { method: 'POST', body: { activo } }));
 
 ipcMain.handle("cursos:requisitos:listar", async (_event, cursoId) => {
   const resultado = await ejecutarPeticionAutenticada(

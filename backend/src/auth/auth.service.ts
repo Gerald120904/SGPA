@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -14,6 +15,7 @@ import { AceptarInvitacionDto } from './dto/aceptar-invitacion.dto';
 import { MailService } from '../mail/mail.service';
 import { RolSistema, ROLES_SISTEMA } from './constants/roles.constants';
 import { PermisosService } from '../permisos/permisos.service';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +24,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
     private readonly permisosService: PermisosService,
+    @Optional() private readonly alcanceJerarquico?: AlcanceJerarquicoService,
   ) {}
 
   private obtenerRolesValidos(
@@ -71,6 +74,16 @@ export class AuthService {
       throw new UnauthorizedException(
         'El usuario no posee acceso habilitado al SGPA.',
       );
+    }
+
+    if (roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL) &&
+      (roles.includes(RolSistema.COORDINADOR) || roles.includes(RolSistema.ADMIN_GLOBAL))) {
+      throw new UnauthorizedException('Combinación de roles jerárquicos no permitida.');
+    }
+
+    if (roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL) &&
+      (!this.alcanceJerarquico || !(await this.alcanceJerarquico.tieneCoordinadorResponsableActivo(usuario.id)))) {
+      throw new UnauthorizedException('La cuenta asistente no tiene coordinador responsable activo.');
     }
 
     const permisos = await this.permisosService.obtenerPermisosEfectivos(

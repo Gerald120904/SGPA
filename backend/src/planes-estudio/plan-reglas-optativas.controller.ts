@@ -15,9 +15,10 @@ import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { GuardarReglaOptativaPlanDto } from './dto/guardar-regla-optativa-plan.dto';
 import { PlanReglasOptativasService } from './plan-reglas-optativas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Controller('planes-estudio/:planId/regla-optativas')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class PlanReglasOptativasController {
   constructor(private readonly service: PlanReglasOptativasService) {}
 

@@ -12,9 +12,10 @@ import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ValidarImportacionPlanDto } from './dto/validar-importacion-plan.dto';
 import { PlanImportacionService } from './plan-importacion.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Controller('planes-estudio/:planId/importacion')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class PlanImportacionController {
   constructor(private readonly service: PlanImportacionService) {}
 

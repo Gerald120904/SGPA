@@ -123,7 +123,7 @@ describe('CursoRequisitosController', () => {
       .expect(200);
 
     expect(response.body).toEqual([]);
-    expect(requisitosService.listar).toHaveBeenCalledWith(1);
+    expect(requisitosService.listar).toHaveBeenCalledWith(1, 1);
   });
 
   it('GET /cursos/:cursoId/requisitos - responde 403 sin CURSOS_VER', async () => {
@@ -174,7 +174,7 @@ describe('CursoRequisitosController', () => {
     expect(requisitosService.crear).toHaveBeenCalledWith(1, {
       requisitoCursoId: 2,
       tipo: TipoRequisito.REQUISITO,
-    });
+    }, 1);
   });
 
   it('DELETE /cursos/:cursoId/requisitos/:id - responde 403 sin CURSOS_GESTIONAR', async () => {
@@ -197,6 +197,6 @@ describe('CursoRequisitosController', () => {
       .set('Authorization', `Bearer ${generarToken('COORDINADOR')}`)
       .expect(204);
 
-    expect(requisitosService.eliminar).toHaveBeenCalledWith(1, 5);
+    expect(requisitosService.eliminar).toHaveBeenCalledWith(1, 5, 1);
   });
 });

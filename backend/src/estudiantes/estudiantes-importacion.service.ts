@@ -2,9 +2,12 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
@@ -70,6 +73,8 @@ export class EstudiantesImportacionService {
     private readonly periodoRepository: Repository<PeriodoAcademico>,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly alcanceJerarquico?: AlcanceJerarquicoService,
   ) {}
 
   async validar(usuarioId: number, dto: ImportarEstudiantesDto) {
@@ -107,6 +112,26 @@ export class EstudiantesImportacionService {
     dto: ImportarEstudiantesDto,
     fuente: FuenteRegistroAcademico,
   ) {
+    if (this.alcanceJerarquico) {
+      const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
+      if (tipo === 'ASISTENTE_ESTUDIANTIL') {
+        throw new ForbiddenException(
+          'La importación directa de estudiantes por asistentes requiere una solicitud aprobada.',
+        );
+      }
+      if (tipo === 'COORDINADOR') {
+        const puede = await this.alcanceJerarquico.puedeEjecutar(
+          usuarioId,
+          PermisoSistema.ESTUDIANTES_GESTIONAR,
+          dto.carreraId,
+        );
+        if (!puede) {
+          throw new ForbiddenException(
+            'No posee permiso para gestionar estudiantes de esta carrera.',
+          );
+        }
+      }
+    }
     await this.validarContexto(usuarioId, dto.carreraId, dto.planEstudioId);
     const filas = await this.validarFilas(dto);
     const procesables = filas.filter(
@@ -163,6 +188,79 @@ export class EstudiantesImportacionService {
     };
   }
 
+  async importarDesdeSolicitud(
+    coordinadorId: number,
+    dto: ImportarEstudiantesDto,
+    manager: EntityManager,
+  ): Promise<Record<string, unknown>> {
+    await this.validarContexto(coordinadorId, dto.carreraId, dto.planEstudioId);
+    if (this.alcanceJerarquico) {
+      const puede = await this.alcanceJerarquico.puedeEjecutar(
+        coordinadorId,
+        PermisoSistema.ESTUDIANTES_GESTIONAR,
+        dto.carreraId,
+      );
+      if (!puede) {
+        throw new ForbiddenException('Coordinador sin permiso sobre la carrera.');
+      }
+    }
+    const filas = await this.validarFilas(dto);
+    const errores = filas.filter((fila) => fila.accion === 'ERROR');
+    if (errores.length > 0) {
+      throw new BadRequestException(
+        `La importación contiene ${errores.length} filas con error que impiden su aplicación atómica.`,
+      );
+    }
+    const procesables = filas.filter(
+      (fila) => fila.accion === 'CREAR' || fila.accion === 'ACTUALIZAR',
+    );
+    let creados = 0;
+    let actualizados = 0;
+    let aprobacionesNuevas = 0;
+
+    const estudiantes = manager.getRepository(Estudiante);
+    const historiales = manager.getRepository(HistorialAcademicoEstudiante);
+    for (const fila of procesables) {
+      let estudianteId = fila.estudianteId;
+      if (fila.accion === 'CREAR') {
+        const guardado = await estudiantes.save(
+          estudiantes.create({
+            cedula: fila.cedula,
+            ...fila.datos,
+            carreraId: dto.carreraId,
+            planEstudioId: dto.planEstudioId,
+            periodoIngresoId: fila.periodoIngresoId!,
+            estado: EstadoEstudiante.ACTIVO,
+          }),
+        );
+        estudianteId = guardado.id;
+        creados += 1;
+      } else {
+        await estudiantes.update(estudianteId!, fila.datos);
+        actualizados += 1;
+      }
+      for (const aprobacion of fila.aprobacionesNuevas) {
+        await this.guardarAprobacionImportada(
+          historiales,
+          estudianteId!,
+          aprobacion.planAsignaturaId,
+          coordinadorId,
+          FuenteRegistroAcademico.EXCEL,
+        );
+        aprobacionesNuevas += 1;
+      }
+    }
+
+    return {
+      creados,
+      actualizados,
+      aprobacionesNuevas,
+      sinCambios: filas.filter((fila) => fila.accion === 'SIN_CAMBIOS').length,
+      errores: 0,
+      totalProcesadas: procesables.length,
+    };
+  }
+
   private async validarContexto(
     usuarioId: number,
     carreraId: number,
@@ -174,7 +272,18 @@ export class EstudiantesImportacionService {
     if (!carrera) throw new BadRequestException('La carrera no existe.');
     if (!carrera.activo)
       throw new BadRequestException('La carrera se encuentra inactiva.');
-    if (
+    if (this.alcanceJerarquico && (await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId))) {
+      const tienePermiso = await this.alcanceJerarquico.puedeEjecutar(
+        usuarioId,
+        PermisoSistema.ESTUDIANTES_VER,
+        carreraId,
+      );
+      if (!tienePermiso) {
+        throw new ForbiddenException(
+          'No posee permiso para consultar estudiantes de esta carrera.',
+        );
+      }
+    } else if (
       !(await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
         usuarioId,
         carreraId,

@@ -8,49 +8,62 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { RolSistema } from '../auth/constants/roles.constants';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarOptativaDto } from './dto/actualizar-optativa.dto';
 import { CambiarEstadoOptativaDto } from './dto/cambiar-estado-optativa.dto';
 import { CrearOptativaDto } from './dto/crear-optativa.dto';
 import { OptativasService } from './optativas.service';
 
 @Controller('optativas')
-@UseGuards(AuthGuard, RolesGuard)
-@Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR)
+@UseGuards(AuthGuard, PermisosGuard)
 export class OptativasController {
   constructor(private readonly service: OptativasService) {}
 
   @Get()
-  listar() {
-    return this.service.listar();
+  @Permisos(PermisoSistema.OPTATIVAS_VER)
+  listar(@UsuarioActualId() usuarioId?: number) {
+    return this.service.listar(usuarioId);
   }
 
   @Get(':id')
-  obtenerPorId(@Param('id', ParseIntPipe) id: number) {
-    return this.service.obtenerPorId(id);
+  @Permisos(PermisoSistema.OPTATIVAS_VER)
+  obtenerPorId(
+    @Param('id', ParseIntPipe) id: number,
+    @UsuarioActualId() usuarioId?: number,
+  ) {
+    return this.service.obtenerPorId(id, usuarioId);
   }
 
   @Post()
-  crear(@Body() dto: CrearOptativaDto) {
-    return this.service.crear(dto);
+  @Permisos(PermisoSistema.OPTATIVAS_GESTIONAR)
+  crear(
+    @Body() dto: CrearOptativaDto,
+    @UsuarioActualId() usuarioId?: number,
+  ) {
+    return this.service.crear(dto, usuarioId);
   }
 
   @Patch(':id')
+  @Permisos(PermisoSistema.OPTATIVAS_GESTIONAR)
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarOptativaDto,
+    @UsuarioActualId() usuarioId?: number,
   ) {
-    return this.service.actualizar(id, dto);
+    return this.service.actualizar(id, dto, usuarioId);
   }
 
   @Patch(':id/estado')
+  @Permisos(PermisoSistema.OPTATIVAS_GESTIONAR)
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoOptativaDto,
+    @UsuarioActualId() usuarioId?: number,
   ) {
-    return this.service.cambiarEstado(id, dto.activo);
+    return this.service.cambiarEstado(id, dto.activo, usuarioId);
   }
 }

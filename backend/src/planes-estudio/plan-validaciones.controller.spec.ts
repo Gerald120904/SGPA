@@ -6,6 +6,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PlanValidacionesController } from './plan-validaciones.controller';
 import { PlanValidacionesService } from './plan-validaciones.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanValidacionesController', () => {
   const service = { validar: jest.fn() };
@@ -14,7 +15,8 @@ describe('PlanValidacionesController', () => {
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PlanValidacionesController],
-      providers: [{ provide: PlanValidacionesService, useValue: service }],
+      providers: [{ provide: PlanValidacionesService, useValue: service },
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } }],
     })
       .overrideGuard(AuthGuard)
       .useValue({ canActivate: () => true })
