@@ -1028,7 +1028,14 @@ async function cerrarFormulario(
 
 async function conectarGoogle() {
   try {
-    await conectarGoogleFormularios();
+    const resultado = await conectarGoogleFormularios();
+
+    if (resultado?.ok !== true || resultado?.abierto !== true) {
+      throw new Error(
+        resultado?.message ||
+        'No fue posible abrir la autorización de Google en el navegador.'
+      );
+    }
 
     mostrarExito({
       titulo:
