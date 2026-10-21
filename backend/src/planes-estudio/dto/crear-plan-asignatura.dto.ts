@@ -24,10 +24,11 @@ export class CrearPlanAsignaturaDto {
   @Max(20)
   ciclo!: number;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(200)
-  orden!: number;
+  orden?: number;
 
   @IsInt()
   @Min(1)

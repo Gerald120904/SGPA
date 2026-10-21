@@ -6,10 +6,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { EstadoPerfilProfesor } from '../perfiles-academicos/constants/estado-perfil-profesor.constant';
 import { EstadoCumplimientoRequisito } from './constants/estado-cumplimiento-requisito.constant';
 import { EstadoAtestadoProfesor } from './constants/estado-atestado-profesor.constant';
@@ -79,6 +81,20 @@ describe('ProfesoresController', () => {
           },
         },
         {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
+            })),
+          },
+        },
+        {
           provide: PermisosService,
           useValue: permisosService,
         },
@@ -106,6 +122,7 @@ describe('ProfesoresController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rolesActuales = ['ADMIN_GLOBAL'];
     permisosAsignados.clear();
 
     profesoresService.listar.mockResolvedValue([]);
@@ -157,11 +174,14 @@ describe('ProfesoresController', () => {
     await app.close();
   });
 
+  let rolesActuales: string[] = ['ADMIN_GLOBAL'];
+
   async function crearToken(roles: string[], sub = 10) {
+    rolesActuales = roles && roles.length > 0 ? roles : ['ADMIN_GLOBAL'];
     return jwtService.signAsync({
       sub,
       correo: 'usuario@sgpa.local',
-      roles,
+      roles: rolesActuales,
     });
   }
 

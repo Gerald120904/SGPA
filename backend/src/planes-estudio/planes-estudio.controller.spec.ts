@@ -2,15 +2,18 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { PlanesEstudioController } from './planes-estudio.controller';
 import { PlanesEstudioService } from './planes-estudio.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanesEstudioController', () => {
   const jwtSecret = 'planes-estudio-controller-test-secret';
@@ -38,9 +41,26 @@ describe('PlanesEstudioController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
+          },
         },
         {
           provide: PermisosService,
@@ -82,7 +102,10 @@ describe('PlanesEstudioController', () => {
     }
   });
 
+  let rolActual = 'ADMIN_GLOBAL';
+
   async function token(rol: string) {
+    rolActual = rol;
     return jwtService.signAsync({
       sub: 1,
       correo: 'usuario@sgpa.local',
@@ -100,7 +123,7 @@ describe('PlanesEstudioController', () => {
       .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
       .expect(200, []);
 
-    expect(service.listar).toHaveBeenCalledTimes(1);
+    expect(service.listar).toHaveBeenCalledWith(1);
     expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
@@ -111,7 +134,7 @@ describe('PlanesEstudioController', () => {
       .set('Authorization', `Bearer ${await token('ASISTENTE_ESTUDIANTIL')}`)
       .expect(200, []);
 
-    expect(service.listar).toHaveBeenCalledTimes(1);
+    expect(service.listar).toHaveBeenCalledWith(1);
   });
 
   it('responde 403 sin PLANES_ESTUDIO_VER', async () => {

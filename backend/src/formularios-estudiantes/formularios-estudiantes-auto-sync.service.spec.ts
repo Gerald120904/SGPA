@@ -9,6 +9,9 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
   let syncService: {
     sincronizarFormulario: jest.Mock;
   };
+  let googleOauthService: {
+    puedeSincronizarAutomaticamente: jest.Mock;
+  };
 
   beforeEach(() => {
     formularioRepository = {
@@ -17,10 +20,14 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
     syncService = {
       sincronizarFormulario: jest.fn(),
     };
+    googleOauthService = {
+      puedeSincronizarAutomaticamente: jest.fn().mockResolvedValue(true),
+    };
 
     service = new FormulariosEstudiantesAutoSyncService(
       formularioRepository as never,
       syncService as never,
+      googleOauthService as never,
     );
   });
 
@@ -29,8 +36,16 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
   });
 
   it('sincroniza todos los formularios PUBLICADOS', async () => {
-    const form1 = { id: 1, estado: EstadoFormularioEstudiante.PUBLICADO };
-    const form2 = { id: 2, estado: EstadoFormularioEstudiante.PUBLICADO };
+    const form1 = {
+      id: 1,
+      creadoPorUsuarioId: 10,
+      estado: EstadoFormularioEstudiante.PUBLICADO,
+    };
+    const form2 = {
+      id: 2,
+      creadoPorUsuarioId: 20,
+      estado: EstadoFormularioEstudiante.PUBLICADO,
+    };
 
     formularioRepository.find.mockResolvedValue([form1, form2]);
     syncService.sincronizarFormulario
@@ -49,8 +64,16 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
   });
 
   it('continúa con el siguiente formulario si uno falla con excepción', async () => {
-    const form1 = { id: 1, estado: EstadoFormularioEstudiante.PUBLICADO };
-    const form2 = { id: 2, estado: EstadoFormularioEstudiante.PUBLICADO };
+    const form1 = {
+      id: 1,
+      creadoPorUsuarioId: 10,
+      estado: EstadoFormularioEstudiante.PUBLICADO,
+    };
+    const form2 = {
+      id: 2,
+      creadoPorUsuarioId: 20,
+      estado: EstadoFormularioEstudiante.PUBLICADO,
+    };
 
     formularioRepository.find.mockResolvedValue([form1, form2]);
     syncService.sincronizarFormulario
@@ -60,6 +83,30 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
     await service.sincronizarAutomaticamente();
 
     expect(syncService.sincronizarFormulario).toHaveBeenCalledTimes(2);
+  });
+
+  it('omite solo los formularios cuyo propietario requiere reautenticación', async () => {
+    const formInvalido = {
+      id: 60,
+      creadoPorUsuarioId: 1,
+      estado: EstadoFormularioEstudiante.PUBLICADO,
+    };
+    const formValido = {
+      id: 61,
+      creadoPorUsuarioId: 2,
+      estado: EstadoFormularioEstudiante.PUBLICADO,
+    };
+
+    formularioRepository.find.mockResolvedValue([formInvalido, formValido]);
+    googleOauthService.puedeSincronizarAutomaticamente
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    syncService.sincronizarFormulario.mockResolvedValue({ nuevas: 0 });
+
+    await service.sincronizarAutomaticamente();
+
+    expect(syncService.sincronizarFormulario).toHaveBeenCalledTimes(1);
+    expect(syncService.sincronizarFormulario).toHaveBeenCalledWith(formValido);
   });
 
   it('evita ejecuciones concurrentes si una iteración sigue activa', async () => {

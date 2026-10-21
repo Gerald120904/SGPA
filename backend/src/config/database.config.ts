@@ -1,5 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { AddOptativeRuleCounts2026101500000 } from '../migrations/2026101500000-AddOptativeRuleCounts';
+import { AddAulaEquipmentInventory2026101600000 } from '../migrations/2026101600000-AddAulaEquipmentInventory';
+import { AddInvitationOutbox2026101700000 } from '../migrations/2026101700000-AddInvitationOutbox';
+import { AddHierarchicalAccess2026101900000 } from '../migrations/2026101900000-AddHierarchicalAccess';
 
 const TEST_DATABASE = 'sgpa_test';
 
@@ -49,6 +53,13 @@ export function crearConfiguracionBaseDatos(
     database,
     autoLoadEntities: true,
     synchronize,
+    migrations: [
+      AddOptativeRuleCounts2026101500000,
+      AddAulaEquipmentInventory2026101600000,
+      AddInvitationOutbox2026101700000,
+      AddHierarchicalAccess2026101900000,
+    ],
+    migrationsRun: false,
   };
 }
 

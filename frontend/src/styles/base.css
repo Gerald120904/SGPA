@@ -66,68 +66,152 @@ button {
 }
 
 /* =========================================================
-   CONFIRMACIÓN GLOBAL SGPA
+   CONFIRMACIÓN GLOBAL SGPA — ESTILO INSTITUCIONAL
    ========================================================= */
 
 .sgpa-confirm-dialog {
-  width: min(430px, calc(100vw - 40px));
+  position: fixed;
+  inset: 0;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  margin: auto;
   padding: 0;
   border: 0;
-  border-radius: 14px;
+  border-radius: 16px;
   background: transparent;
-  box-shadow: 0 20px 55px rgba(16, 24, 40, 0.25);
+  outline: none;
+  overflow: visible;
+  box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.25);
 }
 
 .sgpa-confirm-dialog::backdrop {
-  background: rgba(17, 24, 39, 0.48);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  animation: sgpa-alert-backdrop-in 0.18s ease-out;
 }
 
 .sgpa-confirm-card {
-  padding: 24px;
-  border-radius: 14px;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  padding: 28px 28px 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   background: #ffffff;
+  animation: sgpa-alert-enter 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.sgpa-confirm-icon {
-  width: 42px;
-  height: 42px;
+.sgpa-confirm-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+
+.sgpa-confirm-danger-mode::before {
+  background: var(--una-red, #cf2029);
+}
+
+.sgpa-confirm-neutral-mode::before {
+  background: #344054;
+}
+
+.sgpa-confirm-icon-area {
+  display: flex;
+  margin-bottom: 16px;
+}
+
+.sgpa-confirm-icon-ring {
+  position: relative;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
   border-radius: 50%;
-  background: #fff1f0;
-  color: #b42318;
-  font-size: 20px;
+}
+
+.sgpa-confirm-icon-ring svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.2;
+}
+
+.sgpa-confirm-danger-mode .sgpa-confirm-icon-ring {
+  background: rgba(207, 32, 41, 0.08);
+  color: var(--una-red, #cf2029);
+  box-shadow: 0 0 0 4px rgba(207, 32, 41, 0.06);
+}
+
+.sgpa-confirm-neutral-mode .sgpa-confirm-icon-ring {
+  background: #f1f5f9;
+  color: #334155;
+  box-shadow: 0 0 0 4px rgba(51, 65, 85, 0.06);
+}
+
+.sgpa-confirm-content {
+  margin-bottom: 22px;
+}
+
+.sgpa-confirm-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sgpa-confirm-danger-mode .sgpa-confirm-eyebrow {
+  color: var(--una-red, #cf2029);
+}
+
+.sgpa-confirm-neutral-mode .sgpa-confirm-eyebrow {
+  color: #64748b;
 }
 
 .sgpa-confirm-content h3 {
   margin: 0 0 8px;
-  color: #182235;
-  font-size: 19px;
+  color: #1d2939;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
 }
 
 .sgpa-confirm-content p {
   margin: 0;
-  color: #667085;
-  line-height: 1.5;
+  color: #475467;
+  font-size: 13.5px;
+  line-height: 1.55;
+  word-break: break-word;
 }
 
 .sgpa-confirm-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 24px;
 }
 
 .sgpa-confirm-actions button {
   min-height: 40px;
-  padding: 0 15px;
+  padding: 0 18px;
   border-radius: 8px;
-  font: inherit;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.sgpa-confirm-actions button:hover {
+  transform: translateY(-1px);
 }
 
 .sgpa-confirm-cancel {
@@ -136,45 +220,33 @@ button {
   color: #344054;
 }
 
+.sgpa-confirm-cancel:hover {
+  background: #f8fafc;
+  border-color: #c6ccd6;
+}
+
 .sgpa-confirm-accept {
-  background: #344054;
+  border: 1px solid #1e293b;
+  background: #1e293b;
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(30, 41, 59, 0.18);
+}
+
+.sgpa-confirm-accept:hover {
+  background: #0f172a;
+  border-color: #0f172a;
+  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.25);
 }
 
 .sgpa-confirm-danger {
-  background: #b5121b;
+  border: 1px solid var(--una-red, #cf2029);
+  background: var(--una-red, #cf2029);
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(207, 32, 41, 0.2);
 }
 
-
-/* =========================================================
-   CENTRADO GLOBAL DE MODALES DE CONFIRMACIÓN
-   ========================================================= */
-
-.sgpa-confirm-dialog {
-  position: fixed;
-
-  inset: 0;
-
-  width:
-    min(
-      430px,
-      calc(100vw - 40px)
-    );
-
-  max-height:
-    calc(100vh - 40px);
-
-  margin: auto;
-
-  padding: 0;
-
-  border: 0;
-  border-radius: 14px;
-
-  background: transparent;
-
-  box-shadow:
-    0 20px 55px
-    rgba(16, 24, 40, 0.25);
+.sgpa-confirm-danger:hover {
+  background: var(--una-red-dark, #b71922);
+  border-color: var(--una-red-dark, #b71922);
+  box-shadow: 0 4px 12px rgba(207, 32, 41, 0.28);
 }

@@ -15,6 +15,8 @@ import {
   escapeHtml
 } from '../utils/html.js';
 
+import { logoUnaUrl } from '../utils/brand-assets.js';
+
 
 function renderNavItem(module) {
 
@@ -137,7 +139,7 @@ export function Sidebar({
         <div class="sidebar-header-brand">
 
           <img
-            src="/Logo-UNA-Rojo_FondoTransparente.png"
+            src="${logoUnaUrl}"
             alt="Universidad Nacional de Costa Rica"
             class="sidebar-logo"
             draggable="false"

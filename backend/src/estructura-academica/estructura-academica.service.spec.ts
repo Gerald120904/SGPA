@@ -94,6 +94,7 @@ describe('EstructuraAcademicaService', () => {
       carreraRepository as unknown as Repository<Carrera>,
       usuarioRepository as unknown as Repository<Usuario>,
       profesorCarreraRepository as unknown as Repository<ProfesorCarrera>,
+      { tipoCuentaJerarquica: jest.fn().mockResolvedValue(null) } as any,
     );
 
     jest.clearAllMocks();
@@ -418,6 +419,15 @@ describe('EstructuraAcademicaService', () => {
   });
 
   describe('inactivarAsignacion', () => {
+    it('bloquea la via antigua para revocar carreras jerarquicas', async () => {
+      asignacionRepository.findOne.mockResolvedValue({
+        id: 1, tipo: TipoAsignacionAcademica.COORDINADOR_CARRERA,
+        activo: true, fechaInicio: '2026-01-01', fechaFin: null,
+      });
+      await expect(service.inactivarAsignacion(1)).rejects.toThrow(BadRequestException);
+      expect(asignacionRepository.save).not.toHaveBeenCalled();
+    });
+
     it('inactiva una asignación activa y asigna fechaFin', async () => {
       asignacionRepository.findOne.mockResolvedValue({
         id: 1,
@@ -459,5 +469,13 @@ describe('EstructuraAcademicaService', () => {
         service.inactivarAsignacion(1, { fechaFin: '2026-08-20' }),
       ).rejects.toThrow(BadRequestException);
     });
+  });
+
+  it('bloquea la via antigua para crear asignaciones jerarquicas', async () => {
+    await expect(service.crearAsignacion({
+      usuarioId: 10, tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA,
+      carreraId: 1, fechaInicio: '2026-01-01',
+    } as any)).rejects.toThrow(BadRequestException);
+    expect(asignacionRepository.save).not.toHaveBeenCalled();
   });
 });

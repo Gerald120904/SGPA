@@ -344,6 +344,104 @@ describe('GoogleOauthService', () => {
       );
       expect(googleConexionRepo.save).toHaveBeenCalledWith(conexionPrevia);
     });
+
+    it('reconexión de una autorización inválida exige un refresh token nuevo', async () => {
+      const plainVerifier = 'my_test_code_verifier';
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv(
+        'aes-256-gcm',
+        Buffer.from(ENCRYPTION_KEY_HEX, 'hex'),
+        iv,
+      );
+      let enc = cipher.update(plainVerifier, 'utf8', 'hex');
+      enc += cipher.final('hex');
+      const tag = cipher.getAuthTag().toString('hex');
+
+      googleOauthEstadoRepo.findOne.mockResolvedValue({
+        id: 1,
+        usuarioId: 30,
+        stateHash: 'mockHash',
+        codeVerifierCifrado: `${iv.toString('hex')}.${tag}.${enc}`,
+        expiraAt: new Date(Date.now() + 60000),
+        usadoAt: null,
+      });
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+        tokens: {
+          access_token: 'at_123',
+          id_token: 'valid_id_token',
+          refresh_token: undefined,
+        },
+      } as any);
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+        getPayload: () => ({
+          email: 'reconnect@sgpa.cr',
+          sub: 'google_subject_888',
+        }),
+      } as any);
+      googleConexionRepo.findOne.mockResolvedValue({
+        id: 5,
+        usuarioId: 30,
+        refreshTokenCifrado: 'token.invalido.cifrado',
+        activo: false,
+      });
+
+      await expect(
+        service.procesarCallback('code123', 'state123'),
+      ).rejects.toThrow('token de actualización nuevo');
+      expect(googleConexionRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('reconexión con token nuevo reactiva la misma conexión', async () => {
+      const plainVerifier = 'my_test_code_verifier';
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv(
+        'aes-256-gcm',
+        Buffer.from(ENCRYPTION_KEY_HEX, 'hex'),
+        iv,
+      );
+      let enc = cipher.update(plainVerifier, 'utf8', 'hex');
+      enc += cipher.final('hex');
+      const tag = cipher.getAuthTag().toString('hex');
+
+      googleOauthEstadoRepo.findOne.mockResolvedValue({
+        id: 1,
+        usuarioId: 30,
+        stateHash: 'mockHash',
+        codeVerifierCifrado: `${iv.toString('hex')}.${tag}.${enc}`,
+        expiraAt: new Date(Date.now() + 60000),
+        usadoAt: null,
+      });
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+        tokens: {
+          access_token: 'at_123',
+          id_token: 'valid_id_token',
+          refresh_token: 'refresh_nuevo',
+        },
+      } as any);
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+        getPayload: () => ({
+          email: 'reconnect@sgpa.cr',
+          sub: 'google_subject_888',
+        }),
+      } as any);
+      const conexionPrevia = {
+        id: 5,
+        usuarioId: 30,
+        refreshTokenCifrado: 'token.invalido.cifrado',
+        activo: false,
+        revocadoAt: null,
+      };
+      googleConexionRepo.findOne.mockResolvedValue(conexionPrevia);
+
+      await service.procesarCallback('code123', 'state123');
+
+      expect(googleConexionRepo.create).not.toHaveBeenCalled();
+      expect(conexionPrevia.activo).toBe(true);
+      expect(conexionPrevia.refreshTokenCifrado).not.toBe(
+        'token.invalido.cifrado',
+      );
+      expect(googleConexionRepo.save).toHaveBeenCalledWith(conexionPrevia);
+    });
   });
 
   describe('obtenerEstado', () => {
@@ -361,11 +459,114 @@ describe('GoogleOauthService', () => {
 
       expect(estado).toEqual({
         conectado: true,
+        requiereReautenticacion: false,
+        estado: 'CONECTADO',
         googleEmail: 'usuario@sgpa.cr',
         conectadoAt: expect.any(Date),
       });
       expect(estado).not.toHaveProperty('refreshTokenCifrado');
       expect(estado).not.toHaveProperty('refreshToken');
+    });
+
+    it('comunica que una conexión con token inválido requiere reautenticación', async () => {
+      googleConexionRepo.findOne.mockResolvedValue({
+        usuarioId: 15,
+        googleEmail: 'usuario@sgpa.cr',
+        refreshTokenCifrado: 'iv.tag.cifrado',
+        conectadoAt: new Date(),
+        activo: false,
+      });
+
+      const estado = await service.obtenerEstado(15);
+
+      expect(estado).toEqual(
+        expect.objectContaining({
+          conectado: false,
+          requiereReautenticacion: true,
+          estado: 'REQUIERE_REAUTENTICACION',
+        }),
+      );
+    });
+  });
+
+  describe('obtenerClienteAutorizado', () => {
+    function cifrarToken(token: string): string {
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv(
+        'aes-256-gcm',
+        Buffer.from(ENCRYPTION_KEY_HEX, 'hex'),
+        iv,
+      );
+      let enc = cipher.update(token, 'utf8', 'hex');
+      enc += cipher.final('hex');
+      return `${iv.toString('hex')}.${cipher.getAuthTag().toString('hex')}.${enc}`;
+    }
+
+    it('mantiene activa una conexión cuyo token puede renovarse', async () => {
+      const conexion = {
+        usuarioId: 15,
+        refreshTokenCifrado: cifrarToken('refresh_valido'),
+        activo: true,
+      };
+      googleConexionRepo.findOne.mockResolvedValue(conexion);
+      jest.spyOn(OAuth2Client.prototype, 'getAccessToken').mockResolvedValue({
+        token: 'access_token',
+      } as any);
+
+      await expect(
+        service.obtenerClienteAutorizado(15),
+      ).resolves.toBeInstanceOf(OAuth2Client);
+      expect(conexion.activo).toBe(true);
+      expect(googleConexionRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('inactiva y conserva el token cifrado solamente ante invalid_grant', async () => {
+      const tokenCifrado = cifrarToken('refresh_revocado');
+      const conexion = {
+        usuarioId: 15,
+        refreshTokenCifrado: tokenCifrado,
+        activo: true,
+        revocadoAt: null,
+      };
+      googleConexionRepo.findOne.mockResolvedValue(conexion);
+      jest.spyOn(OAuth2Client.prototype, 'getAccessToken').mockRejectedValue({
+        response: {
+          status: 400,
+          data: { error: 'invalid_grant' },
+        },
+      });
+
+      await expect(service.obtenerClienteAutorizado(15)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(conexion.activo).toBe(false);
+      expect(conexion.refreshTokenCifrado).toBe(tokenCifrado);
+      expect(conexion.revocadoAt).toBeNull();
+      expect(googleConexionRepo.save).toHaveBeenCalledWith(conexion);
+    });
+
+    it('no inactiva la conexión ante un error temporal de Google', async () => {
+      const conexion = {
+        usuarioId: 15,
+        refreshTokenCifrado: cifrarToken('refresh_valido'),
+        activo: true,
+      };
+      const errorTemporal = {
+        response: {
+          status: 503,
+          data: { error: 'temporarily_unavailable' },
+        },
+      };
+      googleConexionRepo.findOne.mockResolvedValue(conexion);
+      jest
+        .spyOn(OAuth2Client.prototype, 'getAccessToken')
+        .mockRejectedValue(errorTemporal);
+
+      await expect(service.obtenerClienteAutorizado(15)).rejects.toBe(
+        errorTemporal,
+      );
+      expect(conexion.activo).toBe(true);
+      expect(googleConexionRepo.save).not.toHaveBeenCalled();
     });
   });
 

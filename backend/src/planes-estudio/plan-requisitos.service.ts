@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
 import { CargaMasivaPlanRequisitosDto } from './dto/carga-masiva-plan-requisitos.dto';
 import { CrearPlanRequisitoDto } from './dto/crear-plan-requisito.dto';
@@ -382,5 +382,198 @@ export class PlanRequisitosService {
     return {
       message: 'Relación académica eliminada correctamente.',
     };
+  }
+
+  async obtenerRelacionParaSolicitud(planId: number, id: number): Promise<PlanRequisito> {
+    return this.obtenerRelacion(planId, id);
+  }
+
+  async crearDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    dto: CrearPlanRequisitoDto,
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asigRepo = manager.getRepository(PlanAsignatura);
+    const reqRepo = manager.getRepository(PlanRequisito);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    if (dto.asignaturaId === dto.requisitoAsignaturaId) {
+      throw new BadRequestException('Una asignatura no puede ser requisito de sí misma.');
+    }
+
+    const [asig, reqAsig] = await Promise.all([
+      asigRepo.findOne({ where: { id: dto.asignaturaId, planEstudioId: planId } }),
+      asigRepo.findOne({ where: { id: dto.requisitoAsignaturaId, planEstudioId: planId } }),
+    ]);
+
+    if (!asig || !reqAsig) {
+      throw new BadRequestException('Una de las asignaturas seleccionadas no pertenece al plan.');
+    }
+    if (!asig.activo || !reqAsig.activo) {
+      throw new BadRequestException('No se pueden utilizar asignaturas inactivas en una relación de requisitos.');
+    }
+
+    const existente = await reqRepo.findOne({
+      where: {
+        asignaturaId: dto.asignaturaId,
+        requisitoAsignaturaId: dto.requisitoAsignaturaId,
+        tipo: dto.tipo,
+      },
+    });
+    if (existente) {
+      throw new ConflictException('Esta relación académica ya está registrada.');
+    }
+
+    if (dto.tipo === TipoRequisito.REQUISITO) {
+      const existentes = await reqRepo.find({
+        where: {
+          tipo: TipoRequisito.REQUISITO,
+          asignatura: { planEstudioId: planId },
+        },
+        relations: { asignatura: true },
+      });
+      this.validarSinCiclos(existentes, [dto]);
+    }
+
+    const guardada = await reqRepo.save(
+      reqRepo.create({
+        asignaturaId: dto.asignaturaId,
+        requisitoAsignaturaId: dto.requisitoAsignaturaId,
+        tipo: dto.tipo,
+      }),
+    );
+    return guardada.id;
+  }
+
+  async eliminarDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    id: number,
+    esperado: { asignaturaId: number; requisitoAsignaturaId: number; tipo: TipoRequisito },
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const reqRepo = manager.getRepository(PlanRequisito);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const relacion = await reqRepo.findOne({
+      where: { id },
+      relations: {
+        asignatura: true,
+        requisitoAsignatura: true,
+      },
+    });
+    if (!relacion || relacion.asignatura?.planEstudioId !== planId || relacion.requisitoAsignatura?.planEstudioId !== planId) {
+      throw new NotFoundException('Relación de requisito no encontrada.');
+    }
+
+    if (
+      relacion.asignaturaId !== esperado.asignaturaId ||
+      relacion.requisitoAsignaturaId !== esperado.requisitoAsignaturaId ||
+      relacion.tipo !== esperado.tipo
+    ) {
+      throw new ConflictException('La relación de requisito cambió desde la propuesta.');
+    }
+
+    await reqRepo.delete(id);
+    return id;
+  }
+
+  async cargaMasivaDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    dto: CargaMasivaPlanRequisitosDto,
+    manager: EntityManager,
+  ): Promise<{ total: number }> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asigRepo = manager.getRepository(PlanAsignatura);
+    const reqRepo = manager.getRepository(PlanRequisito);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const relacionesDelLote = new Set<string>();
+    const asignaturaIds = new Set<number>();
+
+    for (const req of dto.requisitos) {
+      if (req.asignaturaId === req.requisitoAsignaturaId) {
+        throw new BadRequestException('Una asignatura no puede ser requisito de sí misma.');
+      }
+      const clave = `${req.asignaturaId}-${req.requisitoAsignaturaId}-${req.tipo}`;
+      if (relacionesDelLote.has(clave)) {
+        throw new BadRequestException('La carga contiene relaciones académicas repetidas.');
+      }
+      relacionesDelLote.add(clave);
+      asignaturaIds.add(req.asignaturaId);
+      asignaturaIds.add(req.requisitoAsignaturaId);
+    }
+
+    const ids = [...asignaturaIds];
+    const asignaturas = await asigRepo.find({
+      where: { id: In(ids), planEstudioId: planId },
+    });
+    if (asignaturas.length !== ids.length) {
+      throw new BadRequestException('Una de las asignaturas seleccionadas no pertenece al plan.');
+    }
+    if (asignaturas.some((a) => !a.activo)) {
+      throw new BadRequestException('No se pueden utilizar asignaturas inactivas en una relación de requisitos.');
+    }
+
+    const duplicadas = await reqRepo.find({
+      where: dto.requisitos.map((r) => ({
+        asignaturaId: r.asignaturaId,
+        requisitoAsignaturaId: r.requisitoAsignaturaId,
+        tipo: r.tipo,
+      })),
+    });
+    if (duplicadas.length > 0) {
+      throw new ConflictException('Una o más relaciones académicas ya están registradas.');
+    }
+
+    if (dto.requisitos.some((r) => r.tipo === TipoRequisito.REQUISITO)) {
+      const existentes = await reqRepo.find({
+        where: { tipo: TipoRequisito.REQUISITO, asignatura: { planEstudioId: planId } },
+        relations: { asignatura: true },
+      });
+      this.validarSinCiclos(existentes, dto.requisitos);
+    }
+
+    const nuevas = dto.requisitos.map((r) =>
+      reqRepo.create({
+        asignaturaId: r.asignaturaId,
+        requisitoAsignaturaId: r.requisitoAsignaturaId,
+        tipo: r.tipo,
+      }),
+    );
+
+    const guardadas = await reqRepo.save(nuevas);
+    return { total: guardadas.length };
   }
 }

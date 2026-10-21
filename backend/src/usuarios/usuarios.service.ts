@@ -3,10 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { DataSource, In, Repository } from 'typeorm';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { DataSource, EntityManager, In, MoreThan, Repository } from 'typeorm';
+import { MailService } from '../mail/mail.service';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Rol } from '../roles/entities/rol.entity';
 import { ActualizarUsuarioDto } from './dto/actualizar-usuario.dto';
@@ -14,9 +18,19 @@ import { CrearUsuarioDto } from './dto/crear-usuario.dto';
 import { UsuarioRol } from './entities/usuario-rol.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
-import { obtenerPermisosPredeterminadosPorRoles } from '../permisos/constants/plantillas-permisos.constant';
+import { UsuarioPermisoExcepcion } from '../permisos/entities/usuario-permiso-excepcion.entity';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import {
+  obtenerPermisosPredeterminadosPorRoles,
+  PERMISOS_PREDETERMINADOS_POR_ROL,
+} from '../permisos/constants/plantillas-permisos.constant';
+import { PermisosService } from '../permisos/permisos.service';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Carrera } from '../carreras/entities/carrera.entity';
+import { InvitacionOutboxService } from './invitacion-outbox.service';
+import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
+import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
+import { SolicitudCambio } from './entities/solicitud-cambio.entity';
 
 @Injectable()
 export class UsuariosService {
@@ -32,6 +46,12 @@ export class UsuariosService {
     @InjectRepository(Carrera)
     private readonly carreraRepository: Repository<Carrera>,
     private readonly dataSource: DataSource,
+    @Optional()
+    private readonly permisosService?: PermisosService,
+    @Optional()
+    private readonly mailService?: MailService,
+    @Optional()
+    private readonly invitaciones?: InvitacionOutboxService,
   ) {}
 
   private normalizarCampoRequerido(valor: string, etiqueta: string): string {
@@ -168,7 +188,56 @@ export class UsuariosService {
     return this.serializarUsuario(usuario);
   }
 
-  async crear(dto: CrearUsuarioDto) {
+  private origenInvitacion(): URL {
+    if (!this.mailService || !this.invitaciones) {
+      throw new BadRequestException('El servicio de invitaciones no está disponible.');
+    }
+    const esProduccion = process.env.NODE_ENV === 'production';
+    const base = process.env.SGPA_INVITATION_BASE_URL ||
+      (esProduccion ? '' : `http://127.0.0.1:${process.env.PORT || 3000}`);
+    try {
+      const origen = new URL(base);
+      const hostname = origen.hostname.toLowerCase().replace(/\.$/, '');
+      const esLocal = hostname === 'localhost' || hostname === '[::1]' ||
+        hostname.endsWith('.localhost') || /^127\./.test(hostname);
+      if (origen.username || origen.password || origen.search || origen.hash ||
+        (esProduccion && esLocal) ||
+        (origen.protocol !== 'https:' &&
+          (esProduccion || origen.protocol !== 'http:' || !esLocal))) {
+        throw new Error('Origen inseguro');
+      }
+      return new URL('/auth/invitacion', origen);
+    } catch {
+      throw new BadRequestException('Configure una URL pública HTTPS para las invitaciones.');
+    }
+  }
+
+  async crearConInvitacion(dto: CrearUsuarioDto, despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>) {
+    const url = this.origenInvitacion();
+    await this.invitaciones!.verificarDestino();
+    const token = randomBytes(32).toString('hex');
+    url.hash = new URLSearchParams({
+      correo: dto.correo.trim().toLowerCase(),
+      token,
+    }).toString();
+    return this.crear(
+      { ...dto, password: randomBytes(32).toString('hex') },
+      { tokenHash: createHash('sha256').update(token).digest('hex'),
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        url: url.toString() },
+      despuesDeCrear,
+    );
+  }
+
+  async crear(
+    dto: CrearUsuarioDto,
+    invitacion?: { tokenHash: string; expiresAt: Date; url: string },
+    despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>,
+  ) {
+    if (!dto.password) {
+      throw new BadRequestException('La contraseña es obligatoria.');
+    }
+    const password = dto.password;
     const cedula = this.normalizarCampoRequerido(dto.cedula, 'cédula');
     const nombres = this.normalizarCampoRequerido(dto.nombres, 'nombre');
     const apellido1 = this.normalizarCampoRequerido(
@@ -185,7 +254,9 @@ export class UsuariosService {
       );
     }
 
-    const permisosFinales = dto.roles.includes(RolSistema.ADMIN_GLOBAL)
+    const cuentaJerarquica = dto.roles.includes(RolSistema.COORDINADOR) ||
+      dto.roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL);
+    const permisosFinales = dto.roles.includes(RolSistema.ADMIN_GLOBAL) || cuentaJerarquica
       ? []
       : (dto.permisos ?? obtenerPermisosPredeterminadosPorRoles(dto.roles));
 
@@ -235,11 +306,11 @@ export class UsuariosService {
           apellido1,
           apellido2: dto.apellido2?.trim() || null,
           correo,
-          passwordHash: await bcrypt.hash(dto.password, 10),
-          activo: true,
+          passwordHash: await bcrypt.hash(password, 10),
+          activo: !invitacion,
           ultimoAcceso: null,
-          passwordResetTokenHash: null,
-          passwordResetExpiresAt: null,
+          passwordResetTokenHash: invitacion?.tokenHash ?? null,
+          passwordResetExpiresAt: invitacion?.expiresAt ?? null,
         });
 
         const guardado = await usuarios.save(usuario);
@@ -253,16 +324,76 @@ export class UsuariosService {
           ),
         );
 
-        if (permisosFinales.length > 0) {
-          await permisosRepository.save(
-            permisosFinales.map((permiso) =>
-              permisosRepository.create({
-                usuarioId: guardado.id,
-                permiso,
-                activo: true,
-              }),
-            ),
+        if (this.permisosService?.esPoliticaOpcionBActiva()) {
+          if (cuentaJerarquica || (dto.permisos && !dto.roles.includes(RolSistema.ADMIN_GLOBAL))) {
+            const basePlantilla = new Set<PermisoSistema>();
+            for (const r of roles) {
+              for (
+                const p of PERMISOS_PREDETERMINADOS_POR_ROL[
+                  r.nombre as RolSistema
+                ] || []
+              ) {
+                basePlantilla.add(p);
+              }
+            }
+            const deseados = new Set(permisosFinales);
+            const excepcionesPorCrear: UsuarioPermisoExcepcion[] = [];
+            let repoExc: Repository<UsuarioPermisoExcepcion> | null = null;
+            try {
+              repoExc = manager.getRepository(UsuarioPermisoExcepcion);
+            } catch {
+              repoExc = null;
+            }
+
+            if (repoExc) {
+              for (const p of basePlantilla) {
+                if (!deseados.has(p)) {
+                  excepcionesPorCrear.push(
+                    repoExc.create({
+                      usuarioId: guardado.id,
+                      permiso: p,
+                      tipo: 'DENEGAR',
+                      motivo: 'Exclusión inicial al crear usuario',
+                      asignadoPorUsuarioId: null,
+                    }),
+                  );
+                }
+              }
+              for (const p of deseados) {
+                if (!basePlantilla.has(p)) {
+                  excepcionesPorCrear.push(
+                    repoExc.create({
+                      usuarioId: guardado.id,
+                      permiso: p,
+                      tipo: 'CONCEDER',
+                      motivo: 'Concesión inicial al crear usuario',
+                      asignadoPorUsuarioId: null,
+                    }),
+                  );
+                }
+              }
+              if (excepcionesPorCrear.length > 0) {
+                await repoExc.save(excepcionesPorCrear);
+              }
+            }
+          }
+          await this.permisosService?.sincronizarDobleEscritura(
+            manager,
+            guardado.id,
+            new Set(permisosFinales),
           );
+        } else {
+          if (permisosFinales.length > 0) {
+            await permisosRepository.save(
+              permisosFinales.map((permiso) =>
+                permisosRepository.create({
+                  usuarioId: guardado.id,
+                  permiso,
+                  activo: true,
+                }),
+              ),
+            );
+          }
         }
 
         if (carrerasValidadas.length > 0) {
@@ -276,13 +407,42 @@ export class UsuariosService {
           );
         }
 
+        await despuesDeCrear?.(manager, guardado.id);
+        if (invitacion) await this.invitaciones!.crearPendiente(
+          manager, guardado.id, invitacion.tokenHash,
+          invitacion.url, invitacion.expiresAt,
+        );
         return guardado.id;
       });
     } catch (error) {
       this.relanzarErrorPersistencia(error);
     }
 
+    if (invitacion) {
+      const enviado = await this.invitaciones!.procesarUsuario(usuarioId);
+      if (enviado !== 'ENVIADA') {
+        throw new ServiceUnavailableException(
+          'Usuario inactivo registrado; la invitación requiere recuperación administrativa.',
+        );
+      }
+    }
     return this.obtenerPorId(usuarioId);
+  }
+
+  async reintentarInvitacion(id: number) {
+    const origen = this.origenInvitacion();
+    const estado = await this.invitaciones!.rotarYReintentar(id, origen);
+    if (estado !== 'ENVIADA') {
+      throw new ServiceUnavailableException(
+        'La invitación requiere una nueva revisión administrativa.',
+      );
+    }
+    return { estado };
+  }
+
+  async obtenerEstadoInvitacion(id: number) {
+    await this.obtenerEntidadPorId(id);
+    return this.invitaciones!.obtenerEstado(id);
   }
 
   async actualizar(id: number, dto: ActualizarUsuarioDto) {
@@ -374,13 +534,69 @@ export class UsuariosService {
   }
 
   async cambiarEstado(id: number, activo: boolean, usuarioActualId: number) {
-    await this.obtenerEntidadPorId(id);
+    const usuario = await this.obtenerEntidadPorId(id);
+
+    if (activo && !usuario.activo && usuario.passwordResetTokenHash) {
+      throw new BadRequestException(
+        'La cuenta debe completar su invitación antes de activarse.',
+      );
+    }
+
+    if (activo && !usuario.activo && this.usuarioTieneRol(usuario, RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      throw new BadRequestException('La reactivacion de asistentes requiere restablecer su dependencia jerarquica.');
+    }
 
     if (id === usuarioActualId && !activo) {
       throw new BadRequestException('No puede desactivar su propia cuenta.');
     }
 
-    await this.usuarioRepository.update(id, { activo });
+    if (!activo && this.usuarioTieneRol(usuario, RolSistema.ASISTENTE_ESTUDIANTIL)) {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+        await manager.getRepository(Usuario).update(id, { activo: false });
+        await manager.getRepository(DependenciaUsuario).update(
+          { asistenteId: id, activo: true },
+          { activo: false, desactivadoEn: new Date(), motivoDesactivacion: 'Desactivación operativa del asistente' },
+        );
+        await manager.getRepository(SolicitudCambio).update(
+          { solicitanteId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId, objetivoUsuarioId: id,
+          accion: 'DESACTIVAR_ASISTENTE', detalle: { asistenteId: id },
+        });
+      });
+    } else if (!activo && this.usuarioTieneRol(usuario, RolSistema.COORDINADOR)) {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+        const dependencias = manager.getRepository(DependenciaUsuario);
+        const relacionadas = await dependencias.find({ where: { coordinadorId: id, activo: true } });
+        const asistentes = relacionadas.map((rel) => rel.asistenteId);
+        if (asistentes.length) {
+          await manager.getRepository(Usuario).update({ id: In(asistentes) }, { activo: false });
+          for (const relacion of relacionadas) {
+            relacion.activo = false;
+            relacion.desactivadoEn = new Date();
+            relacion.motivoDesactivacion = 'Desactivación operativa del coordinador responsable';
+          }
+          await dependencias.save(relacionadas);
+        }
+        await manager.getRepository(SolicitudCambio).update(
+          { coordinadorId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(Usuario).update(id, { activo: false });
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId,
+          objetivoUsuarioId: id,
+          accion: 'DESACTIVAR_COORDINADOR',
+          detalle: { asistentesDesactivados: asistentes },
+        });
+      });
+    } else {
+      await this.usuarioRepository.update(id, { activo });
+    }
     return this.obtenerPorId(id);
   }
 
@@ -410,12 +626,29 @@ export class UsuariosService {
     }
 
     try {
-      await this.usuarioRolRepository.save(
-        this.usuarioRolRepository.create({
-          usuarioId: id,
-          rolId: rol.id,
-        }),
-      );
+      if (this.permisosService?.esPoliticaOpcionBActiva()) {
+        await this.dataSource.transaction(async (manager) => {
+          const usuarioRolRepo = manager.getRepository(UsuarioRol);
+          await usuarioRolRepo.save(
+            usuarioRolRepo.create({
+              usuarioId: id,
+              rolId: rol.id,
+            }),
+          );
+
+          await this.permisosService?.sincronizarPermisosUsuarioEnTransaccion(
+            manager,
+            id,
+          );
+        });
+      } else {
+        await this.usuarioRolRepository.save(
+          this.usuarioRolRepository.create({
+            usuarioId: id,
+            rolId: rol.id,
+          }),
+        );
+      }
     } catch (error) {
       this.relanzarErrorPersistencia(error);
     }
@@ -450,6 +683,7 @@ export class UsuariosService {
     }
 
     await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
       const relaciones = manager.getRepository(UsuarioRol);
       const profesorCarreras = manager.getRepository(ProfesorCarrera);
 
@@ -462,6 +696,53 @@ export class UsuariosService {
         await profesorCarreras.delete({
           profesorUsuarioId: id,
         });
+      }
+
+      if (relacion.rol.nombre === RolSistema.COORDINADOR) {
+        const dependencias = manager.getRepository(DependenciaUsuario);
+        const relacionadas = await dependencias.find({ where: { coordinadorId: id, activo: true } });
+        const asistentes = relacionadas.map((rel) => rel.asistenteId);
+        if (asistentes.length) {
+          await manager.getRepository(Usuario).update({ id: In(asistentes) }, { activo: false });
+          for (const rel of relacionadas) {
+            rel.activo = false;
+            rel.desactivadoEn = new Date();
+            rel.motivoDesactivacion = 'Revocación del rol de coordinador responsable';
+          }
+          await dependencias.save(relacionadas);
+        }
+        await manager.getRepository(SolicitudCambio).update(
+          { coordinadorId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId,
+          objetivoUsuarioId: id,
+          accion: 'REVOCAR_COORDINADOR',
+          detalle: { asistentesDesactivados: asistentes },
+        });
+      }
+
+      if (relacion.rol.nombre === RolSistema.ASISTENTE_ESTUDIANTIL) {
+        await manager.getRepository(DependenciaUsuario).update(
+          { asistenteId: id, activo: true },
+          { activo: false, desactivadoEn: new Date(), motivoDesactivacion: 'Revocación del rol de asistente' },
+        );
+        await manager.getRepository(SolicitudCambio).update(
+          { solicitanteId: id, estado: 'PENDIENTE' },
+          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
+        );
+        await manager.getRepository(AuditoriaJerarquia).save({
+          actorUsuarioId: usuarioActualId, objetivoUsuarioId: id,
+          accion: 'REVOCAR_ASISTENTE', detalle: { asistenteId: id },
+        });
+      }
+
+      if (this.permisosService?.esPoliticaOpcionBActiva()) {
+        await this.permisosService?.sincronizarPermisosUsuarioEnTransaccion(
+          manager,
+          id,
+        );
       }
     });
 
@@ -516,6 +797,39 @@ export class UsuariosService {
       passwordResetTokenHash: null,
       passwordResetExpiresAt: null,
     });
+  }
+
+  async aceptarInvitacion(correo: string, token: string, password: string) {
+    const error = new BadRequestException('Invitación inválida o expirada.');
+    if (!/^[a-f0-9]{64}$/.test(token)) throw error;
+    const usuario = await this.buscarPorCorreo(correo.trim().toLowerCase());
+    if (!usuario || usuario.activo || !usuario.passwordResetTokenHash ||
+        !usuario.passwordResetExpiresAt ||
+        usuario.passwordResetExpiresAt.getTime() <= Date.now()) {
+      throw error;
+    }
+    const esperado = Buffer.from(usuario.passwordResetTokenHash, 'hex');
+    const recibido = Buffer.from(createHash('sha256').update(token).digest('hex'), 'hex');
+    if (esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) {
+      throw error;
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    const resultado = await this.usuarioRepository.update(
+      {
+        id: usuario.id,
+        activo: false,
+        passwordResetTokenHash: usuario.passwordResetTokenHash,
+        passwordResetExpiresAt: MoreThan(new Date()),
+      },
+      {
+        passwordHash,
+        activo: true,
+        passwordResetTokenHash: null,
+        passwordResetExpiresAt: null,
+      },
+    );
+    if (resultado.affected !== 1) throw error;
+    return { message: 'Contraseña establecida. Ya puede iniciar sesión.' };
   }
 
   async limpiarRecuperacionPassword(id: number): Promise<void> {

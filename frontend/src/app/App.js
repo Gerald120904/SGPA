@@ -15,6 +15,7 @@ import {
   UsuariosPage,
   iniciarUsuariosPage
 } from '../pages/usuarios/UsuariosPage.js';
+import { MisAsistentesPage, iniciarMisAsistentesPage } from '../pages/usuarios/MisAsistentesPage.js';
 
 import {
   CarrerasPage,
@@ -121,6 +122,9 @@ const PAGE_RENDERERS = {
 
   usuarios:
     UsuariosPage,
+
+  'mis-asistentes':
+    MisAsistentesPage,
 
   carreras:
     CarrerasPage,
@@ -463,6 +467,10 @@ function renderizarRuta(
 
     iniciarUsuariosPage();
 
+  }
+
+  if (module.id === 'mis-asistentes') {
+    iniciarMisAsistentesPage();
   }
 
 

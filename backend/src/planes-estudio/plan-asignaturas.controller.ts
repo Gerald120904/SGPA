@@ -17,9 +17,10 @@ import { CambiarEstadoPlanAsignaturaDto } from './dto/cambiar-estado-plan-asigna
 import { CargaMasivaPlanAsignaturasDto } from './dto/carga-masiva-plan-asignaturas.dto';
 import { CrearPlanAsignaturaDto } from './dto/crear-plan-asignatura.dto';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Controller('planes-estudio/:planId/asignaturas')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class PlanAsignaturasController {
   constructor(
     private readonly planAsignaturasService: PlanAsignaturasService,

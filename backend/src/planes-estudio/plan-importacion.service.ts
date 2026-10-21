@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
@@ -706,5 +706,145 @@ export class PlanImportacionService {
         'La importación no pudo completarse. No se guardó ningún dato.',
       );
     }
+  }
+
+  async importarDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    dto: ValidarImportacionPlanDto,
+    manager: EntityManager,
+  ): Promise<{ asignaturas: number; requisitos: number; salidas: number; asignacionesSalidas: number }> {
+    const validacion = await this.validar(planId, dto);
+    if (!validacion.puedeImportar) {
+      throw new BadRequestException({
+        message: 'El archivo contiene errores y no puede importarse.',
+        validacion,
+      });
+    }
+
+    const planRepo = manager.getRepository(PlanEstudio);
+    const asignaturaRepo = manager.getRepository(PlanAsignatura);
+    const requisitoRepo = manager.getRepository(PlanRequisito);
+    const salidaRepo = manager.getRepository(SalidaAcademica);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('El plan de estudio no existe.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede importar información a un plan inactivo.');
+    }
+
+    const [asignaturasExistentes, salidasExistentes] = await Promise.all([
+      asignaturaRepo.count({ where: { planEstudioId: planId } }),
+      salidaRepo.count({ where: { planEstudioId: planId } }),
+    ]);
+    if (asignaturasExistentes || salidasExistentes) {
+      throw new BadRequestException(
+        'El plan dejó de estar vacío. Vuelva a validar el archivo antes de importar.',
+      );
+    }
+
+    const asignaturas = await asignaturaRepo.save(
+      asignaturaRepo.create(
+        dto.asignaturas.map((fila) => ({
+          planEstudioId: planId,
+          cursoId: null,
+          nivel: Number(this.numero(fila.NIVEL)),
+          ciclo: Number(this.numero(fila.CICLO)),
+          orden: Number(this.numero(fila.ORDEN)),
+          creditos: Number(this.numero(fila.CREDITOS)),
+          tipo: this.mayuscula(fila.TIPO) as TipoPlanAsignatura,
+          tipoOptativa:
+            this.mayuscula(fila.TIPO) === TipoPlanAsignatura.OPTATIVA
+              ? (this.mayuscula(fila.TIPO_OPTATIVA) as TipoOptativa)
+              : null,
+          codigoReferencia: this.mayuscula(fila.CODIGO),
+          nombreReferencia: this.texto(fila.NOMBRE),
+          horasTeoria: this.numero(fila.T),
+          horasPractica: this.numero(fila.P),
+          horasLaboratorio: this.numero(fila.L),
+          horasGira: this.numero(fila.G),
+          horasEstudioIndependiente: this.numero(fila.EI),
+          horasTotales: this.numero(fila.HT),
+          horasDocente: this.numero(fila.HD),
+          observacionHoras: this.texto(fila.OBSERVACION_HORAS) || null,
+          activo: true,
+        })),
+      ),
+    );
+
+    const asignaturaPorClave = new Map(
+      dto.asignaturas.map((fila, indice) => [
+        this.mayuscula(fila.CLAVE),
+        asignaturas[indice],
+      ]),
+    );
+
+    const requisitos = dto.requisitos.map((fila) => {
+      const asignatura = asignaturaPorClave.get(this.mayuscula(fila.ASIGNATURA_CLAVE));
+      const relacionada = asignaturaPorClave.get(this.mayuscula(fila.RELACIONADA_CLAVE));
+      if (!asignatura || !relacionada) {
+        throw new BadRequestException('No fue posible resolver una relación de requisitos.');
+      }
+      return requisitoRepo.create({
+        asignaturaId: asignatura.id,
+        requisitoAsignaturaId: relacionada.id,
+        tipo: this.mayuscula(fila.TIPO) as TipoRequisito,
+      });
+    });
+    if (requisitos.length) await requisitoRepo.save(requisitos);
+
+    const salidas = await salidaRepo.save(
+      salidaRepo.create(
+        dto.salidas.map((fila) => ({
+          planEstudioId: planId,
+          codigo: this.mayuscula(fila.CODIGO),
+          nombre: this.texto(fila.NOMBRE),
+          tipo: this.mayuscula(fila.TIPO) as TipoSalidaAcademica,
+          creditosRequeridos: Number(this.numero(fila.CREDITOS_REQUERIDOS)),
+          orden: Number(this.numero(fila.ORDEN)),
+          descripcion: this.texto(fila.DESCRIPCION) || null,
+          activo: true,
+          asignaturas: [],
+        })),
+      ),
+    );
+
+    const salidaPorCodigo = new Map(
+      salidas.map((salida) => [this.mayuscula(salida.codigo), salida]),
+    );
+    const agrupadasPorSalida = new Map<string, PlanAsignatura[]>();
+
+    for (const fila of dto.salidaAsignaturas) {
+      const codigoSalida = this.mayuscula(fila.SALIDA_CODIGO);
+      const claveAsignatura = this.mayuscula(fila.ASIGNATURA_CLAVE);
+      const asignatura = asignaturaPorClave.get(claveAsignatura);
+      if (!asignatura) {
+        throw new BadRequestException('No fue posible asociar una asignatura a la salida académica.');
+      }
+      if (!agrupadasPorSalida.has(codigoSalida)) {
+        agrupadasPorSalida.set(codigoSalida, []);
+      }
+      agrupadasPorSalida.get(codigoSalida)!.push(asignatura);
+    }
+
+    for (const [codigoSalida, asignaturasSalida] of agrupadasPorSalida.entries()) {
+      const salida = salidaPorCodigo.get(codigoSalida);
+      if (!salida) {
+        throw new BadRequestException('No fue posible resolver la salida académica para asociar asignaturas.');
+      }
+      salida.asignaturas = asignaturasSalida;
+      await salidaRepo.save(salida);
+    }
+
+    return {
+      asignaturas: asignaturas.length,
+      requisitos: requisitos.length,
+      salidas: salidas.length,
+      asignacionesSalidas: dto.salidaAsignaturas.length,
+    };
   }
 }

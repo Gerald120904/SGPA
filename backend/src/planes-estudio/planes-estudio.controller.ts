@@ -16,16 +16,18 @@ import { ActualizarPlanEstudioDto } from './dto/actualizar-plan-estudio.dto';
 import { CambiarEstadoPlanEstudioDto } from './dto/cambiar-estado-plan-estudio.dto';
 import { CrearPlanEstudioDto } from './dto/crear-plan-estudio.dto';
 import { PlanesEstudioService } from './planes-estudio.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
+import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 
 @Controller('planes-estudio')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class PlanesEstudioController {
   constructor(private readonly planesEstudioService: PlanesEstudioService) {}
 
   @Get()
   @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
-  listar() {
-    return this.planesEstudioService.listar();
+  listar(@UsuarioActualId() usuarioId: number) {
+    return this.planesEstudioService.listar(usuarioId);
   }
 
   @Get(':id')

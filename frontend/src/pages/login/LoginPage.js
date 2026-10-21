@@ -8,6 +8,8 @@ import {
   renderizarIconos
 } from '../../utils/icons.js';
 
+import { logoUnaUrl } from '../../utils/brand-assets.js';
+
 
 const CLAVE_CUENTAS_RECORDADAS =
   'sgpa-cuentas-recordadas';
@@ -112,7 +114,7 @@ export function LoginPage() {
           <div class="brand-area">
 
             <img
-              src="/Logo-UNA-Rojo_FondoTransparente.png"
+              src="${logoUnaUrl}"
               alt="Universidad Nacional"
               class="brand-logo"
               draggable="false"

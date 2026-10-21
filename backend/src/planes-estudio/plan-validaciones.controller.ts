@@ -10,9 +10,10 @@ import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PlanValidacionesService } from './plan-validaciones.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Controller('planes-estudio/:planId/validaciones')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class PlanValidacionesController {
   constructor(private readonly service: PlanValidacionesService) {}
 

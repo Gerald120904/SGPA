@@ -9,8 +9,10 @@ import { listarCarreras } from "../../services/carreras.service.js";
 import { listarPlanesEstudio } from "../../services/planes-estudio.service.js";
 import { listarPlanAsignaturas } from "../../services/plan-asignaturas.service.js";
 import { listarPlanRequisitos } from "../../services/plan-requisitos.service.js";
-import { usuarioTienePermiso } from "../../app/session.js";
-import { PERMISOS } from "../../config/permissions.js";
+import { obtenerCatalogoCursosJerarquia } from '../../services/jerarquia.service.js';
+import { proponerEstadoCurso, proponerRequisitoCurso, proponerEliminarRequisitoCurso } from '../../services/solicitudes-cambio.service.js';
+import { usuarioTienePermiso, obtenerRolesUsuario } from "../../app/session.js";
+import { PERMISOS, ROLES } from "../../config/permissions.js";
 import { confirmarAccion } from "../../utils/confirm.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
@@ -48,6 +50,9 @@ function puedeGestionarCursos() {
     PERMISOS.CURSOS_GESTIONAR,
   );
 }
+
+const esAsistente = () => obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+const esCuentaJerarquica = () => esAsistente() || obtenerRolesUsuario().includes(ROLES.COORDINADOR);
 
 /* =========================================================
    PAGE
@@ -387,15 +392,18 @@ async function cargarDatos(instancia) {
   }
 
   try {
-    const [
-      resultadoCursos,
-      resultadoCarreras,
-      resultadoPlanes,
-    ] = await Promise.all([
+    const [resultadoCursos, resultadoCatalogo] = await Promise.all([
       listarCursos(),
-      listarCarreras(),
-      listarPlanesEstudio(),
+      esCuentaJerarquica()
+        ? obtenerCatalogoCursosJerarquia()
+        : Promise.all([listarCarreras(), listarPlanesEstudio()]),
     ]);
+    const resultadoCarreras = esCuentaJerarquica()
+      ? { ok: resultadoCatalogo?.ok, carreras: resultadoCatalogo?.data?.carreras, message: resultadoCatalogo?.message }
+      : resultadoCatalogo[0];
+    const resultadoPlanes = esCuentaJerarquica()
+      ? { ok: resultadoCatalogo?.ok, planes: resultadoCatalogo?.data?.planes, message: resultadoCatalogo?.message }
+      : resultadoCatalogo[1];
 
     if (instancia !== instanciaActual) {
       return;
@@ -535,7 +543,7 @@ async function seleccionarCarrera(
     planes[0] || null;
 
   try {
-    if (planCarreraSeleccionado) {
+    if (planCarreraSeleccionado && !esCuentaJerarquica()) {
       const [
         resultadoAsignaturas,
         resultadoRequisitos,
@@ -675,7 +683,7 @@ async function alternarEstado(curso) {
 
   try {
     const resultado =
-      await cambiarEstadoCurso(
+      await (esAsistente() ? proponerEstadoCurso : cambiarEstadoCurso)(
         curso.id,
         nuevoEstado,
       );
@@ -689,10 +697,12 @@ async function alternarEstado(curso) {
 
     mostrarExito({
       titulo:
+        esAsistente() ? 'Solicitud enviada' :
         nuevoEstado
           ? "Curso activado"
           : "Curso desactivado",
       mensaje:
+        esAsistente() ? `El cambio de estado de "${curso.nombre}" quedó pendiente de aprobación.` :
         `"${curso.nombre}" se ${
           nuevoEstado
             ? "activó"
@@ -727,12 +737,13 @@ async function abrirRequisitosCurso(curso) {
     return;
   }
 
-  const puedeGestionar = puedeGestionarCursos();
+  const puedeGestionar = curso.puedeGestionarGlobal ?? puedeGestionarCursos();
 
   const candidatos = cursos.filter(
     (item) =>
       item.activo === true &&
-      Number(item.id) !== Number(curso.id),
+      Number(item.id) !== Number(curso.id) &&
+      (item.puedeGestionarGlobal ?? true),
   );
 
   const renderModal = (requisitos = [], cargando = false, errorMensaje = "") => {
@@ -978,7 +989,7 @@ async function abrirRequisitosCurso(curso) {
           errorBox?.classList.add("hidden");
 
           try {
-            const res = await crearRequisitoCurso(curso.id, {
+            const res = await (esAsistente() ? proponerRequisitoCurso : crearRequisitoCurso)(curso.id, {
               requisitoCursoId,
               tipo,
             });
@@ -990,8 +1001,8 @@ async function abrirRequisitosCurso(curso) {
             }
 
             mostrarExito({
-              titulo: "Requisito agregado",
-              mensaje: "El requisito se agregó correctamente.",
+              titulo: esAsistente() ? 'Solicitud enviada' : "Requisito agregado",
+              mensaje: esAsistente() ? 'El requisito quedó pendiente de aprobación.' : "El requisito se agregó correctamente.",
             });
 
             await cargarRequisitos();
@@ -1048,7 +1059,7 @@ async function abrirRequisitosCurso(curso) {
         }
 
         try {
-          const res = await eliminarRequisitoCurso(curso.id, requisitoId);
+          const res = await (esAsistente() ? proponerEliminarRequisitoCurso : eliminarRequisitoCurso)(curso.id, requisitoId);
           if (!res?.ok) {
             throw new Error(
               res?.message || "No fue posible eliminar el requisito.",
@@ -1056,8 +1067,8 @@ async function abrirRequisitosCurso(curso) {
           }
 
           mostrarExito({
-            titulo: "Requisito eliminado",
-            mensaje: "El requisito se eliminó correctamente.",
+            titulo: esAsistente() ? 'Solicitud enviada' : "Requisito eliminado",
+            mensaje: esAsistente() ? 'La eliminación quedó pendiente de aprobación.' : "El requisito se eliminó correctamente.",
           });
 
           await cargarRequisitos();

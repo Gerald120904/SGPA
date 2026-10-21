@@ -1,0 +1,32 @@
+.mis-asistentes-page { display: grid; gap: 18px; }
+.mis-asistentes-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.mis-asistentes-header h2 { margin: 0; color: #4b1721; }
+.mis-asistentes-header p { margin: 5px 0 0; color: #667085; }
+.mis-asistentes-panel { margin-bottom: 16px; padding: 18px; background: #fff; border: 1px solid #e8d9dc; border-radius: 10px; }
+.mis-asistentes-panel h3 { margin: 0 0 10px; color: #6f1d2b; }
+.mis-asistentes-panel p { margin: 6px 0; }
+.mis-asistentes-panel ul { list-style: none; margin: 0; padding: 0; }
+.mis-asistentes-panel li { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #eee; }
+.mis-asistentes-solicitudes { display: grid; gap: 12px; }
+.mis-asistentes-solicitud { border: 1px solid #e8d9dc; border-radius: 8px; padding: 14px; }
+.mis-asistentes-solicitud-top, .mis-asistentes-actions { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.mis-asistentes-solicitud-top strong { color: #6f1d2b; }
+.mis-asistentes-propuesta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.mis-asistentes-propuesta div { min-width: 0; }
+.mis-asistentes-propuesta dt { color: #667085; font-size: 12px; }
+.mis-asistentes-propuesta dd { margin: 2px 0; overflow-wrap: anywhere; }
+.mis-asistentes-actions { justify-content: flex-end; margin-top: 12px; }
+.mis-asistentes-cuenta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mis-asistentes-cuenta label { display: grid; gap: 5px; }
+.mis-asistentes-carreras { display: grid; gap: 12px; margin: 16px 0; }
+.mis-asistentes-carrera { border: 1px solid #e8d9dc; border-radius: 8px; padding: 12px; }
+.mis-asistentes-carrera legend { color: #6f1d2b; font-weight: 600; }
+.mis-asistentes-permisos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; max-height: 230px; overflow: auto; }
+.mis-asistentes-permisos label { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; }
+.mis-asistentes-page .usuarios-primary-button { background: #842532; }
+.mis-asistentes-page .usuarios-primary-button:hover:not(:disabled) { background: #681c27; }
+@media (max-width: 700px) {
+  .mis-asistentes-header, .mis-asistentes-panel li { flex-direction: column; align-items: stretch; }
+  .mis-asistentes-cuenta { grid-template-columns: 1fr; }
+  .mis-asistentes-page .usuario-dialog { max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: auto; }
+}

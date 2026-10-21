@@ -9,6 +9,7 @@ import { In, Repository } from 'typeorm';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { TipoAsignacionAcademica } from './constants/tipo-asignacion-academica.constant';
 import { ActualizarAreaAcademicaDto } from './dto/actualizar-area-academica.dto';
@@ -40,6 +41,7 @@ export class EstructuraAcademicaService {
 
     @InjectRepository(ProfesorCarrera)
     private readonly profesorCarreraRepository: Repository<ProfesorCarrera>,
+    private readonly alcanceJerarquico: AlcanceJerarquicoService,
   ) {}
 
   // --- Helper de Fecha Institucional y Vigencia ---
@@ -135,6 +137,9 @@ export class EstructuraAcademicaService {
     usuarioId: number,
     carreraId: number,
   ): Promise<boolean> {
+    if (await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId)) {
+      return (await this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuarioId)).includes(carreraId);
+    }
     if (await this.esAdminGlobal(usuarioId)) {
       return true;
     }
@@ -184,6 +189,9 @@ export class EstructuraAcademicaService {
   }
 
   async obtenerCarreraIdsConAlcance(usuarioId: number): Promise<number[]> {
+    if (await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId)) {
+      return this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuarioId);
+    }
     if (await this.esAdminGlobal(usuarioId)) {
       const carreras = await this.carreraRepository.find({
         select: { id: true },
@@ -257,6 +265,12 @@ export class EstructuraAcademicaService {
     usuarioId: number,
     profesorUsuarioId: number,
   ): Promise<boolean> {
+    if (await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId)) {
+      const propias = new Set(await this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuarioId));
+      if (!propias.size) return false;
+      const carrerasProfesor = await this.profesorCarreraRepository.find({ where: { profesorUsuarioId } });
+      return carrerasProfesor.some((rel) => propias.has(rel.carreraId));
+    }
     const asignaciones = await this.obtenerAsignacionesVigentes(usuarioId);
 
     if (
@@ -469,6 +483,10 @@ export class EstructuraAcademicaService {
   async crearAsignacion(
     dto: CrearAsignacionAcademicaDto,
   ): Promise<AsignacionAcademica> {
+    if (dto.tipo === TipoAsignacionAcademica.COORDINADOR_CARRERA ||
+      dto.tipo === TipoAsignacionAcademica.ASISTENTE_CARRERA) {
+      throw new BadRequestException('Use la administracion jerarquica para asignaciones de coordinadores y asistentes.');
+    }
     this.validarAmbito(dto.tipo, dto.carreraId, dto.areaAcademicaId);
 
     const usuario = await this.usuarioRepository.findOne({
@@ -548,6 +566,10 @@ export class EstructuraAcademicaService {
     dto: ActualizarAsignacionAcademicaDto,
   ): Promise<AsignacionAcademica> {
     const asignacion = await this.obtenerAsignacionPorId(id);
+    if (asignacion.tipo === TipoAsignacionAcademica.COORDINADOR_CARRERA ||
+      asignacion.tipo === TipoAsignacionAcademica.ASISTENTE_CARRERA) {
+      throw new BadRequestException('Use la administracion jerarquica para asignaciones de coordinadores y asistentes.');
+    }
 
     const fechaInicio = dto.fechaInicio ?? asignacion.fechaInicio;
     const fechaFin =
@@ -579,6 +601,10 @@ export class EstructuraAcademicaService {
     dto: InactivarAsignacionAcademicaDto = {},
   ): Promise<AsignacionAcademica> {
     const asignacion = await this.obtenerAsignacionPorId(id);
+    if (asignacion.tipo === TipoAsignacionAcademica.COORDINADOR_CARRERA ||
+      asignacion.tipo === TipoAsignacionAcademica.ASISTENTE_CARRERA) {
+      throw new BadRequestException('Use la administracion jerarquica para asignaciones de coordinadores y asistentes.');
+    }
 
     if (!asignacion.activo) {
       throw new ConflictException(

@@ -18,12 +18,19 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
+    const request = context.switchToHttp().getRequest();
+    const usuario = request.user;
+
+    if (usuario?.jerarquiaConfigurada === true &&
+      !usuario.roles?.includes(RolSistema.ADMIN_GLOBAL) &&
+      (usuario.roles?.includes(RolSistema.COORDINADOR) || usuario.roles?.includes(RolSistema.ASISTENTE_ESTUDIANTIL)) &&
+      !['JerarquiaUsuariosController', 'SolicitudesCambioController'].includes(context.getClass()?.name)) {
+      throw new ForbiddenException('Esta ruta no verifica aún el alcance por carrera.');
+    }
+
     if (!rolesPermitidos || rolesPermitidos.length === 0) {
       return true;
     }
-
-    const request = context.switchToHttp().getRequest();
-    const usuario = request.user;
 
     if (!usuario || !Array.isArray(usuario.roles)) {
       throw new ForbiddenException(

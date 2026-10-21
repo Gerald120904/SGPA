@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { TipoIndisponibilidadAula } from '../constants/tipo-indisponibilidad-aula.constant';
+import { fechaHoraInstitucionalTransformer } from '../fecha-hora-institucional.transformer';
 import { Aula } from './aula.entity';
 
 @Entity({ name: 'indisponibilidades_aulas' })
@@ -42,12 +43,14 @@ export class IndisponibilidadAula {
   @Column({
     name: 'fecha_hora_inicio',
     type: 'datetime',
+    transformer: fechaHoraInstitucionalTransformer,
   })
   fechaHoraInicio!: Date;
 
   @Column({
     name: 'fecha_hora_fin',
     type: 'datetime',
+    transformer: fechaHoraInstitucionalTransformer,
   })
   fechaHoraFin!: Date;
 

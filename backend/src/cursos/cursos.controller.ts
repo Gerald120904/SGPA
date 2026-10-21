@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
@@ -26,45 +27,48 @@ export class CursosController {
 
   @Get()
   @Permisos(PermisoSistema.CURSOS_VER)
-  listar() {
-    return this.cursosService.listar();
+  listar(@UsuarioActualId() usuarioId: number) {
+    return this.cursosService.listar(usuarioId);
   }
 
   @Get('asignaturas-disponibles')
   @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   listarAsignaturasDisponibles(
+    @UsuarioActualId() usuarioId: number,
     @Query() filtros: ListarAsignaturasDisponiblesDto,
   ) {
-    return this.cursosService.listarAsignaturasDisponibles(filtros);
+    return this.cursosService.listarAsignaturasDisponibles(filtros, usuarioId);
   }
 
   @Get(':id')
   @Permisos(PermisoSistema.CURSOS_VER)
-  obtenerPorId(@Param('id', ParseIntPipe) id: number) {
-    return this.cursosService.obtenerPorId(id);
+  obtenerPorId(@UsuarioActualId() usuarioId: number, @Param('id', ParseIntPipe) id: number) {
+    return this.cursosService.obtenerPorId(id, usuarioId);
   }
 
   @Post()
   @Permisos(PermisoSistema.CURSOS_GESTIONAR)
-  crear(@Body() dto: CrearCursoDto) {
-    return this.cursosService.crear(dto);
+  crear(@UsuarioActualId() usuarioId: number, @Body() dto: CrearCursoDto) {
+    return this.cursosService.crear(dto, usuarioId);
   }
 
   @Patch(':id')
   @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   actualizar(
+    @UsuarioActualId() usuarioId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarCursoDto,
   ) {
-    return this.cursosService.actualizar(id, dto);
+    return this.cursosService.actualizar(id, dto, usuarioId);
   }
 
   @Patch(':id/estado')
   @Permisos(PermisoSistema.CURSOS_GESTIONAR)
   cambiarEstado(
+    @UsuarioActualId() usuarioId: number,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoCursoDto,
   ) {
-    return this.cursosService.cambiarEstado(id, dto.activo);
+    return this.cursosService.cambiarEstado(id, dto.activo, usuarioId);
   }
 }

@@ -24,6 +24,7 @@ import { PlanesEstudioController } from './planes-estudio.controller';
 import { PlanesEstudioService } from './planes-estudio.service';
 import { SalidasAcademicasController } from './salidas-academicas.controller';
 import { SalidasAcademicasService } from './salidas-academicas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SalidasAcademicasService } from './salidas-academicas.service';
     PlanValidacionesService,
     PlanImportacionService,
     PlanReglasOptativasService,
+    PlanesAlcanceGuard,
   ],
   exports: [
     PlanesEstudioService,

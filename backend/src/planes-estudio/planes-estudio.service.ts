@@ -5,8 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { createHash } from 'node:crypto';
+import { EntityManager, In, Repository } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { ActualizarPlanEstudioDto } from './dto/actualizar-plan-estudio.dto';
 import { CrearPlanEstudioDto } from './dto/crear-plan-estudio.dto';
 import { PlanEstudio } from './entities/plan-estudio.entity';
@@ -18,6 +21,7 @@ export class PlanesEstudioService {
     private readonly planRepository: Repository<PlanEstudio>,
     @InjectRepository(Carrera)
     private readonly carreraRepository: Repository<Carrera>,
+    private readonly alcance: AlcanceJerarquicoService,
   ) {}
 
   private async obtenerEntidadPorId(id: number): Promise<PlanEstudio> {
@@ -33,6 +37,25 @@ export class PlanesEstudioService {
     }
 
     return plan;
+  }
+
+  async obtenerPlanCompleto(id: number): Promise<PlanEstudio> {
+    return this.obtenerEntidadPorId(id);
+  }
+
+  huellaPlan(plan: PlanEstudio): string {
+    return createHash('sha256').update(JSON.stringify({ id: plan.id, carreraId: plan.carreraId,
+      grado: plan.grado, codigo: plan.codigo, nombre: plan.nombre, descripcion: plan.descripcion,
+      activo: plan.activo, updatedAt: plan.updatedAt ? new Date(plan.updatedAt).toISOString() : null }))
+      .digest('hex');
+  }
+
+  async validarDelegacionCompleta(coordinadorId: number, asistenteId: number, carreraId: number): Promise<void> {
+    const [coordinador, asistente] = await Promise.all([
+      this.alcance.puedeEjecutar(coordinadorId, PermisoSistema.PLANES_ESTUDIO_GESTIONAR, carreraId),
+      this.alcance.puedeEjecutar(asistenteId, PermisoSistema.PLANES_ESTUDIO_GESTIONAR, carreraId),
+    ]);
+    if (!coordinador || !asistente) throw new ConflictException('Ya no existe permiso vigente sobre la carrera del plan.');
   }
 
   private async obtenerCarreraActiva(carreraId: number): Promise<Carrera> {
@@ -92,8 +115,18 @@ export class PlanesEstudioService {
     throw error;
   }
 
-  async listar(): Promise<PlanEstudio[]> {
+  async listar(usuarioId?: number): Promise<PlanEstudio[]> {
+    let carreraIds: number[] | null = null;
+    if (usuarioId !== undefined && await this.alcance.tipoCuentaJerarquica(usuarioId)) {
+      const asignadas = await this.alcance.obtenerCarrerasAutorizadas(usuarioId);
+      carreraIds = (await Promise.all(asignadas.map(async (id) =>
+        await this.alcance.puedeEjecutar(usuarioId, PermisoSistema.PLANES_ESTUDIO_VER, id) ||
+        await this.alcance.puedeEjecutar(usuarioId, PermisoSistema.PLANES_ESTUDIO_GESTIONAR, id) ? id : null)))
+        .filter((id): id is number => id !== null);
+      if (!carreraIds.length) return [];
+    }
     return this.planRepository.find({
+      ...(carreraIds !== null && { where: { carreraId: In(carreraIds) } }),
       relations: {
         carrera: true,
       },
@@ -195,5 +228,51 @@ export class PlanesEstudioService {
     await this.planRepository.update(id, { activo });
 
     return this.obtenerEntidadPorId(id);
+  }
+
+  async crearDesdeSolicitud(coordinadorId: number, asistenteId: number, dto: CrearPlanEstudioDto,
+    manager: EntityManager): Promise<number> {
+    await this.validarDelegacionCompleta(coordinadorId, asistenteId, dto.carreraId);
+    const carrera = await manager.getRepository(Carrera).findOne({ where: { id: dto.carreraId },
+      lock: { mode: 'pessimistic_read' } });
+    if (!carrera || !carrera.activo) throw new BadRequestException('La carrera seleccionada no estÃ¡ activa.');
+    const repo = manager.getRepository(PlanEstudio);
+    const codigo = dto.codigo.trim().toUpperCase();
+    if (await repo.findOne({ where: { carreraId: dto.carreraId, codigo } })) {
+      throw new ConflictException('Ya existe un plan con ese cÃ³digo para la carrera.');
+    }
+    const guardado = await repo.save(repo.create({ carreraId: dto.carreraId, grado: dto.grado,
+      codigo, nombre: dto.nombre.trim(), descripcion: dto.descripcion?.trim() || null, activo: true }));
+    return guardado.id;
+  }
+
+  private async planBloqueado(manager: EntityManager, id: number): Promise<PlanEstudio> {
+    const plan = await manager.getRepository(PlanEstudio).findOne({ where: { id },
+      relations: { carrera: true }, lock: { mode: 'pessimistic_write' } });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    return plan;
+  }
+
+  async actualizarDesdeSolicitud(coordinadorId: number, asistenteId: number, id: number,
+    dto: ActualizarPlanEstudioDto, huella: string, manager: EntityManager): Promise<number> {
+    const plan = await this.planBloqueado(manager, id);
+    if (this.huellaPlan(plan) !== huella) throw new ConflictException('El plan cambiÃ³ desde que se enviÃ³ la solicitud.');
+    await this.validarDelegacionCompleta(coordinadorId, asistenteId, plan.carreraId);
+    if (dto.grado !== undefined) plan.grado = dto.grado;
+    if (dto.codigo !== undefined) plan.codigo = dto.codigo.trim().toUpperCase();
+    if (dto.nombre !== undefined) plan.nombre = dto.nombre.trim();
+    if (dto.descripcion !== undefined) plan.descripcion = dto.descripcion?.trim() || null;
+    try { await manager.getRepository(PlanEstudio).save(plan); } catch (error) { this.relanzarErrorPersistencia(error); }
+    return id;
+  }
+
+  async cambiarEstadoDesdeSolicitud(coordinadorId: number, asistenteId: number, id: number,
+    activo: boolean, huella: string, manager: EntityManager): Promise<number> {
+    const plan = await this.planBloqueado(manager, id);
+    if (this.huellaPlan(plan) !== huella) throw new ConflictException('El plan cambiÃ³ desde que se enviÃ³ la solicitud.');
+    await this.validarDelegacionCompleta(coordinadorId, asistenteId, plan.carreraId);
+    plan.activo = activo;
+    await manager.getRepository(PlanEstudio).save(plan);
+    return id;
   }
 }

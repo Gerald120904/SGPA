@@ -2,9 +2,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
@@ -53,6 +55,22 @@ describe('CursosController', () => {
           },
         },
         {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
+          },
+        },
+        {
           provide: PermisosService,
           useValue: permisosService,
         },
@@ -94,7 +112,10 @@ describe('CursosController', () => {
     await app.close();
   });
 
+  let rolActual = 'ADMIN_GLOBAL';
+
   async function crearToken(rol: string) {
+    rolActual = rol;
     return jwtService.signAsync({
       sub: 1,
       correo: 'usuario@sgpa.local',
@@ -151,7 +172,7 @@ describe('CursosController', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200, { id: 1 });
 
-    expect(cursosService.obtenerPorId).toHaveBeenCalledWith(1);
+    expect(cursosService.obtenerPorId).toHaveBeenCalledWith(1, 1);
   });
 
   it('responde 403 al consultar asignaturas disponibles sin CURSOS_GESTIONAR', async () => {
@@ -182,7 +203,7 @@ describe('CursosController', () => {
       planId: 2,
       nivel: 1,
       ciclo: 2,
-    });
+    }, 1);
   });
 
   it('responde 403 al crear un curso sin CURSOS_GESTIONAR', async () => {
@@ -218,7 +239,7 @@ describe('CursosController', () => {
         id: 1,
       });
 
-    expect(cursosService.crear).toHaveBeenCalledWith(dto);
+    expect(cursosService.crear).toHaveBeenCalledWith(dto, 1);
   });
 
   it('rechaza crear un curso sin planAsignaturaId', async () => {
@@ -310,7 +331,7 @@ describe('CursosController', () => {
         id: 1,
       });
 
-    expect(cursosService.actualizar).toHaveBeenCalledWith(1, dto);
+    expect(cursosService.actualizar).toHaveBeenCalledWith(1, dto, 1);
   });
 
   it('rechaza modificar manualmente el código de un curso', async () => {
@@ -355,7 +376,7 @@ describe('CursosController', () => {
         id: 1,
       });
 
-    expect(cursosService.cambiarEstado).toHaveBeenCalledWith(1, false);
+    expect(cursosService.cambiarEstado).toHaveBeenCalledWith(1, false, 1);
   });
 
   it('rechaza estado que no sea boolean', async () => {

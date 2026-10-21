@@ -42,7 +42,7 @@ export class UsuariosController {
 
   @Post()
   crear(@Body() dto: CrearUsuarioDto) {
-    return this.usuariosService.crear(dto);
+    return this.usuariosService.crearConInvitacion(dto);
   }
 
   @Patch(':id')
@@ -79,6 +79,16 @@ export class UsuariosController {
     dto: AsignarRolDto,
   ) {
     return this.usuariosService.asignarRol(id, dto.rol);
+  }
+
+  @Get(':id/invitacion')
+  obtenerEstadoInvitacion(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.obtenerEstadoInvitacion(id);
+  }
+
+  @Post(':id/invitacion/reintentar')
+  reintentarInvitacion(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.reintentarInvitacion(id);
   }
 
   @Delete(':id/roles/:rolId')

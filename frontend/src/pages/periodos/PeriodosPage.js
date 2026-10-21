@@ -960,10 +960,7 @@ function abrirFormulario(
       <input
         id="periodoFechaInicio"
         type="date"
-        value="${
-          periodo?.fechaInicio ??
-          ""
-        }"
+        value="${periodo?.fechaInicio ?? ""}"
         required
         ${estructuraBloqueada ? "disabled" : ""}
       >
@@ -980,10 +977,7 @@ function abrirFormulario(
       <input
         id="periodoFechaFin"
         type="date"
-        value="${
-          periodo?.fechaFin ??
-          ""
-        }"
+        value="${periodo?.fechaFin ?? ""}"
         required
         ${estructuraBloqueada ? "disabled" : ""}
       >
@@ -1086,6 +1080,27 @@ function abrirFormulario(
     dialog,
   );
 
+  const inputFechaInicio = document.getElementById("periodoFechaInicio");
+  const inputFechaLimite = document.getElementById("periodoFechaLimite");
+  const actualizarLimiteDisponibilidad = () => {
+    const partes = inputFechaInicio?.value?.split("-").map(Number);
+    if (partes?.length === 3 && !partes.some(Number.isNaN)) {
+      const [anio, mes, dia] = partes;
+      const diaAnterior = new Date(anio, mes - 1, dia - 1);
+      const fechaMaxima = [
+        diaAnterior.getFullYear(),
+        String(diaAnterior.getMonth() + 1).padStart(2, "0"),
+        String(diaAnterior.getDate()).padStart(2, "0"),
+      ].join("-");
+      inputFechaLimite.max = fechaMaxima;
+    } else {
+      inputFechaLimite?.removeAttribute("max");
+    }
+  };
+  if (inputFechaInicio && inputFechaLimite) {
+    actualizarLimiteDisponibilidad();
+    inputFechaInicio.addEventListener("change", actualizarLimiteDisponibilidad);
+  }
 
   const cerrar =
     () => dialog.close();
@@ -1540,3 +1555,7 @@ export function iniciarPeriodosPage() {
     instancia,
   );
 }
+
+/* =========================================================
+   SELECTOR INTELIGENTE DE FECHA LÍMITE (SGPA)
+   ========================================================= */

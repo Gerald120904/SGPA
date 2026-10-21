@@ -2,11 +2,15 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { PermisosService } from '../permisos/permisos.service';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { TipoOptativa } from './constants/tipo-optativa.constant';
 import { OptativasController } from './optativas.controller';
 import { OptativasService } from './optativas.service';
@@ -20,6 +24,10 @@ describe('OptativasController', () => {
     crear: jest.fn(),
     actualizar: jest.fn(),
     cambiarEstado: jest.fn(),
+  };
+
+  const permisosService = {
+    usuarioTienePermisos: jest.fn().mockResolvedValue(true),
   };
 
   let app: INestApplication<App>;
@@ -36,10 +44,31 @@ describe('OptativasController', () => {
       providers: [
         AuthGuard,
         RolesGuard,
+        PermisosGuard,
+        {
+          provide: PermisosService,
+          useValue: permisosService,
+        },
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
+          },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
           },
         },
         {
@@ -71,12 +100,16 @@ describe('OptativasController', () => {
     jest.clearAllMocks();
   });
 
-  const generarToken = (rol: RolSistema = RolSistema.ADMIN_GLOBAL) =>
-    jwtService.sign({
+  let rolActual: RolSistema = RolSistema.ADMIN_GLOBAL;
+
+  const generarToken = (rol: RolSistema = RolSistema.ADMIN_GLOBAL) => {
+    rolActual = rol;
+    return jwtService.sign({
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
     });
+  };
 
   it('GET /optativas - lista las optativas', async () => {
     optativasService.listar.mockResolvedValue([]);
@@ -100,7 +133,7 @@ describe('OptativasController', () => {
       .expect(200);
 
     expect(response.body).toEqual(optativa);
-    expect(optativasService.obtenerPorId).toHaveBeenCalledWith(1);
+    expect(optativasService.obtenerPorId).toHaveBeenCalledWith(1, 1);
   });
 
   it('POST /optativas - crea una optativa', async () => {
@@ -119,12 +152,15 @@ describe('OptativasController', () => {
       .expect(201);
 
     expect(response.body).toEqual(nueva);
-    expect(optativasService.crear).toHaveBeenCalledWith({
-      codigo: 'EIF472',
-      nombre: 'Seguridad Informática',
-      tipo: TipoOptativa.DISCIPLINARIA,
-      carreraOrigenId: 1,
-    });
+    expect(optativasService.crear).toHaveBeenCalledWith(
+      {
+        codigo: 'EIF472',
+        nombre: 'Seguridad Informática',
+        tipo: TipoOptativa.DISCIPLINARIA,
+        carreraOrigenId: 1,
+      },
+      1,
+    );
   });
 
   it('PATCH /optativas/:id - actualiza una optativa', async () => {
@@ -140,9 +176,13 @@ describe('OptativasController', () => {
       .expect(200);
 
     expect(response.body).toEqual(actualizada);
-    expect(optativasService.actualizar).toHaveBeenCalledWith(1, {
-      tipo: TipoOptativa.ABIERTA,
-    });
+    expect(optativasService.actualizar).toHaveBeenCalledWith(
+      1,
+      {
+        tipo: TipoOptativa.ABIERTA,
+      },
+      1,
+    );
   });
 
   it('PATCH /optativas/:id/estado - cambia el estado de una optativa', async () => {
@@ -158,6 +198,6 @@ describe('OptativasController', () => {
       .expect(200);
 
     expect(response.body).toEqual(actualizada);
-    expect(optativasService.cambiarEstado).toHaveBeenCalledWith(1, false);
+    expect(optativasService.cambiarEstado).toHaveBeenCalledWith(1, false, 1);
   });
 });

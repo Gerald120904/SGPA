@@ -73,10 +73,26 @@ let planesDisponibles = [];
 
 let estadoGoogle = {
   conectado: false,
+  requiereReautenticacion: false,
+  estado: 'DESCONECTADO',
   googleEmail: null
 };
 
 let observadorFocusRegistrado = false;
+
+export function agruparAsignaturasVistaPrevia(asignaturas) {
+  const estructura = new Map();
+  asignaturas.forEach((asignatura) => {
+    const nivel = Number(asignatura.nivel);
+    const ciclo = Number(asignatura.ciclo);
+    const ciclosNivel = estructura.get(nivel) || new Map();
+    const cursosCiclo = ciclosNivel.get(ciclo) || [];
+    cursosCiclo.push(asignatura);
+    ciclosNivel.set(ciclo, cursosCiclo);
+    estructura.set(nivel, ciclosNivel);
+  });
+  return estructura;
+}
 
 export function FormulariosEstudiantesPage() {
   return `
@@ -146,6 +162,20 @@ function renderizarEstadoGoogle() {
 
   if (!contenedor) return;
 
+  if (estadoGoogle.requiereReautenticacion) {
+    contenedor.innerHTML = `
+      <div class="formularios-google-status formularios-google-disconnected">
+        <span class="formularios-google-dot" aria-hidden="true"></span>
+        <span>
+          <strong>Google requiere reconexión</strong>
+          <small>La autorización expiró o fue revocada.</small>
+        </span>
+      </div>
+    `;
+
+    return;
+  }
+
   if (estadoGoogle.conectado) {
     contenedor.innerHTML = `
       <div class="formularios-google-status formularios-google-connected">
@@ -206,7 +236,11 @@ function renderizarAcciones() {
           data-lucide="link"
           aria-hidden="true"
         ></i>
-        Conectar Google
+        ${
+          estadoGoogle.requiereReautenticacion
+            ? 'Volver a conectar Google'
+            : 'Conectar Google'
+        }
       </button>
     `);
   }
@@ -1072,6 +1106,8 @@ async function desconectarGoogle() {
 
     estadoGoogle = {
       conectado: false,
+      requiereReautenticacion: false,
+      estado: 'DESCONECTADO',
       googleEmail: null
     };
 
@@ -1474,24 +1510,7 @@ async function abrirNuevoFormulario() {
         planSeleccionadoTieneCursos =
           reales.length > 0;
 
-        const estructura =
-          new Map();
-
-        reales.forEach((asignatura) => {
-          const nivel =
-            Number(asignatura.nivel);
-          const ciclo =
-            Number(asignatura.ciclo);
-          const ciclosNivel =
-            estructura.get(nivel) ||
-            new Map();
-
-          ciclosNivel.set(
-            ciclo,
-            (ciclosNivel.get(ciclo) || 0) + 1
-          );
-          estructura.set(nivel, ciclosNivel);
-        });
+        const estructura = agruparAsignaturasVistaPrevia(reales);
 
         const planSeleccionado =
           planesDisponibles.find(
@@ -1510,13 +1529,19 @@ async function abrirNuevoFormulario() {
                   .sort(([cicloA], [cicloB]) =>
                     cicloA - cicloB
                   )
-                  .map(([ciclo, cantidad]) => `
-                    <div>
-                      <span>Ciclo ${ciclo}</span>
-                      <strong>
-                        ${cantidad}
-                        curso${cantidad === 1 ? '' : 's'}
-                      </strong>
+                  .map(([ciclo, cursos]) => `
+                    <div class="formularios-plan-preview-cycle">
+                      <strong>Ciclo ${ciclo}</strong>
+                      <ul>
+                        ${cursos
+                          .sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0))
+                          .map((asignatura) => `
+                            <li>
+                              ${escapeHtml(asignatura.curso.nombre)}
+                              <small>${escapeHtml(asignatura.curso.codigo || '')}</small>
+                            </li>
+                          `).join('')}
+                      </ul>
                     </div>
                   `)
                   .join('')}
@@ -1576,6 +1601,8 @@ async function abrirNuevoFormulario() {
       () => dialog.close()
     );
 
+  let estaCreando = false;
+
   document
     .getElementById(
       'nuevoFormularioEstudianteForm'
@@ -1584,6 +1611,10 @@ async function abrirNuevoFormulario() {
       'submit',
       async (event) => {
         event.preventDefault();
+
+        if (estaCreando) {
+          return;
+        }
 
         const tituloInput =
           document.getElementById(
@@ -1603,6 +1634,11 @@ async function abrirNuevoFormulario() {
         const crearButton =
           document.getElementById(
             'crearFormularioButton'
+          );
+
+        const cancelarButton =
+          document.getElementById(
+            'cancelarNuevoFormularioButton'
           );
 
         if (
@@ -1656,16 +1692,42 @@ async function abrirNuevoFormulario() {
           'hidden'
         );
 
+        estaCreando = true;
         crearButton.disabled = true;
+        if (cancelarButton) {
+          cancelarButton.disabled = true;
+        }
+        tituloInput.disabled = true;
+        descripcionInput.disabled = true;
+        carreraInput.disabled = true;
+        planInput.disabled = true;
 
-        const textoBoton =
-          crearButton.querySelector(
-            'span'
+        crearButton.innerHTML = `
+          <span class="formularios-btn-spinner" aria-hidden="true"></span>
+          <span>Creando y publicando...</span>
+        `;
+
+        const scrollContainer =
+          dialog.querySelector('.sgpa-form-scroll') ||
+          dialog.querySelector('.sgpa-form');
+
+        let avisoCarga =
+          document.getElementById(
+            'formulariosCreandoNotice'
           );
 
-        if (textoBoton) {
-          textoBoton.textContent =
-            'Creando formulario...';
+        if (!avisoCarga && scrollContainer) {
+          avisoCarga =
+            document.createElement('div');
+          avisoCarga.id =
+            'formulariosCreandoNotice';
+          avisoCarga.className =
+            'formularios-creando-notice';
+          avisoCarga.innerHTML = `
+            <span class="formularios-pulse-dot" aria-hidden="true"></span>
+            <span>Generando la estructura del formulario y publicando en Google Forms... Por favor espere.</span>
+          `;
+          scrollContainer.appendChild(avisoCarga);
         }
 
         try {
@@ -1686,12 +1748,30 @@ async function abrirNuevoFormulario() {
 
           dialog.close();
 
-          mostrarExito({
-            titulo:
-              'Formulario creado',
-            mensaje:
-              'El formulario fue creado y publicado correctamente en Google Forms.'
-          });
+          const formulario =
+            res?.data ?? res;
+
+          const estaPublicado =
+            formulario?.estado === 'PUBLICADO' ||
+            Boolean(formulario?.responderUri);
+
+          if (estaPublicado) {
+            mostrarExito({
+              titulo:
+                'Formulario publicado',
+              mensaje:
+                'El formulario fue creado y publicado correctamente en Google Forms.'
+            });
+          } else {
+            mostrarExito({
+              titulo:
+                'Formulario registrado',
+              mensaje:
+                'El formulario fue registrado en el sistema. Estado: ' +
+                (formulario?.estado || 'CREADO') +
+                '.'
+            });
+          }
 
           await cargarFormularios();
         } catch (error) {
@@ -1703,12 +1783,28 @@ async function abrirNuevoFormulario() {
               'Ocurrió un error durante la creación.'
           });
         } finally {
+          estaCreando = false;
           crearButton.disabled = false;
-
-          if (textoBoton) {
-            textoBoton.textContent =
-              'Crear y publicar';
+          if (cancelarButton) {
+            cancelarButton.disabled = false;
           }
+          tituloInput.disabled = false;
+          descripcionInput.disabled = false;
+          carreraInput.disabled = false;
+          planInput.disabled = false;
+
+          document
+            .getElementById(
+              'formulariosCreandoNotice'
+            )
+            ?.remove();
+
+          crearButton.innerHTML = `
+            <i data-lucide="file-plus" aria-hidden="true"></i>
+            <span>Crear y publicar</span>
+          `;
+
+          renderizarIconos();
         }
       }
     );
@@ -1764,6 +1860,16 @@ function registrarActualizacionAlVolver() {
               googleData?.conectado
             ),
 
+          requiereReautenticacion:
+            Boolean(
+              googleData?.requiereReautenticacion ||
+              googleData?.estado === 'REQUIERE_REAUTENTICACION'
+            ),
+
+          estado:
+            googleData?.estado ??
+            'DESCONECTADO',
+
           googleEmail:
             googleData?.googleEmail ??
             null
@@ -1814,6 +1920,16 @@ export async function iniciarFormulariosEstudiantesPage() {
     estadoGoogle = {
       conectado:
         Boolean(googleData?.conectado),
+
+      requiereReautenticacion:
+        Boolean(
+          googleData?.requiereReautenticacion ||
+          googleData?.estado === 'REQUIERE_REAUTENTICACION'
+        ),
+
+      estado:
+        googleData?.estado ??
+        'DESCONECTADO',
 
       googleEmail:
         googleData?.googleEmail ?? null

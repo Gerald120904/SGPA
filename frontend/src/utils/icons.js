@@ -139,6 +139,8 @@ import {
   CircleX,
   CircleAlert,
   AlertCircle,
+  CircleHelp,
+  HelpCircle,
 
   TriangleAlert,
 
@@ -318,6 +320,8 @@ export function renderizarIconos() {
       CircleX,
       CircleAlert,
       AlertCircle,
+      CircleHelp,
+      HelpCircle,
 
       TriangleAlert,
 

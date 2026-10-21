@@ -5192,56 +5192,6 @@ async function abrirDetalleAula(
       </section>
 
 
-      <section
-        class="aulas-detail-card"
-      >
-
-        <div
-          class="aulas-section-header"
-        >
-
-          <div>
-            <h3>
-              Reservas extraordinarias
-            </h3>
-
-            <p class="aulas-muted">
-              Exámenes, reuniones, eventos
-              y otras ocupaciones temporales.
-            </p>
-          </div>
-
-
-          ${
-            puedeGestionarAulas() &&
-            aula.activo
-              ? `
-                <button
-                  id="nuevaReservaAulaButton"
-                  class="aulas-primary-button"
-                  type="button"
-                >
-                  <i
-                    data-lucide="plus"
-                    aria-hidden="true"
-                  ></i>
-
-                  Nueva reserva
-                </button>
-              `
-              : ''
-          }
-
-        </div>
-
-
-        ${renderizarReservasAula(
-          reservasAulaActual,
-        )}
-
-      </section>
-
-
       ${renderizarSeccionOcupacion()}
 
 
@@ -5394,69 +5344,6 @@ async function abrirDetalleAula(
 
               await cambiarEstadoIndisponibilidad(
                 indisponibilidad,
-              );
-
-            },
-          );
-
-        },
-      );
-
-
-    document
-      .getElementById(
-        'nuevaReservaAulaButton',
-      )
-      ?.addEventListener(
-        'click',
-        () => {
-          abrirFormularioReserva();
-        },
-      );
-
-
-    vista
-      .querySelectorAll(
-        '[data-reserva-action]',
-      )
-      .forEach(
-        (boton) => {
-
-          boton.addEventListener(
-            'click',
-            async () => {
-
-              const id =
-                Number(
-                  boton.dataset.reservaId,
-                );
-
-              const reserva =
-                reservasAulaActual.find(
-                  (item) =>
-                    item.id === id,
-                );
-
-              if (!reserva) {
-                return;
-              }
-
-
-              if (
-                boton.dataset
-                  .reservaAction ===
-                'editar'
-              ) {
-                abrirFormularioReserva(
-                  reserva,
-                );
-
-                return;
-              }
-
-
-              await cambiarEstadoReserva(
-                reserva,
               );
 
             },
