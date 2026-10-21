@@ -18,6 +18,7 @@ import { Estudiante } from './entities/estudiante.entity';
 import { HistorialAcademicoEstudiante } from './entities/historial-academico-estudiante.entity';
 import { HistorialPlanEstudiante } from './entities/historial-plan-estudiante.entity';
 import { EstudiantesService } from './estudiantes.service';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 
 describe('EstudiantesService', () => {
   const repo = () => ({
@@ -41,6 +42,11 @@ describe('EstudiantesService', () => {
     obtenerCarreraIdsConAlcance: jest.Mock;
   };
   let dataSource: { transaction: jest.Mock };
+  let alcanceJerarquico: {
+    tipoCuentaJerarquica: jest.Mock;
+    obtenerCarrerasAutorizadas: jest.Mock;
+    puedeEjecutar: jest.Mock;
+  };
   let service: EstudiantesService;
 
   const periodoIngreso = { id: 1, anio: 2025, ciclo: 1 } as PeriodoAcademico;
@@ -81,6 +87,11 @@ describe('EstudiantesService', () => {
         }),
       ),
     };
+    alcanceJerarquico = {
+      tipoCuentaJerarquica: jest.fn().mockResolvedValue(null),
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([1]),
+      puedeEjecutar: jest.fn().mockResolvedValue(true),
+    };
     service = new EstudiantesService(
       estudiantes as unknown as Repository<Estudiante>,
       historialAcademico as unknown as Repository<HistorialAcademicoEstudiante>,
@@ -92,7 +103,21 @@ describe('EstudiantesService', () => {
       periodos as unknown as Repository<PeriodoAcademico>,
       alcance as unknown as EstructuraAcademicaService,
       dataSource as unknown as DataSource,
+      alcanceJerarquico as unknown as AlcanceJerarquicoService,
     );
+  });
+
+  it('el asistente no escribe datos oficiales desde el endpoint directo', async () => {
+    alcanceJerarquico.tipoCuentaJerarquica.mockResolvedValue('ASISTENTE_ESTUDIANTIL');
+    await expect(service.crear(3, { carreraId: 1 } as any)).rejects.toThrow(ForbiddenException);
+    expect(estudiantes.save).not.toHaveBeenCalled();
+  });
+
+  it('el coordinador necesita permiso por carrera para escribir', async () => {
+    alcanceJerarquico.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+    alcanceJerarquico.puedeEjecutar.mockResolvedValue(false);
+    await expect(service.crear(1, { carreraId: 1 } as any)).rejects.toThrow(ForbiddenException);
+    expect(estudiantes.save).not.toHaveBeenCalled();
   });
 
   it('crea y normaliza un estudiante válido', async () => {
@@ -185,6 +210,26 @@ describe('EstudiantesService', () => {
       'Los nombres no puede quedar vacío.',
     );
     expect(estudiantes.save).not.toHaveBeenCalled();
+  });
+
+  it('la aprobación bloquea la fila y rechaza una versión obsoleta', async () => {
+    const actual = { ...estudiante, updatedAt: new Date('2026-10-19T00:00:00Z') };
+    estudiantes.findOne.mockResolvedValue(actual);
+    const manager = { getRepository: () => estudiantes } as any;
+    await expect(service.actualizarDesdeSolicitud(1, 7, 1, { nombres: 'Nuevo' }, '0'.repeat(64), manager))
+      .rejects.toThrow(ConflictException);
+    expect(estudiantes.findOne).toHaveBeenCalledWith({ where: { id: 7 }, lock: { mode: 'pessimistic_write' } });
+    expect(estudiantes.save).not.toHaveBeenCalled();
+  });
+
+  it('la aprobación aplica solo si la carrera y la huella siguen vigentes', async () => {
+    const actual = { ...estudiante, updatedAt: new Date('2026-10-19T00:00:00Z') };
+    estudiantes.findOne.mockResolvedValue(actual);
+    const manager = { getRepository: () => estudiantes } as any;
+    const huella = service.huellaEstudiante(actual);
+    await service.actualizarDesdeSolicitud(1, 7, 1, { nombres: 'Nuevo' }, huella, manager);
+    expect(estudiantes.save).toHaveBeenCalledWith(expect.objectContaining({ nombres: 'Nuevo' }));
+    expect(service.huellaEstudiante({ ...actual, nombres: 'Alterado' })).not.toBe(huella);
   });
 
   it('devuelve responsables sin campos sensibles en ambos historiales', async () => {
@@ -547,6 +592,7 @@ describe('EstudiantesService', () => {
     );
     expect(estudiantes.update).toHaveBeenCalledWith(7, {
       planEstudioId: 11,
+      carreraId: 1,
     });
   });
 

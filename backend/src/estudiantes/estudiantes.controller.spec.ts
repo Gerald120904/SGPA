@@ -2,9 +2,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { EstudiantesController } from './estudiantes.controller';
@@ -43,6 +45,20 @@ describe('EstudiantesController', () => {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
         },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
+            })),
+          },
+        },
       ],
     }).compile();
     app = modulo.createNestApplication();
@@ -57,8 +73,11 @@ describe('EstudiantesController', () => {
     await app.init();
   });
 
+  let rolesActuales: string[] = ['COORDINADOR'];
+
   beforeEach(() => {
     jest.clearAllMocks();
+    rolesActuales = ['COORDINADOR'];
     service.listar.mockResolvedValue([]);
     service.crear.mockResolvedValue({ id: 7 });
     service.obtenerProgreso.mockResolvedValue({ resumen: {} });
@@ -66,8 +85,14 @@ describe('EstudiantesController', () => {
 
   afterAll(async () => app.close());
 
-  const token = (roles: string[] = []) =>
-    jwt.signAsync({ sub: 3, correo: 'gestor@una.cr', roles });
+  const token = (roles?: string[]) => {
+    if (roles !== undefined && roles.length > 0) {
+      rolesActuales = roles;
+    } else {
+      rolesActuales = ['COORDINADOR'];
+    }
+    return jwt.signAsync({ sub: 3, correo: 'gestor@una.cr', roles: rolesActuales });
+  };
 
   it('requiere autenticación', async () => {
     await request(app.getHttpServer()).get('/estudiantes').expect(401);

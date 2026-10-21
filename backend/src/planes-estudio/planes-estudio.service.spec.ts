@@ -21,6 +21,11 @@ describe('PlanesEstudioService', () => {
   let carreraRepository: {
     findOne: jest.Mock;
   };
+  const alcance = {
+    tipoCuentaJerarquica: jest.fn().mockResolvedValue(null),
+    obtenerCarrerasAutorizadas: jest.fn(),
+    puedeEjecutar: jest.fn(),
+  };
 
   const carrera = {
     id: 1,
@@ -61,6 +66,7 @@ describe('PlanesEstudioService', () => {
     service = new PlanesEstudioService(
       planRepository as unknown as Repository<PlanEstudio>,
       carreraRepository as unknown as Repository<Carrera>,
+      alcance as never,
     );
   });
 
@@ -76,6 +82,17 @@ describe('PlanesEstudioService', () => {
         codigo: 'ASC',
       },
     });
+  });
+
+  it('filtra el listado en SQL para una cuenta jerÃ¡rquica', async () => {
+    alcance.tipoCuentaJerarquica.mockResolvedValueOnce('COORDINADOR');
+    alcance.obtenerCarrerasAutorizadas.mockResolvedValueOnce([1, 2]);
+    alcance.puedeEjecutar.mockImplementation(async (_u: number, _p: string, carreraId: number) => carreraId === 1);
+    planRepository.find.mockResolvedValue([crearPlan()]);
+    await service.listar(9);
+    expect(planRepository.find).toHaveBeenCalledWith(expect.objectContaining({
+      where: { carreraId: expect.anything() },
+    }));
   });
 
   it('obtiene un plan por id con su carrera', async () => {

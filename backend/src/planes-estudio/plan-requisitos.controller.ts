@@ -15,9 +15,10 @@ import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { CargaMasivaPlanRequisitosDto } from './dto/carga-masiva-plan-requisitos.dto';
 import { CrearPlanRequisitoDto } from './dto/crear-plan-requisito.dto';
 import { PlanRequisitosService } from './plan-requisitos.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Controller('planes-estudio/:planId/requisitos')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class PlanRequisitosController {
   constructor(private readonly planRequisitosService: PlanRequisitosService) {}
 

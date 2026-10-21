@@ -220,11 +220,31 @@ describe('PlanReglasOptativasService', () => {
     const regla = crearRegla();
     planRepository.findOne.mockResolvedValue(planActivo);
     reglaRepository.findOne.mockResolvedValue(regla);
+    asignaturaRepository.count.mockResolvedValue(0);
     reglaRepository.remove.mockResolvedValue(regla);
 
     await service.eliminar(1);
 
+    expect(asignaturaRepository.count).toHaveBeenCalledWith({
+      where: {
+        planEstudioId: 1,
+        tipo: TipoPlanAsignatura.OPTATIVA,
+        activo: true,
+      },
+    });
     expect(reglaRepository.remove).toHaveBeenCalledWith(regla);
+  });
+
+  it('rechaza eliminar la regla mientras hay optativas activas', async () => {
+    planRepository.findOne.mockResolvedValue(planActivo);
+    reglaRepository.findOne.mockResolvedValue(crearRegla());
+    asignaturaRepository.count.mockResolvedValue(1);
+
+    await expect(service.eliminar(1)).rejects.toThrow(
+      'No se puede eliminar la regla mientras existan asignaturas optativas activas',
+    );
+
+    expect(reglaRepository.remove).not.toHaveBeenCalled();
   });
 
   it('rechaza eliminar regla si no existe para el plan', async () => {

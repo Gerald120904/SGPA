@@ -25,6 +25,24 @@ import {
   reemplazarAsignaturasSalida,
 } from "../../services/salidas-academicas.service.js";
 import { listarCarreras } from "../../services/carreras.service.js";
+import { obtenerCatalogoPlanesJerarquia } from '../../services/jerarquia.service.js';
+import {
+  proponerCrearPlan,
+  proponerActualizarPlan,
+  proponerEstadoPlan,
+  proponerAsignaturaPlan,
+  proponerActualizarAsignaturaPlan,
+  proponerEstadoAsignaturaPlan,
+  proponerRequisitoPlan,
+  proponerEliminarRequisitoPlan,
+  proponerSalidaPlan,
+  proponerActualizarSalidaPlan,
+  proponerEstadoSalidaPlan,
+  proponerAsignarAsignaturasSalidaPlan,
+  proponerGuardarReglaOptativaPlan,
+  proponerEliminarReglaOptativaPlan,
+  proponerImportarPlan,
+} from '../../services/solicitudes-cambio.service.js';
 import { obtenerResumenPlan } from "../../services/plan-resumen.service.js";
 import { validarPlanEstudio } from "../../services/plan-validaciones.service.js";
 import {
@@ -38,8 +56,8 @@ import {
   seleccionarExcelPlan,
   validarImportacionPlan,
 } from "../../services/plan-importacion.service.js";
-import { usuarioTienePermiso } from "../../app/session.js";
-import { PERMISOS } from "../../config/permissions.js";
+import { usuarioTienePermiso, obtenerRolesUsuario } from "../../app/session.js";
+import { PERMISOS, ROLES } from "../../config/permissions.js";
 import { confirmarAccion } from "../../utils/confirm.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
@@ -281,9 +299,12 @@ function formatearGradoPlan(grado) {
   return GRADOS_PLAN[grado] || grado || "—";
 }
 
-function puedeGestionarPlanes() {
+function puedeGestionarPlanes(_detalle = false) {
   return usuarioTienePermiso(PERMISOS.PLANES_ESTUDIO_GESTIONAR);
 }
+
+const esAsistente = () => obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+const esCuentaJerarquica = () => esAsistente() || obtenerRolesUsuario().includes(ROLES.COORDINADOR);
 
 let planes = [];
 let carrerasDisponibles = [];
@@ -301,6 +322,7 @@ let reglaOptativasPlan = {
 let planSeleccionado = null;
 let instanciaActual = 0;
 let vistaDetallePlan = "LISTA";
+let vistaPapeleraPlan = false;
 let observerMalla = null;
 let frameDibujoMalla = null;
 let mallaAsignaturaSeleccionadaId = null;
@@ -595,7 +617,7 @@ async function cargarDatos(instancia) {
   try {
     const [resultadoPlanes, resultadoCarreras] = await Promise.all([
       listarPlanesEstudio(),
-      listarCarreras(),
+      esCuentaJerarquica() ? obtenerCatalogoPlanesJerarquia() : listarCarreras(),
     ]);
 
     if (instancia !== instanciaActual) {
@@ -618,8 +640,9 @@ async function cargarDatos(instancia) {
     planes = Array.isArray(resultadoPlanes.planes)
       ? resultadoPlanes.planes
       : [];
-    carrerasDisponibles = Array.isArray(resultadoCarreras.carreras)
-      ? resultadoCarreras.carreras
+    const datosCarreras = resultadoCarreras.data ?? resultadoCarreras;
+    carrerasDisponibles = Array.isArray(datosCarreras.carreras)
+      ? datosCarreras.carreras.filter((carrera) => !esAsistente() || carrera.puedeGestionarPlanes)
       : [];
 
     renderizarFiltroCarreras();
@@ -867,7 +890,9 @@ function abrirFormulario(plan = null) {
         "guardarPlanButton",
 
       submitText:
-        editando
+        esAsistente()
+          ? "Enviar solicitud"
+          : editando
           ? "Guardar cambios"
           : "Crear plan"
     });
@@ -1015,11 +1040,11 @@ function abrirFormulario(plan = null) {
 
           const resultado =
             editando
-              ? await actualizarPlanEstudio(
+              ? await (esAsistente() ? proponerActualizarPlan : actualizarPlanEstudio)(
                   plan.id,
                   datos
                 )
-              : await crearPlanEstudio(
+              : await (esAsistente() ? proponerCrearPlan : crearPlanEstudio)(
                   datos
                 );
 
@@ -1035,7 +1060,9 @@ function abrirFormulario(plan = null) {
           cerrar();
 
           mostrarFeedback(
-            editando
+            esAsistente()
+              ? "La solicitud quedÃ³ pendiente de aprobaciÃ³n."
+              : editando
               ? "Plan actualizado correctamente."
               : "Plan creado correctamente."
           );
@@ -1091,7 +1118,7 @@ async function alternarEstado(plan) {
 
 
   try {
-    const resultado = await cambiarEstadoPlanEstudio(plan.id, nuevoEstado);
+    const resultado = await (esAsistente() ? proponerEstadoPlan : cambiarEstadoPlanEstudio)(plan.id, nuevoEstado);
 
     if (!resultado?.ok) {
       throw new Error(
@@ -1100,7 +1127,9 @@ async function alternarEstado(plan) {
     }
 
     mostrarFeedback(
-      nuevoEstado
+      esAsistente()
+        ? "La solicitud de cambio de estado quedÃ³ pendiente de aprobaciÃ³n."
+        : nuevoEstado
         ? "Plan activado correctamente."
         : "Plan desactivado correctamente.",
     );
@@ -1115,6 +1144,7 @@ async function alternarEstado(plan) {
 
 async function abrirDetallePlan(plan) {
   vistaDetallePlan = "LISTA";
+  vistaPapeleraPlan = false;
   mallaAsignaturaSeleccionadaId = null;
   nivelPaginaPlan = 1;
   planSeleccionado = plan;
@@ -1227,6 +1257,7 @@ function volverListadoPlanes() {
   observerMalla?.disconnect();
   observerMalla = null;
   vistaDetallePlan = "LISTA";
+  vistaPapeleraPlan = false;
   mallaAsignaturaSeleccionadaId = null;
   nivelPaginaPlan = 1;
   planSeleccionado = null;
@@ -1380,6 +1411,21 @@ function obtenerAsignaturasVisibles() {
   return asignaturasPlan;
 }
 
+export function separarAsignaturasPlan(asignaturas) {
+  return {
+    activas: asignaturas.filter((asignatura) => asignatura.activo !== false),
+    papelera: asignaturas.filter((asignatura) => asignatura.activo === false),
+  };
+}
+
+export function ordenarAsignaturasMalla(asignaturas) {
+  return asignaturas.slice().sort(
+    (a, b) =>
+      Number(b.activo !== false) - Number(a.activo !== false) ||
+      Number(a.orden) - Number(b.orden),
+  );
+}
+
 function agruparAsignaturas(asignaturas = obtenerAsignaturasVisibles()) {
   const grupos = new Map();
 
@@ -1400,7 +1446,7 @@ function agruparAsignaturas(asignaturas = obtenerAsignaturasVisibles()) {
   return Array.from(grupos.values())
     .map((grupo) => ({
       ...grupo,
-      asignaturas: grupo.asignaturas.sort((a, b) => a.orden - b.orden),
+      asignaturas: ordenarAsignaturasMalla(grupo.asignaturas),
     }))
     .sort((a, b) => a.nivel - b.nivel || a.ciclo - b.ciclo);
 }
@@ -1489,7 +1535,7 @@ function renderizarAsignaturaLista(asignatura) {
         </button>
 
         ${
-          puedeGestionarPlanes()
+          puedeGestionarPlanes(true)
             ? `
               <button
                 class="planes-icon-button"
@@ -1753,7 +1799,7 @@ function renderizarCicloAcademico(nivel, ciclo, asignaturas = []) {
                   </div>
 
                   ${
-                    puedeGestionarPlanes()
+                    puedeGestionarPlanes(true)
                       ? `
                         <button
                           class="plan-cycle-add-button"
@@ -1885,15 +1931,39 @@ function renderizarPaginacionNiveles() {
 }
 
 function renderizarListaAsignaturas() {
-  const asignaturas = obtenerAsignaturasVisibles();
+  const { activas, papelera } = separarAsignaturasPlan(obtenerAsignaturasVisibles());
   nivelPaginaPlan = normalizarNivelPaginaPlan(nivelPaginaPlan);
 
   return `
     <div class="plan-level-list-page">
-      <div class="plan-levels">
-        ${renderizarNivelAcademico(nivelPaginaPlan, asignaturas)}
-      </div>
-      ${renderizarPaginacionNiveles()}
+      <button id="togglePapeleraPlanButton" class="sgpa-form-secondary" type="button"
+        aria-pressed="${vistaPapeleraPlan}">
+        ${vistaPapeleraPlan ? "Volver a asignaturas activas" : `Papelera (${papelera.length})`}
+      </button>
+      ${vistaPapeleraPlan
+        ? `<div class="plan-levels">
+            ${papelera.length
+              ? papelera
+                  .slice()
+                  .sort((a, b) =>
+                    Number(a.nivel) - Number(b.nivel) ||
+                    Number(a.ciclo) - Number(b.ciclo) ||
+                    Number(a.orden) - Number(b.orden))
+                  .map((asignatura) => `
+                    <section class="plan-cycle">
+                      <header class="plan-cycle-header">
+                        <h4>${escapeHtml(obtenerNombreAnioNivel(asignatura.nivel))} ·
+                          ${escapeHtml(obtenerNombreCiclo(asignatura.ciclo))}</h4>
+                      </header>
+                      ${renderizarAsignaturaLista(asignatura)}
+                    </section>`)
+                  .join("")
+              : '<div class="planes-message">La papelera está vacía.</div>'}
+          </div>`
+        : `<div class="plan-levels">
+            ${renderizarNivelAcademico(nivelPaginaPlan, activas)}
+          </div>
+          ${renderizarPaginacionNiveles()}`}
     </div>
   `;
 }
@@ -2435,7 +2505,7 @@ async function descargarPlantillaPlan() {
 }
 
 async function seleccionarExcelParaPlan() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -2543,7 +2613,7 @@ function renderizarProblemasImportacion(titulo, items, esError) {
 }
 
 async function ejecutarImportacionPlan(datos) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -2566,14 +2636,24 @@ async function ejecutarImportacionPlan(datos) {
   }
 
   try {
-    const resultado = await ejecutarImportacionPlanCompleta(
+    const resultado = await (esAsistente()
+      ? proponerImportarPlan
+      : ejecutarImportacionPlanCompleta)(
       planSeleccionado.id,
       datos,
     );
     if (!resultado?.ok) {
       throw new Error(resultado?.message || "No fue posible importar el plan.");
     }
-    mostrarImportacionCompletada(resultado.importacion);
+    if (esAsistente()) {
+      document.getElementById("asignaturaDialog")?.close();
+      mostrarExito({
+        titulo: "Propuesta enviada",
+        mensaje: "La propuesta de importación del plan quedó pendiente de aprobación.",
+      });
+    } else {
+      mostrarImportacionCompletada(resultado.importacion);
+    }
   } catch (error) {
     console.error("Error ejecutando importación:", error);
     mostrarErrorImportacion(
@@ -2779,7 +2859,15 @@ function renderizarEstadoGeneralRevision(validacion) {
 
 function formatearCodigoValidacion(codigo) {
   const nombres = {
+    ASIGNATURA_SIN_NOMBRE: "Asignatura sin nombre curricular",
+    ASIGNATURA_SIN_CODIGO: "Asignatura sin código curricular",
+    CODIGO_ASIGNATURA_DUPLICADO: "Código curricular duplicado",
     HORAS_NO_COINCIDEN: "Horas inconsistentes",
+    OPTATIVA_SIN_CLASIFICAR: "Optativa sin clasificar",
+    REGLA_OPTATIVAS_NO_CONFIGURADA: "Regla de optativas no configurada",
+    CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA: "Cantidad de optativas disciplinarias",
+    CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA: "Cantidad de optativas abiertas",
+    CANTIDAD_OPTATIVAS_SEDE_NO_CUMPLIDA: "Cantidad de optativas de sede",
     CURSO_DUPLICADO: "Curso duplicado",
     REQUISITO_POSTERIOR: "Requisito posterior",
     REQUISITO_INACTIVO: "Requisito inactivo",
@@ -2791,14 +2879,53 @@ function formatearCodigoValidacion(codigo) {
   return nombres[codigo] || codigo?.replaceAll("_", " ") || "Validación";
 }
 
-function renderizarItemRevision(item, tipo) {
+function obtenerSugerenciaRevision(codigo) {
+  const sugerencias = {
+    ASIGNATURA_SIN_NOMBRE: "Revise el nombre curricular registrado para esta asignatura.",
+    ASIGNATURA_SIN_CODIGO: "Revise el código curricular registrado para esta asignatura.",
+    CODIGO_ASIGNATURA_DUPLICADO: "Revise los códigos de las asignaturas activas del plan y corrija el duplicado.",
+    HORAS_NO_COINCIDEN: "Compare las horas totales con la suma de teoría, práctica, laboratorio, gira y estudio independiente.",
+    OPTATIVA_SIN_CLASIFICAR: "Clasifique la optativa como disciplinaria, abierta o de sede.",
+    REGLA_OPTATIVAS_NO_CONFIGURADA: "Revise la cantidad y clasificación de optativas activas y configure la regla del plan.",
+    CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA: "Compare la cantidad disciplinaria configurada con las asignaturas optativas activas de esa clasificación.",
+    CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA: "Compare la cantidad abierta configurada con las asignaturas optativas activas de esa clasificación.",
+    CANTIDAD_OPTATIVAS_SEDE_NO_CUMPLIDA: "Compare la cantidad de sede configurada con las asignaturas optativas activas de esa clasificación.",
+    REQUISITO_INACTIVO: "Revise el estado de la asignatura y de la relación de requisito asociada.",
+    REQUISITO_POSTERIOR: "Revise la ubicación por nivel y ciclo del requisito y la relación registrada.",
+    CICLO_REQUISITOS: "Revise las relaciones de requisitos del plan y elimine la dependencia circular.",
+    SALIDA_SIN_ASIGNATURAS: "Revise las materias activas asociadas a esta salida académica.",
+    CREDITOS_SALIDA_NO_COINCIDEN: "Compare los créditos requeridos con los créditos de las materias activas asociadas.",
+  };
+
+  return sugerencias[codigo] || "Revise la regla académica indicada y los datos relacionados en el plan.";
+}
+
+export function obtenerContextoItemRevision(
+  item,
+  asignaturas = asignaturasPlan,
+  salidas = salidasAcademicas,
+) {
+  const asignatura = item.asignaturaId
+    ? asignaturas.find((registro) => Number(registro.id) === Number(item.asignaturaId))
+    : null;
+  const salida = item.salidaId
+    ? salidas.find((registro) => Number(registro.id) === Number(item.salidaId))
+    : null;
+  return asignatura
+    ? obtenerDatosAsignatura(asignatura).nombre
+    : salida?.nombre || null;
+}
+
+export function renderizarItemRevision(item, tipo, contexto = obtenerContextoItemRevision(item)) {
   const esError = tipo === "ERROR";
   return `
     <article class="plan-review-item ${esError ? "is-error" : "is-warning"}">
       <div class="plan-review-item-icon"><i data-lucide="${esError ? "circle-x" : "triangle-alert"}"></i></div>
       <div class="plan-review-item-content">
         <strong>${escapeHtml(formatearCodigoValidacion(item.codigo))}</strong>
+        ${contexto ? `<small>Elemento relacionado: ${escapeHtml(contexto)}</small>` : ""}
         <p>${escapeHtml(item.mensaje || "Inconsistencia detectada.")}</p>
+        <p class="plan-review-item-guidance"><strong>Qué revisar:</strong> ${escapeHtml(obtenerSugerenciaRevision(item.codigo))}</p>
       </div>
     </article>`;
 }
@@ -2979,7 +3106,7 @@ function renderizarDetallePlan() {
     creditosTotales,
     vista: vistaDetallePlan,
     contenidoVista,
-    puedeGestionar: puedeGestionarPlanes(),
+    puedeGestionar: puedeGestionarPlanes(true),
   });
 
 
@@ -3126,7 +3253,7 @@ function actualizarTipoOptativaFilaCarga(fila) {
 }
 
 function abrirCargaRapida() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -3399,7 +3526,7 @@ function construirCargaRapida() {
 }
 
 async function guardarCargaRapida() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -3443,7 +3570,7 @@ async function guardarCargaRapida() {
 }
 
 function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -3463,20 +3590,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
   const cicloInicial = editando
     ? Number(asignatura.ciclo || 1)
     : Number(valoresIniciales.ciclo || 1);
-  const asignaturasMismoCiclo = asignaturasPlan.filter(
-    (item) =>
-      Number(item.nivel) === nivelInicial &&
-      Number(item.ciclo) === cicloInicial,
-  );
-
-  const ordenSugerido = asignaturasMismoCiclo.length
-    ? Math.max(
-        ...asignaturasMismoCiclo.map((item) => Number(item.orden || 0)),
-      ) + 1
-    : 1;
-  const ordenInicial = editando
-    ? Number(asignatura.orden || 1)
-    : ordenSugerido;
+  const ordenInicial = editando ? Number(asignatura.orden || 1) : null;
 
   const reglaOptativas = obtenerReglaOptativasActual();
   const excluirIdCupo = editando && asignatura?.activo !== false
@@ -3557,7 +3671,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
         >
       </label>
 
-      <label>
+      ${editando ? `<label>
         <span>Orden</span>
         <input
           id="asignaturaOrden"
@@ -3567,7 +3681,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
           value="${ordenInicial}"
           required
         >
-      </label>
+      </label>` : ""}
 
       <label class="sgpa-form-wide">
         <span>Tipo</span>
@@ -3818,7 +3932,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
     cancelButtonId: "cancelarAsignaturaButton",
     cancelText: "Cancelar",
     submitButtonId: "guardarAsignaturaButton",
-    submitText: editando ? "Guardar cambios" : "Agregar asignatura",
+    submitText: esAsistente() ? "Enviar propuesta" : (editando ? "Guardar cambios" : "Agregar asignatura"),
     submitIcon: "save",
     layout: "custom",
     formClass: "asignatura-plan-form",
@@ -3929,7 +4043,7 @@ function abrirFormularioAsignatura(asignatura = null, valoresIniciales = {}) {
 }
 
 async function guardarAsignatura(asignatura, cerrar) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -3971,9 +4085,9 @@ async function guardarAsignatura(asignatura, cerrar) {
   const creditos = Number(
     document.getElementById("asignaturaCreditos")?.value,
   );
-  const orden = Number(
-    document.getElementById("asignaturaOrden")?.value,
-  );
+  const orden = editando
+    ? Number(document.getElementById("asignaturaOrden")?.value)
+    : undefined;
 
   if (
     !Number.isInteger(creditos) ||
@@ -3987,11 +4101,11 @@ async function guardarAsignatura(asignatura, cerrar) {
     return;
   }
 
-  if (
+  if (editando && (
     !Number.isInteger(orden) ||
     orden < 1 ||
     orden > MAX_ORDEN_ASIGNATURA
-  ) {
+  )) {
     errorBox.textContent =
       `El orden debe estar entre 1 y ${MAX_ORDEN_ASIGNATURA}.`;
     errorBox.classList.remove("hidden");
@@ -4029,7 +4143,7 @@ async function guardarAsignatura(asignatura, cerrar) {
     nivel: Number(document.getElementById("asignaturaNivel")?.value),
     ciclo: Number(document.getElementById("asignaturaCiclo")?.value),
     creditos,
-    orden,
+    ...(editando ? { orden } : {}),
     tipo,
     tipoOptativa: tipo === "OPTATIVA" ? tipoOptativa : null,
   };
@@ -4061,13 +4175,21 @@ async function guardarAsignatura(asignatura, cerrar) {
   errorBox.classList.add("hidden");
 
   try {
-    const resultado = editando
-      ? await actualizarPlanAsignatura(
-          planSeleccionado.id,
-          asignatura.id,
-          datos,
-        )
-      : await crearPlanAsignatura(planSeleccionado.id, datos);
+    const resultado = esAsistente()
+      ? editando
+        ? await proponerActualizarAsignaturaPlan(
+            planSeleccionado.id,
+            asignatura.id,
+            datos,
+          )
+        : await proponerAsignaturaPlan(planSeleccionado.id, datos)
+      : editando
+        ? await actualizarPlanAsignatura(
+            planSeleccionado.id,
+            asignatura.id,
+            datos,
+          )
+        : await crearPlanAsignatura(planSeleccionado.id, datos);
 
     if (!resultado?.ok) {
       throw new Error(
@@ -4084,13 +4206,17 @@ async function guardarAsignatura(asignatura, cerrar) {
     }
 
     cerrar();
-    await recargarAsignaturasPlan();
+    if (!esAsistente()) {
+      await recargarAsignaturasPlan();
+    }
 
     mostrarExito({
-      titulo: editando ? "Asignatura actualizada" : "Asignatura agregada",
-      mensaje: editando
-        ? `"${nombreReferencia}" se actualizó correctamente.`
-        : `"${nombreReferencia}" se agregó correctamente al Nivel ${datos.nivel}, Ciclo ${datos.ciclo}.`,
+      titulo: esAsistente() ? "Propuesta enviada" : (editando ? "Asignatura actualizada" : "Asignatura agregada"),
+      mensaje: esAsistente()
+        ? `La propuesta para "${nombreReferencia}" quedó pendiente de aprobación.`
+        : (editando
+            ? `"${nombreReferencia}" se actualizó correctamente.`
+            : `"${nombreReferencia}" se agregó correctamente al Nivel ${datos.nivel}, Ciclo ${datos.ciclo}.`),
     });
   } catch (error) {
     errorBox.textContent =
@@ -4153,7 +4279,7 @@ async function ejecutarAccionAsignatura(accion, id) {
     return;
   }
 
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -4183,7 +4309,9 @@ async function ejecutarAccionAsignatura(accion, id) {
   }
 
   try {
-    const resultado = await cambiarEstadoPlanAsignatura(
+    const resultado = await (esAsistente()
+      ? proponerEstadoAsignaturaPlan
+      : cambiarEstadoPlanAsignatura)(
       planSeleccionado.id,
       asignatura.id,
       nuevoEstado,
@@ -4196,7 +4324,13 @@ async function ejecutarAccionAsignatura(accion, id) {
       );
     }
 
-    await recargarAsignaturasPlan();
+    if (esAsistente()) {
+      mostrarFeedbackDetalle(
+        "La solicitud de cambio de estado de la asignatura quedó pendiente de aprobación.",
+      );
+    } else {
+      await recargarAsignaturasPlan();
+    }
   } catch (error) {
     mostrarFeedbackDetalle(
       error?.message || "No fue posible cambiar el estado de la asignatura.",
@@ -4301,6 +4435,12 @@ function conectarEventosDetallePlan(contenedor) {
           return;
         }
         vistaDetallePlan = vista;
+        renderizarDetallePlan();
+        return;
+      }
+
+      if (target.closest("#togglePapeleraPlanButton")) {
+        vistaPapeleraPlan = !vistaPapeleraPlan;
         renderizarDetallePlan();
         return;
       }
@@ -4422,7 +4562,7 @@ function renderizarReglaOptativasPlan() {
     return;
   }
 
-  const puedeGestionar = puedeGestionarPlanes();
+  const puedeGestionar = puedeGestionarPlanes(true);
   const conteoOptativas = obtenerConteoOptativasPlan();
   const regla = obtenerReglaOptativasActual();
   const puedeConfigurar = puedeGestionar && planSeleccionado.activo;
@@ -4689,7 +4829,7 @@ function renderizarReglaOptativasPlan() {
             ${puedeConfigurar ? "" : "disabled"}
           >
             <i data-lucide="save" aria-hidden="true"></i>
-            <span>${regla ? "Guardar cambios" : "Crear regla"}</span>
+            <span>${esAsistente() ? "Enviar propuesta" : (regla ? "Guardar cambios" : "Crear regla")}</span>
           </button>
         `
         : ""
@@ -4730,7 +4870,7 @@ function renderizarReglaOptativasPlan() {
 }
 
 async function guardarReglaOptativasFrontend() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -4813,7 +4953,9 @@ async function guardarReglaOptativasFrontend() {
   button.disabled = true;
 
   try {
-    const resultado = await guardarReglaOptativasPlan(planSeleccionado.id, {
+    const resultado = await (esAsistente()
+      ? proponerGuardarReglaOptativaPlan
+      : guardarReglaOptativasPlan)(planSeleccionado.id, {
       cantidadDisciplinarias,
       cantidadAbiertas,
       cantidadSede,
@@ -4825,15 +4967,18 @@ async function guardarReglaOptativasFrontend() {
       );
     }
 
-    await recargarReglaOptativasPlan();
     document.getElementById("asignaturaDialog")?.close();
-    renderizarDetallePlan();
+    if (!esAsistente()) {
+      await recargarReglaOptativasPlan();
+      renderizarDetallePlan();
+    }
 
     mostrarExito({
-      titulo: "Regla de optativas guardada",
-      mensaje:
-        `El plan permite ${cantidadDisciplinarias} optativa(s) de carrera, ` +
-        `${cantidadAbiertas} abierta(s) y ${cantidadSede} de sede.`,
+      titulo: esAsistente() ? "Propuesta enviada" : "Regla de optativas guardada",
+      mensaje: esAsistente()
+        ? "La propuesta de regla de optativas quedó pendiente de aprobación."
+        : `El plan permite ${cantidadDisciplinarias} optativa(s) de carrera, ` +
+          `${cantidadAbiertas} abierta(s) y ${cantidadSede} de sede.`,
     });
   } catch (error) {
     errorBox.textContent =
@@ -4845,7 +4990,7 @@ async function guardarReglaOptativasFrontend() {
 }
 
 async function eliminarReglaOptativasFrontend() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -4886,7 +5031,9 @@ async function eliminarReglaOptativasFrontend() {
   }
 
   try {
-    const resultado = await eliminarReglaOptativasPlan(planSeleccionado.id);
+    const resultado = await (esAsistente()
+      ? proponerEliminarReglaOptativaPlan
+      : eliminarReglaOptativasPlan)(planSeleccionado.id);
 
     if (!resultado?.ok) {
       throw new Error(
@@ -4894,14 +5041,17 @@ async function eliminarReglaOptativasFrontend() {
       );
     }
 
-    await recargarReglaOptativasPlan();
     document.getElementById("asignaturaDialog")?.close();
-    renderizarDetallePlan();
+    if (!esAsistente()) {
+      await recargarReglaOptativasPlan();
+      renderizarDetallePlan();
+    }
 
     mostrarExito({
-      titulo: "Regla eliminada",
-      mensaje:
-        "La regla fue eliminada. Configure una nueva antes de registrar optativas.",
+      titulo: esAsistente() ? "Propuesta enviada" : "Regla eliminada",
+      mensaje: esAsistente()
+        ? "La propuesta para eliminar la regla de optativas quedó pendiente de aprobación."
+        : "La regla fue eliminada. Configure una nueva antes de registrar optativas.",
     });
   } catch (error) {
     if (errorBox) {
@@ -4932,7 +5082,7 @@ function crearFilaRequisitoRapido() {
 }
 
 function abrirRequisitosRapidos() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -5174,7 +5324,7 @@ function construirRequisitosRapidos() {
 }
 
 async function guardarRequisitosRapidos() {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -5226,6 +5376,35 @@ async function guardarRequisitosRapidos() {
   }
 }
 
+function actualizarListaRequisitos(asignatura) {
+  const lista = document.querySelector("#requisitoForm .plan-requirements-list");
+  const contador = document.querySelector("#requisitoForm .plan-requirements-count");
+  if (!lista || !contador) return;
+
+  const relaciones = obtenerRequisitosDeAsignatura(asignatura.id);
+  const filas = relaciones.map((relacion) => {
+    const requisito = asignaturasPlan.find(
+      (item) => Number(item.id) === Number(relacion.requisitoAsignaturaId),
+    ) || relacion.requisitoAsignatura;
+    const datos = requisito
+      ? obtenerDatosAsignatura(requisito)
+      : { codigo: "", nombre: "Asignatura no disponible" };
+    return `
+      <article class="plan-requirement-row">
+        <div class="plan-requirement-row-info">
+          <span class="plan-requirement-type ${relacion.tipo === "CORREQUISITO" ? "plan-requirement-coreq" : ""}">
+            ${relacion.tipo === "CORREQUISITO" ? "Correquisito" : "Requisito"}
+          </span>
+          <strong>${datos.codigo ? `${escapeHtml(datos.codigo)} - ` : ""}${escapeHtml(datos.nombre)}</strong>
+        </div>
+        ${puedeGestionarPlanes() ? `<button class="plan-requirement-delete" data-eliminar-requisito="${relacion.id}" type="button" aria-label="Quitar ${escapeHtml(datos.nombre)}"><i data-lucide="trash-2" aria-hidden="true"></i><span>Quitar</span></button>` : ""}
+      </article>`;
+  });
+  lista.innerHTML = filas.length ? filas.join("") : `<div class="plan-requirements-empty plan-requirements-empty-modern">Sin relaciones académicas.</div>`;
+  contador.textContent = String(relaciones.length);
+  renderizarIconos();
+}
+
 function abrirFormularioRequisitos(asignatura) {
   const dialog = document.getElementById("asignaturaDialog");
   const content = document.getElementById("asignaturaDialogContent");
@@ -5234,7 +5413,7 @@ function abrirFormularioRequisitos(asignatura) {
     return;
   }
 
-  const puedeGestionar = puedeGestionarPlanes();
+  const puedeGestionar = puedeGestionarPlanes(true);
   const datosAsignatura = obtenerDatosAsignatura(asignatura);
   const relaciones = obtenerRequisitosDeAsignatura(asignatura.id);
 
@@ -5362,7 +5541,7 @@ function abrirFormularioRequisitos(asignatura) {
                     type="submit"
                   >
                     <i data-lucide="plus" aria-hidden="true"></i>
-                    <span>Agregar</span>
+                    <span>${esAsistente() ? "Proponer" : "Agregar"}</span>
                   </button>
                 </div>
               `
@@ -5439,13 +5618,14 @@ function abrirFormularioRequisitos(asignatura) {
         await agregarRequisitoFrontend(asignatura);
       });
 
-    document.querySelectorAll("[data-eliminar-requisito]").forEach((button) => {
-      button.addEventListener("click", async () => {
+    document.querySelector("#requisitoForm .plan-requirements-list")?.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-eliminar-requisito]");
+      if (button) {
         await eliminarRequisitoFrontend(
           Number(button.dataset.eliminarRequisito),
           asignatura,
         );
-      });
+      }
     });
   }
 }
@@ -5477,11 +5657,18 @@ async function agregarRequisitoFrontend(asignatura) {
   errorBox.classList.add("hidden");
 
   try {
-    const resultado = await crearPlanRequisito(planSeleccionado.id, {
-      asignaturaId: asignatura.id,
-      requisitoAsignaturaId,
-      tipo,
-    });
+    const esAsistenteActivo = typeof esAsistente === 'function' && esAsistente();
+    const resultado = esAsistenteActivo
+      ? await proponerRequisitoPlan(planSeleccionado.id, {
+          planAsignaturaId: Number(asignatura.id),
+          asignaturaRequisitoId: Number(requisitoAsignaturaId),
+          tipo,
+        })
+      : await crearPlanRequisito(planSeleccionado.id, {
+          asignaturaId: asignatura.id,
+          requisitoAsignaturaId,
+          tipo,
+        });
 
     if (!resultado?.ok) {
       throw new Error(
@@ -5489,9 +5676,23 @@ async function agregarRequisitoFrontend(asignatura) {
       );
     }
 
-    await recargarRequisitosPlan();
-    const actualizada = obtenerAsignaturaPorId(asignatura.id) || asignatura;
-    abrirFormularioRequisitos(actualizada);
+    if (typeof esAsistente === 'function' && esAsistente()) {
+      mostrarExito({
+        titulo: "Propuesta enviada",
+        mensaje: "La propuesta de requisito académico quedó pendiente de aprobación.",
+        duracion: 2500,
+      });
+    } else {
+      await recargarRequisitosPlan({ preservarDialogo: true });
+      const actualizada = obtenerAsignaturaPorId(asignatura.id) || asignatura;
+      actualizarListaRequisitos(actualizada);
+      button.focus();
+      mostrarExito({
+        titulo: "Relación agregada",
+        mensaje: "El requisito o correquisito se registró correctamente.",
+        duracion: 2500,
+      });
+    }
   } catch (error) {
     const actualErrorBox = document.getElementById("requisitosFormError");
     if (actualErrorBox) {
@@ -5541,10 +5742,10 @@ async function eliminarRequisitoFrontend(relacionId, asignatura) {
   }
 
   try {
-    const resultado = await eliminarPlanRequisito(
-      planSeleccionado.id,
-      relacionId,
-    );
+    const esAsistenteActivo = typeof esAsistente === 'function' && esAsistente();
+    const resultado = esAsistenteActivo
+      ? await proponerEliminarRequisitoPlan(planSeleccionado.id, relacionId)
+      : await eliminarPlanRequisito(planSeleccionado.id, relacionId);
 
     if (!resultado?.ok) {
       throw new Error(
@@ -5552,9 +5753,18 @@ async function eliminarRequisitoFrontend(relacionId, asignatura) {
       );
     }
 
-    await recargarRequisitosPlan();
-    const actualizada = obtenerAsignaturaPorId(asignatura.id) || asignatura;
-    abrirFormularioRequisitos(actualizada);
+    if (typeof esAsistente === 'function' && esAsistente()) {
+      mostrarExito({
+        titulo: "Propuesta enviada",
+        mensaje: "La propuesta para quitar la relación quedó pendiente de aprobación.",
+        duracion: 2500,
+      });
+    } else {
+      await recargarRequisitosPlan({ preservarDialogo: true });
+      const actualizada = obtenerAsignaturaPorId(asignatura.id) || asignatura;
+      actualizarListaRequisitos(actualizada);
+      document.getElementById("requisitoAsignatura")?.focus();
+    }
   } catch (error) {
     const errorBox = document.getElementById("requisitosFormError");
 
@@ -5570,12 +5780,13 @@ async function eliminarRequisitoFrontend(relacionId, asignatura) {
   }
 }
 
-async function recargarRequisitosPlan() {
+async function recargarRequisitosPlan({ preservarDialogo = false } = {}) {
   if (!planSeleccionado) {
     return;
   }
 
-  const resultado = await listarPlanRequisitos(planSeleccionado.id);
+  const planId = planSeleccionado.id;
+  const resultado = await listarPlanRequisitos(planId);
 
   if (!resultado?.ok) {
     throw new Error(
@@ -5587,6 +5798,18 @@ async function recargarRequisitosPlan() {
     ? resultado.requisitos
     : [];
   await recargarResumenPlan();
+  const dialog = document.getElementById("asignaturaDialog");
+  if (preservarDialogo && dialog?.open) {
+    if (!dialog.dataset.requisitosDetallePendiente) {
+      dialog.dataset.requisitosDetallePendiente = "true";
+      dialog.addEventListener("close", () => {
+        if (dialog.isConnected && planSeleccionado?.id === planId) {
+          renderizarDetallePlan();
+        }
+      }, { once: true });
+    }
+    return;
+  }
   renderizarDetallePlan();
 }
 
@@ -5742,7 +5965,7 @@ function abrirAdministradorSalidas() {
     return;
   }
 
-  const puedeGestionar = puedeGestionarPlanes();
+  const puedeGestionar = puedeGestionarPlanes(true);
 
   const salidasHtml = salidasAcademicas.length
     ? salidasAcademicas
@@ -5946,7 +6169,7 @@ function abrirAdministradorSalidas() {
 }
 
 function abrirFormularioSalida(salida = null) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -6065,7 +6288,7 @@ function abrirFormularioSalida(salida = null) {
     cancelButtonId: "volverSalidasButton",
     cancelText: "Volver",
     submitButtonId: "guardarSalidaButton",
-    submitText: editando ? "Guardar cambios" : "Crear y seleccionar materias",
+    submitText: esAsistente() ? "Enviar propuesta" : (editando ? "Guardar cambios" : "Crear y seleccionar materias"),
     submitIcon: "save",
   });
 
@@ -6090,7 +6313,7 @@ function abrirFormularioSalida(salida = null) {
 }
 
 async function guardarSalidaAcademicaFrontend(salida) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -6141,14 +6364,27 @@ async function guardarSalidaAcademicaFrontend(salida) {
   button.disabled = true;
 
   try {
-    const resultado = salida
-      ? await actualizarSalidaAcademica(planSeleccionado.id, salida.id, datos)
-      : await crearSalidaAcademica(planSeleccionado.id, datos);
+    const resultado = esAsistente()
+      ? salida
+        ? await proponerActualizarSalidaPlan(planSeleccionado.id, salida.id, datos)
+        : await proponerSalidaPlan(planSeleccionado.id, datos)
+      : salida
+        ? await actualizarSalidaAcademica(planSeleccionado.id, salida.id, datos)
+        : await crearSalidaAcademica(planSeleccionado.id, datos);
 
     if (!resultado?.ok) {
       throw new Error(
         resultado?.message || "No fue posible guardar la salida académica.",
       );
+    }
+
+    if (esAsistente()) {
+      document.getElementById("asignaturaDialog")?.close();
+      mostrarExito({
+        titulo: "Propuesta enviada",
+        mensaje: "La propuesta de salida académica quedó pendiente de aprobación.",
+      });
+      return;
     }
 
     await recargarSalidasAcademicas({ renderizar: false });
@@ -6218,7 +6454,7 @@ async function recargarSalidasAcademicas({ renderizar = true } = {}) {
 }
 
 function abrirAsignaturasSalida(salida) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -6339,7 +6575,7 @@ function abrirAsignaturasSalida(salida) {
     cancelButtonId: "volverAsignaturasSalida",
     cancelText: "Volver",
     submitButtonId: "guardarAsignaturasSalida",
-    submitText: "Guardar selección",
+    submitText: esAsistente() ? "Enviar propuesta" : "Guardar selección",
     submitButtonType: "button",
     submitIcon: "save",
     layout: "custom",
@@ -6453,7 +6689,7 @@ function abrirAsignaturasSalida(salida) {
 }
 
 async function guardarAsignaturasSalidaFrontend(salida) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -6492,10 +6728,12 @@ async function guardarAsignaturasSalidaFrontend(salida) {
   errorBox.classList.add("hidden");
 
   try {
-    const resultado = await reemplazarAsignaturasSalida(
+    const resultado = await (esAsistente()
+      ? proponerAsignarAsignaturasSalidaPlan
+      : reemplazarAsignaturasSalida)(
       planSeleccionado.id,
       salida.id,
-      asignaturaIds,
+      { asignaturaIds },
     );
 
     if (!resultado?.ok) {
@@ -6503,6 +6741,15 @@ async function guardarAsignaturasSalidaFrontend(salida) {
         resultado?.message ||
           "No fue posible guardar las asignaturas de la salida.",
       );
+    }
+
+    if (esAsistente()) {
+      document.getElementById("asignaturaDialog")?.close();
+      mostrarExito({
+        titulo: "Propuesta enviada",
+        mensaje: "La propuesta de asignaturas para la salida académica quedó pendiente de aprobación.",
+      });
+      return;
     }
 
     if (ultima) {
@@ -6530,7 +6777,7 @@ async function guardarAsignaturasSalidaFrontend(salida) {
 }
 
 async function alternarEstadoSalida(salida) {
-  if (!puedeGestionarPlanes()) {
+  if (!puedeGestionarPlanes(true)) {
     mostrarFeedbackDetalle("No posee permiso para modificar el plan.");
     return;
   }
@@ -6552,7 +6799,9 @@ async function alternarEstadoSalida(salida) {
   }
 
   try {
-    const resultado = await cambiarEstadoSalidaAcademica(
+    const resultado = await (esAsistente()
+      ? proponerEstadoSalidaPlan
+      : cambiarEstadoSalidaAcademica)(
       planSeleccionado.id,
       salida.id,
       nuevoEstado,
@@ -6564,8 +6813,14 @@ async function alternarEstadoSalida(salida) {
       );
     }
 
-    await recargarSalidasAcademicas();
-    abrirAdministradorSalidas();
+    if (esAsistente()) {
+      mostrarFeedbackDetalle(
+        "La solicitud de cambio de estado de la salida académica quedó pendiente de aprobación.",
+      );
+    } else {
+      await recargarSalidasAcademicas();
+      abrirAdministradorSalidas();
+    }
   } catch (error) {
     mostrarFeedbackDetalle(
       error?.message || "No fue posible cambiar el estado de la salida.",

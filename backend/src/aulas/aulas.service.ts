@@ -3,9 +3,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
+  DataSource,
   FindOptionsWhere,
   In,
   LessThan,
@@ -13,6 +15,7 @@ import {
   MoreThan,
   MoreThanOrEqual,
   Repository,
+  EntityManager,
 } from 'typeorm';
 import { EstadoPeriodoAcademico } from '../periodos-academicos/constants/estado-periodo-academico.constant';
 import { PeriodosAcademicosService } from '../periodos-academicos/periodos-academicos.service';
@@ -37,6 +40,7 @@ import { AulaEquipamiento } from './entities/aula-equipamiento.entity';
 import { Aula } from './entities/aula.entity';
 import { AuditoriaAula } from './entities/auditoria-aula.entity';
 import { DisponibilidadAula } from './entities/disponibilidad-aula.entity';
+import { fechaHoraInstitucionalDesdeTextoLocal } from './fecha-hora-institucional.transformer';
 import { Equipamiento } from './entities/equipamiento.entity';
 import { IndisponibilidadAula } from './entities/indisponibilidad-aula.entity';
 import { ReservaAula } from './entities/reserva-aula.entity';
@@ -67,7 +71,61 @@ export class AulasService {
     @InjectRepository(DisponibilidadAula)
     private readonly disponibilidadAulaRepository: Repository<DisponibilidadAula>,
     private readonly periodosAcademicosService: PeriodosAcademicosService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
+
+  private enTransaccionOcupacion = false;
+
+  private async ejecutarOcupacionEnTransaccion<T>(
+    aulaIds: number[],
+    operacion: (servicio: AulasService) => Promise<T>,
+  ): Promise<T> {
+    const ids = [...new Set(aulaIds)].sort((a, b) => a - b);
+    for (let intento = 0; intento < 2; intento++) {
+      try {
+        return await this.dataSource.transaction(
+          'READ COMMITTED',
+          async (manager: EntityManager) => {
+            // La fila de aula serializa incluso cuando no existen ocupaciones en el intervalo.
+            for (const id of ids) {
+              const filas: { id: number }[] = await manager.query(
+                'SELECT id FROM aulas WHERE id = ? FOR UPDATE',
+                [id],
+              );
+              if (!filas.length) {
+                throw new NotFoundException('Aula no encontrada.');
+              }
+            }
+            const servicio = new AulasService(
+              manager.getRepository(Aula),
+              manager.getRepository(Equipamiento),
+              manager.getRepository(AulaEquipamiento),
+              manager.getRepository(IndisponibilidadAula),
+              manager.getRepository(ReservaAula),
+              manager.getRepository(AuditoriaAula),
+              manager.getRepository(DisponibilidadAula),
+              this.periodosAcademicosService,
+              this.dataSource,
+            );
+            servicio.enTransaccionOcupacion = true;
+            return operacion(servicio);
+          },
+        );
+      } catch (error) {
+        const codigo =
+          (error as { driverError?: { code?: string }; code?: string })
+            ?.driverError?.code ?? (error as { code?: string })?.code;
+        if (codigo !== 'ER_LOCK_DEADLOCK' && codigo !== 'ER_LOCK_WAIT_TIMEOUT') {
+          throw error;
+        }
+        if (intento === 1) {
+          throw new ServiceUnavailableException('El aula está en uso. Intente nuevamente.');
+        }
+      }
+    }
+    throw new ServiceUnavailableException('El aula está en uso. Intente nuevamente.');
+  }
 
   private async obtenerEntidadPorId(id: number): Promise<Aula> {
     const aula = await this.aulaRepository.findOne({ where: { id } });
@@ -229,7 +287,16 @@ export class AulasService {
   }
 
   private convertirFechaHora(valor: string): Date {
-    const fecha = new Date(valor);
+    let fecha: Date;
+    try {
+      fecha = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(
+        valor,
+      )
+        ? fechaHoraInstitucionalDesdeTextoLocal(valor)
+        : new Date(valor);
+    } catch {
+      throw new BadRequestException('La fecha y hora indicada no es válida.');
+    }
 
     if (Number.isNaN(fecha.getTime())) {
       throw new BadRequestException('La fecha y hora indicada no es válida.');
@@ -347,24 +414,38 @@ export class AulasService {
     return 'MUY_RECOMENDADA';
   }
 
-  private extraerFechaCalendario(valor: string): string {
-    const coincidencia = /^(\d{4}-\d{2}-\d{2})T/.exec(valor);
-
+  private obtenerCalendarioInstitucional(valor: string): {
+    fecha: string;
+    hora: string;
+  } {
+    const coincidencia = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}/.exec(valor);
     if (!coincidencia) {
       throw new BadRequestException('La fecha y hora indicada no es válida.');
     }
-
-    return coincidencia[1];
-  }
-
-  private extraerHoraCalendario(valor: string): string {
-    const coincidencia = /T(\d{2}):(\d{2})/.exec(valor);
-
-    if (!coincidencia) {
+    const fechaValidada = new Date(`${coincidencia[1]}T00:00:00.000Z`);
+    if (
+      Number.isNaN(fechaValidada.getTime()) ||
+      fechaValidada.toISOString().slice(0, 10) !== coincidencia[1]
+    ) {
       throw new BadRequestException('La fecha y hora indicada no es válida.');
     }
 
-    return `${coincidencia[1]}:${coincidencia[2]}`;
+    const partes = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Costa_Rica',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(this.convertirFechaHora(valor));
+    const valores = Object.fromEntries(
+      partes.map(({ type, value }) => [type, value]),
+    );
+    return {
+      fecha: `${valores.year}-${valores.month}-${valores.day}`,
+      hora: `${valores.hour}:${valores.minute}`,
+    };
   }
 
   private obtenerDiaSemana(fecha: string): number {
@@ -463,9 +544,12 @@ export class AulasService {
       );
     }
 
-    const fechaInicio = this.extraerFechaCalendario(dto.fechaHoraInicio);
-
-    const fechaFin = this.extraerFechaCalendario(dto.fechaHoraFin);
+    const calendarioInicio = this.obtenerCalendarioInstitucional(
+      dto.fechaHoraInicio,
+    );
+    const calendarioFin = this.obtenerCalendarioInstitucional(dto.fechaHoraFin);
+    const fechaInicio = calendarioInicio.fecha;
+    const fechaFin = calendarioFin.fecha;
 
     if (fechaInicio !== fechaFin) {
       throw new BadRequestException(
@@ -481,9 +565,8 @@ export class AulasService {
 
     const diaSemana = this.obtenerDiaSemana(fechaInicio);
 
-    const horaInicio = this.extraerHoraCalendario(dto.fechaHoraInicio);
-
-    const horaFin = this.extraerHoraCalendario(dto.fechaHoraFin);
+    const horaInicio = calendarioInicio.hora;
+    const horaFin = calendarioFin.hora;
 
     this.validarRangoHoras(horaInicio, horaFin);
 
@@ -531,7 +614,7 @@ export class AulasService {
     for (const aula of aulas) {
       const bloques = bloquesPorAula.get(aula.id) ?? [];
 
-      if (this.bloquesDisponibilidadCubrenRango(bloques, horaInicio, horaFin)) {
+      if (!bloques.length || this.bloquesDisponibilidadCubrenRango(bloques, horaInicio, horaFin)) {
         aulasConDisponibilidad.add(aula.id);
       }
     }
@@ -1487,6 +1570,11 @@ export class AulasService {
     dto: CrearIndisponibilidadAulaDto,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
+    if (!this.enTransaccionOcupacion) {
+      return this.ejecutarOcupacionEnTransaccion([aulaId], (servicio) =>
+        servicio.crearIndisponibilidadAula(aulaId, dto, usuarioId),
+      );
+    }
     const aula = await this.obtenerEntidadPorId(aulaId);
 
     if (!aula.activo) {
@@ -1544,6 +1632,11 @@ export class AulasService {
     dto: ActualizarIndisponibilidadAulaDto,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
+    if (!this.enTransaccionOcupacion) {
+      return this.ejecutarOcupacionEnTransaccion([aulaId], (servicio) =>
+        servicio.actualizarIndisponibilidadAula(aulaId, id, dto, usuarioId),
+      );
+    }
     const aula = await this.obtenerEntidadPorId(aulaId);
     this.validarAulaActivaParaOcupacion(aula);
     const indisponibilidad = await this.obtenerIndisponibilidadAula(aulaId, id);
@@ -1614,6 +1707,11 @@ export class AulasService {
     activo: boolean,
     usuarioId?: number,
   ): Promise<IndisponibilidadAula> {
+    if (!this.enTransaccionOcupacion) {
+      return this.ejecutarOcupacionEnTransaccion([aulaId], (servicio) =>
+        servicio.cambiarEstadoIndisponibilidadAula(aulaId, id, activo, usuarioId),
+      );
+    }
     const aula = await this.obtenerEntidadPorId(aulaId);
     const indisponibilidad = await this.obtenerIndisponibilidadAula(aulaId, id);
 
@@ -1665,6 +1763,11 @@ export class AulasService {
     dto: CrearReservaAulaDto,
     usuarioId?: number,
   ): Promise<ReservaAula> {
+    if (!this.enTransaccionOcupacion) {
+      return this.ejecutarOcupacionEnTransaccion([aulaId], (servicio) =>
+        servicio.crearReservaAula(aulaId, dto, usuarioId),
+      );
+    }
     const aula = await this.obtenerEntidadPorId(aulaId);
 
     if (!aula.activo) {
@@ -1719,6 +1822,11 @@ export class AulasService {
     dto: ActualizarReservaAulaDto,
     usuarioId?: number,
   ): Promise<ReservaAula> {
+    if (!this.enTransaccionOcupacion) {
+      return this.ejecutarOcupacionEnTransaccion([aulaId], (servicio) =>
+        servicio.actualizarReservaAula(aulaId, id, dto, usuarioId),
+      );
+    }
     const aula = await this.obtenerEntidadPorId(aulaId);
     this.validarAulaActivaParaOcupacion(aula);
     const reserva = await this.obtenerReservaAula(aulaId, id);
@@ -1795,6 +1903,11 @@ export class AulasService {
     activo: boolean,
     usuarioId?: number,
   ): Promise<ReservaAula> {
+    if (!this.enTransaccionOcupacion) {
+      return this.ejecutarOcupacionEnTransaccion([aulaId], (servicio) =>
+        servicio.cambiarEstadoReservaAula(aulaId, id, activo, usuarioId),
+      );
+    }
     const aula = await this.obtenerEntidadPorId(aulaId);
     const reserva = await this.obtenerReservaAula(aulaId, id);
 

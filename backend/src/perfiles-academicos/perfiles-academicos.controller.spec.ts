@@ -2,10 +2,12 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { PerfilesAcademicosController } from './perfiles-academicos.controller';
@@ -55,6 +57,22 @@ describe('PerfilesAcademicosController', () => {
           },
         },
         {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
+          },
+        },
+        {
           provide: PermisosService,
           useValue: permisosService,
         },
@@ -101,7 +119,10 @@ describe('PerfilesAcademicosController', () => {
     await app.close();
   });
 
+  let rolActual = 'ADMIN_GLOBAL';
+
   async function crearToken(rol: string) {
+    rolActual = rol;
     return jwtService.signAsync({
       sub: 1,
       correo: 'usuario@sgpa.local',

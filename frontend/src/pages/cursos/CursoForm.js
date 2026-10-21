@@ -3,8 +3,9 @@ import {
   crearCurso,
   listarAsignaturasDisponiblesCurso,
 } from "../../services/cursos.service.js";
-import { usuarioTienePermiso } from "../../app/session.js";
-import { PERMISOS } from "../../config/permissions.js";
+import { proponerCrearCurso, proponerActualizarCurso } from '../../services/solicitudes-cambio.service.js';
+import { usuarioTienePermiso, obtenerRolesUsuario } from "../../app/session.js";
+import { PERMISOS, ROLES } from "../../config/permissions.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
 import {
@@ -19,6 +20,8 @@ import {
 /* =========================================================
    FORMULARIO DE CURSO
    ========================================================= */
+
+const esAsistente = () => obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
 
 export async function abrirFormularioCurso({
   curso = null,
@@ -125,7 +128,7 @@ function abrirFormularioEdicion({
 
   content.innerHTML = FormDialog({
     formId: "cursoForm",
-    title: "Editar curso",
+    title: esAsistente() ? 'Proponer edición de curso' : "Editar curso",
     description:
       "El código, nombre y créditos provienen del plan de estudio. Puede modificar la descripción del catálogo.",
     body,
@@ -133,7 +136,7 @@ function abrirFormularioEdicion({
     cancelButtonId: "cancelarCursoButton",
     cancelText: "Cancelar",
     submitButtonId: "guardarCursoButton",
-    submitText: "Guardar cambios",
+    submitText: esAsistente() ? 'Enviar solicitud' : "Guardar cambios",
     submitIcon: "save",
   });
 
@@ -182,7 +185,7 @@ function abrirFormularioEdicion({
 
         try {
           const resultado =
-            await actualizarCurso(curso.id, {
+            await (esAsistente() ? proponerActualizarCurso : actualizarCurso)(curso.id, {
               descripcion:
                 descripcionInput.value.trim(),
             });
@@ -197,8 +200,10 @@ function abrirFormularioEdicion({
           cerrar();
 
           mostrarExito({
-            titulo: "Curso actualizado",
-            mensaje: `"${curso.nombre}" se actualizó correctamente.`,
+            titulo: esAsistente() ? 'Solicitud enviada' : "Curso actualizado",
+            mensaje: esAsistente()
+              ? `La edición de "${curso.nombre}" quedó pendiente de aprobación.`
+              : `"${curso.nombre}" se actualizó correctamente.`,
           });
 
           if (typeof onGuardado === "function") {
@@ -245,7 +250,7 @@ function abrirFormularioCreacion({
     carrerasDisponibles
       .filter(
         (carrera) =>
-          carrera.activo === true,
+          carrera.activo === true && carrera.puedeGestionarCursos !== false,
       )
       .slice()
       .sort((a, b) =>
@@ -382,7 +387,7 @@ function abrirFormularioCreacion({
 
   content.innerHTML = FormDialog({
     formId: "cursoForm",
-    title: "Nuevo curso",
+    title: esAsistente() ? 'Proponer nuevo curso' : "Nuevo curso",
     description:
       "Seleccione una asignatura existente dentro del plan de estudio de la carrera.",
     body,
@@ -390,7 +395,7 @@ function abrirFormularioCreacion({
     cancelButtonId: "cancelarCursoButton",
     cancelText: "Cancelar",
     submitButtonId: "guardarCursoButton",
-    submitText: "Crear curso",
+    submitText: esAsistente() ? 'Enviar solicitud' : "Crear curso",
     submitIcon: "save",
   });
 
@@ -851,7 +856,7 @@ function abrirFormularioCreacion({
 
         try {
           const resultado =
-            await crearCurso({
+            await (esAsistente() ? proponerCrearCurso : crearCurso)({
               planAsignaturaId,
               descripcion:
                 descripcionInput?.value?.trim() ||
@@ -875,8 +880,10 @@ function abrirFormularioCreacion({
           cerrar();
 
           mostrarExito({
-            titulo: "Curso creado",
-            mensaje: `"${asignatura?.nombreReferencia || "El curso"}" se agregó correctamente al catálogo.`,
+            titulo: esAsistente() ? 'Solicitud enviada' : "Curso creado",
+            mensaje: esAsistente()
+              ? `La creación de "${asignatura?.nombreReferencia || 'El curso'}" quedó pendiente de aprobación.`
+              : `"${asignatura?.nombreReferencia || "El curso"}" se agregó correctamente al catálogo.`,
           });
 
           if (typeof onGuardado === "function") {

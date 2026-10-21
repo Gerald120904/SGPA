@@ -2,9 +2,11 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
@@ -51,6 +53,22 @@ describe('CursoRequisitosController', () => {
           },
         },
         {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
+          },
+        },
+        {
           provide: PermisosService,
           useValue: permisosService,
         },
@@ -84,12 +102,16 @@ describe('CursoRequisitosController', () => {
     permisosAsignados.clear();
   });
 
-  const generarToken = (rol = 'ADMIN_GLOBAL') =>
-    jwtService.sign({
+  let rolActual = 'ADMIN_GLOBAL';
+
+  const generarToken = (rol = 'ADMIN_GLOBAL') => {
+    rolActual = rol;
+    return jwtService.sign({
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
     });
+  };
 
   it('GET /cursos/:cursoId/requisitos - lista requisitos con CURSOS_VER', async () => {
     permisosAsignados.add(PermisoSistema.CURSOS_VER);
@@ -101,7 +123,7 @@ describe('CursoRequisitosController', () => {
       .expect(200);
 
     expect(response.body).toEqual([]);
-    expect(requisitosService.listar).toHaveBeenCalledWith(1);
+    expect(requisitosService.listar).toHaveBeenCalledWith(1, 1);
   });
 
   it('GET /cursos/:cursoId/requisitos - responde 403 sin CURSOS_VER', async () => {
@@ -152,7 +174,7 @@ describe('CursoRequisitosController', () => {
     expect(requisitosService.crear).toHaveBeenCalledWith(1, {
       requisitoCursoId: 2,
       tipo: TipoRequisito.REQUISITO,
-    });
+    }, 1);
   });
 
   it('DELETE /cursos/:cursoId/requisitos/:id - responde 403 sin CURSOS_GESTIONAR', async () => {
@@ -175,6 +197,6 @@ describe('CursoRequisitosController', () => {
       .set('Authorization', `Bearer ${generarToken('COORDINADOR')}`)
       .expect(204);
 
-    expect(requisitosService.eliminar).toHaveBeenCalledWith(1, 5);
+    expect(requisitosService.eliminar).toHaveBeenCalledWith(1, 5, 1);
   });
 });

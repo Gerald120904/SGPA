@@ -44,6 +44,29 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Compilación incremental y limpieza de `dist`
+
+`nest-cli.json` conserva `dist/tsconfig.build.tsbuildinfo` entre compilaciones.
+`scripts/dist-guard.js` elimina de `dist` los archivos `.js`, `.d.ts` y sus
+mapas cuando ya no existe el archivo TypeScript correspondiente. Los comandos
+`build`, `start` y `start:prod` ejecutan esa comprobación antes de usar `dist`.
+`start:dev` y `start:debug` la mantienen activa durante la vigilancia de `src`.
+
+Para una compilación completamente nueva:
+
+```bash
+npm run build:clean
+```
+
+Para borrar únicamente los artefactos de compilación:
+
+```bash
+npm run clean
+```
+
+El archivo `package.json` define esos comandos y mantiene los comandos de
+arranque existentes. Esta fase no cambia entidades, migraciones ni el API.
+
 ## Run tests
 
 ```bash

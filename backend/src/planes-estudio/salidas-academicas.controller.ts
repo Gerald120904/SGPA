@@ -18,9 +18,10 @@ import { ActualizarSalidaAcademicaDto } from './dto/actualizar-salida-academica.
 import { CambiarEstadoSalidaAcademicaDto } from './dto/cambiar-estado-salida-academica.dto';
 import { CrearSalidaAcademicaDto } from './dto/crear-salida-academica.dto';
 import { SalidasAcademicasService } from './salidas-academicas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 @Controller('planes-estudio/:planId/salidas-academicas')
-@UseGuards(AuthGuard, PermisosGuard)
+@UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
 export class SalidasAcademicasController {
   constructor(private readonly service: SalidasAcademicasService) {}
 

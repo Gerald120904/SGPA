@@ -2,10 +2,12 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { TipoAsignacionAcademica } from './constants/tipo-asignacion-academica.constant';
 import { EstructuraAcademicaController } from './estructura-academica.controller';
 import { EstructuraAcademicaService } from './estructura-academica.service';
@@ -49,6 +51,20 @@ describe('EstructuraAcademicaController', () => {
           },
         },
         {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
+            })),
+          },
+        },
+        {
           provide: EstructuraAcademicaService,
           useValue: estructuraService,
         },
@@ -81,15 +97,18 @@ describe('EstructuraAcademicaController', () => {
     await app.close();
   });
 
+  let rolesActuales: string[] = ['COORDINADOR'];
+
   async function crearToken(roles: string[], sub = 1) {
+    rolesActuales = roles && roles.length > 0 ? roles : ['COORDINADOR'];
     return jwtService.signAsync({
       sub,
       correo: 'admin@sgpa.local',
-      roles,
+      roles: rolesActuales,
     });
   }
 
-  it('GET /estructura-academica/areas - permite a COORDINADOR', async () => {
+  it('GET /estructura-academica/areas - permite a COORDINADOR legacy', async () => {
     const token = await crearToken(['COORDINADOR']);
 
     await request(app.getHttpServer())

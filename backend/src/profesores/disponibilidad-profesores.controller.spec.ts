@@ -2,10 +2,12 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
@@ -56,6 +58,20 @@ describe('DisponibilidadProfesoresController', () => {
           },
         },
         {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: rolesActuales.map((r, i) => ({
+                usuarioId: where?.id ?? 1,
+                rolId: i + 1,
+                rol: { id: i + 1, nombre: r, activo: true },
+              })),
+            })),
+          },
+        },
+        {
           provide: PermisosService,
           useValue: permisosService,
         },
@@ -83,6 +99,7 @@ describe('DisponibilidadProfesoresController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rolesActuales = ['PROFESOR'];
     permisosAsignados.clear();
 
     disponibilidadService.listarPeriodosMiDisponibilidad.mockResolvedValue([]);
@@ -122,11 +139,14 @@ describe('DisponibilidadProfesoresController', () => {
     await app.close();
   });
 
+  let rolesActuales: string[] = ['PROFESOR'];
+
   async function crearToken(roles: string[], sub = 10) {
+    rolesActuales = roles && roles.length > 0 ? roles : ['PROFESOR'];
     return jwtService.signAsync({
       sub,
       correo: 'usuario@sgpa.local',
-      roles,
+      roles: rolesActuales,
     });
   }
 

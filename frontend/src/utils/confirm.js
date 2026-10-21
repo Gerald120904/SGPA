@@ -1,3 +1,6 @@
+import { escapeHtml } from './html.js';
+import { renderizarIconos } from './icons.js';
+
 export function confirmarAccion({
   titulo = 'Confirmar acción',
   mensaje = '¿Desea continuar?',
@@ -6,21 +9,28 @@ export function confirmarAccion({
 } = {}) {
   return new Promise((resolve) => {
     const anterior = document.getElementById('sgpaConfirmDialog');
-
     anterior?.remove();
 
     const dialog = document.createElement('dialog');
-
     dialog.id = 'sgpaConfirmDialog';
     dialog.className = 'sgpa-confirm-dialog';
 
+    const icono = peligro ? 'triangle-alert' : 'circle-help';
+    const estadoClase = peligro ? 'sgpa-confirm-danger-mode' : 'sgpa-confirm-neutral-mode';
+    const eyebrow = peligro ? 'Acción importante' : 'Confirmación';
+
     dialog.innerHTML = `
-      <form method="dialog" class="sgpa-confirm-card">
-        <div class="sgpa-confirm-icon">!</div>
+      <form method="dialog" class="sgpa-confirm-card ${estadoClase}">
+        <div class="sgpa-confirm-icon-area">
+          <div class="sgpa-confirm-icon-ring" aria-hidden="true">
+            <i data-lucide="${icono}" aria-hidden="true"></i>
+          </div>
+        </div>
 
         <div class="sgpa-confirm-content">
-          <h3>${escapar(titulo)}</h3>
-          <p>${escapar(mensaje)}</p>
+          <span class="sgpa-confirm-eyebrow">${escapeHtml(eyebrow)}</span>
+          <h3>${escapeHtml(titulo)}</h3>
+          <p>${escapeHtml(mensaje)}</p>
         </div>
 
         <div class="sgpa-confirm-actions">
@@ -39,13 +49,14 @@ export function confirmarAccion({
               peligro ? 'sgpa-confirm-danger' : 'sgpa-confirm-accept'
             }"
           >
-            ${escapar(textoConfirmar)}
+            ${escapeHtml(textoConfirmar)}
           </button>
         </div>
       </form>
     `;
 
     document.body.appendChild(dialog);
+    renderizarIconos();
 
     let terminado = false;
 
@@ -85,13 +96,4 @@ export function confirmarAccion({
 
     dialog.showModal();
   });
-}
-
-function escapar(valor) {
-  return String(valor)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }

@@ -131,7 +131,7 @@ export function ModulesPage() {
       <!-- GRID DE MÓDULOS -->
       <!-- =============================================== -->
 
-      <div class="modules-dashboard-grid">
+      <div class="modules-dashboard-grid system-modules-grid">
 
         ${cards}
 

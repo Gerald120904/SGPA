@@ -12,6 +12,8 @@ import { PeriodosAcademicosModule } from '../periodos-academicos/periodos-academ
 import { AuditoriaAula } from './entities/auditoria-aula.entity';
 import { DisponibilidadAula } from './entities/disponibilidad-aula.entity';
 import { ReservaAula } from './entities/reserva-aula.entity';
+import { OfertaAcademicaModule } from '../oferta-academica/oferta-academica.module';
+import { AulasAnalisisAcademicoService } from './aulas-analisis-academico.service';
 
 @Module({
   imports: [
@@ -27,9 +29,10 @@ import { ReservaAula } from './entities/reserva-aula.entity';
     SecurityModule,
     PermisosModule,
     PeriodosAcademicosModule,
+    OfertaAcademicaModule,
   ],
   controllers: [AulasController],
-  providers: [AulasService],
-  exports: [AulasService],
+  providers: [AulasService, AulasAnalisisAcademicoService],
+  exports: [AulasService, AulasAnalisisAcademicoService],
 })
 export class AulasModule {}

@@ -4,7 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { createHash } from 'node:crypto';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
 import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { GuardarReglaOptativaPlanDto } from './dto/guardar-regla-optativa-plan.dto';
@@ -213,5 +214,123 @@ export class PlanReglasOptativasService {
     }
 
     await this.reglaRepository.remove(regla);
+  }
+
+  huellaRegla(regla: ReglaOptativaPlan | null): string {
+    if (!regla) return 'NO_REGLA';
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          id: regla.id,
+          planEstudioId: regla.planEstudioId,
+          cantidadDisciplinarias: regla.cantidadDisciplinarias,
+          cantidadAbiertas: regla.cantidadAbiertas,
+          cantidadSede: regla.cantidadSede,
+        }),
+      )
+      .digest('hex');
+  }
+
+  async obtenerReglaParaSolicitud(planId: number): Promise<ReglaOptativaPlan | null> {
+    return this.reglaRepository.findOne({ where: { planEstudioId: planId } });
+  }
+
+  async guardarDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    dto: GuardarReglaOptativaPlanDto,
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const reglaRepo = manager.getRepository(ReglaOptativaPlan);
+    const asigRepo = manager.getRepository(PlanAsignatura);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const totalConfigurado = dto.cantidadDisciplinarias + dto.cantidadAbiertas + dto.cantidadSede;
+    if (totalConfigurado > 200) {
+      throw new BadRequestException('La suma de espacios optativos no puede superar 200.');
+    }
+
+    const [disciplinarias, abiertas, sede, sinClasificar] = await Promise.all([
+      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: TipoOptativa.DISCIPLINARIA, activo: true } }),
+      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: TipoOptativa.ABIERTA, activo: true } }),
+      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: TipoOptativa.SEDE, activo: true } }),
+      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: IsNull(), activo: true } }),
+    ]);
+
+    if (sinClasificar > 0) {
+      throw new BadRequestException('Existen asignaturas optativas sin clasificar. Clasifíquelas antes de modificar la regla.');
+    }
+    if (disciplinarias > dto.cantidadDisciplinarias) {
+      throw new BadRequestException(`El plan ya tiene ${disciplinarias} optativas disciplinarias activas. No puede fijar un límite de ${dto.cantidadDisciplinarias}.`);
+    }
+    if (abiertas > dto.cantidadAbiertas) {
+      throw new BadRequestException(`El plan ya tiene ${abiertas} optativas abiertas activas. No puede fijar un límite de ${dto.cantidadAbiertas}.`);
+    }
+    if (sede > dto.cantidadSede) {
+      throw new BadRequestException(`El plan ya tiene ${sede} optativas de sede activas. No puede fijar un límite de ${dto.cantidadSede}.`);
+    }
+
+    let regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
+    const datos = {
+      cantidadDisciplinarias: dto.cantidadDisciplinarias,
+      cantidadAbiertas: dto.cantidadAbiertas,
+      cantidadSede: dto.cantidadSede,
+      minimoDisciplinariasPropias: dto.cantidadDisciplinarias,
+      maximoOtrasAreas: dto.cantidadAbiertas + dto.cantidadSede,
+    };
+
+    if (!regla) {
+      regla = reglaRepo.create({ planEstudioId: planId, ...datos });
+    } else {
+      Object.assign(regla, datos);
+    }
+
+    const guardada = await reglaRepo.save(regla);
+    return guardada.id;
+  }
+
+  async eliminarDesdeSolicitud(
+    coordinadorId: number,
+    asistenteId: number,
+    planId: number,
+    manager: EntityManager,
+  ): Promise<number> {
+    const planRepo = manager.getRepository(PlanEstudio);
+    const reglaRepo = manager.getRepository(ReglaOptativaPlan);
+    const asigRepo = manager.getRepository(PlanAsignatura);
+
+    const plan = await planRepo.findOne({
+      where: { id: planId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!plan) throw new NotFoundException('Plan de estudio no encontrado.');
+    if (!plan.activo) {
+      throw new BadRequestException('No se puede modificar un plan de estudio inactivo.');
+    }
+
+    const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
+    if (!regla) {
+      throw new NotFoundException('Regla de optativas no encontrada para este plan.');
+    }
+
+    const cantidadOptativas = await asigRepo.count({
+      where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, activo: true },
+    });
+    if (cantidadOptativas > 0) {
+      throw new BadRequestException('No se puede eliminar la regla mientras existan asignaturas optativas activas en el plan.');
+    }
+
+    await reglaRepo.remove(regla);
+    return planId;
   }
 }

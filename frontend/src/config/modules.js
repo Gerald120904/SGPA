@@ -160,6 +160,14 @@ export const MODULES = [
     section: 'Administración',
     description:
       'Usuarios, roles y acceso al sistema'
+  },
+  {
+    id: 'mis-asistentes',
+    title: 'Asistentes y solicitudes',
+    route: '/mis-asistentes',
+    icon: 'users',
+    section: 'Administración',
+    description: 'Delegación de asistentes y revisión de solicitudes'
   }
 
 ];

@@ -1,13 +1,16 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { TipoRequisito } from '../planes-estudio/constants/tipo-requisito.constant';
 import { CursoRequisitosService } from './curso-requisitos.service';
 import { CursoRequisito } from './entities/curso-requisito.entity';
 import { Curso } from './entities/curso.entity';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 
 describe('CursoRequisitosService', () => {
   let service: CursoRequisitosService;
@@ -22,6 +25,8 @@ describe('CursoRequisitosService', () => {
   let cursoRepository: {
     findOne: jest.Mock;
   };
+  let alcance: { tipoCuentaJerarquica: jest.Mock; puedeEjecutar: jest.Mock };
+  let dataSource: { transaction: jest.Mock };
 
   const crearCurso = (
     id: number,
@@ -71,12 +76,60 @@ describe('CursoRequisitosService', () => {
       findOne: jest.fn(),
     };
 
+    alcance = { tipoCuentaJerarquica: jest.fn().mockResolvedValue(null),
+      puedeEjecutar: jest.fn().mockResolvedValue(true) };
+    dataSource = { transaction: jest.fn(async (callback) => callback({
+      query: jest.fn().mockResolvedValue([{ id: 1 }]),
+      getRepository: (entity: unknown) => entity === Usuario ?
+        { findOne: jest.fn().mockResolvedValue({ id: 99 }) } :
+        entity === Curso ? cursoRepository : requisitoRepository,
+    })) };
     service = new CursoRequisitosService(
       requisitoRepository as unknown as Repository<CursoRequisito>,
       cursoRepository as unknown as Repository<Curso>,
+      alcance as unknown as AlcanceJerarquicoService,
+      dataSource as unknown as DataSource,
     );
 
     jest.clearAllMocks();
+  });
+
+  it('no revela requisitos de un curso ajeno consultado por ID', async () => {
+    alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+    alcance.puedeEjecutar.mockResolvedValue(false);
+    cursoRepository.findOne.mockResolvedValue({ ...cursoA, carreras: [{ id: 2 }] });
+    await expect(service.listar(1, 99)).rejects.toThrow(ForbiddenException);
+    expect(requisitoRepository.find).not.toHaveBeenCalled();
+  });
+
+  it('no permite alterar requisitos de un curso compartido sin permiso en todas sus carreras', async () => {
+    alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+    alcance.puedeEjecutar.mockImplementation(async (_id, _permiso, carreraId) => carreraId === 1);
+    cursoRepository.findOne
+      .mockResolvedValueOnce({ ...cursoA, carreras: [{ id: 1 }, { id: 2 }] })
+      .mockResolvedValueOnce({ ...cursoB, carreras: [{ id: 1 }] });
+    await expect(service.crear(1, { requisitoCursoId: 2, tipo: TipoRequisito.REQUISITO }, 99))
+      .rejects.toThrow(ForbiddenException);
+    expect(requisitoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('el aplicador de requisitos usa el administrador transaccional y revalida el grafo', async () => {
+    alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+    alcance.puedeEjecutar.mockResolvedValue(true);
+    cursoRepository.findOne
+      .mockResolvedValueOnce({ ...cursoA, carreras: [{ id: 1 }] })
+      .mockResolvedValueOnce({ ...cursoB, carreras: [{ id: 1 }] });
+    requisitoRepository.findOne.mockResolvedValue(null);
+    requisitoRepository.find.mockResolvedValue([]);
+    requisitoRepository.save.mockResolvedValue({ id: 8 });
+    requisitoRepository.findOneOrFail.mockResolvedValue(crearRequisito(8, 1, 2));
+    const manager = { query: jest.fn().mockResolvedValue([{ id: 1 }]),
+      getRepository: (entity: unknown) => entity === Curso ? cursoRepository : requisitoRepository } as any;
+    const id = await service.crearDesdeSolicitud(99, 3, 1,
+      { requisitoCursoId: 2, tipo: TipoRequisito.REQUISITO }, manager);
+    expect(id).toBe(8);
+    expect(manager.query).toHaveBeenCalledWith('SELECT id FROM cursos ORDER BY id LIMIT 1 FOR UPDATE');
+    expect(requisitoRepository.save).toHaveBeenCalledTimes(1);
   });
 
   it('crea un requisito normal válido entre cursos', async () => {

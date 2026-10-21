@@ -2,14 +2,17 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { PlanReglasOptativasController } from './plan-reglas-optativas.controller';
 import { PlanReglasOptativasService } from './plan-reglas-optativas.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanReglasOptativasController', () => {
   const jwtSecret = 'test-secret';
@@ -40,10 +43,27 @@ describe('PlanReglasOptativasController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
+          },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
           },
         },
         {
@@ -89,12 +109,16 @@ describe('PlanReglasOptativasController', () => {
     );
   });
 
-  const generarToken = (rol: string = 'ADMIN_GLOBAL') =>
-    jwtService.sign({
+  let rolActual = 'ADMIN_GLOBAL';
+
+  const generarToken = (rol: string = 'ADMIN_GLOBAL') => {
+    rolActual = rol;
+    return jwtService.sign({
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
     });
+  };
 
   it('GET /planes-estudio/:planId/regla-optativas - obtiene la regla del plan con PLANES_ESTUDIO_VER', async () => {
     const data = {

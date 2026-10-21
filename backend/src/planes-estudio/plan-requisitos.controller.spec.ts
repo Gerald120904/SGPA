@@ -2,15 +2,18 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { TipoRequisito } from './constants/tipo-requisito.constant';
 import { PlanRequisitosController } from './plan-requisitos.controller';
 import { PlanRequisitosService } from './plan-requisitos.service';
+import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 
 describe('PlanRequisitosController', () => {
   const jwtSecret = 'plan-requisitos-test-secret';
@@ -37,9 +40,26 @@ describe('PlanRequisitosController', () => {
       providers: [
         AuthGuard,
         PermisosGuard,
+        { provide: PlanesAlcanceGuard, useValue: { canActivate: () => true } },
         {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue(jwtSecret) },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => ({
+              id: where?.id ?? 1,
+              activo: true,
+              usuarioRoles: [
+                {
+                  usuarioId: where?.id ?? 1,
+                  rolId: 1,
+                  rol: { id: 1, nombre: rolActual, activo: true },
+                },
+              ],
+            })),
+          },
         },
         {
           provide: PermisosService,
@@ -85,7 +105,10 @@ describe('PlanRequisitosController', () => {
     }
   });
 
+  let rolActual = 'ADMIN_GLOBAL';
+
   async function token(rol: string) {
+    rolActual = rol;
     return jwtService.signAsync({
       sub: 1,
       correo: 'usuario@sgpa.local',

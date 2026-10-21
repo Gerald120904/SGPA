@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
@@ -13,6 +14,8 @@ import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { CursosService } from './cursos.service';
 import { CursoRequisito } from './entities/curso-requisito.entity';
 import { Curso } from './entities/curso.entity';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 
 describe('CursosService', () => {
   let service: CursosService;
@@ -49,6 +52,7 @@ describe('CursosService', () => {
   let dataSource: {
     transaction: jest.Mock;
   };
+  let alcance: { tipoCuentaJerarquica: jest.Mock; obtenerCarrerasAutorizadas: jest.Mock; puedeEjecutar: jest.Mock };
 
   const carrera: Carrera = {
     id: 1,
@@ -165,12 +169,15 @@ describe('CursosService', () => {
             if (target === Curso) return managerCursoRepository;
             if (target === PlanAsignatura)
               return managerPlanAsignaturaRepository;
+            if (target === Usuario) return { findOne: jest.fn().mockResolvedValue({ id: 99 }) };
             return {};
           }),
         };
         return callback(manager);
       }),
     };
+    alcance = { tipoCuentaJerarquica: jest.fn().mockResolvedValue(null),
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([]), puedeEjecutar: jest.fn().mockResolvedValue(true) };
 
     service = new CursosService(
       cursoRepository as unknown as Repository<Curso>,
@@ -178,6 +185,7 @@ describe('CursosService', () => {
       optativaRepository as unknown as Repository<CursoOptativo>,
       planAsignaturaRepository as unknown as Repository<PlanAsignatura>,
       dataSource as unknown as DataSource,
+      alcance as unknown as AlcanceJerarquicoService,
     );
 
     jest.clearAllMocks();
@@ -586,6 +594,74 @@ describe('CursosService', () => {
         }),
       );
       expect(resultado.descripcion).toBe('Nueva descripción');
+    });
+  });
+
+  describe('alcance jerárquico de Cursos', () => {
+    it('filtra en la consulta SQL y oculta asociaciones de otras carreras', async () => {
+      alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+      alcance.obtenerCarrerasAutorizadas.mockResolvedValue([1]);
+      alcance.puedeEjecutar.mockImplementation(async (_id, permiso, carreraId) =>
+        permiso === 'CURSOS_VER' && carreraId === 1);
+      cursoRepository.find.mockResolvedValue([crearCurso({ carreras: [carrera] })]);
+      cursoRepository.findOne.mockResolvedValue(crearCurso({ carreras: [carrera, carrera2] }));
+      const resultado = await service.listar(99);
+      expect(cursoRepository.find).toHaveBeenCalledWith(expect.objectContaining({
+        where: { carreras: { id: expect.anything() } },
+      }));
+      expect(resultado[0].carreras.map((c) => c.id)).toEqual([1]);
+      expect((resultado[0] as Curso & { puedeGestionarGlobal: boolean }).puedeGestionarGlobal).toBe(false);
+    });
+
+    it('rechaza el ID de un curso exclusivo de carrera ajena', async () => {
+      alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+      alcance.obtenerCarrerasAutorizadas.mockResolvedValue([1]);
+      alcance.puedeEjecutar.mockImplementation(async (_id, _permiso, carreraId) => carreraId === 1);
+      cursoRepository.findOne.mockResolvedValue(crearCurso({ carreras: [carrera2] }));
+      await expect(service.obtenerPorId(5, 99)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('no permite editar un dato global de curso compartido con una sola carrera', async () => {
+      alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+      alcance.puedeEjecutar.mockImplementation(async (_id, _permiso, carreraId) => carreraId === 1);
+      managerCursoRepository.findOne.mockResolvedValue(crearCurso({ carreras: [carrera, carrera2] }));
+      await expect(service.actualizar(5, { descripcion: 'Nueva' }, 99)).rejects.toThrow(ForbiddenException);
+      expect(managerCursoRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('el coordinador autorizado crea de inmediato desde la asignatura de su carrera', async () => {
+      alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+      alcance.puedeEjecutar.mockResolvedValue(true);
+      const fuente = crearPlanAsignatura();
+      planAsignaturaRepository.findOne.mockResolvedValue(fuente);
+      managerPlanAsignaturaRepository.findOne.mockResolvedValue(fuente);
+      managerCursoRepository.findOne.mockResolvedValue(null);
+      managerCursoRepository.save.mockResolvedValue(crearCurso());
+      managerCursoRepository.findOneOrFail.mockResolvedValue(crearCurso());
+      await service.crear({ planAsignaturaId: 17 }, 99);
+      expect(managerCursoRepository.save).toHaveBeenCalledTimes(1);
+      expect(managerPlanAsignaturaRepository.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('una solicitud obsoleta no modifica el curso oficial', async () => {
+      const actual = crearCurso({ carreras: [carrera, carrera2] });
+      managerCursoRepository.findOne.mockResolvedValue(actual);
+      const manager = { getRepository: () => managerCursoRepository } as any;
+      await expect(service.actualizarDesdeSolicitud(99, 3, 5, 1,
+        { descripcion: 'Nueva' }, '0'.repeat(64), manager)).rejects.toThrow(ConflictException);
+      expect(managerCursoRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('la aprobación de curso compartido revalida todas las carreras del asistente', async () => {
+      const actual = crearCurso({ carreras: [carrera, carrera2] });
+      managerCursoRepository.findOne.mockResolvedValue(actual);
+      alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+      alcance.puedeEjecutar.mockImplementation(async (usuarioId, _permiso, carreraId) =>
+        usuarioId === 99 || carreraId === 1);
+      const manager = { getRepository: () => managerCursoRepository } as any;
+      await expect(service.actualizarDesdeSolicitud(99, 3, 5, 1,
+        { descripcion: 'Nueva' }, service.huellaCurso(actual), manager)).rejects.toThrow(ForbiddenException);
+      expect(managerCursoRepository.save).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
+import { PermisosModule } from '../permisos/permisos.module';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { ProfesorCarrera } from '../profesores/entities/profesor-carrera.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
@@ -21,6 +22,7 @@ import { EstructuraAcademicaService } from './estructura-academica.service';
       ProfesorCarrera,
     ]),
     SecurityModule,
+    PermisosModule,
   ],
   controllers: [EstructuraAcademicaController],
   providers: [EstructuraAcademicaService],

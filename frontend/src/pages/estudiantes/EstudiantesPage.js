@@ -21,8 +21,19 @@ import {
 } from '../../components/StatusBadge.js';
 
 import {
-  usuarioTienePermiso
+  usuarioTienePermiso,
+  obtenerRolesUsuario
 } from '../../app/session.js';
+import { ROLES } from '../../config/permissions.js';
+import {
+  proponerCrearEstudiante,
+  proponerActualizarEstudiante,
+  proponerEstadoEstudiante,
+  proponerCambioPlanEstudiante,
+  proponerResultadoEstudiante,
+  proponerImportacionEstudiantes,
+} from '../../services/solicitudes-cambio.service.js';
+import { obtenerCatalogoEstudiantesJerarquia } from '../../services/jerarquia.service.js';
 
 import {
   listarEstudiantes,
@@ -98,6 +109,30 @@ let catalogoEstudiantes = [];
 let solicitudesFormularios = [];
 
 let intervaloSolicitudes = null;
+
+function esCuentaJerarquica() {
+  const roles = obtenerRolesUsuario();
+  return !roles.includes(ROLES.ADMIN_GLOBAL) &&
+    (roles.includes(ROLES.COORDINADOR) || roles.includes(ROLES.ASISTENTE_ESTUDIANTIL));
+}
+
+async function listarCarrerasParaEstudiantes() {
+  if (!esCuentaJerarquica()) return listarCarreras();
+  const resultado = await obtenerCatalogoEstudiantesJerarquia();
+  return resultado.ok ? { ok: true, carreras: resultado.data.carreras } : resultado;
+}
+
+async function listarPlanesParaEstudiantes() {
+  if (!esCuentaJerarquica()) return listarPlanesEstudio();
+  const resultado = await obtenerCatalogoEstudiantesJerarquia();
+  return resultado.ok ? { ok: true, planes: resultado.data.planes } : resultado;
+}
+
+async function listarPeriodosParaEstudiantes() {
+  if (!esCuentaJerarquica()) return listarPeriodosAcademicos();
+  const resultado = await obtenerCatalogoEstudiantesJerarquia();
+  return resultado.ok ? { ok: true, periodos: resultado.data.periodos } : resultado;
+}
 
 let instanciaActual = 0;
 
@@ -453,10 +488,9 @@ function renderizarEstudiantes() {
     return;
   }
 
-  const puedeGestionar =
-    usuarioTienePermiso(
-      PERMISOS.GESTIONAR
-    );
+  const esAsistente = obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+  const puedeEditar = usuarioTienePermiso(PERMISOS.GESTIONAR);
+  const puedeGestionar = !esAsistente && puedeEditar;
 
   const rows =
     estudiantes
@@ -554,7 +588,7 @@ function renderizarEstudiantes() {
                 </button>
 
                 ${
-                  puedeGestionar
+                  puedeEditar
                     ? `
                       <button
                         type="button"
@@ -583,6 +617,14 @@ function renderizarEstudiantes() {
                           aria-hidden="true"
                         ></i>
                       </button>
+
+                    `
+                    : ''
+                }
+
+                ${
+                  puedeGestionar
+                    ? `
 
                       <button
                         type="button"
@@ -1114,8 +1156,8 @@ async function mostrarCarreras() {
       resultadoPlanes,
       resultadoConteos
     ] = await Promise.all([
-      listarCarreras(),
-      listarPlanesEstudio(),
+      listarCarrerasParaEstudiantes(),
+      listarPlanesParaEstudiantes(),
       contarEstudiantesPorCarrera()
     ]);
 
@@ -1278,7 +1320,7 @@ async function mostrarPlanesCarrera(carrera) {
       resultadoEstudiantes,
       resultadoSolicitudes
     ] = await Promise.all([
-      listarPlanesEstudio(),
+      listarPlanesParaEstudiantes(),
       contarEstudiantesPorPlan(carrera.id),
       contarSolicitudesPorPlan(carrera.id)
     ]);
@@ -1479,7 +1521,7 @@ async function mostrarEstudiantesPlan() {
         puedeGestionar
           ? `
             <div class="sgpa-toolbar-actions">
-              <button
+              ${obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL) ? '' : `<button
                 id="importarEstudiantesExcelButton"
                 type="button"
                 class="sgpa-button sgpa-button-secondary"
@@ -1490,7 +1532,7 @@ async function mostrarEstudiantesPlan() {
                 ></i>
 
                 Importar Excel
-              </button>
+              </button>`}
 
               <button
                 id="nuevoEstudianteButton"
@@ -1502,7 +1544,8 @@ async function mostrarEstudiantesPlan() {
                   aria-hidden="true"
                 ></i>
 
-                Nuevo estudiante
+                ${obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                  ? 'Solicitar nuevo estudiante' : 'Nuevo estudiante'}
               </button>
             </div>
           `
@@ -2120,10 +2163,14 @@ async function abrirEditarEstudiante(
           'editarEstudianteForm',
 
         title:
-          'Editar estudiante',
+          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+            ? 'Proponer actualización de estudiante'
+            : 'Editar estudiante',
 
         description:
-          'Actualice la información personal del estudiante.',
+          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+            ? 'El coordinador debe aprobar esta propuesta antes de aplicar los cambios.'
+            : 'Actualice la información personal del estudiante.',
 
         errorId:
           'editarEstudianteError',
@@ -2135,7 +2182,9 @@ async function abrirEditarEstudiante(
           'guardarEstudianteButton',
 
         submitText:
-          'Guardar cambios',
+          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+            ? 'Enviar propuesta'
+            : 'Guardar cambios',
 
         body: `
           <label>
@@ -2255,7 +2304,9 @@ async function abrirEditarEstudiante(
 
           try {
             const respuesta =
-              await actualizarEstudiante(
+              await (obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                ? proponerActualizarEstudiante
+                : actualizarEstudiante)(
                 estudiante.id,
                 {
                   cedula:
@@ -2319,9 +2370,13 @@ async function abrirEditarEstudiante(
 
             mostrarExito({
               titulo:
-                'Estudiante actualizado',
+                obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                  ? 'Propuesta enviada'
+                  : 'Estudiante actualizado',
               mensaje:
-                'La información se actualizó correctamente.'
+                obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                  ? 'La actualización quedó pendiente de aprobación.'
+                  : 'La información se actualizó correctamente.'
             });
 
             await cargarEstudiantes(
@@ -2359,9 +2414,9 @@ async function obtenerCatalogosEstudiante() {
     resultadoPlanes,
     resultadoPeriodos
   ] = await Promise.all([
-    listarCarreras(),
-    listarPlanesEstudio(),
-    listarPeriodosAcademicos()
+    listarCarrerasParaEstudiantes(),
+    listarPlanesParaEstudiantes(),
+    listarPeriodosParaEstudiantes()
   ]);
 
   if (!resultadoCarreras?.ok) {
@@ -2423,7 +2478,7 @@ async function abrirNuevoEstudiante() {
 
   try {
     const resultadoPeriodos =
-      await listarPeriodosAcademicos();
+      await listarPeriodosParaEstudiantes();
 
     if (!resultadoPeriodos?.ok) {
       throw new Error(
@@ -2458,7 +2513,9 @@ async function abrirNuevoEstudiante() {
           'Nuevo estudiante',
 
         description:
-          'Registre los datos personales y académicos iniciales.',
+          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+            ? 'La propuesta quedará pendiente hasta que la apruebe su coordinador.'
+            : 'Registre los datos personales y académicos iniciales.',
 
         errorId:
           'nuevoEstudianteError',
@@ -2470,7 +2527,9 @@ async function abrirNuevoEstudiante() {
           'crearEstudianteButton',
 
         submitText:
-          'Crear estudiante',
+          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+            ? 'Enviar solicitud de creación'
+            : 'Crear estudiante',
 
         body: `
           <label>
@@ -2598,8 +2657,8 @@ async function abrirNuevoEstudiante() {
           button.disabled = true;
 
           try {
-            const resultado =
-              await crearEstudiante({
+            const esAsistente = obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+            const datosEstudiante = {
                 cedula:
                   document
                     .getElementById('nuevoCedula')
@@ -2644,7 +2703,10 @@ async function abrirNuevoEstudiante() {
                       )
                       .value
                   )
-              });
+              };
+            const resultado = esAsistente
+              ? await proponerCrearEstudiante(datosEstudiante)
+              : await crearEstudiante(datosEstudiante);
 
             if (!resultado?.ok) {
               throw new Error(
@@ -2657,15 +2719,14 @@ async function abrirNuevoEstudiante() {
 
             mostrarExito({
               titulo:
-                'Estudiante creado',
+                esAsistente ? 'Solicitud enviada' : 'Estudiante creado',
               mensaje:
-                'El estudiante fue registrado correctamente.'
+                esAsistente
+                  ? 'La propuesta está pendiente de aprobación. Los datos oficiales aún no cambiaron.'
+                  : 'El estudiante fue registrado correctamente.'
             });
 
-            await cargarEstudiantes(
-              instanciaActual,
-              true
-            );
+            if (!esAsistente) await cargarEstudiantes(instanciaActual, true);
           } catch (error) {
             mostrarError({
               titulo:
@@ -2728,7 +2789,9 @@ async function abrirCambiarEstadoEstudiante(
         'cambiarEstadoEstudianteForm',
 
       title:
-        'Cambiar estado',
+        obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          ? 'Proponer cambio de estado'
+          : 'Cambiar estado',
 
       description:
         obtenerNombreCompleto(
@@ -2742,7 +2805,9 @@ async function abrirCambiarEstadoEstudiante(
         'guardarEstadoEstudiante',
 
       submitText:
-        'Cambiar estado',
+        obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          ? 'Enviar propuesta'
+          : 'Cambiar estado',
 
       body: `
         <label class="sgpa-form-wide">
@@ -2807,7 +2872,7 @@ async function abrirCambiarEstadoEstudiante(
               'Confirmar cambio de estado',
 
             mensaje:
-              `El estudiante pasará de ${formatearEstado(
+              `${obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL) ? 'Se solicitará cambiar el estado' : 'El estudiante pasará'} de ${formatearEstado(
                 estudiante.estado
               )} a ${formatearEstado(
                 estado
@@ -2824,7 +2889,9 @@ async function abrirCambiarEstadoEstudiante(
 
         try {
           const respuesta =
-            await cambiarEstadoEstudiante(
+            await (obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+              ? proponerEstadoEstudiante
+              : cambiarEstadoEstudiante)(
               id,
               estado
             );
@@ -2840,9 +2907,13 @@ async function abrirCambiarEstadoEstudiante(
 
           mostrarExito({
             titulo:
-              'Estado actualizado',
+              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                ? 'Propuesta enviada'
+                : 'Estado actualizado',
             mensaje:
-              'El estado del estudiante se actualizó correctamente.'
+              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                ? 'El cambio de estado quedó pendiente de aprobación.'
+                : 'El estado del estudiante se actualizó correctamente.'
           });
 
           await cargarEstudiantes(
@@ -2871,8 +2942,8 @@ async function abrirCambiarPlanEstudiante(
     ] =
       await Promise.all([
         obtenerEstudiante(id),
-        listarPlanesEstudio(),
-        listarPeriodosAcademicos()
+        listarPlanesParaEstudiantes(),
+        listarPeriodosParaEstudiantes()
       ]);
 
     if (!resultadoEstudiante?.ok) {
@@ -3055,37 +3126,23 @@ async function abrirCambiarPlanEstudiante(
           event.preventDefault();
 
           try {
-            const respuesta =
-              await cambiarPlanEstudiante(
-                id,
-                {
-                  planNuevoId:
-                    Number(
-                      document
-                        .getElementById(
-                          'planNuevoEstudiante'
-                        )
-                        .value
-                    ),
-
-                  periodoCambioId:
-                    Number(
-                      document
-                        .getElementById(
-                          'periodoCambioEstudiante'
-                        )
-                        .value
-                    ),
-
-                  motivo:
-                    document
-                      .getElementById(
-                        'motivoCambioPlan'
-                      )
-                      .value
-                      .trim() || null
-                }
-              );
+            const esAsistente =
+              typeof obtenerRolesUsuario === 'function' &&
+              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+            const datosPlan = {
+              planNuevoId: Number(
+                document.getElementById('planNuevoEstudiante').value,
+              ),
+              periodoCambioId: Number(
+                document.getElementById('periodoCambioEstudiante').value,
+              ),
+              motivo:
+                document.getElementById('motivoCambioPlan').value.trim() ||
+                null,
+            };
+            const respuesta = esAsistente
+              ? await proponerCambioPlanEstudiante(id, datosPlan)
+              : await cambiarPlanEstudiante(id, datosPlan);
 
             if (!respuesta?.ok) {
               throw new Error(
@@ -3098,9 +3155,11 @@ async function abrirCambiarPlanEstudiante(
 
             mostrarExito({
               titulo:
-                'Plan actualizado',
+                esAsistente ? 'Solicitud enviada' : 'Plan actualizado',
               mensaje:
-                'El cambio de plan se registró correctamente en el historial del estudiante.'
+                esAsistente
+                  ? 'La propuesta de cambio de plan fue enviada a su coordinador para revisión.'
+                  : 'El cambio de plan se registró correctamente en el historial del estudiante.'
             });
 
             await cargarEstudiantes(
@@ -3162,7 +3221,7 @@ async function abrirExpedienteEstudiante(
           id
         ),
 
-        listarPeriodosAcademicos()
+        listarPeriodosParaEstudiantes()
       ]);
 
     if (!resultadoEstudiante?.ok) {
@@ -3459,7 +3518,7 @@ async function abrirRegistrarResultadoAcademico(
           estudiante.planEstudioId
         ),
 
-        listarPeriodosAcademicos()
+        listarPeriodosParaEstudiantes()
       ]);
 
     if (!resultadoAsignaturas?.ok) {
@@ -3757,19 +3816,22 @@ async function abrirRegistrarResultadoAcademico(
                 .value
                 .trim();
 
-            const respuesta =
-              await registrarResultadoAcademicoEstudiante(
-                estudiante.id,
-                {
-                  planAsignaturaId,
-                  periodoId,
-                  resultado,
-                  origenAcademico,
-                  observaciones:
-                    observaciones ||
-                    null
-                }
-              );
+            const esAsistente =
+              typeof obtenerRolesUsuario === 'function' &&
+              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+            const datosResultado = {
+              planAsignaturaId,
+              periodoId,
+              resultado,
+              origenAcademico,
+              observaciones: observaciones || null,
+            };
+            const respuesta = esAsistente
+              ? await proponerResultadoEstudiante(estudiante.id, datosResultado)
+              : await registrarResultadoAcademicoEstudiante(
+                  estudiante.id,
+                  datosResultado,
+                );
 
             if (!respuesta?.ok) {
               throw new Error(
@@ -3782,10 +3844,11 @@ async function abrirRegistrarResultadoAcademico(
 
             mostrarExito({
               titulo:
-                'Resultado registrado',
-
+                esAsistente ? 'Solicitud enviada' : 'Resultado registrado',
               mensaje:
-                'El resultado académico fue registrado correctamente en el expediente.'
+                esAsistente
+                  ? 'La propuesta de resultado académico fue enviada a su coordinador para revisión.'
+                  : 'El resultado académico fue registrado correctamente en el expediente.'
             });
 
             await abrirExpedienteEstudiante(
@@ -4200,58 +4263,52 @@ function renderizarPreviewImportacionEstudiantes(
         }
 
         try {
-          const resultado =
-            await ejecutarImportacionEstudiantes(
-              {
-                carreraId:
-                  contexto.carreraId,
+          const esAsistente =
+            typeof obtenerRolesUsuario === 'function' &&
+            obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+          const resultado = esAsistente
+            ? await proponerImportacionEstudiantes({
+                carreraId: contexto.carreraId,
+                planEstudioId: contexto.planEstudioId,
+                estudiantes: contexto.datosExcel,
+              })
+            : await ejecutarImportacionEstudiantes(
+                {
+                  carreraId: contexto.carreraId,
+                  planEstudioId: contexto.planEstudioId,
+                },
+                contexto.datosExcel,
+              );
 
-                planEstudioId:
-                  contexto.planEstudioId
-              },
-
-              contexto.datosExcel
-            );
-
-          if (
-            resultado?.ok === false
-          ) {
+          if (resultado?.ok === false) {
             throw new Error(
               resultado?.message ||
               'No fue posible completar la importación.'
             );
           }
 
-          const importacion =
-            extraerData(resultado);
-
-          const resumenFinal =
-            obtenerResumenImportacion(
-              importacion
-            );
-
-          const dialog =
-            document.getElementById(
-              'estudianteDialog'
-            );
-
+          const dialog = document.getElementById('estudianteDialog');
           dialog?.close();
 
-          mostrarExito({
-            titulo:
-              'Importación completada',
-
-            mensaje:
-              `${resumenFinal.creados} estudiantes creados, ` +
-              `${resumenFinal.actualizados} actualizados, ` +
-              `${resumenFinal.sinCambios} sin cambios y ` +
-              `${resumenFinal.errores} omitidos por errores.`
-          });
-
-          await cargarEstudiantes(
-            instanciaActual,
-            true
-          );
+          if (esAsistente) {
+            mostrarExito({
+              titulo: 'Solicitud enviada',
+              mensaje:
+                'La propuesta de importación masiva de estudiantes fue enviada a su coordinador para revisión y aplicación.',
+            });
+          } else {
+            const importacion = extraerData(resultado);
+            const resumenFinal = obtenerResumenImportacion(importacion);
+            mostrarExito({
+              titulo: 'Importación completada',
+              mensaje:
+                `${resumenFinal.creados} estudiantes creados, ` +
+                `${resumenFinal.actualizados} actualizados, ` +
+                `${resumenFinal.sinCambios} sin cambios y ` +
+                `${resumenFinal.errores} omitidos por errores.`,
+            });
+            await cargarEstudiantes(instanciaActual, true);
+          }
         } catch (error) {
           mostrarError({
             titulo:
@@ -4808,7 +4865,7 @@ function renderizarSolicitudesFormularios() {
   }
 
   const puedeGestionar =
-    usuarioTienePermiso(
+    !obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL) && usuarioTienePermiso(
       PERMISOS.GESTIONAR
     );
 

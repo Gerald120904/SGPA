@@ -2,10 +2,12 @@ import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { RolesController } from './roles.controller';
 import { RolesService } from './roles.service';
 
@@ -29,6 +31,25 @@ describe('RolesController', () => {
           provide: ConfigService,
           useValue: {
             get: jest.fn().mockReturnValue(jwtSecret),
+          },
+        },
+        {
+          provide: getRepositoryToken(Usuario),
+          useValue: {
+            findOne: jest.fn().mockImplementation(async ({ where }) => {
+              const rol = where?.id === 1 ? 'ADMIN_GLOBAL' : 'COORDINADOR';
+              return {
+                id: where?.id ?? 1,
+                activo: true,
+                usuarioRoles: [
+                  {
+                    usuarioId: where?.id ?? 1,
+                    rolId: where?.id === 1 ? 1 : 2,
+                    rol: { id: where?.id === 1 ? 1 : 2, nombre: rol, activo: true },
+                  },
+                ],
+              };
+            }),
           },
         },
         {
@@ -70,6 +91,13 @@ describe('RolesController', () => {
   });
 
   it('responde 200 para ADMIN_GLOBAL', async () => {
+    const rolesOficiales = [
+      { id: 9, nombre: 'ADMIN_GLOBAL', activo: true },
+      { id: 11, nombre: 'COORDINADOR', activo: true },
+      { id: 12, nombre: 'PROFESOR', activo: true },
+      { id: 13, nombre: 'ASISTENTE_ESTUDIANTIL', activo: true },
+    ];
+    rolesService.listar.mockResolvedValueOnce(rolesOficiales);
     const token = await jwtService.signAsync({
       sub: 1,
       correo: 'admin@sgpa.local',
@@ -79,7 +107,7 @@ describe('RolesController', () => {
     await request(app.getHttpServer())
       .get('/roles')
       .set('Authorization', `Bearer ${token}`)
-      .expect(200, []);
+      .expect(200, rolesOficiales);
 
     expect(rolesService.listar).toHaveBeenCalledTimes(1);
   });

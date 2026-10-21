@@ -18,6 +18,7 @@ import {
   listarCarreras,
 } from '../../services/carreras.service.js';
 import { ROLES } from '../../config/permissions.js';
+import { obtenerCoordinadorJerarquia, configurarCoordinadorJerarquia, listarAuditoriaJerarquia } from '../../services/jerarquia.service.js';
 
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
@@ -98,6 +99,15 @@ function obtenerRoles(usuario) {
         : rol
     ))
     .filter((rol) => rol?.nombre);
+}
+
+export function nombreVisibleRol(nombre) {
+  return {
+    ADMIN_GLOBAL: 'Administrador global',
+    COORDINADOR: 'Coordinador',
+    PROFESOR: 'Profesor',
+    ASISTENTE_ESTUDIANTIL: 'Asistente estudiantil',
+  }[nombre] || nombre;
 }
 
 function mensajeResultado(resultado, mensajePredeterminado) {
@@ -277,6 +287,40 @@ function obtenerCodigosPermisos(
       )
       .filter(Boolean),
   );
+}
+
+export function obtenerEstadoSeleccionPermisosCarrera(
+  permisos,
+) {
+  const editables = Array.from(
+    permisos || [],
+  ).filter(
+    (permiso) => !permiso.disabled,
+  );
+  const seleccionados = editables.filter(
+    (permiso) => permiso.checked,
+  ).length;
+
+  return {
+    checked:
+      editables.length > 0 &&
+      seleccionados === editables.length,
+    indeterminate:
+      seleccionados > 0 &&
+      seleccionados < editables.length,
+    disabled: editables.length === 0,
+  };
+}
+
+export function establecerSeleccionPermisosCarrera(
+  permisos,
+  seleccionado,
+) {
+  Array.from(permisos || [])
+    .filter((permiso) => !permiso.disabled)
+    .forEach((permiso) => {
+      permiso.checked = Boolean(seleccionado);
+    });
 }
 
 export async function iniciarUsuariosPage() {
@@ -460,6 +504,11 @@ export async function iniciarUsuariosPage() {
         roles,
       );
 
+    const porCarrera = roles.includes(ROLES.COORDINADOR) ||
+      roles.includes(ROLES.ASISTENTE_ESTUDIANTIL);
+    dialogoContenido.querySelector('#permisosCreacionSection')
+      ?.classList.toggle('hidden', porCarrera);
+
     dialogoContenido
       .querySelectorAll(
         'input[name="permisos"]',
@@ -467,7 +516,7 @@ export async function iniciarUsuariosPage() {
       .forEach(
         (input) => {
           input.checked =
-            sugeridos.has(
+            !porCarrera && sugeridos.has(
               input.value,
             );
         },
@@ -509,7 +558,7 @@ export async function iniciarUsuariosPage() {
         usuario.cedula,
         obtenerNombreCompleto(usuario),
         usuario.correo,
-        ...obtenerRoles(usuario).map((rol) => rol.nombre),
+        ...obtenerRoles(usuario).map((rol) => nombreVisibleRol(rol.nombre)),
       ].join(' ').toLowerCase();
 
       return texto.includes(termino);
@@ -522,7 +571,7 @@ export async function iniciarUsuariosPage() {
             <span
               class="usuarios-role-badge"
               title="${escapeHtml(rol.descripcion || rol.nombre)}"
-            >${escapeHtml(rol.nombre)}</span>
+            >${escapeHtml(nombreVisibleRol(rol.nombre))}</span>
           `).join('')
         : '<span class="usuarios-no-role">Sin rol asignado</span>';
 
@@ -551,6 +600,14 @@ export async function iniciarUsuariosPage() {
               >
                 <i data-lucide="pencil" aria-hidden="true"></i>
               </button>
+              ${roles.some((rol) => rol.nombre === ROLES.COORDINADOR) ? `
+                <button class="usuarios-icon-button" type="button"
+                  data-action="configurar-jerarquia" data-user-id="${usuario.id}"
+                  aria-label="Configurar carreras y permisos de ${escapeHtml(obtenerNombreCompleto(usuario))}"
+                  title="Carreras y permisos por carrera">
+                  <i data-lucide="shield-check" aria-hidden="true"></i>
+                </button>
+              ` : ''}
               <button
                 class="usuarios-icon-button ${usuario.activo ? 'is-danger' : 'is-success'}"
                 type="button"
@@ -686,9 +743,10 @@ export async function iniciarUsuariosPage() {
             required
             maxlength="20"
             autocomplete="off"
+            placeholder="Ej: 501230456 o 1-1111-1111"
             value="${escapeHtml(usuario?.cedula || '')}"
           >
-          <small>Identificación única del usuario.</small>
+          <small>Identificación única del usuario (sin espacios).</small>
         </label>
 
         <label>
@@ -699,23 +757,41 @@ export async function iniciarUsuariosPage() {
             required
             maxlength="150"
             autocomplete="email"
+            placeholder="Ej: usuario@una.cr"
             value="${escapeHtml(usuario?.correo || '')}"
           >
           <small>
-            Correo único para identificar la cuenta.
+            Correo institucional para la cuenta y notificaciones.
           </small>
         </label>
         <label>
           <span>Nombres</span>
-          <input name="nombres" required maxlength="100" value="${escapeHtml(usuario?.nombres || '')}">
+          <input
+            name="nombres"
+            required
+            maxlength="100"
+            placeholder="Nombre o nombres"
+            value="${escapeHtml(usuario?.nombres || '')}"
+          >
         </label>
         <label>
           <span>Primer apellido</span>
-          <input name="apellido1" required maxlength="100" value="${escapeHtml(usuario?.apellido1 || '')}">
+          <input
+            name="apellido1"
+            required
+            maxlength="100"
+            placeholder="Primer apellido"
+            value="${escapeHtml(usuario?.apellido1 || '')}"
+          >
         </label>
         <label class="usuario-form-full">
           <span>Segundo apellido</span>
-          <input name="apellido2" maxlength="100" value="${escapeHtml(usuario?.apellido2 || '')}">
+          <input
+            name="apellido2"
+            maxlength="100"
+            placeholder="Segundo apellido (opcional)"
+            value="${escapeHtml(usuario?.apellido2 || '')}"
+          >
         </label>
       </div>
     `;
@@ -725,6 +801,14 @@ export async function iniciarUsuariosPage() {
     usuario,
     permisosUsuario,
   ) {
+    if (obtenerRoles(usuario).some((rol) =>
+      rol.nombre === ROLES.COORDINADOR || rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL)) {
+      return `<section class="usuario-permission-manager">
+        <h4>Permisos por carrera</h4>
+        <p>Utilice el botón de escudo en la lista de usuarios para configurar el alcance del coordinador.
+          Los permisos de asistentes se administran desde Asistentes y solicitudes.</p>
+      </section>`;
+    }
     const asignados =
       obtenerCodigosPermisos(
         permisosUsuario,
@@ -738,6 +822,7 @@ export async function iniciarUsuariosPage() {
     if (esAdmin) {
       return `
         <section
+          id="permisosCreacionSection"
           class="usuario-permission-manager"
         >
 
@@ -752,8 +837,8 @@ export async function iniciarUsuariosPage() {
               </h4>
 
               <p>
-                Este usuario posee el rol
-                ADMIN_GLOBAL.
+                Este usuario posee el rol de
+                ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))}.
               </p>
 
             </div>
@@ -778,10 +863,7 @@ export async function iniciarUsuariosPage() {
               </strong>
 
               <p>
-                ADMIN_GLOBAL no necesita
-                permisos granulares individuales.
-                El backend le concede acceso
-                administrativo automáticamente.
+                El ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))} cuenta con acceso administrativo total en el sistema y no requiere permisos granulares individuales.
               </p>
 
             </div>
@@ -887,11 +969,13 @@ export async function iniciarUsuariosPage() {
 
         ${camposUsuario()}
 
-        <label class="usuario-password-field">
-          <span>Contraseña temporal</span>
-          <input name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password">
-          <small>Debe contener entre 8 y 128 caracteres.</small>
-        </label>
+        <div class="usuario-invitacion-banner">
+          <i data-lucide="mail" aria-hidden="true"></i>
+          <div>
+            <strong>Invitación por correo electrónico</strong>
+            <p>No se requiere contraseña temporal. Al crear la cuenta se enviará una invitación segura para que el usuario configure su acceso.</p>
+          </div>
+        </div>
 
         <fieldset class="usuario-role-options">
           <legend>Roles iniciales</legend>
@@ -899,7 +983,7 @@ export async function iniciarUsuariosPage() {
             <label>
               <input type="checkbox" name="roles" value="${escapeHtml(rol.nombre)}">
               <span>
-                <strong>${escapeHtml(rol.nombre)}</strong>
+                <strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
                 <small>${escapeHtml(rol.descripcion || '')}</small>
               </span>
             </label>
@@ -961,6 +1045,85 @@ export async function iniciarUsuariosPage() {
     if (!dialogo.open) dialogo.showModal();
   }
 
+  function renderizarDialogoJerarquia(usuario, configuracion, auditoria = []) {
+    const asignadas = new Map((configuracion.carreras || []).map((c) => [Number(c.carreraId), new Set(c.permisos || [])]));
+    dialogoContenido.innerHTML = `
+      <form id="jerarquiaForm" class="usuario-form" data-user-id="${usuario.id}">
+        <div class="usuario-dialog-header">
+          <div>
+            <h3>Carreras y permisos de ${escapeHtml(obtenerNombreCompleto(usuario))}</h3>
+            <p>Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.</p>
+          </div>
+          <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
+            <i data-lucide="x" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="usuario-dialog-feedback hidden" role="status"></div>
+        <div class="usuarios-alcances">
+          ${estado.carreras.map((carrera) => {
+            const permisos = asignadas.get(Number(carrera.id)) || new Set();
+            return `<fieldset class="usuarios-alcance" data-carrera-id="${carrera.id}">
+              <legend>
+                <label><input type="checkbox" name="jerarquia-carrera" value="${carrera.id}"
+                  ${asignadas.has(Number(carrera.id)) ? 'checked' : ''}>
+                  ${escapeHtml(carrera.nombre)} (${escapeHtml(carrera.codigo)})</label>
+              </legend>
+              <label class="usuarios-alcance-seleccionar-todos">
+                <input type="checkbox" name="jerarquia-todos-permisos">
+                <span>Seleccionar todos los permisos de esta carrera</span>
+              </label>
+              <div class="usuarios-alcance-permisos">
+                ${estado.permisosCatalogo.filter((permiso) =>
+                  [
+                    'ESTUDIANTES_VER',
+                    'ESTUDIANTES_GESTIONAR',
+                    'CURSOS_VER',
+                    'CURSOS_GESTIONAR',
+                    'PLANES_ESTUDIO_VER',
+                    'PLANES_ESTUDIO_GESTIONAR',
+                    'OPTATIVAS_VER',
+                    'OPTATIVAS_GESTIONAR',
+                  ].includes(permiso)).map((permiso) => `
+                  <label><input type="checkbox" name="jerarquia-permiso" value="${escapeHtml(permiso)}"
+                    ${permisos.has(permiso) ? 'checked' : ''}>
+                    ${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</label>
+                `).join('')}
+              </div>
+            </fieldset>`;
+          }).join('')}
+        </div>
+        <div class="usuario-dialog-actions">
+          <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
+          <button class="usuarios-primary-button" type="submit">Guardar alcance</button>
+        </div>
+        <section class="usuarios-auditoria">
+          <h4>Historial reciente</h4>
+          ${auditoria.length ? `<ul>${auditoria.map((item) => `
+            <li>${escapeHtml(item.accion)} · ${escapeHtml(new Date(item.createdAt).toLocaleString('es-CR'))}</li>
+          `).join('')}</ul>` : '<p>Sin cambios registrados.</p>'}
+        </section>
+      </form>`;
+    dialogoContenido
+      .querySelectorAll('.usuarios-alcance')
+      .forEach(actualizarSeleccionTodosPermisosCarrera);
+    renderizarIconos();
+    if (!dialogo.open) dialogo.showModal();
+  }
+
+  function actualizarSeleccionTodosPermisosCarrera(campo) {
+    const selector = campo?.querySelector(
+      '[name="jerarquia-todos-permisos"]',
+    );
+    if (!selector) return;
+
+    const estadoSeleccion = obtenerEstadoSeleccionPermisosCarrera(
+      campo.querySelectorAll('[name="jerarquia-permiso"]'),
+    );
+    selector.checked = estadoSeleccion.checked;
+    selector.indeterminate = estadoSeleccion.indeterminate;
+    selector.disabled = estadoSeleccion.disabled;
+  }
+
   function renderizarDialogoEdicion(
     usuario,
     permisosUsuario = [],
@@ -1000,13 +1163,13 @@ export async function iniciarUsuariosPage() {
             ${rolesUsuario.length
               ? rolesUsuario.map((rol) => `
                   <span class="usuarios-role-badge is-removable">
-                    ${escapeHtml(rol.nombre)}
+                    ${escapeHtml(nombreVisibleRol(rol.nombre))}
                     <button
                       type="button"
                       data-action="revocar-rol"
                       data-user-id="${usuario.id}"
                       data-role-id="${rol.id ?? ''}"
-                      aria-label="Revocar ${escapeHtml(rol.nombre)}"
+                      aria-label="Revocar ${escapeHtml(nombreVisibleRol(rol.nombre))}"
                       ${rol.id == null ? 'disabled' : ''}
                     >×</button>
                   </span>
@@ -1018,7 +1181,7 @@ export async function iniciarUsuariosPage() {
             <select id="rolParaAsignar" ${rolesDisponibles.length ? '' : 'disabled'}>
               ${rolesDisponibles.length
                 ? rolesDisponibles.map((rol) => `
-                    <option value="${escapeHtml(rol.nombre)}">${escapeHtml(rol.nombre)}</option>
+                    <option value="${escapeHtml(rol.nombre)}">${escapeHtml(nombreVisibleRol(rol.nombre))}</option>
                   `).join('')
                 : '<option>Todos los roles están asignados</option>'}
             </select>
@@ -1163,7 +1326,7 @@ export async function iniciarUsuariosPage() {
   pagina.addEventListener('input', (event) => {
     if (
       event.target.matches?.(
-        '#usuarioForm [name="cedula"], #usuarioForm [name="correo"], #usuarioForm [name="nombres"], #usuarioForm [name="apellido1"]'
+        '#usuarioForm [name="cedula"], #usuarioForm [name="correo"], #usuarioForm [name="nombres"], #usuarioForm [name="apellido1"], #usuarioForm [name="apellido2"]'
       )
     ) {
       event.target.setCustomValidity('');
@@ -1175,6 +1338,49 @@ export async function iniciarUsuariosPage() {
   });
 
   pagina.addEventListener('change', (event) => {
+    const campoCarrera = event.target.closest?.(
+      '#jerarquiaForm .usuarios-alcance',
+    );
+
+    if (
+      campoCarrera &&
+      event.target.name === 'jerarquia-todos-permisos'
+    ) {
+      establecerSeleccionPermisosCarrera(
+        campoCarrera.querySelectorAll('[name="jerarquia-permiso"]'),
+        event.target.checked,
+      );
+
+      if (event.target.checked) {
+        const carrera = campoCarrera.querySelector(
+          '[name="jerarquia-carrera"]',
+        );
+        if (carrera && !carrera.disabled) {
+          carrera.checked = true;
+        }
+      }
+
+      actualizarSeleccionTodosPermisosCarrera(campoCarrera);
+      return;
+    }
+
+    if (
+      campoCarrera &&
+      event.target.name === 'jerarquia-permiso'
+    ) {
+      if (event.target.checked) {
+        const carrera = campoCarrera.querySelector(
+          '[name="jerarquia-carrera"]',
+        );
+        if (carrera && !carrera.disabled) {
+          carrera.checked = true;
+        }
+      }
+
+      actualizarSeleccionTodosPermisosCarrera(campoCarrera);
+      return;
+    }
+
     if (
       event.target.name === 'roles' &&
       dialogo?.open &&
@@ -1194,22 +1400,28 @@ export async function iniciarUsuariosPage() {
     const id = Number(formulario.dataset.userId);
 
     const usuario = {
-      cedula: datos.get('cedula').trim(),
-      nombres: datos.get('nombres').trim(),
-      apellido1: datos.get('apellido1').trim(),
-      apellido2: datos.get('apellido2').trim() || null,
-      correo: datos.get('correo').trim().toLowerCase(),
+      cedula: (datos.get('cedula') || '').trim(),
+      nombres: (datos.get('nombres') || '').trim(),
+      apellido1: (datos.get('apellido1') || '').trim(),
+      apellido2: (datos.get('apellido2') || '').trim() || null,
+      correo: (datos.get('correo') || '').trim().toLowerCase(),
     };
 
     const cedulaInput = formulario.querySelector('[name="cedula"]');
     const correoInput = formulario.querySelector('[name="correo"]');
     const nombresInput = formulario.querySelector('[name="nombres"]');
     const apellido1Input = formulario.querySelector('[name="apellido1"]');
+    const apellido2Input = formulario.querySelector('[name="apellido2"]');
 
     cedulaInput?.setCustomValidity('');
     correoInput?.setCustomValidity('');
     nombresInput?.setCustomValidity('');
     apellido1Input?.setCustomValidity('');
+    apellido2Input?.setCustomValidity('');
+
+    const cedulaRegex = /^[a-zA-Z0-9-]+$/;
+    const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
+    const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     const otrosUsuarios = estado.usuarios.filter(
       (existente) => Number(existente.id) !== id
@@ -1226,24 +1438,41 @@ export async function iniciarUsuariosPage() {
         String(existente.correo ?? '').trim().toLowerCase() === usuario.correo
     );
 
-    if (cedulaDuplicada) {
+    // Validaciones de cédula
+    if (!usuario.cedula) {
+      cedulaInput?.setCustomValidity('La cédula es obligatoria.');
+    } else if (!cedulaRegex.test(usuario.cedula)) {
+      cedulaInput?.setCustomValidity('La cédula solo debe contener letras, números o guiones (sin espacios ni caracteres especiales).');
+    } else if (cedulaDuplicada) {
       cedulaInput?.setCustomValidity('La cédula ya está registrada.');
     }
 
-    if (correoDuplicado) {
+    // Validaciones de correo
+    if (!usuario.correo) {
+      correoInput?.setCustomValidity('El correo electrónico es obligatorio.');
+    } else if (!correoRegex.test(usuario.correo)) {
+      correoInput?.setCustomValidity('Ingrese un correo electrónico válido (ejemplo: usuario@una.cr).');
+    } else if (correoDuplicado) {
       correoInput?.setCustomValidity('El correo ya está registrado.');
     }
 
-    if (!usuario.cedula) {
-      cedulaInput?.setCustomValidity('La cédula es obligatoria.');
-    }
-
+    // Validaciones de nombre
     if (!usuario.nombres) {
       nombresInput?.setCustomValidity('El nombre es obligatorio.');
+    } else if (!nombreRegex.test(usuario.nombres)) {
+      nombresInput?.setCustomValidity('El nombre solo debe contener letras y espacios válidos.');
     }
 
+    // Validaciones de primer apellido
     if (!usuario.apellido1) {
       apellido1Input?.setCustomValidity('El primer apellido es obligatorio.');
+    } else if (!nombreRegex.test(usuario.apellido1)) {
+      apellido1Input?.setCustomValidity('El primer apellido solo debe contener letras.');
+    }
+
+    // Validaciones de segundo apellido (opcional)
+    if (usuario.apellido2 && !nombreRegex.test(usuario.apellido2)) {
+      apellido2Input?.setCustomValidity('El segundo apellido solo debe contener letras.');
     }
 
     if (!formulario.reportValidity()) return;
@@ -1281,7 +1510,6 @@ export async function iniciarUsuariosPage() {
         mensajeResultado(
           await crearUsuario({
             ...usuario,
-            password: datos.get('password'),
             roles,
             permisos: roles.includes(ROLES.ADMIN_GLOBAL)
               ? []
@@ -1290,7 +1518,9 @@ export async function iniciarUsuariosPage() {
           }),
           'No fue posible crear el usuario.',
         );
-        mostrarFeedback('Usuario creado correctamente.');
+        mostrarFeedback(roles.includes(ROLES.COORDINADOR)
+          ? 'Coordinador creado. Configure sus carreras y permisos con el botón de escudo.'
+          : 'Usuario creado. Se envió la invitación a su correo.');
       }
 
 
@@ -1298,6 +1528,32 @@ export async function iniciarUsuariosPage() {
       await cargarUsuarios(false);
     } catch (error) {
       mostrarFeedback(error.message, 'error');
+      boton.disabled = false;
+    }
+  });
+
+  pagina.addEventListener('submit', async (event) => {
+    if (event.target.id !== 'jerarquiaForm') return;
+    event.preventDefault();
+    const formulario = event.target;
+    const boton = formulario.querySelector('[type="submit"]');
+    const carreras = [...formulario.querySelectorAll('.usuarios-alcance')]
+      .filter((campo) => campo.querySelector('[name="jerarquia-carrera"]')?.checked)
+      .map((campo) => ({
+        carreraId: Number(campo.dataset.carreraId),
+        permisos: [...campo.querySelectorAll('[name="jerarquia-permiso"]:checked')].map((input) => input.value),
+      }));
+    try {
+      boton.disabled = true;
+      mensajeResultado(
+        await configurarCoordinadorJerarquia(Number(formulario.dataset.userId), carreras),
+        'No fue posible guardar el alcance del coordinador.',
+      );
+      dialogo.close();
+      mostrarFeedback('Carreras y permisos actualizados.');
+    } catch (error) {
+      mostrarFeedback(error.message, 'error');
+    } finally {
       boton.disabled = false;
     }
   });
@@ -1318,6 +1574,25 @@ export async function iniciarUsuariosPage() {
       try {
         boton.disabled = true;
         await abrirEdicion(id);
+      } catch (error) {
+        mostrarFeedback(error.message, 'error');
+      } finally {
+        boton.disabled = false;
+      }
+      return;
+    }
+
+    if (accion === 'configurar-jerarquia') {
+      try {
+        boton.disabled = true;
+        const [configuracion, auditoria] = await Promise.all([
+          obtenerCoordinadorJerarquia(id),
+          listarAuditoriaJerarquia(id),
+        ]);
+        const datos = mensajeResultado(configuracion, 'No fue posible consultar el alcance.');
+        if (!sigueActiva()) return;
+        const usuario = estado.usuarios.find((item) => Number(item.id) === id);
+        renderizarDialogoJerarquia(usuario, datos.data, auditoria.ok ? auditoria.data : []);
       } catch (error) {
         mostrarFeedback(error.message, 'error');
       } finally {
