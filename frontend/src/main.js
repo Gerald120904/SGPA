@@ -4,12 +4,12 @@ import started from "electron-squirrel-startup";
 
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
+import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 
 const API_URL = process.env.SGPA_API_URL || "http://127.0.0.1:3000";
 let accessToken = null;
 
 const HOSTS_OAUTH_GOOGLE_PERMITIDOS = new Set(["accounts.google.com"]);
-const HOSTS_FORMULARIOS_GOOGLE_PERMITIDOS = new Set(["docs.google.com"]);
 
 function validarUrlExternaGoogle(valor, hostsPermitidos) {
   let url;
@@ -22,6 +22,7 @@ function validarUrlExternaGoogle(valor, hostsPermitidos) {
 
   if (
     url.protocol !== "https:" ||
+    url.port ||
     url.username ||
     url.password ||
     !hostsPermitidos.has(url.hostname.toLowerCase())
@@ -32,6 +33,20 @@ function validarUrlExternaGoogle(valor, hostsPermitidos) {
   return url.toString();
 }
 
+function resolverUrlPublicaFormulario(responderUri) {
+  if (!responderUri || typeof responderUri !== 'string') {
+    throw new Error('URI de respuesta inválida.');
+  }
+
+  const uri = responderUri.trim();
+  if (uri.startsWith('http://') || uri.startsWith('https://')) {
+    return uri;
+  }
+
+  const baseUrl = process.env.SGPA_PUBLIC_URL || API_URL;
+  const pathNormalizado = uri.startsWith('/') ? uri : `/${uri}`;
+  return `${baseUrl.replace(/\/+$/, '')}${pathNormalizado}`;
+}
 
 async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
   if (!accessToken) {
@@ -337,6 +352,9 @@ ipcMain.handle('jerarquia:mis-carreras', async () =>
 
 ipcMain.handle('jerarquia:mis-alcances', async () =>
   ejecutarPeticionAutenticada('/jerarquia-usuarios/mis-alcances'));
+
+ipcMain.handle('jerarquia:asistentes-configuracion', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/asistentes-configuracion'));
 
 ipcMain.handle('jerarquia:catalogo-estudiantes', async () =>
   ejecutarPeticionAutenticada('/jerarquia-usuarios/catalogo-estudiantes'));
@@ -2376,6 +2394,20 @@ ipcMain.handle('formularios-estudiantes:cerrar', async (_event, id) => {
   );
 });
 
+ipcMain.handle('formularios-estudiantes:publicar', async (_event, id) => {
+  return ejecutarPeticionAutenticada(
+    `/formularios-estudiantes/${id}/publicar`,
+    { method: 'POST' },
+  );
+});
+
+ipcMain.handle('formularios-estudiantes:regenerar-token', async (_event, id) => {
+  return ejecutarPeticionAutenticada(
+    `/formularios-estudiantes/${id}/regenerar-token`,
+    { method: 'POST' },
+  );
+});
+
 ipcMain.handle('formularios-estudiantes:respuestas', async (_event, id) => {
   return ejecutarPeticionAutenticada(
     `/formularios-estudiantes/${id}/respuestas`,
@@ -2383,14 +2415,35 @@ ipcMain.handle('formularios-estudiantes:respuestas', async (_event, id) => {
 });
 
 ipcMain.handle(
+  'formularios-estudiantes:obtener-url-publica',
+  async (_event, responderUri) => {
+    try {
+      const url = resolverUrlPublicaFormulario(responderUri);
+      return { ok: true, url };
+    } catch (error) {
+      return { ok: false, message: error.message };
+    }
+  },
+);
+
+ipcMain.handle(
   'formularios-estudiantes:abrir-enlace',
   async (_event, url) => {
-    const urlValidada = validarUrlExternaGoogle(
-      url,
-      HOSTS_FORMULARIOS_GOOGLE_PERMITIDOS,
-    );
-    await shell.openExternal(urlValidada);
-    return { ok: true };
+    try {
+      const urlResuelta = resolverUrlPublicaFormulario(url);
+      const urlValidada = validarUrlExternaFormulario(
+        urlResuelta,
+        process.env.SGPA_PUBLIC_URL || API_URL,
+        process.env.NODE_ENV === 'production',
+      );
+      await shell.openExternal(urlValidada);
+      return { ok: true, url: urlValidada };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error.message || 'No fue posible abrir el enlace.',
+      };
+    }
   },
 );
 

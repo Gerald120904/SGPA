@@ -19,6 +19,11 @@ import { FormulariosEstudiantesController } from './formularios-estudiantes.cont
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
+import { FormulariosPublicosController } from './formularios-publicos.controller';
+import { FormulariosPublicosWebController } from './formularios-publicos-web.controller';
+import { FormulariosPublicosService } from './formularios-publicos.service';
+import { RateLimitPublicoGuard } from './guards/rate-limit-publico.guard';
 import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta-formulario.service';
 
 @Module({
@@ -40,12 +45,19 @@ import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta
     PeriodosAcademicosModule,
     EstructuraAcademicaModule,
   ],
-  controllers: [FormulariosEstudiantesController],
+  controllers: [
+    FormulariosEstudiantesController,
+    FormulariosPublicosController,
+    FormulariosPublicosWebController,
+  ],
   providers: [
     FormulariosEstudiantesService,
     FormulariosEstudiantesSyncService,
     FormulariosEstudiantesAutoSyncService,
     FormulariosEstudiantesProcesamientoService,
+    FormulariosInternosPersistenciaService,
+    FormulariosPublicosService,
+    RateLimitPublicoGuard,
     NormalizadorRespuestaFormularioService,
   ],
   exports: [
@@ -53,6 +65,8 @@ import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta
     FormulariosEstudiantesSyncService,
     FormulariosEstudiantesAutoSyncService,
     FormulariosEstudiantesProcesamientoService,
+    FormulariosInternosPersistenciaService,
+    FormulariosPublicosService,
   ],
 })
 export class FormulariosEstudiantesModule {}

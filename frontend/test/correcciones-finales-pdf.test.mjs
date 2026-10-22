@@ -67,7 +67,7 @@ test('5. Períodos Académicos: conserva el calendario nativo en los tres campos
 
 test('6 y 7. Formularios: Vista previa de cursos completa y animación interactiva con confirmación real', () => {
   const formulariosCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
-  assert.match(formulariosCode, /escapeHtml\(asignatura\.curso\.nombre\)/);
+  assert.match(formulariosCode, /escapeHtml\(asignatura\.curso\?\.nombre \|\| asignatura\.nombreReferencia/);
   assert.match(formulariosCode, /formularios-btn-spinner/);
   assert.match(formulariosCode, /formulariosCreandoNotice/);
   assert.match(formulariosCode, /estaCreando/);

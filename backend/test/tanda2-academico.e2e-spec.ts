@@ -11,6 +11,9 @@ import { PlanEstudio } from '../src/planes-estudio/entities/plan-estudio.entity'
 import { PeriodoAcademico } from '../src/periodos-academicos/entities/periodo-academico.entity';
 import { PlanAsignatura } from '../src/planes-estudio/entities/plan-asignatura.entity';
 import { TipoPlanAsignatura } from '../src/planes-estudio/constants/tipo-plan-asignatura.constant';
+import { GradoAcademico } from '../src/carreras/constants/grado-academico.constant';
+import { EstadoPeriodoAcademico } from '../src/periodos-academicos/constants/estado-periodo-academico.constant';
+import { EstadoEstudiante } from '../src/estudiantes/constants/estado-estudiante.constant';
 import { PlanRequisito } from '../src/planes-estudio/entities/plan-requisito.entity';
 import { TipoRequisito } from '../src/planes-estudio/constants/tipo-requisito.constant';
 import { Usuario } from '../src/usuarios/entities/usuario.entity';
@@ -107,7 +110,6 @@ describe('Tanda 2 — Núcleo Académico de Estudiantes (e2e)', () => {
         usuarioRolRepo.create({
           usuarioId: usuarioAdmin.id,
           rolId: rolAdmin.id,
-          activo: true,
         }),
       );
     }
@@ -157,8 +159,8 @@ describe('Tanda 2 — Núcleo Académico de Estudiantes (e2e)', () => {
           codigo: 'PLAN-TEST-2',
           nombre: 'Plan Test 2',
           carreraId: carrera.id,
+          grado: GradoAcademico.BACHILLERATO,
           activo: true,
-          anioInicio: 2024,
         }),
       );
     } else {
@@ -167,8 +169,8 @@ describe('Tanda 2 — Núcleo Académico de Estudiantes (e2e)', () => {
           codigo: 'PLAN-TEST-1',
           nombre: 'Plan Test 1',
           carreraId: carrera.id,
+          grado: GradoAcademico.BACHILLERATO,
           activo: true,
-          anioInicio: 2022,
         }),
       );
       plan2 = await planRepo.save(
@@ -176,8 +178,8 @@ describe('Tanda 2 — Núcleo Académico de Estudiantes (e2e)', () => {
           codigo: 'PLAN-TEST-2',
           nombre: 'Plan Test 2',
           carreraId: carrera.id,
+          grado: GradoAcademico.BACHILLERATO,
           activo: true,
-          anioInicio: 2024,
         }),
       );
     }
@@ -197,7 +199,7 @@ describe('Tanda 2 — Núcleo Académico de Estudiantes (e2e)', () => {
             fechaInicio: `${anio}-${mesInicio}-01`,
             fechaFin: `${anio}-${mesFin}-30`,
             fechaLimiteDisponibilidad: `${anio}-${mesFin}-15`,
-            activo: true,
+            estado: EstadoPeriodoAcademico.EN_CURSO,
           }),
         );
       }
@@ -316,14 +318,14 @@ describe('Tanda 2 — Núcleo Académico de Estudiantes (e2e)', () => {
           carreraId: carrera.id,
           planEstudioId: plan1.id,
           periodoIngresoId: pIngreso.id,
-          estado: 'ACTIVO',
+          estado: EstadoEstudiante.ACTIVO,
         }),
       );
     } else {
       est.carreraId = carrera.id;
       est.planEstudioId = plan1.id;
       est.periodoIngresoId = pIngreso.id;
-      est.estado = 'ACTIVO';
+      est.estado = EstadoEstudiante.ACTIVO;
       estudiante = await estudianteRepo.save(est);
     }
 

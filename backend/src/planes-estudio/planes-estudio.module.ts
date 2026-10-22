@@ -25,6 +25,7 @@ import { PlanesEstudioService } from './planes-estudio.service';
 import { SalidasAcademicasController } from './salidas-academicas.controller';
 import { SalidasAcademicasService } from './salidas-academicas.service';
 import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
+import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.service';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
     PlanImportacionService,
     PlanReglasOptativasService,
     PlanesAlcanceGuard,
+    MotorRequisitosService,
   ],
   exports: [
     PlanesEstudioService,
@@ -69,6 +71,7 @@ import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
     PlanValidacionesService,
     PlanImportacionService,
     PlanReglasOptativasService,
+    MotorRequisitosService,
   ],
 })
 export class PlanesEstudioModule {}

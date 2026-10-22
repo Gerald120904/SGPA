@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
 
 describe('FormulariosEstudiantesSyncService', () => {
@@ -309,6 +310,15 @@ describe('FormulariosEstudiantesSyncService', () => {
         service.sincronizarFormulario({
           ...mockFormulario,
           googleFormId: null,
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('sincronizarFormulario falla con BadRequestException si el proveedor es INTERNO', async () => {
+      await expect(
+        service.sincronizarFormulario({
+          ...mockFormulario,
+          proveedor: ProveedorFormulario.INTERNO,
         } as any),
       ).rejects.toThrow(BadRequestException);
     });

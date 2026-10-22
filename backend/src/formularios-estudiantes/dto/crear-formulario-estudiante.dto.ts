@@ -1,11 +1,14 @@
 import { Transform } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsPositive,
   IsString,
   MaxLength,
 } from 'class-validator';
+import { ProveedorFormulario } from '../constants/proveedor-formulario.constant';
 
 export class CrearFormularioEstudianteDto {
   @Transform(({ value }) =>
@@ -31,4 +34,8 @@ export class CrearFormularioEstudianteDto {
   @IsInt()
   @IsPositive()
   planEstudioId!: number;
+
+  @IsOptional()
+  @IsEnum(ProveedorFormulario)
+  proveedor?: ProveedorFormulario;
 }

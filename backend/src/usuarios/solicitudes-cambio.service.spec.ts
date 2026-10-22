@@ -17,7 +17,8 @@ describe('SolicitudesCambioService', () => {
   let alcance: { puedeEjecutar: jest.Mock; puedeAdministrarAsistente: jest.Mock };
   let estudiantes: { crearDesdeSolicitud: jest.Mock; obtenerPorId: jest.Mock;
     huellaEstudiante: jest.Mock; actualizarDesdeSolicitud: jest.Mock;
-    cambiarEstadoDesdeSolicitud: jest.Mock };
+    cambiarEstadoDesdeSolicitud: jest.Mock; cambiarPlanDesdeSolicitud: jest.Mock;
+    registrarResultadoDesdeSolicitud: jest.Mock };
   let service: SolicitudesCambioService;
   let cursos: { contextoCreacion: jest.Mock; obtenerCursoCompleto: jest.Mock;
     huellaCurso: jest.Mock; validarDelegacionCompleta: jest.Mock; crearDesdeSolicitud: jest.Mock;
@@ -498,7 +499,7 @@ describe('SolicitudesCambioService', () => {
     await service.aprobar(1, crear.id);
     expect(optativas.crearDesdeSolicitud).toHaveBeenCalledWith(expect.anything(), 10, dtoCrear);
 
-    const actu = await service.proponerActualizarOptativa(3, 501, { nombre: 'Seguridad de Redes' });
+    const actu = await service.proponerActualizarOptativa(3, 501, { descripcion: 'Seguridad de Redes' });
     expect(actu.operacion).toBe('ACTUALIZAR');
     expect(actu.huellaOriginal).toBe('g'.repeat(64));
     await service.aprobar(1, actu.id);
@@ -506,7 +507,7 @@ describe('SolicitudesCambioService', () => {
       expect.anything(),
       10,
       501,
-      expect.objectContaining({ nombre: 'Seguridad de Redes' }),
+      expect.objectContaining({ descripcion: 'Seguridad de Redes' }),
       'g'.repeat(64),
     );
 

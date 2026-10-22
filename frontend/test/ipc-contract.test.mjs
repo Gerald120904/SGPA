@@ -213,7 +213,7 @@ test('se conservan las integraciones nuevas de carreras del profesor', () => {
   );
 });
 
-test('shell.openExternal solo recibe URLs de Google validadas', () => {
+test('shell.openExternal recibe URLs de OAuth o formularios validadas', () => {
   const calls = [...mainSource.matchAll(/shell\.openExternal\(([^)]+)\)/g)].map(
     (match) => match[1].trim(),
   );
@@ -221,7 +221,8 @@ test('shell.openExternal solo recibe URLs de Google validadas', () => {
   assert.deepEqual(calls, ['urlValidada', 'urlValidada']);
   assert.match(mainSource, /url\.protocol !== ["']https:["']/);
   assert.match(mainSource, /HOSTS_OAUTH_GOOGLE_PERMITIDOS/);
-  assert.match(mainSource, /HOSTS_FORMULARIOS_GOOGLE_PERMITIDOS/);
+  assert.match(mainSource, /validarUrlExternaFormulario\(\s*urlResuelta,/);
+  assert.match(mainSource, /SGPA_PUBLIC_URL \|\| API_URL/);
 });
 
 test('cada API de Electron utilizada en main está importada', () => {

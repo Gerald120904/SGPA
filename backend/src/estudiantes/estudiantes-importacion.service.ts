@@ -96,11 +96,25 @@ export class EstudiantesImportacionService {
     );
   }
 
+  async ejecutarDesdeFormulario(
+    usuarioId: number,
+    dto: ImportarEstudiantesDto,
+    fuente: FuenteRegistroAcademico = FuenteRegistroAcademico.FORMULARIO_INTERNO,
+    manager?: EntityManager,
+  ) {
+    return this.ejecutarConFuente(
+      usuarioId,
+      dto,
+      fuente,
+      manager,
+    );
+  }
+
   async ejecutarDesdeGoogleForms(
     usuarioId: number,
     dto: ImportarEstudiantesDto,
   ) {
-    return this.ejecutarConFuente(
+    return this.ejecutarDesdeFormulario(
       usuarioId,
       dto,
       FuenteRegistroAcademico.GOOGLE_FORMS,
@@ -111,6 +125,7 @@ export class EstudiantesImportacionService {
     usuarioId: number,
     dto: ImportarEstudiantesDto,
     fuente: FuenteRegistroAcademico,
+    managerExterno?: EntityManager,
   ) {
     if (this.alcanceJerarquico) {
       const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
@@ -142,7 +157,7 @@ export class EstudiantesImportacionService {
     let aprobacionesNuevas = 0;
 
     if (procesables.length) {
-      await this.dataSource.transaction(async (manager) => {
+      const importar = async (manager: EntityManager) => {
         const estudiantes = manager.getRepository(Estudiante);
         const historiales = manager.getRepository(HistorialAcademicoEstudiante);
         for (const fila of procesables) {
@@ -175,7 +190,12 @@ export class EstudiantesImportacionService {
             aprobacionesNuevas += 1;
           }
         }
-      });
+      };
+      if (managerExterno) {
+        await importar(managerExterno);
+      } else {
+        await this.dataSource.transaction(importar);
+      }
     }
 
     return {

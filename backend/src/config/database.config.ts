@@ -4,6 +4,7 @@ import { AddOptativeRuleCounts2026101500000 } from '../migrations/2026101500000-
 import { AddAulaEquipmentInventory2026101600000 } from '../migrations/2026101600000-AddAulaEquipmentInventory';
 import { AddInvitationOutbox2026101700000 } from '../migrations/2026101700000-AddInvitationOutbox';
 import { AddHierarchicalAccess2026101900000 } from '../migrations/2026101900000-AddHierarchicalAccess';
+import { AddInternalFormSupport2026102100000 } from '../migrations/2026102100000-AddInternalFormSupport';
 
 const TEST_DATABASE = 'sgpa_test';
 
@@ -58,6 +59,7 @@ export function crearConfiguracionBaseDatos(
       AddAulaEquipmentInventory2026101600000,
       AddInvitationOutbox2026101700000,
       AddHierarchicalAccess2026101900000,
+      AddInternalFormSupport2026102100000,
     ],
     migrationsRun: false,
   };

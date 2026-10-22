@@ -9,13 +9,32 @@ describe('runner de migraciones QA-004 y QA-005', () => {
   const qa005 = { name: 'AddAulaEquipmentInventory2026101600000' };
   const outbox = { name: 'AddInvitationOutbox2026101700000' };
   const jerarquia = { name: 'AddHierarchicalAccess2026101900000' };
+  const formularioInterno = { name: 'AddInternalFormSupport2026102100000' };
   const ajena = { name: 'MigrationUnexpected2026101400000' };
 
-  it('acepta únicamente QA-004, QA-005, Outbox y Jerarquía configuradas y pendientes', () => {
-    expect(() => assertQa004Qa005Configured([qa004, qa005, outbox, jerarquia])).not.toThrow();
+  it('acepta únicamente QA-004, QA-005, Outbox, Jerarquía y Formulario Interno configuradas y pendientes', () => {
+    expect(() =>
+      assertQa004Qa005Configured([
+        qa004,
+        qa005,
+        outbox,
+        jerarquia,
+        formularioInterno,
+      ]),
+    ).not.toThrow();
     expect(() => assertOnlyQa004Qa005Pending([qa005])).not.toThrow();
-    expect(() => assertOnlyQa004Qa005Pending([outbox, jerarquia])).not.toThrow();
-    expect(() => assertOnlyQa004Qa005Pending([qa004, qa005, outbox, jerarquia])).not.toThrow();
+    expect(() =>
+      assertOnlyQa004Qa005Pending([outbox, jerarquia, formularioInterno]),
+    ).not.toThrow();
+    expect(() =>
+      assertOnlyQa004Qa005Pending([
+        qa004,
+        qa005,
+        outbox,
+        jerarquia,
+        formularioInterno,
+      ]),
+    ).not.toThrow();
     expect(() => assertOnlyQa004Qa005Pending([])).not.toThrow();
   });
 

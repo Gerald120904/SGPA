@@ -106,6 +106,32 @@ describe('EstudiantesImportacionService', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
+  it('resuelve una optativa sin Curso por su código de referencia', async () => {
+    asignaturaRepository.find.mockResolvedValue([{
+      id: 5, planEstudioId: 2, cursoId: null, curso: null,
+      codigoReferencia: 'OPT-101', activo: true,
+    } as PlanAsignatura]);
+    const entrada = dto();
+    entrada.estudiantes[0].asignaturasAprobadas = ['opt-101'];
+    const resultado = await service.validar(9, entrada);
+    expect(resultado.resumen.errores).toBe(0);
+    expect(resultado.filas[0].aprobacionesNuevas).toEqual([{
+      codigo: 'OPT-101', planAsignaturaId: 5,
+    }]);
+  });
+
+  it('envía a revisión referencias duplicadas en un mismo plan', async () => {
+    asignaturaRepository.find.mockResolvedValue([5, 6].map((id) => ({
+      id, planEstudioId: 2, cursoId: null, curso: null,
+      codigoReferencia: 'OPT-101', activo: true,
+    } as PlanAsignatura)));
+    const entrada = dto();
+    entrada.estudiantes[0].asignaturasAprobadas = ['OPT-101'];
+    const resultado = await service.validar(9, entrada);
+    expect(resultado.filas[0].accion).toBe('ERROR');
+    expect(resultado.filas[0].errores).toContain('La asignatura OPT-101 es ambigua dentro del plan.');
+  });
+
   it('devuelve los datos normalizados necesarios para la previsualización', async () => {
     const resultado = await service.validar(9, dto());
     expect(resultado.filas[0]).toMatchObject({
@@ -298,7 +324,7 @@ describe('EstudiantesImportacionService', () => {
     const save = jest.fn(async (valor) => ({ ...valor, id: 20 }));
     const create = jest.fn((valor) => valor);
     const update = jest.fn();
-    dataSource.transaction.mockImplementation(async (callback) =>
+    dataSource.transaction.mockImplementation(async (callback: any) =>
       callback({
         getRepository: (entity: unknown) =>
           entity === Estudiante ? { save, create, update } : { save, create },
@@ -323,7 +349,7 @@ describe('EstudiantesImportacionService', () => {
     const save = jest.fn(async (valor) => ({ ...valor, id: 20 }));
     const create = jest.fn((valor) => valor);
     const update = jest.fn();
-    dataSource.transaction.mockImplementation(async (callback) =>
+    dataSource.transaction.mockImplementation(async (callback: any) =>
       callback({
         getRepository: (entity: unknown) =>
           entity === Estudiante ? { save, create, update } : { save, create },
@@ -340,6 +366,32 @@ describe('EstudiantesImportacionService', () => {
         periodoId: null,
         resultado: ResultadoAcademico.APROBADO,
         fuenteRegistro: FuenteRegistroAcademico.GOOGLE_FORMS,
+      }),
+    );
+  });
+
+  it('usa el gestor transaccional recibido desde Formularios sin abrir otra transacción', async () => {
+    const save = jest.fn(async (valor) => ({ ...valor, id: 20 }));
+    const create = jest.fn((valor) => valor);
+    const manager = {
+      getRepository: (entity: unknown) =>
+        entity === Estudiante
+          ? { save, create, update: jest.fn() }
+          : { save, create },
+    };
+
+    const resultado = await service.ejecutarDesdeFormulario(
+      9,
+      dto(),
+      FuenteRegistroAcademico.FORMULARIO_INTERNO,
+      manager as never,
+    );
+
+    expect(resultado.aprobacionesNuevas).toBe(1);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fuenteRegistro: FuenteRegistroAcademico.FORMULARIO_INTERNO,
       }),
     );
   });
@@ -393,7 +445,7 @@ describe('EstudiantesImportacionService', () => {
       } as HistorialAcademicoEstudiante,
     ]);
     const save = jest.fn(async (valor) => ({ ...valor, id: 8 }));
-    dataSource.transaction.mockImplementation(async (callback) =>
+    dataSource.transaction.mockImplementation(async (callback: any) =>
       callback({
         getRepository: () => ({
           save,
@@ -428,7 +480,7 @@ describe('EstudiantesImportacionService', () => {
     }));
     const create = jest.fn((valor) => valor);
     const update = jest.fn();
-    dataSource.transaction.mockImplementation(async (callback) =>
+    dataSource.transaction.mockImplementation(async (callback: any) =>
       callback({
         getRepository: (entity: unknown) =>
           entity === Estudiante

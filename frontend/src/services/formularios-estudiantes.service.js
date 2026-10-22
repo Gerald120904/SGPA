@@ -130,6 +130,24 @@ export async function cerrarFormularioEstudiantes(id) {
     .cerrarFormularioEstudiantes(id);
 }
 
+export async function publicarFormularioEstudiantes(id) {
+  validarApi(
+    'publicarFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .publicarFormularioEstudiantes(id);
+}
+
+export async function regenerarTokenFormularioEstudiantes(id) {
+  validarApi(
+    'regenerarTokenFormularioEstudiantes'
+  );
+
+  return window.sgpa
+    .regenerarTokenFormularioEstudiantes(id);
+}
+
 export async function listarRespuestasFormularioEstudiantes(
   id
 ) {
@@ -153,5 +171,18 @@ export async function abrirEnlaceFormularioEstudiantes(
   return window.sgpa
     .abrirEnlaceFormularioEstudiantes(
       url
+    );
+}
+
+export async function obtenerUrlPublicaFormulario(
+  responderUri
+) {
+  validarApi(
+    'obtenerUrlPublicaFormulario'
+  );
+
+  return window.sgpa
+    .obtenerUrlPublicaFormulario(
+      responderUri
     );
 }

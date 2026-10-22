@@ -1,4 +1,5 @@
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { FormulariosEstudiantesAutoSyncService } from './formularios-estudiantes-auto-sync.service';
 
 describe('FormulariosEstudiantesAutoSyncService', () => {
@@ -35,16 +36,18 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
     jest.clearAllMocks();
   });
 
-  it('sincroniza todos los formularios PUBLICADOS', async () => {
+  it('sincroniza únicamente formularios PUBLICADOS con proveedor GOOGLE_FORMS', async () => {
     const form1 = {
       id: 1,
       creadoPorUsuarioId: 10,
       estado: EstadoFormularioEstudiante.PUBLICADO,
+      proveedor: ProveedorFormulario.GOOGLE_FORMS,
     };
     const form2 = {
       id: 2,
       creadoPorUsuarioId: 20,
       estado: EstadoFormularioEstudiante.PUBLICADO,
+      proveedor: ProveedorFormulario.GOOGLE_FORMS,
     };
 
     formularioRepository.find.mockResolvedValue([form1, form2]);
@@ -57,6 +60,7 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
     expect(formularioRepository.find).toHaveBeenCalledWith({
       where: {
         estado: EstadoFormularioEstudiante.PUBLICADO,
+        proveedor: ProveedorFormulario.GOOGLE_FORMS,
       },
     });
     expect(syncService.sincronizarFormulario).toHaveBeenNthCalledWith(1, form1);
@@ -120,5 +124,12 @@ describe('FormulariosEstudiantesAutoSyncService', () => {
     await Promise.all([promesa1, promesa2]);
 
     expect(formularioRepository.find).toHaveBeenCalledTimes(1);
+  });
+
+  it('captura errores de base de datos en consulta sin propagar excepción', async () => {
+    formularioRepository.find.mockRejectedValue(new Error('Unknown column proveedor'));
+
+    await expect(service.sincronizarAutomaticamente()).resolves.toBeUndefined();
+    expect(syncService.sincronizarFormulario).not.toHaveBeenCalled();
   });
 });
