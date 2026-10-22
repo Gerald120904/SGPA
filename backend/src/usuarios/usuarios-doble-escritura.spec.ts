@@ -432,7 +432,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
     permisosService.activarPoliticaOpcionB(true);
 
     // Usuario 30 tiene rol PROFESOR y dos excepciones:
-    // CONCEDER: AULAS_CREAR (fuera de plantilla)
+    // CONCEDER: AULAS_ASIGNAR (fuera de plantilla)
     // DENEGAR: PERIODOS_VER (en plantilla de profesor)
     usuariosDb.set(30, {
       id: 30,
@@ -443,7 +443,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
     });
     usuarioRolesDb.push({ usuarioId: 30, rolId: 3 });
     excepcionesDb.push(
-      { usuarioId: 30, permiso: PermisoSistema.AULAS_CREAR, tipo: 'CONCEDER' },
+      { usuarioId: 30, permiso: PermisoSistema.AULAS_ASIGNAR, tipo: 'CONCEDER' },
       { usuarioId: 30, permiso: PermisoSistema.PERIODOS_VER, tipo: 'DENEGAR' },
     );
 
@@ -455,7 +455,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
       .map((up) => up.permiso);
 
     // Excepción CONCEDER respetada
-    expect(permisosTrasAsignar).toContain(PermisoSistema.AULAS_CREAR);
+    expect(permisosTrasAsignar).toContain(PermisoSistema.AULAS_ASIGNAR);
     // Excepción DENEGAR prevalece incluso con COORDINADOR
     expect(permisosTrasAsignar).not.toContain(PermisoSistema.PERIODOS_VER);
 
@@ -467,7 +467,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
       .map((up) => up.permiso);
 
     // Sigue respetando CONCEDER y DENEGAR
-    expect(permisosTrasRevocar).toContain(PermisoSistema.AULAS_CREAR);
+    expect(permisosTrasRevocar).toContain(PermisoSistema.AULAS_ASIGNAR);
     expect(permisosTrasRevocar).not.toContain(PermisoSistema.PERIODOS_VER);
     expect(permisosTrasRevocar).not.toContain(PermisoSistema.PERIODOS_GESTIONAR);
   });
@@ -583,7 +583,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
       roles: [RolSistema.PROFESOR],
       permisos: [
         PermisoSistema.AULAS_VER, // en plantilla
-        PermisoSistema.AULAS_CREAR, // custom CONCEDER (fuera de plantilla)
+        PermisoSistema.AULAS_ASIGNAR, // custom CONCEDER (fuera de plantilla)
         // omitió PERIODOS_VER (en plantilla) -> custom DENEGAR
       ],
     };
@@ -592,7 +592,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
 
     // Excepciones generadas
     const excUsuario = excepcionesDb.filter((e) => e.usuarioId === creado.id);
-    const concedida = excUsuario.find((e) => e.permiso === PermisoSistema.AULAS_CREAR);
+    const concedida = excUsuario.find((e) => e.permiso === PermisoSistema.AULAS_ASIGNAR);
     const denegada = excUsuario.find((e) => e.permiso === PermisoSistema.PERIODOS_VER);
 
     expect(concedida?.tipo).toBe('CONCEDER');
@@ -604,7 +604,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
       .map((up) => up.permiso);
 
     expect(permisosLegacy).toContain(PermisoSistema.AULAS_VER);
-    expect(permisosLegacy).toContain(PermisoSistema.AULAS_CREAR);
+    expect(permisosLegacy).toContain(PermisoSistema.AULAS_ASIGNAR);
     expect(permisosLegacy).not.toContain(PermisoSistema.PERIODOS_VER);
   });
 

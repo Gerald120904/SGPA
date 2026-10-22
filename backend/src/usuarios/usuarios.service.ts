@@ -212,7 +212,8 @@ export class UsuariosService {
     }
   }
 
-  async crearConInvitacion(dto: CrearUsuarioDto, despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>) {
+  async crearConInvitacion(dto: CrearUsuarioDto, despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>,
+    opciones: { respetarConfiguracionEnvio?: boolean; incluirEstadoInvitacion?: boolean } = {}) {
     const url = this.origenInvitacion();
     await this.invitaciones!.verificarDestino();
     const token = randomBytes(32).toString('hex');
@@ -225,7 +226,7 @@ export class UsuariosService {
       { tokenHash: createHash('sha256').update(token).digest('hex'),
         expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
         url: url.toString() },
-      despuesDeCrear,
+      despuesDeCrear, opciones,
     );
   }
 
@@ -233,6 +234,7 @@ export class UsuariosService {
     dto: CrearUsuarioDto,
     invitacion?: { tokenHash: string; expiresAt: Date; url: string },
     despuesDeCrear?: (manager: EntityManager, usuarioId: number) => Promise<void>,
+    opciones: { respetarConfiguracionEnvio?: boolean; incluirEstadoInvitacion?: boolean } = {},
   ) {
     if (!dto.password) {
       throw new BadRequestException('La contraseña es obligatoria.');
@@ -418,15 +420,22 @@ export class UsuariosService {
       this.relanzarErrorPersistencia(error);
     }
 
-    if (invitacion) {
+    let estadoInvitacion: 'PENDIENTE' | 'ENVIADA' = 'PENDIENTE';
+    const envioHabilitado = !opciones.respetarConfiguracionEnvio ||
+      process.env.SGPA_INVITATION_OUTBOX_ENABLED === 'true';
+    if (invitacion && envioHabilitado) {
       const enviado = await this.invitaciones!.procesarUsuario(usuarioId);
       if (enviado !== 'ENVIADA') {
         throw new ServiceUnavailableException(
           'Usuario inactivo registrado; la invitación requiere recuperación administrativa.',
         );
       }
+      estadoInvitacion = 'ENVIADA';
     }
-    return this.obtenerPorId(usuarioId);
+    const usuario = await this.obtenerPorId(usuarioId);
+    return opciones.incluirEstadoInvitacion
+      ? { ...usuario, invitacion: { estado: estadoInvitacion } }
+      : usuario;
   }
 
   async reintentarInvitacion(id: number) {

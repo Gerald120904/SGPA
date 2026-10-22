@@ -352,6 +352,31 @@ describe('UsuariosService', () => {
     expect(invitaciones.crearPendiente).toHaveBeenCalledTimes(1);
   });
 
+  it('conserva la invitación pendiente cuando el envío automático está deshabilitado', async () => {
+    const anterior = process.env.SGPA_INVITATION_OUTBOX_ENABLED;
+    try {
+      process.env.SGPA_INVITATION_OUTBOX_ENABLED = 'false';
+      usuarioRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(crearUsuario({ activo: false }));
+      txRolRepository.find.mockResolvedValue([rolAdmin]);
+      txUsuarioRepository.save.mockImplementation(async (usuario) => ({ ...usuario, id: 1 }));
+
+      const resultado = await service.crearConInvitacion({
+        cedula: '222222222', nombres: 'Invitada', apellido1: 'Prueba',
+        correo: 'invitada@sgpa.local', roles: [RolSistema.ADMIN_GLOBAL],
+      }, undefined, { respetarConfiguracionEnvio: true, incluirEstadoInvitacion: true });
+
+      expect(invitaciones.crearPendiente).toHaveBeenCalledTimes(1);
+      expect(invitaciones.procesarUsuario).not.toHaveBeenCalled();
+      expect((resultado as any).invitacion).toEqual({ estado: 'PENDIENTE' });
+    } finally {
+      if (anterior === undefined) delete process.env.SGPA_INVITATION_OUTBOX_ENABLED;
+      else process.env.SGPA_INVITATION_OUTBOX_ENABLED = anterior;
+    }
+  });
+
   it.each([
     ['http://127.0.0.1:3000', 'production'],
     ['https://127.0.0.2:3000', 'production'],
