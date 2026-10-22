@@ -23,56 +23,67 @@ import { obtenerCoordinadorJerarquia, configurarCoordinadorJerarquia, listarAudi
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 import { confirmarAccion } from '../../utils/confirm.js';
+import { DataTable } from '../../components/DataTable.js';
+import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
+import { StatCard } from '../../components/StatCard.js';
+import { StatusBadge } from '../../components/StatusBadge.js';
 
 let instanciaActual = 0;
 
 export function UsuariosPage() {
   return `
-    <section
-      id="usuariosPage"
-      class="module-view usuarios-page"
-    >
-      <div class="usuarios-toolbar">
-        <div>
+    <section id="usuariosPage" class="module-view usuarios-page">
+      <header class="usuarios-toolbar sgpa-toolbar">
+        <div class="usuarios-heading">
+          <span class="usuarios-eyebrow">Administración institucional</span>
           <h2>Usuarios</h2>
-          <p>Administración de cuentas, roles y accesos del SGPA.</p>
+          <p>Gestión de cuentas, roles y accesos al Sistema de Gestión y Proyección Académica.</p>
         </div>
 
-        <button
-          id="nuevoUsuarioButton"
-          class="usuarios-primary-button"
-          type="button"
-        >
+        <button id="nuevoUsuarioButton" class="usuarios-primary-button"
+          type="button">
           <i data-lucide="user-plus" aria-hidden="true"></i>
-          Nuevo usuario
+          <span>Nuevo usuario</span>
         </button>
-      </div>
+      </header>
 
-      <div
-        id="usuariosFeedback"
-        class="usuarios-feedback hidden"
-        role="status"
-      ></div>
+      <div id="usuariosFeedback" class="usuarios-feedback hidden" role="status"
+        aria-live="polite"></div>
 
-      <label class="usuarios-search" for="usuariosBuscar">
-        <i data-lucide="search" aria-hidden="true"></i>
-        <input
-          id="usuariosBuscar"
-          type="search"
-          placeholder="Buscar por nombre, cédula, correo o rol..."
-          autocomplete="off"
-        >
-      </label>
+      <div id="usuariosResumen" class="usuarios-resumen" aria-label="Resumen de usuarios"></div>
 
-      <div
-        id="usuariosContent"
-        class="usuarios-content"
-        aria-live="polite"
-      >
-        <div class="usuarios-message">Cargando usuarios...</div>
-      </div>
+      <section class="usuarios-panel" aria-label="Directorio de usuarios">
+        <div class="usuarios-panel-header">
+          <div class="usuarios-panel-title">
+            <span class="usuarios-panel-icon" aria-hidden="true">
+              <i data-lucide="users"></i>
+            </span>
+            <div>
+              <h3>Directorio institucional</h3>
+              <p>Consulte usuarios, roles asignados y estado de las cuentas.</p>
+            </div>
+          </div>
+          <span id="usuariosContador" class="usuarios-result-count" aria-live="polite"></span>
+        </div>
 
-      <dialog id="usuarioDialog" class="usuario-dialog">
+        <div class="usuarios-filtros">
+          <label class="usuarios-search sgpa-search" for="usuariosBuscar">
+            <i data-lucide="search" aria-hidden="true"></i>
+            <input id="usuariosBuscar" type="search"
+              placeholder="Buscar por nombre, cédula, correo o rol..."
+              autocomplete="off">
+          </label>
+        </div>
+
+        <div id="usuariosContent" class="usuarios-content" aria-live="polite">
+          <div class="usuarios-message">
+            <i data-lucide="loader-circle" aria-hidden="true"></i>
+            <span>Cargando usuarios...</span>
+          </div>
+        </div>
+      </section>
+
+      <dialog id="usuarioDialog" class="sgpa-form-dialog sgpa-form-dialog-lg usuario-dialog">
         <div id="usuarioDialogContent"></div>
       </dialog>
     </section>
@@ -350,6 +361,40 @@ export async function iniciarUsuariosPage() {
   const dialogo = pagina.querySelector('#usuarioDialog');
   const dialogoContenido = pagina.querySelector('#usuarioDialogContent');
 
+  // Presentación reutilizable. Los identificadores y eventos siguen siendo los originales.
+  function mostrarFormularioUsuario({ formId, title, description, body, footerHtml, userId }) {
+    dialogoContenido.innerHTML = FormDialog({
+      formId,
+      title,
+      description,
+      body,
+      footerHtml,
+      layout: 'custom',
+      bodyClass: 'usuario-dialog-body',
+      formClass: 'usuario-form',
+    });
+
+    if (userId != null) {
+      dialogoContenido.querySelector(`#${formId}`).dataset.userId = String(userId);
+    }
+
+    // El formulario de datos personales muestra los errores al lado de cada input.
+    // No afecta a jerarquía, permisos ni a otros FormDialog del SGPA.
+    if (formId === 'usuarioForm') {
+      dialogoContenido.querySelector('#usuarioForm').noValidate = true;
+    }
+
+    dialogoContenido.querySelector('.sgpa-form-header')?.insertAdjacentHTML(
+      'beforeend',
+      `<button class="usuarios-close-button" type="button"
+        data-action="cerrar-dialogo" aria-label="Cerrar formulario" title="Cerrar">
+        <i data-lucide="x" aria-hidden="true"></i>
+      </button>`,
+    );
+    renderizarIconos();
+    if (!dialogo.open) dialogo.showModal();
+  }
+
   function renderizarOpcionesCarreras(
     seleccionados = new Set(),
   ) {
@@ -552,6 +597,27 @@ export async function iniciarUsuariosPage() {
   function renderizarTabla() {
     if (!contenido || !sigueActiva()) return;
 
+    const total = estado.usuarios.length;
+    const activos = estado.usuarios.filter((usuario) => usuario.activo).length;
+    const inactivos = total - activos;
+    const coordinadores = estado.usuarios.filter((usuario) =>
+      obtenerRoles(usuario).some((rol) => rol.nombre === ROLES.COORDINADOR)
+    ).length;
+
+    const resumen = pagina.querySelector('#usuariosResumen');
+    if (resumen) {
+      resumen.innerHTML = [
+        StatCard({ icon: 'users', title: 'Usuarios registrados',
+          value: String(total), description: 'Cuentas en el directorio' }),
+        StatCard({ icon: 'circle-check', title: 'Cuentas activas',
+          value: String(activos), description: 'Accesos habilitados' }),
+        StatCard({ icon: 'circle-pause', title: 'Cuentas inactivas',
+          value: String(inactivos), description: 'Accesos deshabilitados' }),
+        StatCard({ icon: 'shield-check', title: 'Coordinadores',
+          value: String(coordinadores), description: 'Con rol de coordinación' }),
+      ].join('');
+    }
+
     const termino = estado.filtro.trim().toLowerCase();
     const usuarios = estado.usuarios.filter((usuario) => {
       const texto = [
@@ -564,59 +630,66 @@ export async function iniciarUsuariosPage() {
       return texto.includes(termino);
     });
 
+    const contador = pagina.querySelector('#usuariosContador');
+    if (contador) {
+      contador.textContent = termino
+        ? `${usuarios.length} de ${total} usuarios`
+        : `${total} ${total === 1 ? 'usuario' : 'usuarios'}`;
+    }
+
     const filas = usuarios.map((usuario) => {
       const roles = obtenerRoles(usuario);
+      const nombre = obtenerNombreCompleto(usuario);
+      const inicial = nombre.trim().charAt(0).toUpperCase() || 'U';
       const badges = roles.length
         ? roles.map((rol) => `
-            <span
-              class="usuarios-role-badge"
-              title="${escapeHtml(rol.descripcion || rol.nombre)}"
-            >${escapeHtml(nombreVisibleRol(rol.nombre))}</span>
+            <span title="${escapeHtml(rol.descripcion || rol.nombre)}">
+              ${StatusBadge({
+                label: nombreVisibleRol(rol.nombre),
+                tone: rol.nombre === ROLES.ADMIN_GLOBAL ? 'danger'
+                  : rol.nombre === ROLES.COORDINADOR ? 'warning'
+                  : rol.nombre === ROLES.PROFESOR ? 'info' : 'neutral',
+              })}
+            </span>
           `).join('')
         : '<span class="usuarios-no-role">Sin rol asignado</span>';
 
       return `
         <tr>
-          <td>${escapeHtml(usuario.cedula)}</td>
+          <td><span class="usuarios-cedula">${escapeHtml(usuario.cedula)}</span></td>
           <td>
-            <strong>${escapeHtml(obtenerNombreCompleto(usuario))}</strong>
+            <div class="usuarios-persona">
+              <span class="usuarios-avatar" aria-hidden="true">${escapeHtml(inicial)}</span>
+              <strong>${escapeHtml(nombre)}</strong>
+            </div>
           </td>
-          <td>${escapeHtml(usuario.correo)}</td>
+          <td><span class="usuarios-correo">${escapeHtml(usuario.correo)}</span></td>
           <td><div class="usuarios-role-list">${badges}</div></td>
-          <td>
-            <span class="usuarios-status ${usuario.activo ? 'is-active' : 'is-inactive'}">
-              ${usuario.activo ? 'Activo' : 'Inactivo'}
-            </span>
-          </td>
+          <td>${StatusBadge({
+            label: usuario.activo ? 'Activo' : 'Inactivo',
+            tone: usuario.activo ? 'success' : 'neutral',
+          })}</td>
           <td>
             <div class="usuarios-actions">
-              <button
-                class="usuarios-icon-button"
-                type="button"
-                data-action="editar"
-                data-user-id="${usuario.id}"
-                aria-label="Editar ${escapeHtml(obtenerNombreCompleto(usuario))}"
-                title="Editar usuario"
-              >
+              <button class="usuarios-icon-button" type="button"
+                data-action="editar" data-user-id="${usuario.id}"
+                aria-label="Editar ${escapeHtml(nombre)}" title="Editar usuario">
                 <i data-lucide="pencil" aria-hidden="true"></i>
               </button>
               ${roles.some((rol) => rol.nombre === ROLES.COORDINADOR) ? `
                 <button class="usuarios-icon-button" type="button"
                   data-action="configurar-jerarquia" data-user-id="${usuario.id}"
-                  aria-label="Configurar carreras y permisos de ${escapeHtml(obtenerNombreCompleto(usuario))}"
+                  aria-label="Configurar carreras y permisos de ${escapeHtml(nombre)}"
                   title="Carreras y permisos por carrera">
                   <i data-lucide="shield-check" aria-hidden="true"></i>
                 </button>
               ` : ''}
               <button
                 class="usuarios-icon-button ${usuario.activo ? 'is-danger' : 'is-success'}"
-                type="button"
-                data-action="estado"
-                data-user-id="${usuario.id}"
+                type="button" data-action="estado" data-user-id="${usuario.id}"
                 data-active="${usuario.activo}"
                 aria-label="${usuario.activo ? 'Desactivar' : 'Activar'} usuario"
-                title="${usuario.activo ? 'Desactivar' : 'Activar'}"
-              >
+                title="${usuario.activo ? 'Desactivar' : 'Activar'}">
                 <i data-lucide="power" aria-hidden="true"></i>
               </button>
             </div>
@@ -625,40 +698,29 @@ export async function iniciarUsuariosPage() {
       `;
     }).join('');
 
-    contenido.innerHTML = `
-      <div class="usuarios-table-wrap">
-        <table class="usuarios-table">
-          <thead>
-            <tr>
-              <th>Cédula</th>
-              <th>Nombre</th>
-              <th>Correo</th>
-              <th>Roles</th>
-              <th>Estado</th>
-              <th><span class="sr-only">Acciones</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filas || `
-              <tr>
-                <td class="usuarios-empty" colspan="6">
-                  ${termino
-                    ? 'No hay usuarios que coincidan con la búsqueda.'
-                    : 'No hay usuarios registrados.'}
-                </td>
-              </tr>
-            `}
-          </tbody>
-        </table>
-      </div>
-    `;
+    contenido.innerHTML = DataTable({
+      columns: [
+        { label: 'Cédula' },
+        { label: 'Usuario' },
+        { label: 'Correo institucional' },
+        { label: 'Roles' },
+        { label: 'Estado' },
+        { label: 'Acciones' },
+      ],
+      rows: filas,
+      emptyMessage: termino
+        ? 'No hay usuarios que coincidan con la búsqueda.'
+        : 'No hay usuarios registrados.',
+      ariaLabel: 'Directorio institucional de usuarios',
+    });
 
     renderizarIconos();
   }
 
   async function cargarUsuarios(mostrarCarga = true) {
     if (mostrarCarga && contenido) {
-      contenido.innerHTML = '<div class="usuarios-message">Cargando usuarios...</div>';
+      contenido.innerHTML = '<div class="usuarios-message"><i data-lucide="loader-circle" aria-hidden="true"></i><span>Cargando usuarios...</span></div>';
+      renderizarIconos();
     }
 
     const resultado = mensajeResultado(
@@ -733,65 +795,203 @@ export async function iniciarUsuariosPage() {
       resultado.plantillas || {};
   }
 
+  // Límites elegidos para el formulario institucional de Usuarios.
+  // El backend conserva por separado sus contratos actuales para otras integraciones.
+  const LIMITES_USUARIO = Object.freeze({
+    cedula: 9,
+    correo: 150,
+    nombres: 60,
+    apellido1: 50,
+    apellido2: 50,
+  });
+
+  const NOMBRES_CAMPOS_USUARIO = ['cedula', 'correo', 'nombres', 'apellido1', 'apellido2'];
+  const EXPRESION_CARACTERES_NOMBRE = /[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g;
+
+  function leerDatosUsuarioFormulario(formulario) {
+    const datos = new FormData(formulario);
+    return {
+      cedula: String(datos.get('cedula') || '').trim(),
+      nombres: String(datos.get('nombres') || '').trim(),
+      apellido1: String(datos.get('apellido1') || '').trim(),
+      apellido2: String(datos.get('apellido2') || '').trim() || null,
+      correo: String(datos.get('correo') || '').trim().toLowerCase(),
+    };
+  }
+
+  function mostrarErrorCampoUsuario(input, mensaje = '') {
+    if (!input) return;
+    input.setCustomValidity(mensaje);
+    if (mensaje) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+
+    const etiqueta = input.closest('.usuario-campo');
+    etiqueta?.classList.toggle('is-invalid', Boolean(mensaje));
+    const detalle = etiqueta?.querySelector('.usuario-campo-error');
+    if (detalle) {
+      detalle.textContent = mensaje;
+      detalle.classList.toggle('hidden', !mensaje);
+    }
+  }
+
+  function validarCamposUsuario(formulario, usuario, id, { enfocar = false } = {}) {
+    const cedulaRegex = /^\d{1,9}$/;
+    const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
+    const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const otrosUsuarios = estado.usuarios.filter(
+      (existente) => Number(existente.id) !== id,
+    );
+    const cedulaDuplicada = otrosUsuarios.some((existente) =>
+      String(existente.cedula ?? '').trim() === usuario.cedula,
+    );
+    const correoDuplicado = otrosUsuarios.some((existente) =>
+      String(existente.correo ?? '').trim().toLowerCase() === usuario.correo,
+    );
+
+    const errores = {
+      cedula: !usuario.cedula
+        ? 'La cédula es obligatoria.'
+        : !cedulaRegex.test(usuario.cedula)
+          ? 'La cédula solo debe contener números (máximo 9 dígitos, sin guiones).'
+          : cedulaDuplicada
+            ? 'La cédula ya está registrada.'
+            : '',
+      correo: !usuario.correo
+        ? 'El correo electrónico es obligatorio.'
+        : usuario.correo.length > LIMITES_USUARIO.correo
+          ? 'El correo no puede superar los 150 caracteres.'
+          : !correoRegex.test(usuario.correo)
+            ? 'Ingrese un correo válido (ejemplo: usuario@una.cr).'
+            : correoDuplicado
+              ? 'El correo ya está registrado.'
+              : '',
+      nombres: !usuario.nombres
+        ? 'El nombre es obligatorio.'
+        : usuario.nombres.length > LIMITES_USUARIO.nombres
+          ? 'Los nombres no pueden superar los 60 caracteres.'
+          : !nombreRegex.test(usuario.nombres)
+            ? 'El nombre solo debe contener letras y espacios válidos.'
+            : '',
+      apellido1: !usuario.apellido1
+        ? 'El primer apellido es obligatorio.'
+        : usuario.apellido1.length > LIMITES_USUARIO.apellido1
+          ? 'El primer apellido no puede superar los 50 caracteres.'
+          : !nombreRegex.test(usuario.apellido1)
+            ? 'El primer apellido solo debe contener letras y signos propios de nombres.'
+            : '',
+      apellido2: usuario.apellido2 && usuario.apellido2.length > LIMITES_USUARIO.apellido2
+        ? 'El segundo apellido no puede superar los 50 caracteres.'
+        : usuario.apellido2 && !nombreRegex.test(usuario.apellido2)
+          ? 'El segundo apellido solo debe contener letras y signos propios de nombres.'
+          : '',
+    };
+
+    let primerInvalido = null;
+    for (const nombre of NOMBRES_CAMPOS_USUARIO) {
+      const input = formulario.querySelector(`[name="${nombre}"]`);
+      mostrarErrorCampoUsuario(input, errores[nombre]);
+      if (!primerInvalido && errores[nombre]) primerInvalido = input;
+    }
+
+    // La selección de rol es obligatoria solo al crear, no en la edición.
+    const roles = formulario.querySelector('.usuario-role-options');
+    if (roles) {
+      const faltaRol = !id && !roles.querySelector('input[name="roles"]:checked');
+      roles.classList.toggle('is-invalid', faltaRol);
+      const mensajeRol = roles.querySelector('.usuario-roles-error');
+      if (mensajeRol) mensajeRol.classList.toggle('hidden', !faltaRol);
+      if (!primerInvalido && faltaRol) primerInvalido = roles;
+    }
+
+    if (enfocar && primerInvalido) {
+      const destino = primerInvalido.matches('fieldset')
+        ? primerInvalido.querySelector('input[name="roles"]')
+        : primerInvalido;
+      destino?.focus();
+    }
+    return !primerInvalido;
+  }
+
   function camposUsuario(usuario = null) {
     return `
+      <div class="usuario-form-info">Los campos marcados con <strong>*</strong> son obligatorios.</div>
       <div class="usuario-form-grid">
-        <label>
-          <span>Cédula</span>
+        <label class="usuario-campo">
+          <span>Cédula <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
           <input
             name="cedula"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{1,9}"
             required
-            maxlength="20"
+            maxlength="${LIMITES_USUARIO.cedula}"
+            aria-describedby="usuario-cedula-ayuda usuario-cedula-error"
             autocomplete="off"
-            placeholder="Ej: 501230456 o 1-1111-1111"
+            placeholder="Ej: 208570524"
             value="${escapeHtml(usuario?.cedula || '')}"
           >
-          <small>Identificación única del usuario (sin espacios).</small>
+          <small id="usuario-cedula-ayuda">Solo números, hasta 9 dígitos, sin guiones.</small>
+          <small id="usuario-cedula-error" class="usuario-campo-error hidden" role="alert"></small>
         </label>
 
-        <label>
-          <span>Correo electrónico</span>
+        <label class="usuario-campo">
+          <span>Correo electrónico <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
           <input
             name="correo"
             type="email"
             required
-            maxlength="150"
+            maxlength="${LIMITES_USUARIO.correo}"
+            aria-describedby="usuario-correo-ayuda usuario-correo-error"
             autocomplete="email"
             placeholder="Ej: usuario@una.cr"
             value="${escapeHtml(usuario?.correo || '')}"
           >
-          <small>
-            Correo institucional para la cuenta y notificaciones.
-          </small>
+          <small id="usuario-correo-ayuda">Correo institucional · máximo 150 caracteres.</small>
+          <small id="usuario-correo-error" class="usuario-campo-error hidden" role="alert"></small>
         </label>
-        <label>
-          <span>Nombres</span>
+
+        <label class="usuario-campo">
+          <span>Nombres <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
           <input
             name="nombres"
             required
-            maxlength="100"
-            placeholder="Nombre o nombres"
+            maxlength="${LIMITES_USUARIO.nombres}"
+            aria-describedby="usuario-nombres-ayuda usuario-nombres-error"
+            autocomplete="given-name"
+            placeholder="Primer y segundo nombre"
             value="${escapeHtml(usuario?.nombres || '')}"
           >
+          <small id="usuario-nombres-ayuda">Hasta 60 caracteres, únicamente letras.</small>
+          <small id="usuario-nombres-error" class="usuario-campo-error hidden" role="alert"></small>
         </label>
-        <label>
-          <span>Primer apellido</span>
+
+        <label class="usuario-campo">
+          <span>Primer apellido <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
           <input
             name="apellido1"
             required
-            maxlength="100"
+            maxlength="${LIMITES_USUARIO.apellido1}"
+            aria-describedby="usuario-apellido1-ayuda usuario-apellido1-error"
+            autocomplete="family-name"
             placeholder="Primer apellido"
             value="${escapeHtml(usuario?.apellido1 || '')}"
           >
+          <small id="usuario-apellido1-ayuda">Hasta 50 caracteres, sin números.</small>
+          <small id="usuario-apellido1-error" class="usuario-campo-error hidden" role="alert"></small>
         </label>
-        <label class="usuario-form-full">
-          <span>Segundo apellido</span>
+
+        <label class="usuario-campo usuario-form-full">
+          <span>Segundo apellido <small class="usuario-opcional">Opcional</small></span>
           <input
             name="apellido2"
-            maxlength="100"
+            maxlength="${LIMITES_USUARIO.apellido2}"
+            aria-describedby="usuario-apellido2-ayuda usuario-apellido2-error"
+            autocomplete="additional-name"
             placeholder="Segundo apellido (opcional)"
             value="${escapeHtml(usuario?.apellido2 || '')}"
           >
+          <small id="usuario-apellido2-ayuda">Hasta 50 caracteres, sin números.</small>
+          <small id="usuario-apellido2-error" class="usuario-campo-error hidden" role="alert"></small>
         </label>
       </div>
     `;
@@ -950,23 +1150,16 @@ export async function iniciarUsuariosPage() {
   }
 
   function renderizarDialogoCreacion() {
-    dialogoContenido.innerHTML = `
-      <form id="usuarioForm" class="usuario-form">
-        <div class="usuario-dialog-header">
-          <div>
-            <h3>Nuevo usuario</h3>
-            <p>Cree la cuenta y asigne al menos un rol oficial.</p>
-          </div>
-          <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+    mostrarFormularioUsuario({
+      formId: 'usuarioForm',
+      title: 'Nuevo usuario',
+      description: 'Cree una cuenta institucional y asigne al menos un rol oficial.',
+      body: `
+        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
+        <div class="usuario-section-heading">
+          <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
+          <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
         </div>
-
-        <div
-          class="usuario-dialog-feedback hidden"
-          role="status"
-        ></div>
-
         ${camposUsuario()}
 
         <div class="usuario-invitacion-banner">
@@ -978,7 +1171,8 @@ export async function iniciarUsuariosPage() {
         </div>
 
         <fieldset class="usuario-role-options">
-          <legend>Roles iniciales</legend>
+          <legend>Roles iniciales <b class="usuario-obligatorio" aria-hidden="true">*</b></legend>
+          <small class="usuario-roles-error hidden" role="alert">Seleccione al menos un rol para crear el usuario.</small>
           ${estado.roles.map((rol) => `
             <label>
               <input type="checkbox" name="roles" value="${escapeHtml(rol.nombre)}">
@@ -990,75 +1184,50 @@ export async function iniciarUsuariosPage() {
           `).join('')}
         </fieldset>
 
-        <section
-          id="carrerasCreacionSection"
-          class="usuario-role-manager hidden"
-        >
+        <section id="carrerasCreacionSection" class="usuario-role-manager hidden">
           <div class="usuario-permission-header">
             <div>
               <h4>Carreras asignadas (Profesor)</h4>
               <p>Seleccione las carreras a las que pertenece el docente.</p>
             </div>
           </div>
-
-          <div class="usuario-carreras-grid">
-            ${renderizarOpcionesCarreras()}
-          </div>
+          <div class="usuario-carreras-grid">${renderizarOpcionesCarreras()}</div>
         </section>
 
-        <section
-          class="usuario-permission-manager"
-        >
-          <div
-            class="usuario-permission-header"
-          >
+        <section class="usuario-permission-manager">
+          <div class="usuario-permission-header">
             <div>
-              <h4>
-                Permisos iniciales
-              </h4>
-
-              <p>
-                Se sugieren según los roles,
-                pero puede agregar o quitar
-                cualquiera antes de crear
-                el usuario.
-              </p>
+              <h4>Permisos iniciales</h4>
+              <p>Se sugieren según los roles, pero puede agregar o quitar cualquiera antes de crear el usuario.</p>
             </div>
           </div>
-
-          <div
-            id="permisosCreacionUsuario"
-            class="usuario-permission-grid"
-          >
+          <div id="permisosCreacionUsuario" class="usuario-permission-grid">
             ${renderizarOpcionesPermisos()}
           </div>
         </section>
-
-        <div class="usuario-dialog-actions">
-          <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
-          <button class="usuarios-primary-button" type="submit">Crear usuario</button>
-        </div>
-      </form>
-    `;
-
-    renderizarIconos();
-    if (!dialogo.open) dialogo.showModal();
+      `,
+      footerHtml: `
+        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
+        <button class="sgpa-form-primary" type="submit">
+          <i data-lucide="user-plus" aria-hidden="true"></i><span>Crear usuario</span>
+        </button>
+      `,
+    });
   }
 
   function renderizarDialogoJerarquia(usuario, configuracion, auditoria = []) {
     const asignadas = new Map((configuracion.carreras || []).map((c) => [Number(c.carreraId), new Set(c.permisos || [])]));
-    dialogoContenido.innerHTML = `
-      <form id="jerarquiaForm" class="usuario-form" data-user-id="${usuario.id}">
-        <div class="usuario-dialog-header">
-          <div>
-            <h3>Carreras y permisos de ${escapeHtml(obtenerNombreCompleto(usuario))}</h3>
-            <p>Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.</p>
-          </div>
-          <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+    mostrarFormularioUsuario({
+      formId: 'jerarquiaForm',
+      userId: usuario.id,
+      title: `Carreras y permisos de ${obtenerNombreCompleto(usuario)}`,
+      description: 'Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.',
+      body: `
+        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
+        <div class="usuario-section-heading">
+          <span class="usuario-section-icon"><i data-lucide="shield-check" aria-hidden="true"></i></span>
+          <div><h4>Alcance académico por carrera</h4><p>Marque las carreras y los permisos que corresponden.</p></div>
         </div>
-        <div class="usuario-dialog-feedback hidden" role="status"></div>
         <div class="usuarios-alcances">
           ${estado.carreras.map((carrera) => {
             const permisos = asignadas.get(Number(carrera.id)) || new Set();
@@ -1092,22 +1261,25 @@ export async function iniciarUsuariosPage() {
             </fieldset>`;
           }).join('')}
         </div>
-        <div class="usuario-dialog-actions">
-          <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
-          <button class="usuarios-primary-button" type="submit">Guardar alcance</button>
-        </div>
         <section class="usuarios-auditoria">
-          <h4>Historial reciente</h4>
+          <div class="usuario-section-heading">
+            <span class="usuario-section-icon"><i data-lucide="history" aria-hidden="true"></i></span>
+            <div><h4>Historial reciente</h4><p>Registro de las últimas modificaciones al alcance.</p></div>
+          </div>
           ${auditoria.length ? `<ul>${auditoria.map((item) => `
             <li>${escapeHtml(item.accion)} · ${escapeHtml(new Date(item.createdAt).toLocaleString('es-CR'))}</li>
-          `).join('')}</ul>` : '<p>Sin cambios registrados.</p>'}
+          `).join('')}</ul>` : '<p class="usuarios-muted">Sin cambios registrados.</p>'}
         </section>
-      </form>`;
-    dialogoContenido
-      .querySelectorAll('.usuarios-alcance')
+      `,
+      footerHtml: `
+        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
+        <button class="sgpa-form-primary" type="submit">
+          <i data-lucide="save" aria-hidden="true"></i><span>Guardar alcance</span>
+        </button>
+      `,
+    });
+    dialogoContenido.querySelectorAll('.usuarios-alcance')
       .forEach(actualizarSeleccionTodosPermisosCarrera);
-    renderizarIconos();
-    if (!dialogo.open) dialogo.showModal();
   }
 
   function actualizarSeleccionTodosPermisosCarrera(campo) {
@@ -1134,64 +1306,56 @@ export async function iniciarUsuariosPage() {
       (rol) => !nombresAsignados.has(rol.nombre),
     );
     const esProfesor = rolesUsuario.some((rol) => rol.nombre === ROLES.PROFESOR);
-    const carrerasAsignadas = new Set(
-      (usuario.carreras || []).map((c) => c.id),
-    );
+    const carrerasAsignadas = new Set((usuario.carreras || []).map((c) => c.id));
 
-    dialogoContenido.innerHTML = `
-      <form id="usuarioForm" class="usuario-form" data-user-id="${usuario.id}">
-        <div class="usuario-dialog-header">
-          <div>
-            <h3>Editar usuario</h3>
-            <p>Actualice sus datos administrativos, roles, carreras y permisos.</p>
-          </div>
-          <button class="usuarios-close-button" type="button" data-action="cerrar-dialogo" aria-label="Cerrar">
-            <i data-lucide="x" aria-hidden="true"></i>
-          </button>
+    mostrarFormularioUsuario({
+      formId: 'usuarioForm',
+      userId: usuario.id,
+      title: 'Editar usuario',
+      description: 'Actualice sus datos administrativos, roles, carreras y permisos.',
+      body: `
+        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
+        <div class="usuario-section-heading">
+          <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
+          <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
         </div>
-
-        <div
-          class="usuario-dialog-feedback hidden"
-          role="status"
-        ></div>
-
         ${camposUsuario(usuario)}
 
         <section class="usuario-role-manager">
-          <h4>Roles asignados</h4>
+          <div class="usuario-section-heading">
+            <span class="usuario-section-icon"><i data-lucide="users" aria-hidden="true"></i></span>
+            <div><h4>Roles asignados</h4><p>Administre los perfiles de acceso del usuario.</p></div>
+          </div>
           <div class="usuario-assigned-roles">
             ${rolesUsuario.length
               ? rolesUsuario.map((rol) => `
                   <span class="usuarios-role-badge is-removable">
                     ${escapeHtml(nombreVisibleRol(rol.nombre))}
-                    <button
-                      type="button"
-                      data-action="revocar-rol"
-                      data-user-id="${usuario.id}"
-                      data-role-id="${rol.id ?? ''}"
+                    <button type="button" data-action="revocar-rol"
+                      data-user-id="${usuario.id}" data-role-id="${rol.id ?? ''}"
                       aria-label="Revocar ${escapeHtml(nombreVisibleRol(rol.nombre))}"
-                      ${rol.id == null ? 'disabled' : ''}
-                    >×</button>
+                      title="Revocar rol" ${rol.id == null ? 'disabled' : ''}>
+                      <i data-lucide="x" aria-hidden="true"></i>
+                    </button>
                   </span>
                 `).join('')
               : '<span class="usuarios-no-role">Sin rol asignado</span>'}
           </div>
 
           <div class="usuario-add-role">
-            <select id="rolParaAsignar" ${rolesDisponibles.length ? '' : 'disabled'}>
+            <select id="rolParaAsignar" aria-label="Rol para asignar"
+              ${rolesDisponibles.length ? '' : 'disabled'}>
               ${rolesDisponibles.length
                 ? rolesDisponibles.map((rol) => `
                     <option value="${escapeHtml(rol.nombre)}">${escapeHtml(nombreVisibleRol(rol.nombre))}</option>
                   `).join('')
                 : '<option>Todos los roles están asignados</option>'}
             </select>
-            <button
-              class="usuarios-secondary-button"
-              type="button"
-              data-action="asignar-rol"
-              data-user-id="${usuario.id}"
-              ${rolesDisponibles.length ? '' : 'disabled'}
-            >Agregar rol</button>
+            <button class="usuarios-secondary-button" type="button"
+              data-action="asignar-rol" data-user-id="${usuario.id}"
+              ${rolesDisponibles.length ? '' : 'disabled'}>
+              <i data-lucide="plus" aria-hidden="true"></i>Agregar rol
+            </button>
           </div>
         </section>
 
@@ -1203,28 +1367,19 @@ export async function iniciarUsuariosPage() {
                 <p>Carreras asociadas al perfil docente de este usuario.</p>
               </div>
             </div>
-
-            <div class="usuario-carreras-grid">
-              ${renderizarOpcionesCarreras(carrerasAsignadas)}
-            </div>
+            <div class="usuario-carreras-grid">${renderizarOpcionesCarreras(carrerasAsignadas)}</div>
           </section>
         ` : ''}
 
-        ${renderizarGestorPermisos(
-          usuario,
-          permisosUsuario,
-        )}
-
-
-        <div class="usuario-dialog-actions">
-          <button class="usuarios-secondary-button" type="button" data-action="cerrar-dialogo">Cancelar</button>
-          <button class="usuarios-primary-button" type="submit">Guardar cambios</button>
-        </div>
-      </form>
-    `;
-
-    renderizarIconos();
-    if (!dialogo.open) dialogo.showModal();
+        ${renderizarGestorPermisos(usuario, permisosUsuario)}
+      `,
+      footerHtml: `
+        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
+        <button class="sgpa-form-primary" type="submit">
+          <i data-lucide="save" aria-hidden="true"></i><span>Guardar cambios</span>
+        </button>
+      `,
+    });
   }
 
   async function abrirEdicion(
@@ -1324,12 +1479,41 @@ export async function iniciarUsuariosPage() {
   }
 
   pagina.addEventListener('input', (event) => {
-    if (
-      event.target.matches?.(
-        '#usuarioForm [name="cedula"], #usuarioForm [name="correo"], #usuarioForm [name="nombres"], #usuarioForm [name="apellido1"], #usuarioForm [name="apellido2"]'
-      )
-    ) {
-      event.target.setCustomValidity('');
+    const campoUsuario = event.target.closest?.('#usuarioForm .usuario-campo input');
+    if (campoUsuario) {
+      const anterior = campoUsuario.value;
+      const nombre = campoUsuario.name;
+      const depurado = nombre === 'cedula'
+        ? anterior.replace(/\D/g, '')
+        : ['nombres', 'apellido1', 'apellido2'].includes(nombre)
+          ? anterior.replace(EXPRESION_CARACTERES_NOMBRE, '')
+          : anterior;
+
+      // La cédula no admite letras, y los nombres y apellidos no admiten números,
+      // ni siquiera al pegar texto. Conservar el cursor al eliminar caracteres.
+      if (depurado !== anterior) {
+        const cursor = campoUsuario.selectionStart;
+        const nuevaPosicion = Number.isInteger(cursor)
+          ? (nombre === 'cedula'
+            ? anterior.slice(0, cursor).replace(/\D/g, '').length
+            : ['nombres', 'apellido1', 'apellido2'].includes(nombre)
+              ? anterior.slice(0, cursor).replace(EXPRESION_CARACTERES_NOMBRE, '').length
+              : cursor)
+          : null;
+        campoUsuario.value = depurado;
+        if (nuevaPosicion != null) campoUsuario.setSelectionRange(nuevaPosicion, nuevaPosicion);
+      }
+
+      const formulario = campoUsuario.closest('#usuarioForm');
+      if (formulario?.dataset.validacionIntentada === 'true') {
+        validarCamposUsuario(
+          formulario,
+          leerDatosUsuarioFormulario(formulario),
+          Number(formulario.dataset.userId),
+        );
+      } else {
+        mostrarErrorCampoUsuario(campoUsuario);
+      }
     }
 
     if (event.target.id !== 'usuariosBuscar') return;
@@ -1387,6 +1571,14 @@ export async function iniciarUsuariosPage() {
       !dialogoContenido.querySelector('#usuarioForm')?.dataset.userId
     ) {
       aplicarPlantillaCreacion();
+      const formulario = dialogoContenido.querySelector('#usuarioForm');
+      if (formulario?.dataset.validacionIntentada === 'true') {
+        validarCamposUsuario(
+          formulario,
+          leerDatosUsuarioFormulario(formulario),
+          Number(formulario.dataset.userId),
+        );
+      }
     }
   });
 
@@ -1399,83 +1591,12 @@ export async function iniciarUsuariosPage() {
     const datos = new FormData(formulario);
     const id = Number(formulario.dataset.userId);
 
-    const usuario = {
-      cedula: (datos.get('cedula') || '').trim(),
-      nombres: (datos.get('nombres') || '').trim(),
-      apellido1: (datos.get('apellido1') || '').trim(),
-      apellido2: (datos.get('apellido2') || '').trim() || null,
-      correo: (datos.get('correo') || '').trim().toLowerCase(),
-    };
+    const usuario = leerDatosUsuarioFormulario(formulario);
 
-    const cedulaInput = formulario.querySelector('[name="cedula"]');
-    const correoInput = formulario.querySelector('[name="correo"]');
-    const nombresInput = formulario.querySelector('[name="nombres"]');
-    const apellido1Input = formulario.querySelector('[name="apellido1"]');
-    const apellido2Input = formulario.querySelector('[name="apellido2"]');
-
-    cedulaInput?.setCustomValidity('');
-    correoInput?.setCustomValidity('');
-    nombresInput?.setCustomValidity('');
-    apellido1Input?.setCustomValidity('');
-    apellido2Input?.setCustomValidity('');
-
-    const cedulaRegex = /^[a-zA-Z0-9-]+$/;
-    const nombreRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
-    const correoRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    const otrosUsuarios = estado.usuarios.filter(
-      (existente) => Number(existente.id) !== id
-    );
-
-    const cedulaDuplicada = otrosUsuarios.some(
-      (existente) =>
-        String(existente.cedula ?? '').trim().toLocaleLowerCase('es') ===
-        usuario.cedula.toLocaleLowerCase('es')
-    );
-
-    const correoDuplicado = otrosUsuarios.some(
-      (existente) =>
-        String(existente.correo ?? '').trim().toLowerCase() === usuario.correo
-    );
-
-    // Validaciones de cédula
-    if (!usuario.cedula) {
-      cedulaInput?.setCustomValidity('La cédula es obligatoria.');
-    } else if (!cedulaRegex.test(usuario.cedula)) {
-      cedulaInput?.setCustomValidity('La cédula solo debe contener letras, números o guiones (sin espacios ni caracteres especiales).');
-    } else if (cedulaDuplicada) {
-      cedulaInput?.setCustomValidity('La cédula ya está registrada.');
-    }
-
-    // Validaciones de correo
-    if (!usuario.correo) {
-      correoInput?.setCustomValidity('El correo electrónico es obligatorio.');
-    } else if (!correoRegex.test(usuario.correo)) {
-      correoInput?.setCustomValidity('Ingrese un correo electrónico válido (ejemplo: usuario@una.cr).');
-    } else if (correoDuplicado) {
-      correoInput?.setCustomValidity('El correo ya está registrado.');
-    }
-
-    // Validaciones de nombre
-    if (!usuario.nombres) {
-      nombresInput?.setCustomValidity('El nombre es obligatorio.');
-    } else if (!nombreRegex.test(usuario.nombres)) {
-      nombresInput?.setCustomValidity('El nombre solo debe contener letras y espacios válidos.');
-    }
-
-    // Validaciones de primer apellido
-    if (!usuario.apellido1) {
-      apellido1Input?.setCustomValidity('El primer apellido es obligatorio.');
-    } else if (!nombreRegex.test(usuario.apellido1)) {
-      apellido1Input?.setCustomValidity('El primer apellido solo debe contener letras.');
-    }
-
-    // Validaciones de segundo apellido (opcional)
-    if (usuario.apellido2 && !nombreRegex.test(usuario.apellido2)) {
-      apellido2Input?.setCustomValidity('El segundo apellido solo debe contener letras.');
-    }
-
-    if (!formulario.reportValidity()) return;
+    // Se muestran todos los campos faltantes, sin el aviso genérico del navegador.
+    // La edición conserva su lógica y la creación conserva la obligatoriedad del rol.
+    formulario.dataset.validacionIntentada = 'true';
+    if (!validarCamposUsuario(formulario, usuario, id, { enfocar: true })) return;
 
     try {
       boton.disabled = true;
@@ -1740,9 +1861,7 @@ export async function iniciarUsuariosPage() {
     renderizarDialogoCreacion();
   });
 
-  dialogo.addEventListener('click', (event) => {
-    if (event.target === dialogo) dialogo.close();
-  });
+  habilitarCierreExterior(dialogo);
 
   try {
     await Promise.all([
