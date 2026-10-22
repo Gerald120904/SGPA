@@ -28,9 +28,23 @@ export class AddInternalFormSupport2026102100000 implements MigrationInterface {
       throw new Error(`No existe la tabla requerida ${TABLA}.`);
     }
 
-    const tieneColumnaProveedor = table.columns.some(
-      (c) => c.name === COLUMNA_PROVEEDOR,
-    );
+    const proveedor = table.findColumnByName(COLUMNA_PROVEEDOR);
+    const token = table.findColumnByName(COLUMNA_TOKEN);
+    const indiceToken = table.indices.find((idx) => idx.name === INDICE_TOKEN);
+    const normalize = (value: unknown) => String(value ?? '').replace(/[`'"()\s]/g, '').toLowerCase();
+    if (proveedor && (
+      proveedor.type !== 'varchar' || proveedor.length !== '20' || proveedor.isNullable ||
+      normalize(proveedor.default) !== 'google_forms'
+    )) throw new Error(`La columna ${TABLA}.${COLUMNA_PROVEEDOR} es incompatible.`);
+    if (token && (token.type !== 'varchar' || token.length !== '64' || !token.isNullable)) {
+      throw new Error(`La columna ${TABLA}.${COLUMNA_TOKEN} es incompatible.`);
+    }
+    if (indiceToken && (!indiceToken.isUnique || indiceToken.columnNames.join(',') !== COLUMNA_TOKEN)) {
+      throw new Error(`El índice ${INDICE_TOKEN} es incompatible.`);
+    }
+    if (indiceToken && !token) throw new Error(`Existe ${INDICE_TOKEN} sin su columna ${COLUMNA_TOKEN}.`);
+
+    const tieneColumnaProveedor = Boolean(proveedor);
 
     if (!tieneColumnaProveedor) {
       await queryRunner.addColumn(
@@ -50,9 +64,7 @@ export class AddInternalFormSupport2026102100000 implements MigrationInterface {
       );
     }
 
-    const tieneColumnaToken = table.columns.some(
-      (c) => c.name === COLUMNA_TOKEN,
-    );
+    const tieneColumnaToken = Boolean(token);
 
     if (!tieneColumnaToken) {
       await queryRunner.addColumn(
@@ -66,9 +78,7 @@ export class AddInternalFormSupport2026102100000 implements MigrationInterface {
       );
     }
 
-    const tieneIndiceToken = table.indices.some(
-      (idx) => idx.name === INDICE_TOKEN,
-    );
+    const tieneIndiceToken = Boolean(indiceToken);
 
     if (!tieneIndiceToken) {
       await queryRunner.createIndex(

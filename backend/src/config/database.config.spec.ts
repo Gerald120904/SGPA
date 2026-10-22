@@ -23,7 +23,17 @@ describe('crearConfiguracionBaseDatos', () => {
         SGPA_TEST_MODE: 'false',
         DB_SYNCHRONIZE: 'true',
       }),
-    ).toThrow('solo está permitido para sgpa_test');
+    ).toThrow('prohibido fuera de sgpa_test');
+  });
+
+  it('bloquea synchronize incluso en desarrollo sobre sgpa', () => {
+    expect(() => configuracion({
+      DB_HOST: 'localhost',
+      DB_DATABASE: 'sgpa',
+      SGPA_TEST_MODE: 'false',
+      DB_SYNCHRONIZE: 'true',
+      SGPA_RUNTIME_ENV: 'development',
+    })).toThrow('prohibido fuera de sgpa_test');
   });
 
   it('permite preparar el esquema aislado de pruebas', () => {

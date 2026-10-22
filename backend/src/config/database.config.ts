@@ -1,10 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { AddOptativeRuleCounts2026101500000 } from '../migrations/2026101500000-AddOptativeRuleCounts';
-import { AddAulaEquipmentInventory2026101600000 } from '../migrations/2026101600000-AddAulaEquipmentInventory';
-import { AddInvitationOutbox2026101700000 } from '../migrations/2026101700000-AddInvitationOutbox';
-import { AddHierarchicalAccess2026101900000 } from '../migrations/2026101900000-AddHierarchicalAccess';
-import { AddInternalFormSupport2026102100000 } from '../migrations/2026102100000-AddInternalFormSupport';
+import { OFFICIAL_MIGRATIONS } from '../migrations/official-migrations';
 
 const TEST_DATABASE = 'sgpa_test';
 
@@ -16,33 +12,18 @@ export function crearConfiguracionBaseDatos(
   configService: ConfigService,
 ): TypeOrmModuleOptions {
   const database = configService.get<string>('DB_DATABASE')?.trim();
-  const modoPruebas = esVerdadero(
-    configService.get<string>('SGPA_TEST_MODE'),
-  );
-  const synchronize = esVerdadero(
-    configService.get<string>('DB_SYNCHRONIZE'),
-  );
+  const modoPruebas = esVerdadero(configService.get<string>('SGPA_TEST_MODE'));
+  const synchronizeRequested = esVerdadero(configService.get<string>('DB_SYNCHRONIZE'));
 
-  if (!database) {
-    throw new Error('DB_DATABASE no está configurada.');
-  }
-
+  if (!database) throw new Error('DB_DATABASE no está configurada.');
   if (modoPruebas && database !== TEST_DATABASE) {
-    throw new Error(
-      `Modo de pruebas bloqueado: DB_DATABASE debe ser ${TEST_DATABASE}.`,
-    );
+    throw new Error(`Modo de pruebas bloqueado: DB_DATABASE debe ser ${TEST_DATABASE}.`);
   }
-
   if (database === TEST_DATABASE && !modoPruebas) {
-    throw new Error(
-      'La base sgpa_test solo puede utilizarse con SGPA_TEST_MODE=true.',
-    );
+    throw new Error('La base sgpa_test solo puede utilizarse con SGPA_TEST_MODE=true.');
   }
-
-  if (synchronize && (!modoPruebas || database !== TEST_DATABASE)) {
-    throw new Error(
-      'DB_SYNCHRONIZE=true solo está permitido para sgpa_test en modo de pruebas.',
-    );
+  if (synchronizeRequested && !(modoPruebas && database === TEST_DATABASE)) {
+    throw new Error('DB_SYNCHRONIZE=true está prohibido fuera de sgpa_test en modo de pruebas.');
   }
 
   return {
@@ -53,15 +34,9 @@ export function crearConfiguracionBaseDatos(
     password: configService.get<string>('DB_PASSWORD'),
     database,
     autoLoadEntities: true,
-    synchronize,
-    migrations: [
-      AddOptativeRuleCounts2026101500000,
-      AddAulaEquipmentInventory2026101600000,
-      AddInvitationOutbox2026101700000,
-      AddHierarchicalAccess2026101900000,
-      AddInternalFormSupport2026102100000,
-    ],
+    synchronize: modoPruebas && database === TEST_DATABASE && synchronizeRequested,
+    dropSchema: false,
+    migrations: [...OFFICIAL_MIGRATIONS],
     migrationsRun: false,
   };
 }
-

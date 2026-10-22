@@ -62,6 +62,7 @@ export class UsuarioPermisoExcepcion {
   })
   @JoinColumn({
     name: 'usuario_id',
+    foreignKeyConstraintName: 'FK_excepcion_usuario',
   })
   usuario!: Usuario;
 
@@ -72,6 +73,7 @@ export class UsuarioPermisoExcepcion {
   })
   @JoinColumn({
     name: 'asignado_por_usuario_id',
+    foreignKeyConstraintName: 'FK_excepcion_asignador',
   })
   asignadoPorUsuario!: Usuario | null;
 

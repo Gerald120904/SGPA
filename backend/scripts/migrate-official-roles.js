@@ -1,86 +1,44 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config();
+const dotenv = require('dotenv');
 
-const ROLES_OFICIALES = [
-  ['ADMIN_GLOBAL', 'Administrador global del sistema', 1],
-  ['COORDINADOR', 'Coordinador académico', 1],
-  ['PROFESOR', 'Profesor', 1],
-  ['ASISTENTE_ESTUDIANTIL', 'Estudiante asistente', 1],
-];
+dotenv.config({ path: process.env.SGPA_ENV_FILE || '.env', quiet: true });
 
-async function migrateOfficialRoles() {
+const OFFICIAL = ['ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR', 'ASISTENTE_ESTUDIANTIL'];
+const LEGACY = new Map([
+  ['ADMINISTRADOR', 'ADMIN_GLOBAL'],
+  ['COORDINADOR_ACADEMICO', 'COORDINADOR'],
+  ['ESTUDIANTE', 'ASISTENTE_ESTUDIANTIL'],
+]);
+
+async function main() {
+  const database = process.env.DB_DATABASE?.trim();
+  if (!database) throw new Error('DB_DATABASE no está configurada.');
   const connection = await mysql.createConnection({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USERNAME || process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
+    database,
   });
-
   try {
-    await connection.beginTransaction();
-
-    const [[rolAnterior]] = await connection.query(
-      "SELECT id FROM roles WHERE nombre = 'ESTUDIANTE' FOR UPDATE",
+    const [[identity]] = await connection.query(
+      'SELECT DATABASE() AS base, @@hostname AS servidor, @@port AS puerto, @@server_uuid AS uuid',
     );
-    const [[rolNuevo]] = await connection.query(
-      "SELECT id FROM roles WHERE nombre = 'ASISTENTE_ESTUDIANTIL' FOR UPDATE",
-    );
-
-    if (rolAnterior && !rolNuevo) {
-      await connection.query(
-        `UPDATE roles
-         SET nombre = 'ASISTENTE_ESTUDIANTIL',
-             descripcion = 'Estudiante asistente',
-             activo = 1
-         WHERE id = ?`,
-        [rolAnterior.id],
-      );
-    } else if (rolAnterior && rolNuevo) {
-      await connection.query(
-        `INSERT IGNORE INTO usuario_roles (usuario_id, rol_id)
-         SELECT usuario_id, ? FROM usuario_roles WHERE rol_id = ?`,
-        [rolNuevo.id, rolAnterior.id],
-      );
-      await connection.query('DELETE FROM usuario_roles WHERE rol_id = ?', [
-        rolAnterior.id,
-      ]);
-      await connection.query('DELETE FROM roles WHERE id = ?', [
-        rolAnterior.id,
-      ]);
-    }
-
-    await connection.query(
-      "UPDATE roles SET nombre = 'ADMIN_GLOBAL' WHERE nombre = 'ADMINISTRADOR'",
-    );
-    await connection.query(
-      "UPDATE roles SET nombre = 'COORDINADOR' WHERE nombre = 'COORDINADOR_ACADEMICO'",
-    );
-    await connection.query(
-      `INSERT INTO roles (nombre, descripcion, activo)
-       VALUES ?
-       ON DUPLICATE KEY UPDATE
-         descripcion = VALUES(descripcion),
-         activo = VALUES(activo)`,
-      [ROLES_OFICIALES],
-    );
-
-    await connection.commit();
-
     const [roles] = await connection.query(
       'SELECT id, nombre, descripcion, activo FROM roles ORDER BY id',
     );
-
-    console.table(roles);
-  } catch (error) {
-    await connection.rollback();
-    throw error;
+    const names = new Set(roles.map((role) => role.nombre));
+    const conflicts = [...LEGACY].filter(([legacy, official]) => names.has(legacy) && names.has(official));
+    const legacyRenames = [...LEGACY].filter(([legacy, official]) => names.has(legacy) && !names.has(official));
+    const missing = OFFICIAL.filter((name) => !names.has(name) && !legacyRenames.some(([, official]) => official === name));
+    console.log(JSON.stringify({ read_only: true, identity, roles, conflicts, legacyRenames, missing }, null, 2));
+    if (conflicts.length) process.exitCode = 2;
   } finally {
     await connection.end();
   }
 }
 
-migrateOfficialRoles().catch((error) => {
-  console.error(error);
-  process.exit(1);
+main().catch((error) => {
+  console.error(`No se pudo verificar el catálogo de roles: ${error.message}`);
+  process.exitCode = 1;
 });

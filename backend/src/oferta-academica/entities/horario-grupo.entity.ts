@@ -40,7 +40,7 @@ export class HorarioGrupo {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   })
-  @JoinColumn({ name: 'grupo_id' })
+  @JoinColumn({ name: 'grupo_id', foreignKeyConstraintName: 'FK_horario_grupo' })
   grupo!: Grupo;
 
   @ManyToOne(() => Aula, {
@@ -48,7 +48,7 @@ export class HorarioGrupo {
     onDelete: 'SET NULL',
     onUpdate: 'CASCADE',
   })
-  @JoinColumn({ name: 'aula_id' })
+  @JoinColumn({ name: 'aula_id', foreignKeyConstraintName: 'FK_horario_aula' })
   aula!: Aula | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
