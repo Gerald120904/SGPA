@@ -16,8 +16,12 @@ test('muestra una reconexión explícita cuando OAuth requiere reautenticación'
   assert.match(pagina, /REQUIERE_REAUTENTICACION/);
 });
 
-test('no habilita la creación de formularios sin una conexión activa', () => {
+test('permite crear formularios institucionales sin exigir una conexión activa de Google', () => {
   assert.match(
+    pagina,
+    /id="nuevoFormularioButton"/
+  );
+  assert.doesNotMatch(
     pagina,
     /id="nuevoFormularioButton"[\s\S]*?estadoGoogle\.conectado[\s\S]*?'disabled'/
   );

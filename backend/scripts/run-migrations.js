@@ -8,6 +8,7 @@ const ALLOWED_MIGRATIONS = new Set([
   'AddAulaEquipmentInventory2026101600000',
   'AddInvitationOutbox2026101700000',
   'AddHierarchicalAccess2026101900000',
+  'AddInternalFormSupport2026102100000',
 ]);
 
 function migrationName(migration) {

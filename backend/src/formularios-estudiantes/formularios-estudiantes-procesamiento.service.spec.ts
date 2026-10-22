@@ -4,7 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
+import { FuenteRegistroAcademico } from '../estudiantes/constants/fuente-registro-academico.constant';
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
+import { TipoRequisito } from '../planes-estudio/constants/tipo-requisito.constant';
 
 describe('FormulariosEstudiantesProcesamientoService', () => {
   let service: FormulariosEstudiantesProcesamientoService;
@@ -16,6 +18,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     find: jest.Mock;
     findOne: jest.Mock;
     save: jest.Mock;
+    update: jest.Mock;
     createQueryBuilder: jest.Mock;
   };
   let periodoRepo: {
@@ -25,7 +28,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     find: jest.Mock;
   };
   let estudiantesImportacionService: {
-    ejecutarDesdeGoogleForms: jest.Mock;
+    ejecutarDesdeFormulario: jest.Mock;
   };
   let estructuraAcademicaService: {
     tieneAlcanceSobreCarrera: jest.Mock;
@@ -99,6 +102,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue({ ...mockRespuestaBase }),
       save: jest.fn(async (r) => r),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
       createQueryBuilder: jest.fn(),
     };
 
@@ -111,7 +115,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     };
 
     estudiantesImportacionService = {
-      ejecutarDesdeGoogleForms: jest.fn().mockResolvedValue({
+      ejecutarDesdeFormulario: jest.fn().mockResolvedValue({
         creados: 1,
         actualizados: 0,
         aprobacionesNuevas: 1,
@@ -133,6 +137,14 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       planAsignaturaRepo as never,
       estudiantesImportacionService as never,
       estructuraAcademicaService as never,
+      {
+        transaction: jest.fn(async (callback) =>
+          callback({
+            query: jest.fn().mockResolvedValue([{ estado: EstadoRespuestaFormulario.PENDIENTE }]),
+            getRepository: () => respuestaRepo,
+          }),
+        ),
+      } as never,
     );
   });
 
@@ -212,6 +224,91 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
   });
 
   describe('aprobarRespuesta', () => {
+    it('envía a revisión si cambió el código de Curso tras publicar el formulario', async () => {
+      respuestaRepo.findOne.mockResolvedValue({
+        ...mockRespuestaBase,
+        formulario: {
+          ...mockFormulario,
+          mapaPreguntas: {
+            version: 3,
+            plan: { id: 3, nombre: 'Plan publicado', codigo: 'QA-3', carreraId: 2 },
+            asignaturas: [
+              { id: 101, planEstudioId: 3, cursoId: 201, codigo: 'EIF201', nombre: 'Programación I', nivel: 1, ciclo: 1, activo: true },
+            ],
+            requisitos: [],
+          },
+        },
+      });
+      planAsignaturaRepo.find.mockResolvedValue([{
+        ...mockPlanAsignatura,
+        curso: { id: 201, codigo: 'EIF201-EDITADO' },
+      }]);
+
+      await expect(service.aprobarRespuesta(respuestaId, usuarioId)).rejects.toThrow(ConflictException);
+      expect(estudiantesImportacionService.ejecutarDesdeFormulario).not.toHaveBeenCalled();
+    });
+
+    it('valida la versión publicada al aprobar aunque el plan actual permita la materia', async () => {
+      respuestaRepo.findOne.mockResolvedValue({
+        ...mockRespuestaBase,
+        formulario: {
+          ...mockFormulario,
+          mapaPreguntas: {
+            version: 3,
+            plan: { id: 3, nombre: 'Plan publicado', codigo: 'QA-3', carreraId: 2 },
+            asignaturas: [
+              { id: 101, planEstudioId: 3, cursoId: 201, codigo: 'EIF201', nombre: 'Programación II', nivel: 1, ciclo: 2, activo: true },
+              { id: 100, planEstudioId: 3, cursoId: 200, codigo: 'EIF200', nombre: 'Programación I', nivel: 1, ciclo: 1, activo: true },
+            ],
+            requisitos: [{ asignaturaId: 101, requisitoAsignaturaId: 100, tipo: TipoRequisito.REQUISITO }],
+          },
+        },
+      });
+
+      await expect(service.aprobarRespuesta(respuestaId, usuarioId)).rejects.toThrow(ConflictException);
+      expect(estudiantesImportacionService.ejecutarDesdeFormulario).not.toHaveBeenCalled();
+    });
+    it('importa una optativa de referencia sin Curso mediante su código curricular', async () => {
+      planAsignaturaRepo.find.mockResolvedValue([{
+        id: 101, planEstudioId: 3, cursoId: null, curso: null,
+        codigoReferencia: 'OPT-101',
+      }]);
+      respuestaRepo.findOne.mockResolvedValue({
+        ...mockRespuestaBase,
+        datosNormalizadosJson: {
+          ...mockRespuestaBase.datosNormalizadosJson,
+          asignaturasAprobadas: [{ planAsignaturaId: 101, cursoId: 0, codigo: 'OPT-101' }],
+        },
+      });
+
+      await service.aprobarRespuesta(respuestaId, usuarioId);
+      expect(estudiantesImportacionService.ejecutarDesdeFormulario).toHaveBeenCalledWith(
+        usuarioId,
+        expect.objectContaining({
+          estudiantes: [expect.objectContaining({ asignaturasAprobadas: ['OPT-101'] })],
+        }),
+        FuenteRegistroAcademico.GOOGLE_FORMS,
+        expect.anything(),
+      );
+    });
+
+    it('envía a revisión una materia de referencia cuyo código cambió', async () => {
+      planAsignaturaRepo.find.mockResolvedValue([{
+        id: 101, planEstudioId: 3, cursoId: null, curso: null,
+        codigoReferencia: 'OPT-102',
+      }]);
+      respuestaRepo.findOne.mockResolvedValue({
+        ...mockRespuestaBase,
+        datosNormalizadosJson: {
+          ...mockRespuestaBase.datosNormalizadosJson,
+          asignaturasAprobadas: [{ planAsignaturaId: 101, cursoId: 0, codigo: 'OPT-101' }],
+        },
+      });
+
+      await expect(service.aprobarRespuesta(respuestaId, usuarioId)).rejects.toThrow(ConflictException);
+      expect(estudiantesImportacionService.ejecutarDesdeFormulario).not.toHaveBeenCalled();
+    });
+
     it('PENDIENTE + aceptar: crea/actualiza estudiante y marca PROCESADO', async () => {
       const mockRespuesta = { ...mockRespuestaBase };
       respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
@@ -227,7 +324,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       });
 
       expect(
-        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+        estudiantesImportacionService.ejecutarDesdeFormulario,
       ).toHaveBeenCalledWith(usuarioId, {
         carreraId: 2,
         planEstudioId: 3,
@@ -244,7 +341,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
             asignaturasAprobadas: ['EIF201'],
           },
         ],
-      });
+      }, FuenteRegistroAcademico.GOOGLE_FORMS, expect.anything());
 
       expect(mockRespuesta.estado).toBe(EstadoRespuestaFormulario.PROCESADO);
       expect(mockRespuesta.revisadoPorUsuarioId).toBe(usuarioId);
@@ -280,7 +377,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       ).rejects.toThrow(ConflictException);
 
       expect(
-        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+        estudiantesImportacionService.ejecutarDesdeFormulario,
       ).not.toHaveBeenCalled();
     });
 
@@ -296,7 +393,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       ).rejects.toThrow(ConflictException);
 
       expect(
-        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+        estudiantesImportacionService.ejecutarDesdeFormulario,
       ).not.toHaveBeenCalled();
     });
 
@@ -304,7 +401,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       const mockRespuesta = { ...mockRespuestaBase };
       respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
 
-      estudiantesImportacionService.ejecutarDesdeGoogleForms.mockResolvedValue({
+      estudiantesImportacionService.ejecutarDesdeFormulario.mockResolvedValue({
         creados: 0,
         actualizados: 0,
         aprobacionesNuevas: 0,
@@ -339,7 +436,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       ).rejects.toThrow(ForbiddenException);
 
       expect(
-        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+        estudiantesImportacionService.ejecutarDesdeFormulario,
       ).not.toHaveBeenCalled();
     });
 
@@ -370,7 +467,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       expect(mockRespuesta.motivoRechazo).toBe('Información inconsistente');
       expect(mockRespuesta.procesadoAt).toBeNull();
       expect(
-        estudiantesImportacionService.ejecutarDesdeGoogleForms,
+        estudiantesImportacionService.ejecutarDesdeFormulario,
       ).not.toHaveBeenCalled();
     });
 

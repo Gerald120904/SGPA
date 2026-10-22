@@ -12,7 +12,7 @@ test('la vista previa conserva nombres, códigos, año y ciclo reales', () => {
   const grupos = agruparAsignaturasVistaPrevia(cursos);
   assert.deepEqual(grupos.get(1).get(1), cursos.slice(0, 2));
   assert.deepEqual(grupos.get(2).get(2), [cursos[2]]);
-  assert.match(readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8'), /escapeHtml\(asignatura\.curso\.nombre\)/);
+  assert.match(readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8'), /escapeHtml\(asignatura\.curso\?\.nombre \|\| asignatura\.nombreReferencia/);
 });
 
 test('agregar requisito refresca solo la lista y conserva el diálogo', () => {

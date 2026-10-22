@@ -19,6 +19,7 @@ export function crearDatosResultadoImportado(input: ResultadoImportadoInput) {
       ![
         FuenteRegistroAcademico.EXCEL,
         FuenteRegistroAcademico.GOOGLE_FORMS,
+        FuenteRegistroAcademico.FORMULARIO_INTERNO,
       ].includes(input.fuenteRegistro))
   ) {
     throw new BadRequestException(

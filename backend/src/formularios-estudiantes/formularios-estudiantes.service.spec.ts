@@ -5,9 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
 
 describe('FormulariosEstudiantesService', () => {
   let service: FormulariosEstudiantesService;
@@ -48,6 +50,9 @@ describe('FormulariosEstudiantesService', () => {
     tieneAlcanceSobreCarrera: jest.Mock;
     obtenerCarreraIdsConAlcance: jest.Mock;
   };
+  let formulariosInternosPersistenciaService: {
+    crearFormularioInterno: jest.Mock;
+  };
 
   const usuarioId = 10;
   const dto: CrearFormularioEstudianteDto = {
@@ -55,6 +60,7 @@ describe('FormulariosEstudiantesService', () => {
     descripcion: 'Indique sus datos personales y asignaturas aprobadas.',
     carreraId: 1,
     planEstudioId: 2,
+    proveedor: ProveedorFormulario.GOOGLE_FORMS,
   };
 
   const mockCarrera = {
@@ -232,7 +238,7 @@ describe('FormulariosEstudiantesService', () => {
         .mockImplementation(async (_usuarioId, _formId, requests) => {
           let questionIndex = 0;
           return {
-            replies: requests.map((request, requestIndex) => {
+            replies: requests.map((request: any, requestIndex: any) => {
               if (!request.createItem) return {};
               if (!request.createItem.item?.questionItem) {
                 return { createItem: { itemId: `section-${requestIndex}` } };
@@ -268,6 +274,10 @@ describe('FormulariosEstudiantesService', () => {
       obtenerCarreraIdsConAlcance: jest.fn().mockResolvedValue([1]),
     };
 
+    formulariosInternosPersistenciaService = {
+      crearFormularioInterno: jest.fn(),
+    };
+
     service = new FormulariosEstudiantesService(
       formularioRepo as never,
       respuestaRepo as never,
@@ -278,6 +288,7 @@ describe('FormulariosEstudiantesService', () => {
       googleFormsClient as never,
       googleDriveClient as never,
       estructuraAcademicaService as never,
+      formulariosInternosPersistenciaService as never,
     );
   });
 
@@ -286,6 +297,80 @@ describe('FormulariosEstudiantesService', () => {
   });
 
   describe('crear', () => {
+    it('delega al motor interno por defecto cuando proveedor no se especifica o es INTERNO sin llamar a Google', async () => {
+      planAsignaturaRepo.find.mockResolvedValue(
+        mockPlanAsignaturas.filter((asignatura) => asignatura.cursoId !== null),
+      );
+      const mockFormularioInterno = {
+        id: 55,
+        titulo: 'Formulario Interno SGPA',
+        proveedor: ProveedorFormulario.INTERNO,
+        estado: EstadoFormularioEstudiante.CREANDO,
+      };
+      formulariosInternosPersistenciaService.crearFormularioInterno.mockResolvedValue(
+        mockFormularioInterno,
+      );
+
+      const dtoInterno: CrearFormularioEstudianteDto = {
+        titulo: 'Formulario Interno SGPA',
+        descripcion: 'Formulario institucional',
+        carreraId: 1,
+        planEstudioId: 2,
+      };
+
+      const resultado = await service.crear(usuarioId, dtoInterno);
+
+      expect(
+        formulariosInternosPersistenciaService.crearFormularioInterno,
+      ).toHaveBeenCalledWith(
+        usuarioId,
+        expect.objectContaining({
+          titulo: 'Formulario Interno SGPA',
+          carreraId: 1,
+          planEstudioId: 2,
+        }),
+      );
+      expect(googleFormsClient.crearFormulario).not.toHaveBeenCalled();
+      expect(resultado).toBe(mockFormularioInterno);
+    });
+
+    it('INTERNO explícito publica sin intentar crear un Google Form', async () => {
+      planAsignaturaRepo.find.mockResolvedValue(
+        mockPlanAsignaturas.filter((asignatura) => asignatura.cursoId !== null),
+      );
+      const interno = { id: 56, proveedor: ProveedorFormulario.INTERNO, estado: EstadoFormularioEstudiante.PUBLICADO };
+      formulariosInternosPersistenciaService.crearFormularioInterno.mockResolvedValue(interno);
+
+      await expect(service.crear(usuarioId, { ...dto, proveedor: ProveedorFormulario.INTERNO }))
+        .resolves.toBe(interno);
+      expect(googleFormsClient.crearFormulario).not.toHaveBeenCalled();
+      expect(googleDriveClient.permitirCualquieraConEnlaceResponder).not.toHaveBeenCalled();
+      expect(formulariosInternosPersistenciaService.crearFormularioInterno).toHaveBeenCalledTimes(1);
+    });
+
+    it('permite una asignatura de referencia sin Curso vinculada al plan', async () => {
+      planAsignaturaRepo.find.mockResolvedValue([{
+        id: 201, planEstudioId: 2, cursoId: null, curso: null,
+        codigoReferencia: 'QA-REF-1', nombreReferencia: 'Materia de Referencia', activo: true,
+      }]);
+
+      formulariosInternosPersistenciaService.crearFormularioInterno.mockResolvedValue({ id: 55 });
+      await expect(service.crear(usuarioId, { ...dto, proveedor: ProveedorFormulario.INTERNO }))
+        .resolves.toEqual({ id: 55 });
+    });
+
+    it('bloquea un plan con asignaturas sin Curso ni código de referencia', async () => {
+      planAsignaturaRepo.find.mockResolvedValue([{
+        id: 201, planEstudioId: 2, cursoId: null, curso: null,
+        codigoReferencia: null, nombreReferencia: 'Materia sin código', activo: true,
+      }]);
+
+      await expect(service.crear(usuarioId, { ...dto, proveedor: ProveedorFormulario.INTERNO }))
+        .rejects.toThrow('El plan contiene asignaturas sin Curso ni código de referencia');
+      expect(formulariosInternosPersistenciaService.crearFormularioInterno).not.toHaveBeenCalled();
+      expect(googleFormsClient.crearFormulario).not.toHaveBeenCalled();
+    });
+
     it('falla con NotFoundException si la carrera no existe o está inactiva', async () => {
       carreraRepo.findOne.mockResolvedValue(null);
 
@@ -404,8 +489,8 @@ describe('FormulariosEstudiantesService', () => {
 
       expect(requests).toHaveLength(19);
 
-      const items = requests.slice(1).map((request) => request.createItem.item);
-      expect(items.map((item) => item.title)).toEqual([
+      const items = requests.slice(1).map((request: any) => request.createItem.item);
+      expect(items.map((item: any) => item.title)).toEqual([
         'Primer nombre',
         'Segundo nombre',
         'Primer apellido',
@@ -445,7 +530,7 @@ describe('FormulariosEstudiantesService', () => {
       ]);
       expect(items[17].questionItem.question.textQuestion.paragraph).toBe(true);
       expect(
-        requests.slice(1).map((request) => request.createItem.location.index),
+        requests.slice(1).map((request: any) => request.createItem.location.index),
       ).toEqual(Array.from({ length: 18 }, (_, index) => index));
       return;
 
@@ -668,6 +753,16 @@ describe('FormulariosEstudiantesService', () => {
       expect(ultimoGuardado.detalleError).toBe('Google API quota exceeded');
     });
 
+    it('GOOGLE_FORMS explícito conserva el rechazo por conexión Google ausente', async () => {
+      const mensaje = 'El usuario no tiene una cuenta de Google conectada o la autorización ha sido revocada';
+      googleFormsClient.crearFormulario.mockRejectedValue(new BadRequestException(mensaje));
+
+      await expect(service.crear(usuarioId, { ...dto, proveedor: ProveedorFormulario.GOOGLE_FORMS }))
+        .rejects.toThrow(mensaje);
+      expect(googleFormsClient.crearFormulario).toHaveBeenCalledTimes(1);
+      expect(formulariosInternosPersistenciaService.crearFormularioInterno).not.toHaveBeenCalled();
+    });
+
     it('falla con InternalServerErrorException si Google no devuelve todos los replies', async () => {
       googleFormsClient.actualizarFormulario.mockResolvedValue({
         replies: [{ createItem: { itemId: 'item-0', questionId: ['q-0'] } }],
@@ -688,7 +783,7 @@ describe('FormulariosEstudiantesService', () => {
     it('falla con InternalServerErrorException si Google no devuelve questionId para alguna pregunta', async () => {
       googleFormsClient.actualizarFormulario.mockImplementation(
         async (_usuario, _formId, requests) => ({
-          replies: requests.map((request, index) => {
+          replies: requests.map((request: any, index: any) => {
             if (!request.createItem) return {};
             if (!request.createItem.item?.questionItem) {
               return { createItem: { itemId: `section-${index}` } };

@@ -17,9 +17,11 @@ import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entit
 import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
 import { MapaPreguntasFormulario } from './types/mapa-preguntas-formulario.type';
 
 @Injectable()
@@ -46,6 +48,7 @@ export class FormulariosEstudiantesService {
     private readonly googleFormsClient: GoogleFormsClientService,
     private readonly googleDriveClient: GoogleDriveClientService,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
+    private readonly formulariosInternosPersistenciaService: FormulariosInternosPersistenciaService,
   ) {}
 
   async listar(usuarioId: number) {
@@ -248,16 +251,18 @@ export class FormulariosEstudiantesService {
       );
     }
 
-    if (!formulario.googleFormId) {
-      throw new BadRequestException(
-        'El formulario no posee un identificador de Google Forms asociado.',
+    if (formulario.proveedor !== ProveedorFormulario.INTERNO) {
+      if (!formulario.googleFormId) {
+        throw new BadRequestException(
+          'El formulario no posee un identificador de Google Forms asociado.',
+        );
+      }
+
+      await this.googleFormsClient.cerrarFormulario(
+        formulario.creadoPorUsuarioId,
+        formulario.googleFormId,
       );
     }
-
-    await this.googleFormsClient.cerrarFormulario(
-      formulario.creadoPorUsuarioId,
-      formulario.googleFormId,
-    );
 
     formulario.estado = EstadoFormularioEstudiante.CERRADO;
     return await this.formularioRepo.save(formulario);
@@ -320,6 +325,39 @@ export class FormulariosEstudiantesService {
         orden: 'ASC',
       },
     });
+
+    // El importador resuelve Curso o codigoReferencia. Las asignaturas generales
+    // y optativas legítimas pueden no tener un Curso vinculado.
+    if (dto.proveedor !== ProveedorFormulario.GOOGLE_FORMS) {
+      if (planAsignaturas.length === 0) {
+        throw new BadRequestException(
+          'El plan de estudio no posee asignaturas activas',
+        );
+      }
+      if (planAsignaturas.some((item) =>
+        !(typeof item.cursoId === 'number' && item.curso) &&
+        !item.codigoReferencia?.trim(),
+      )) {
+        throw new BadRequestException(
+          'El plan contiene asignaturas sin Curso ni código de referencia; no podrían incorporarse al historial académico.',
+        );
+      }
+      const periodosInternos = await this.periodoRepo.find({
+        order: { anio: 'DESC', ciclo: 'DESC' },
+      });
+      if (periodosInternos.length === 0) {
+        throw new BadRequestException('No existen períodos académicos registrados');
+      }
+      return await this.formulariosInternosPersistenciaService.crearFormularioInterno(
+        usuarioId,
+        {
+          titulo: dto.titulo,
+          descripcion: dto.descripcion,
+          carreraId: dto.carreraId,
+          planEstudioId: dto.planEstudioId,
+        },
+      );
+    }
 
     const asignaturasConCurso = planAsignaturas.filter(
       (item) =>

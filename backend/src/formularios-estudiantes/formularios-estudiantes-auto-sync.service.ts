@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Interval } from '@nestjs/schedule';
 import { Repository } from 'typeorm';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
 import { GoogleOauthService } from '../integraciones/google/google-oauth.service';
@@ -36,6 +37,7 @@ export class FormulariosEstudiantesAutoSyncService {
       const formularios = await this.formularioRepository.find({
         where: {
           estado: EstadoFormularioEstudiante.PUBLICADO,
+          proveedor: ProveedorFormulario.GOOGLE_FORMS,
         },
       });
 
@@ -59,6 +61,12 @@ export class FormulariosEstudiantesAutoSyncService {
           );
         }
       }
+    } catch (error) {
+      this.logger.warn(
+        `Error en sincronización automática de formularios: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     } finally {
       this.ejecutando = false;
     }
