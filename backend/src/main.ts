@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { config as cargarEntorno } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
-import { verificarMigracionesAntesDeEscuchar } from './migrations/startup-migrations';
+import { synchronizeDevelopmentSchemaSafely } from './config/development-schema-sync';
 
 async function bootstrap() {
   cargarEntorno({ path: process.env.SGPA_ENV_FILE || '.env', quiet: true });
@@ -18,7 +18,7 @@ async function bootstrap() {
   );
 
   try {
-    await verificarMigracionesAntesDeEscuchar(
+    await synchronizeDevelopmentSchemaSafely(
       app.get(DataSource),
       app.get(ConfigService),
     );
