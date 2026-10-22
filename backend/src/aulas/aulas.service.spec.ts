@@ -945,8 +945,7 @@ describe('AulasService', () => {
     await expect(
       service.asignarEquipamientoAula(1, {
         equipamientoId: 1,
-        cantidadTotal: 1,
-        cantidadDisponible: 1,
+        cantidadAsignada: 1,
       }),
     ).rejects.toThrow(BadRequestException);
     expect(equipamientoRepository.findOne).not.toHaveBeenCalled();
@@ -961,8 +960,7 @@ describe('AulasService', () => {
     await expect(
       service.asignarEquipamientoAula(1, {
         equipamientoId: 1,
-        cantidadTotal: 1,
-        cantidadDisponible: 1,
+        cantidadAsignada: 1,
       }),
     ).rejects.toThrow(BadRequestException);
     expect(aulaEquipamientoRepository.save).not.toHaveBeenCalled();
@@ -978,8 +976,7 @@ describe('AulasService', () => {
     await expect(
       service.asignarEquipamientoAula(1, {
         equipamientoId: 1,
-        cantidadTotal: 1,
-        cantidadDisponible: 1,
+        cantidadAsignada: 1,
       }),
     ).rejects.toThrow(ConflictException);
     expect(aulaEquipamientoRepository.save).not.toHaveBeenCalled();
@@ -2018,8 +2015,7 @@ describe('AulasService', () => {
         equipamientos: [
           crearAulaEquipamiento({
             equipamientoId: 1,
-            cantidadTotal: 25,
-            cantidadDisponible: 10,
+            cantidadAsignada: 10,
             activo: true,
             equipamiento: crearEquipamiento({
               id: 1,
@@ -2062,7 +2058,7 @@ describe('AulasService', () => {
         equipamientos: [
           crearAulaEquipamiento({
             equipamientoId: 1,
-            cantidadDisponible: 1,
+            cantidadAsignada: 1,
             activo: false,
             equipamiento: crearEquipamiento({
               id: 1,
