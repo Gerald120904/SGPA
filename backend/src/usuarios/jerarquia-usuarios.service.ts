@@ -92,6 +92,10 @@ export class JerarquiaUsuariosService {
     })));
   }
 
+  configuracionCreacionAsistente() {
+    return { envioInvitacionHabilitado: process.env.SGPA_INVITATION_OUTBOX_ENABLED === 'true' };
+  }
+
   async catalogoEstudiantes(usuarioId: number) {
     const ids = (await this.alcance.obtenerCarrerasAutorizadas(usuarioId));
     const autorizadas: number[] = [];
@@ -258,6 +262,9 @@ export class JerarquiaUsuariosService {
 
   async crearAsistente(coordinadorId: number, dto: CrearAsistenteJerarquicoDto) {
     if (!dto.carreras.length) throw new BadRequestException('Seleccione al menos una carrera.');
+    if (!dto.carreras.some((carrera) => carrera.permisos.length > 0)) {
+      throw new BadRequestException('Seleccione al menos un permiso delegable.');
+    }
     await this.validarDelegacion(coordinadorId, dto.carreras);
     const cuenta: CrearUsuarioDto = {
       cedula: dto.cedula, nombres: dto.nombres, apellido1: dto.apellido1,
@@ -271,7 +278,7 @@ export class JerarquiaUsuariosService {
         asistenteId, coordinadorId, creadoPorUsuarioId: coordinadorId, activo: true,
       });
       await this.configurarAsistenteEnTransaccion(manager, coordinadorId, asistenteId, dto.carreras);
-    });
+    }, { respetarConfiguracionEnvio: true, incluirEstadoInvitacion: true });
   }
 
   private async validarDelegacion(coordinadorId: number, carreras: AlcanceCarreraDto[]) {

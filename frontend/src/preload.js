@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("sgpa", {
   listarRoles: () => ipcRenderer.invoke("roles:listar"),
   listarMisCarrerasJerarquia: () => ipcRenderer.invoke('jerarquia:mis-carreras'),
   listarMisAlcancesJerarquia: () => ipcRenderer.invoke('jerarquia:mis-alcances'),
+  obtenerConfiguracionAsistentesJerarquia: () => ipcRenderer.invoke('jerarquia:asistentes-configuracion'),
   obtenerCatalogoEstudiantesJerarquia: () => ipcRenderer.invoke('jerarquia:catalogo-estudiantes'),
   obtenerCoordinadorJerarquia: (id) => ipcRenderer.invoke('jerarquia:coordinador', id),
   configurarCoordinadorJerarquia: (id, carreras) => ipcRenderer.invoke('jerarquia:configurar-coordinador', id, carreras),

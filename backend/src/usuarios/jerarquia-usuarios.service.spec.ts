@@ -22,6 +22,7 @@ describe('JerarquiaUsuariosService', () => {
   let service: JerarquiaUsuariosService;
   let usuarios: { findOne: jest.Mock };
   let scope: { obtenerCarrerasAutorizadas: jest.Mock; obtenerPermisosDelegables: jest.Mock };
+  let usuariosService: { crearConInvitacion: jest.Mock };
   let tx: jest.Mock;
 
   beforeEach(() => {
@@ -36,11 +37,12 @@ describe('JerarquiaUsuariosService', () => {
       obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([2]),
       obtenerPermisosDelegables: jest.fn().mockResolvedValue([permiso]),
     };
+    usuariosService = { crearConInvitacion: jest.fn() };
     tx = jest.fn();
     service = new JerarquiaUsuariosService(
       { transaction: tx } as any, usuarios as any, {} as any, {} as any,
       {} as any, {} as any, {} as any, {} as any, {} as any,
-      scope as any, {} as any,
+      scope as any, usuariosService as any,
     );
   });
 
@@ -62,6 +64,62 @@ describe('JerarquiaUsuariosService', () => {
       carreras: [{ carreraId: 9, permisos: [permiso] }],
     } as any)).rejects.toThrow(ForbiddenException);
     expect(tx).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear un asistente sin ningún permiso efectivo', async () => {
+    await expect(service.crearAsistente(2, {
+      cedula: '123', nombres: 'Alex', apellido1: 'Prueba', correo: 'alex@example.com',
+      carreras: [{ carreraId: 2, permisos: [] }],
+    } as any)).rejects.toThrow('Seleccione al menos un permiso delegable');
+    expect(scope.obtenerCarrerasAutorizadas).not.toHaveBeenCalled();
+  });
+
+  it('comunica si el procesamiento automático de invitaciones está habilitado', () => {
+    const anterior = process.env.SGPA_INVITATION_OUTBOX_ENABLED;
+    try {
+      process.env.SGPA_INVITATION_OUTBOX_ENABLED = 'false';
+      expect(service.configuracionCreacionAsistente()).toEqual({ envioInvitacionHabilitado: false });
+      process.env.SGPA_INVITATION_OUTBOX_ENABLED = 'true';
+      expect(service.configuracionCreacionAsistente()).toEqual({ envioInvitacionHabilitado: true });
+    } finally {
+      if (anterior === undefined) delete process.env.SGPA_INVITATION_OUTBOX_ENABLED;
+      else process.env.SGPA_INVITATION_OUTBOX_ENABLED = anterior;
+    }
+  });
+
+  it('crea con estado de invitación y exige respetar la configuración de envío', async () => {
+    usuariosService.crearConInvitacion.mockResolvedValue({
+      id: 8, invitacion: { estado: 'PENDIENTE' },
+    });
+    const resultado = await service.crearAsistente(2, {
+      cedula: '123', nombres: 'Alex', apellido1: 'Prueba', correo: 'alex@example.com',
+      carreras,
+    } as any);
+    expect(resultado).toMatchObject({ invitacion: { estado: 'PENDIENTE' } });
+    expect(usuariosService.crearConInvitacion).toHaveBeenCalledWith(
+      expect.objectContaining({ roles: [RolSistema.ASISTENTE_ESTUDIANTIL] }),
+      expect.any(Function),
+      { respetarConfiguracionEnvio: true, incluirEstadoInvitacion: true },
+    );
+  });
+
+  it('misAlcances conserva carreras sin permisos para que la interfaz explique el estado', async () => {
+    const carrerasRepo = { find: jest.fn().mockResolvedValue([{ id: 2, codigo: 'ISC', nombre: 'Sistemas' }]) };
+    scope.obtenerPermisosDelegables.mockResolvedValue([]);
+    service = new JerarquiaUsuariosService(
+      { transaction: tx } as any, usuarios as any, carrerasRepo as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any, {} as any,
+      scope as any, usuariosService as any,
+    );
+    await expect(service.misAlcances(2)).resolves.toEqual([
+      { id: 2, codigo: 'ISC', nombre: 'Sistemas', permisos: [] },
+    ]);
+  });
+
+  it('misAlcances devuelve una lista vacía cuando el coordinador no tiene carreras', async () => {
+    scope.obtenerCarrerasAutorizadas.mockResolvedValue([]);
+    await expect(service.misAlcances(2)).resolves.toEqual([]);
+    expect(scope.obtenerPermisosDelegables).not.toHaveBeenCalled();
   });
 
   it('rechaza que un coordinador edite al asistente de otro', async () => {

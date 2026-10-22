@@ -353,6 +353,9 @@ ipcMain.handle('jerarquia:mis-carreras', async () =>
 ipcMain.handle('jerarquia:mis-alcances', async () =>
   ejecutarPeticionAutenticada('/jerarquia-usuarios/mis-alcances'));
 
+ipcMain.handle('jerarquia:asistentes-configuracion', async () =>
+  ejecutarPeticionAutenticada('/jerarquia-usuarios/asistentes-configuracion'));
+
 ipcMain.handle('jerarquia:catalogo-estudiantes', async () =>
   ejecutarPeticionAutenticada('/jerarquia-usuarios/catalogo-estudiantes'));
 

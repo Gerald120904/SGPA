@@ -68,6 +68,12 @@ export class JerarquiaUsuariosController {
     return this.jerarquia.listarMisAsistentes(request.user!.sub);
   }
 
+  @Get('asistentes-configuracion')
+  @Roles(RolSistema.COORDINADOR)
+  configuracionCreacionAsistente() {
+    return this.jerarquia.configuracionCreacionAsistente();
+  }
+
   @Get('asistentes/:id')
   @Roles(RolSistema.COORDINADOR)
   obtenerAsistente(@Req() request: Request, @Param('id', ParseIntPipe) id: number) {
