@@ -7,6 +7,7 @@ function invocar(metodo, ...argumentos) {
 
 export const listarMisCarrerasJerarquia = () => invocar('listarMisCarrerasJerarquia');
 export const listarMisAlcancesJerarquia = () => invocar('listarMisAlcancesJerarquia');
+export const obtenerConfiguracionAsistentesJerarquia = () => invocar('obtenerConfiguracionAsistentesJerarquia');
 export const obtenerCatalogoEstudiantesJerarquia = () => invocar('obtenerCatalogoEstudiantesJerarquia');
 export const obtenerCoordinadorJerarquia = (id) => invocar('obtenerCoordinadorJerarquia', id);
 export const configurarCoordinadorJerarquia = (id, carreras) => invocar('configurarCoordinadorJerarquia', id, carreras);

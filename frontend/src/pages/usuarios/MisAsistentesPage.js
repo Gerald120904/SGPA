@@ -1,8 +1,9 @@
-import { obtenerRolesUsuario } from '../../app/session.js';
+import { obtenerRolesUsuario, obtenerUsuario } from '../../app/session.js';
 import { ROLES } from '../../config/permissions.js';
 import {
   listarMisAlcancesJerarquia, listarMisAsistentes, obtenerAsistenteJerarquia,
   crearAsistenteJerarquia, configurarAsistenteJerarquia,
+  obtenerConfiguracionAsistentesJerarquia,
 } from '../../services/jerarquia.service.js';
 import {
   listarMisSolicitudesCambio, listarSolicitudesPendientesCambio,
@@ -13,11 +14,33 @@ import { confirmarAccion } from '../../utils/confirm.js';
 
 let instanciaActual = 0;
 
+const MODULOS_DELEGABLES = [
+  { nombre: 'Estudiantes', consultar: 'ESTUDIANTES_VER', gestionar: 'ESTUDIANTES_GESTIONAR' },
+  { nombre: 'Cursos', consultar: 'CURSOS_VER', gestionar: 'CURSOS_GESTIONAR' },
+  { nombre: 'Planes de estudio', consultar: 'PLANES_ESTUDIO_VER', gestionar: 'PLANES_ESTUDIO_GESTIONAR' },
+  { nombre: 'Optativas', consultar: 'OPTATIVAS_VER', gestionar: 'OPTATIVAS_GESTIONAR' },
+];
+
+export function obtenerEstadoSeleccionPermisosDisponibles(permisos) {
+  const disponibles = Array.from(permisos || []).filter((permiso) => !permiso.disabled);
+  const seleccionados = disponibles.filter((permiso) => permiso.checked).length;
+  return {
+    checked: disponibles.length > 0 && seleccionados === disponibles.length,
+    indeterminate: seleccionados > 0 && seleccionados < disponibles.length,
+    disabled: disponibles.length === 0,
+  };
+}
+
+export function establecerSeleccionPermisosDisponibles(permisos, seleccionado) {
+  Array.from(permisos || []).filter((permiso) => !permiso.disabled)
+    .forEach((permiso) => { permiso.checked = Boolean(seleccionado); });
+}
+
 export function MisAsistentesPage() {
   return `<section id="misAsistentesPage" class="module-view mis-asistentes-page">
     <header class="mis-asistentes-header">
       <div><h2>Asistentes y solicitudes</h2><p>Carreras delegadas y cambios pendientes de aprobación.</p></div>
-      <button type="button" id="crearAsistenteButton" class="usuarios-primary-button">Crear asistente</button>
+      <button type="button" id="crearAsistenteButton" class="usuarios-primary-button" disabled>Crear asistente</button>
     </header>
     <div id="misAsistentesFeedback" class="usuarios-feedback hidden" role="status"></div>
     <div id="misAsistentesContenido" aria-live="polite">Cargando...</div>
@@ -31,6 +54,8 @@ function verificar(resultado, mensaje) {
 }
 
 function nombrePermiso(codigo) {
+  if (String(codigo).endsWith('_VER')) return 'Consultar';
+  if (String(codigo).endsWith('_GESTIONAR')) return 'Proponer cambios';
   return String(codigo).replaceAll('_', ' ').toLocaleLowerCase('es-CR');
 }
 
@@ -92,8 +117,14 @@ export async function iniciarMisAsistentesPage() {
   const feedback = pagina.querySelector('#misAsistentesFeedback');
   const dialogo = pagina.querySelector('#misAsistentesDialog');
   const dialogoContenido = pagina.querySelector('#misAsistentesDialogContenido');
-  const estado = { alcances: [], asistentes: [], solicitudes: [] };
-  pagina.querySelector('#crearAsistenteButton').hidden = esAsistente;
+  const estado = {
+    alcances: [],
+    asistentes: [],
+    solicitudes: [],
+    configuracion: { envioInvitacionHabilitado: false },
+  };
+  const crearAsistenteButton = pagina.querySelector('#crearAsistenteButton');
+  crearAsistenteButton.hidden = esAsistente;
 
   function mensaje(texto, error = false) {
     feedback.textContent = texto;
@@ -105,19 +136,32 @@ export async function iniciarMisAsistentesPage() {
       if (esAsistente) {
         estado.solicitudes = verificar(await listarMisSolicitudesCambio(), 'No se pudieron cargar sus solicitudes.');
       } else {
-        const [alcances, asistentes, solicitudes] = await Promise.all([
+        const [alcances, asistentes, solicitudes, configuracion] = await Promise.all([
           listarMisAlcancesJerarquia(), listarMisAsistentes(), listarSolicitudesPendientesCambio(),
+          obtenerConfiguracionAsistentesJerarquia(),
         ]);
         estado.alcances = verificar(alcances, 'No se pudo cargar su alcance.');
         estado.asistentes = verificar(asistentes, 'No se pudieron cargar los asistentes.');
         estado.solicitudes = verificar(solicitudes, 'No se pudieron cargar las solicitudes.');
+        estado.configuracion = verificar(
+          configuracion,
+          'No se pudo consultar el estado de las invitaciones.',
+        );
       }
       if (!sigueActiva()) return;
       const nombres = new Map(estado.asistentes.map((a) => [Number(a.id), `${a.nombres} ${a.apellido1}`]));
       const carreras = new Map(estado.alcances.map((c) => [Number(c.id), c.nombre]));
       contenido.innerHTML = `
         ${esAsistente ? '' : `<section class="mis-asistentes-panel"><h3>Mis carreras</h3>
-          <p>${estado.alcances.length ? estado.alcances.map((c) => escapeHtml(c.nombre)).join(' · ') : 'Sin carreras delegables.'}</p></section>
+          ${estado.alcances.length
+            ? `<div class="mis-asistentes-alcances-resumen">${estado.alcances.map((c) => `
+                <div><strong>${escapeHtml(c.nombre)}</strong>
+                  ${Array.isArray(c.permisos) && c.permisos.length
+                    ? `<span>${c.permisos.length} permiso(s) delegable(s)</span>`
+                    : '<span>Esta carrera no tiene permisos disponibles para delegar.</span>'}
+                </div>`).join('')}</div>`
+            : '<p class="mis-asistentes-empty">No tenés carreras asignadas para delegar. Solicitá al administrador que configure tus carreras y permisos.</p>'}
+          </section>
           <section class="mis-asistentes-panel"><h3>Mis asistentes</h3>
           ${estado.asistentes.length ? `<ul>${estado.asistentes.map((a) => `<li>
             <span>${escapeHtml(`${a.nombres} ${a.apellido1}`)} · ${escapeHtml(a.correo)}</span>
@@ -139,20 +183,89 @@ export async function iniciarMisAsistentesPage() {
               </div>` : ''}
             </article>`).join('')}</div>` : '<p>No hay solicitudes.</p>'}
         </section>`;
+      crearAsistenteButton.disabled = false;
     } catch (error) {
-      if (sigueActiva()) mensaje(error.message, true);
+      if (sigueActiva()) {
+        crearAsistenteButton.disabled = true;
+        contenido.innerHTML = '<div class="mis-asistentes-load-error">No fue posible cargar las carreras, permisos y solicitudes. Intentá nuevamente.</div>';
+        mensaje(error.message, true);
+      }
     }
   }
 
   function camposCarreras(asignadas = []) {
     const seleccionadas = new Map(asignadas.map((c) => [Number(c.carreraId), new Set(c.permisos)]));
-    return estado.alcances.map((c) => `<fieldset class="mis-asistentes-carrera" data-carrera-id="${c.id}">
+    if (!estado.alcances.length) {
+      return '<p class="mis-asistentes-empty">No tenés carreras asignadas para delegar. Solicitá al administrador que configure tus carreras y permisos.</p>';
+    }
+
+    return estado.alcances.map((c) => {
+      const disponibles = new Set(Array.isArray(c.permisos) ? c.permisos : []);
+      const modulos = MODULOS_DELEGABLES.map((modulo) => ({
+        ...modulo,
+        permisos: [modulo.consultar, modulo.gestionar]
+          .filter((permiso) => disponibles.has(permiso)),
+      })).filter((modulo) => modulo.permisos.length);
+
+      return `<fieldset class="mis-asistentes-carrera" data-carrera-id="${c.id}" data-carrera-nombre="${escapeHtml(c.nombre)}">
       <legend><label><input type="checkbox" name="carrera" value="${c.id}" ${seleccionadas.has(Number(c.id)) ? 'checked' : ''}>
         ${escapeHtml(c.nombre)}</label></legend>
-      <div class="mis-asistentes-permisos">${c.permisos.map((p) => `<label>
-        <input type="checkbox" name="permiso" value="${escapeHtml(p)}" ${seleccionadas.get(Number(c.id))?.has(p) ? 'checked' : ''}>
-        ${escapeHtml(nombrePermiso(p))}</label>`).join('')}</div>
-    </fieldset>`).join('');
+      ${modulos.length ? `
+        <label class="mis-asistentes-seleccionar-todos">
+          <input type="checkbox" name="seleccionar-todos-permisos">
+          <span>Seleccionar todos los permisos disponibles</span>
+        </label>
+        <div class="mis-asistentes-permisos">${modulos.map((modulo) => `
+          <section class="mis-asistentes-modulo">
+            <strong>${escapeHtml(modulo.nombre)}</strong>
+            <div>${modulo.permisos.map((permiso) => `<label>
+              <input type="checkbox" name="permiso" value="${escapeHtml(permiso)}" ${seleccionadas.get(Number(c.id))?.has(permiso) ? 'checked' : ''}>
+              ${escapeHtml(nombrePermiso(permiso))}</label>`).join('')}</div>
+          </section>`).join('')}</div>`
+        : '<p class="mis-asistentes-empty">Esta carrera no tiene permisos disponibles para delegar.</p>'}
+    </fieldset>`;
+    }).join('');
+  }
+
+  function actualizarSelectorCarrera(campo) {
+    const selector = campo?.querySelector('[name="seleccionar-todos-permisos"]');
+    if (!selector) return;
+    const seleccion = obtenerEstadoSeleccionPermisosDisponibles(
+      campo.querySelectorAll('[name="permiso"]'),
+    );
+    selector.checked = seleccion.checked;
+    selector.indeterminate = seleccion.indeterminate;
+    selector.disabled = seleccion.disabled;
+  }
+
+  function actualizarResumenFormulario(formulario) {
+    const resumen = formulario.querySelector('#resumenDelegacionAsistente');
+    const boton = formulario.querySelector('[type="submit"]');
+    if (!resumen || !boton) return;
+    const campos = [...formulario.querySelectorAll('.mis-asistentes-carrera')]
+      .filter((campo) => campo.querySelector('[name="carrera"]')?.checked);
+    const seleccion = campos.map((campo) => ({
+      nombre: campo.dataset.carreraNombre,
+      permisos: [...campo.querySelectorAll('[name="permiso"]:checked')]
+        .map((input) => nombrePermiso(input.value)),
+    }));
+    const totalPermisos = seleccion.reduce((total, carrera) => total + carrera.permisos.length, 0);
+    const usuario = obtenerUsuario();
+    const coordinador = [usuario?.nombres, usuario?.apellido1]
+      .filter(Boolean).join(' ') || 'Coordinador de la sesión';
+    const invitacion = estado.configuracion.envioInvitacionHabilitado
+      ? 'Envío habilitado; el resultado se confirmará al crear.'
+      : 'Pendiente de envío; el envío automático está deshabilitado.';
+
+    resumen.innerHTML = `
+      <h4>Resumen de la delegación</h4>
+      <p><strong>Coordinador responsable:</strong> ${escapeHtml(coordinador)}</p>
+      <p><strong>Estado de la invitación:</strong> ${escapeHtml(invitacion)}</p>
+      ${seleccion.length
+        ? `<ul>${seleccion.map((carrera) => `<li><strong>${escapeHtml(carrera.nombre)}</strong>: ${carrera.permisos.length ? carrera.permisos.map(escapeHtml).join(', ') : 'sin permisos seleccionados'}</li>`).join('')}</ul>`
+        : '<p>No hay carreras seleccionadas.</p>'}`;
+
+    if (!formulario.dataset.id) boton.disabled = seleccion.length === 0 || totalPermisos === 0;
   }
 
   function abrirFormulario(id = null, asignadas = []) {
@@ -167,10 +280,17 @@ export async function iniciarMisAsistentesPage() {
         <label>Segundo apellido<input name="apellido2" maxlength="100"></label>
         <label>Correo<input name="correo" type="email" required maxlength="150"></label>
       </div>`}
-      <div class="mis-asistentes-carreras">${camposCarreras(asignadas)}</div>
+      <section class="mis-asistentes-delegacion">
+        <h4>Carreras y permisos del asistente</h4>
+        <div class="mis-asistentes-carreras">${camposCarreras(asignadas)}</div>
+      </section>
+      <section id="resumenDelegacionAsistente" class="mis-asistentes-resumen"></section>
       <div class="usuario-dialog-actions"><button type="button" data-action="cerrar" class="usuarios-secondary-button">Cancelar</button>
-        <button type="submit" class="usuarios-primary-button">${id ? 'Guardar delegación' : 'Crear e invitar'}</button></div>
+        <button type="submit" class="usuarios-primary-button">${id ? 'Guardar delegación' : estado.configuracion.envioInvitacionHabilitado ? 'Crear e invitar' : 'Crear asistente'}</button></div>
     </form>`;
+    const formulario = dialogoContenido.querySelector('#formAsistente');
+    formulario.querySelectorAll('.mis-asistentes-carrera').forEach(actualizarSelectorCarrera);
+    actualizarResumenFormulario(formulario);
     dialogo.showModal();
   }
 
@@ -211,7 +331,25 @@ export async function iniciarMisAsistentesPage() {
     }
   });
 
-  pagina.querySelector('#crearAsistenteButton').addEventListener('click', () => abrirFormulario());
+  pagina.addEventListener('change', (event) => {
+    const campo = event.target.closest?.('#formAsistente .mis-asistentes-carrera');
+    if (!campo) return;
+
+    if (event.target.name === 'seleccionar-todos-permisos') {
+      establecerSeleccionPermisosDisponibles(
+        campo.querySelectorAll('[name="permiso"]'),
+        event.target.checked,
+      );
+      if (event.target.checked) campo.querySelector('[name="carrera"]').checked = true;
+    } else if (event.target.name === 'permiso' && event.target.checked) {
+      campo.querySelector('[name="carrera"]').checked = true;
+    }
+
+    actualizarSelectorCarrera(campo);
+    actualizarResumenFormulario(event.target.closest('#formAsistente'));
+  });
+
+  crearAsistenteButton.addEventListener('click', () => abrirFormulario());
   pagina.addEventListener('submit', async (event) => {
     if (event.target.id === 'formRechazo') {
       event.preventDefault();
@@ -231,6 +369,7 @@ export async function iniciarMisAsistentesPage() {
     if (event.target.id !== 'formAsistente') return;
     event.preventDefault();
     const form = event.target;
+    if (!form.reportValidity()) return;
     const boton = form.querySelector('[type="submit"]');
     const carreras = [...form.querySelectorAll('.mis-asistentes-carrera')]
       .filter((campo) => campo.querySelector('[name="carrera"]')?.checked)
@@ -238,11 +377,16 @@ export async function iniciarMisAsistentesPage() {
         permisos: [...campo.querySelectorAll('[name="permiso"]:checked')].map((input) => input.value) }));
     const id = Number(form.dataset.id);
     if (!id && !carreras.length) { mensaje('Seleccione al menos una carrera.', true); return; }
+    if (!id && !carreras.some((carrera) => carrera.permisos.length > 0)) {
+      mensaje('Seleccione al menos un permiso delegable.', true);
+      return;
+    }
     const datos = new FormData(form);
     try {
       boton.disabled = true;
+      let resultadoCreacion = null;
       if (id) verificar(await configurarAsistenteJerarquia(id, carreras), 'No se pudo guardar la delegación.');
-      else verificar(await crearAsistenteJerarquia({
+      else resultadoCreacion = verificar(await crearAsistenteJerarquia({
         cedula: String(datos.get('cedula') || '').trim(),
         nombres: String(datos.get('nombres') || '').trim(),
         apellido1: String(datos.get('apellido1') || '').trim(),
@@ -250,7 +394,12 @@ export async function iniciarMisAsistentesPage() {
         correo: String(datos.get('correo') || '').trim().toLowerCase(), carreras,
       }), 'No se pudo crear el asistente.');
       dialogo.close();
-      mensaje(id ? 'Delegación actualizada.' : 'Asistente creado. Se envió la invitación.');
+      const estadoInvitacion = resultadoCreacion?.invitacion?.estado;
+      mensaje(id
+        ? 'Delegación actualizada.'
+        : estadoInvitacion === 'ENVIADA'
+          ? 'Asistente creado. La invitación fue enviada.'
+          : 'Asistente creado. La invitación quedó pendiente de envío.');
       await cargar();
     } catch (error) { mensaje(error.message, true); } finally { boton.disabled = false; }
   });
