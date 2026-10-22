@@ -826,10 +826,16 @@ contextBridge.exposeInMainWorld("sgpa", {
     ),
   cerrarFormularioEstudiantes: (id) =>
     ipcRenderer.invoke('formularios-estudiantes:cerrar', id),
+  publicarFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke('formularios-estudiantes:publicar', id),
+  regenerarTokenFormularioEstudiantes: (id) =>
+    ipcRenderer.invoke('formularios-estudiantes:regenerar-token', id),
   listarRespuestasFormularioEstudiantes: (id) =>
     ipcRenderer.invoke('formularios-estudiantes:respuestas', id),
   abrirEnlaceFormularioEstudiantes: (url) =>
     ipcRenderer.invoke('formularios-estudiantes:abrir-enlace', url),
+  obtenerUrlPublicaFormulario: (responderUri) =>
+    ipcRenderer.invoke('formularios-estudiantes:obtener-url-publica', responderUri),
 
   contarEstudiantesPorCarrera: () =>
     ipcRenderer.invoke('estudiantes:conteos-carreras'),

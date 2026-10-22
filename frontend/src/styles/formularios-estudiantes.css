@@ -377,3 +377,37 @@
     box-shadow: 0 0 0 0 rgba(247, 144, 9, 0);
   }
 }
+
+.badge-proveedor {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.badge-interno {
+  background: #fdf2f4;
+  color: #ba0c2f;
+  border: 1px solid #f8b4be;
+}
+
+.badge-google {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.formularios-icon-button-success {
+  color: #15803d;
+}
+
+.formularios-icon-button-success:hover:not(:disabled) {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}

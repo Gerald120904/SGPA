@@ -13,9 +13,11 @@ import { Carrera } from '../../carreras/entities/carrera.entity';
 import { PlanEstudio } from '../../planes-estudio/entities/plan-estudio.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { EstadoFormularioEstudiante } from '../constants/estado-formulario-estudiante.constant';
+import { ProveedorFormulario } from '../constants/proveedor-formulario.constant';
 import { RespuestaFormularioEstudiante } from './respuesta-formulario-estudiante.entity';
 
 import { MapaPreguntasFormulario } from '../types/mapa-preguntas-formulario.type';
+import type { InstantaneaCurricularInterna } from '../types/instantanea-curricular-interna.type';
 
 @Entity({ name: 'formularios_estudiantes' })
 export class FormularioEstudiante {
@@ -69,6 +71,22 @@ export class FormularioEstudiante {
   responderUri!: string | null;
 
   @Column({
+    type: 'varchar',
+    length: 20,
+    default: ProveedorFormulario.GOOGLE_FORMS,
+  })
+  proveedor!: ProveedorFormulario;
+
+  @Column({
+    name: 'token_publico',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  @Index('UQ_formularios_token_publico', { unique: true })
+  tokenPublico!: string | null;
+
+  @Column({
     type: 'enum',
     enum: EstadoFormularioEstudiante,
     default: EstadoFormularioEstudiante.CREANDO,
@@ -80,7 +98,7 @@ export class FormularioEstudiante {
     type: 'json',
     nullable: true,
   })
-  mapaPreguntas!: MapaPreguntasFormulario | null;
+  mapaPreguntas!: MapaPreguntasFormulario | InstantaneaCurricularInterna | null;
 
   @Column({
     name: 'detalle_error',

@@ -7,7 +7,12 @@ import {
   sincronizarFormularioEstudiantes,
   cerrarFormularioEstudiantes,
   listarRespuestasFormularioEstudiantes,
-  abrirEnlaceFormularioEstudiantes
+  abrirEnlaceFormularioEstudiantes,
+  publicarFormularioEstudiantes,
+  regenerarTokenFormularioEstudiantes,
+  obtenerUrlPublicaFormulario,
+  aceptarSolicitudFormulario,
+  rechazarSolicitudFormulario
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -92,6 +97,29 @@ export function agruparAsignaturasVistaPrevia(asignaturas) {
     estructura.set(nivel, ciclosNivel);
   });
   return estructura;
+}
+
+export function construirDatosCrearFormulario({
+  titulo,
+  descripcion,
+  carreraId,
+  planEstudioId,
+  proveedor
+}) {
+  if (proveedor !== 'INTERNO' && proveedor !== 'GOOGLE_FORMS') {
+    throw new Error('Seleccione una modalidad de formulario válida.');
+  }
+
+  return { titulo, descripcion, carreraId, planEstudioId, proveedor };
+}
+
+export function asignaturasElegiblesParaFormulario(asignaturas, proveedor) {
+  return asignaturas.filter((asignatura) =>
+    asignatura.activo === true && (
+      (asignatura.cursoId != null && asignatura.curso != null) ||
+      (proveedor === 'INTERNO' && Boolean(asignatura.codigoReferencia?.trim()))
+    )
+  );
 }
 
 export function FormulariosEstudiantesPage() {
@@ -270,16 +298,7 @@ function renderizarAcciones() {
         id="nuevoFormularioButton"
         type="button"
         class="formularios-primary-button"
-        ${
-          estadoGoogle.conectado
-            ? ''
-            : 'disabled'
-        }
-        title="${
-          estadoGoogle.conectado
-            ? 'Crear formulario'
-            : 'Conecta Google primero'
-        }"
+        title="Crear formulario de estudiantes en SGPA"
       >
         <i
           data-lucide="plus"
@@ -327,6 +346,9 @@ function renderizarFilaFormulario(
       PERMISOS.VER_RESPUESTAS
     );
 
+  const esInterno =
+    formulario.proveedor === 'INTERNO';
+
   const publicado =
     formulario.estado === 'PUBLICADO';
 
@@ -339,6 +361,7 @@ function renderizarFilaFormulario(
   const tonosEstado = {
     PUBLICADO: 'success',
     CERRADO: 'neutral',
+    CREADO: 'info',
     CREANDO: 'info',
     ERROR: 'danger'
   };
@@ -351,6 +374,12 @@ function renderizarFilaFormulario(
         'neutral'
     });
 
+  const badgeProveedor = `
+    <span class="badge-proveedor ${esInterno ? 'badge-interno' : 'badge-google'}">
+      ${esInterno ? 'SGPA' : 'Google'}
+    </span>
+  `;
+
   return `
     <tr
       data-formulario-id="${formulario.id}"
@@ -361,6 +390,7 @@ function renderizarFilaFormulario(
             formulario.titulo
           )}
         </strong>
+        ${badgeProveedor}
       </td>
 
       <td>
@@ -419,7 +449,11 @@ function renderizarFilaFormulario(
                   class="formularios-icon-button"
                   data-action="abrir-enlace"
                   data-id="${formulario.id}"
-                  title="Abrir formulario en Google Forms"
+                  title="${
+                    esInterno
+                      ? 'Abrir formulario web institucional'
+                      : 'Abrir formulario en Google Forms'
+                  }"
                 >
                   <i
                     data-lucide="external-link"
@@ -450,14 +484,52 @@ function renderizarFilaFormulario(
           }
 
           ${
-            puedeGestionar && operable
+            puedeGestionar && esInterno && formulario.estado === 'CREADO'
+              ? `
+                <button
+                  type="button"
+                  class="formularios-icon-button formularios-icon-button-success"
+                  data-action="publicar"
+                  data-id="${formulario.id}"
+                  title="Publicar formulario para estudiantes"
+                >
+                  <i
+                    data-lucide="globe"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            puedeGestionar && esInterno && publicado
+              ? `
+                <button
+                  type="button"
+                  class="formularios-icon-button"
+                  data-action="regenerar-token"
+                  data-id="${formulario.id}"
+                  title="Regenerar enlace público (revoca el anterior)"
+                >
+                  <i
+                    data-lucide="key-round"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            !esInterno && puedeGestionar && operable
               ? `
                 <button
                   type="button"
                   class="formularios-icon-button"
                   data-action="sincronizar"
                   data-id="${formulario.id}"
-                  title="Sincronizar respuestas"
+                  title="Sincronizar respuestas de Google Forms"
                 >
                   <i
                     data-lucide="refresh-cw"
@@ -628,6 +700,20 @@ async function manejarAccionFormulario(event) {
       );
       break;
 
+    case 'publicar':
+      await publicarFormulario(
+        formulario,
+        button
+      );
+      break;
+
+    case 'regenerar-token':
+      await regenerarTokenFormulario(
+        formulario,
+        button
+      );
+      break;
+
     case 'sincronizar':
       await sincronizarFormulario(
         formulario,
@@ -659,8 +745,11 @@ async function copiarEnlaceFormulario(
   }
 
   try {
+    const enlaceResuelto =
+      await obtenerUrlPublicaFormulario(formulario.responderUri);
+
     await navigator.clipboard.writeText(
-      formulario.responderUri
+      enlaceResuelto || formulario.responderUri
     );
 
     mostrarExito({
@@ -769,7 +858,8 @@ async function verRespuestasFormulario(
         : [];
 
     renderizarRespuestasFormulario(
-      respuestas
+      respuestas,
+      formulario
     );
   } catch (error) {
     dialog.close();
@@ -785,7 +875,8 @@ async function verRespuestasFormulario(
 }
 
 function renderizarRespuestasFormulario(
-  respuestas
+  respuestas,
+  formulario
 ) {
   const contenedor =
     document.getElementById(
@@ -799,7 +890,7 @@ function renderizarRespuestasFormulario(
   const rows =
     respuestas
       .map(
-        renderizarFilaRespuesta
+        (r) => renderizarFilaRespuesta(r, formulario)
       )
       .join('');
 
@@ -812,23 +903,111 @@ function renderizarRespuestasFormulario(
         'Aprobadas',
         'Estado',
         'Procesada',
-        'Detalle'
+        'Detalle',
+        'Acciones'
       ],
 
       rows,
 
       emptyMessage:
-        'Este formulario todavía no tiene respuestas sincronizadas.',
+        'Este formulario todavía no tiene respuestas registradas.',
 
       ariaLabel:
         'Respuestas del formulario'
     });
 
   renderizarIconos();
+
+  contenedor.querySelectorAll('.btn-accion-aprobar-resp').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const respuestaId = Number(btn.getAttribute('data-id'));
+      const nombreEstudiante = btn.getAttribute('data-estudiante') || 'el estudiante';
+
+      const confirmado = await confirmarAccion({
+        titulo: 'Aprobar respuesta',
+        mensaje: `¿Desea aprobar la solicitud de ${nombreEstudiante} e incorporar sus materias aprobadas al expediente?`,
+        textoConfirmar: 'Aprobar respuesta',
+        peligro: false
+      });
+
+      if (!confirmado) return;
+
+      const fila = btn.closest('tr');
+      if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = true));
+
+      try {
+        const resultado = await aceptarSolicitudFormulario(respuestaId);
+        if (resultado && resultado.ok === false) {
+          throw new Error(resultado.message || 'No fue posible aprobar la solicitud.');
+        }
+
+        mostrarExito({
+          titulo: 'Solicitud aprobada',
+          mensaje: 'La respuesta fue procesada correctamente y registrada en el historial académico.'
+        });
+
+        if (formulario?.id) {
+          const res = await listarRespuestasFormularioEstudiantes(formulario.id);
+          const data = res?.data ?? res;
+          renderizarRespuestasFormulario(Array.isArray(data) ? data : [], formulario);
+        }
+      } catch (error) {
+        mostrarError({
+          titulo: 'No fue posible aprobar la respuesta',
+          mensaje: error?.message || 'La respuesta requiere revisión antes de poder incorporarse.'
+        });
+        if (formulario?.id) {
+          const res = await listarRespuestasFormularioEstudiantes(formulario.id);
+          const data = res?.data ?? res;
+          renderizarRespuestasFormulario(Array.isArray(data) ? data : [], formulario);
+        } else if (fila) {
+          fila.querySelectorAll('button').forEach((b) => (b.disabled = false));
+        }
+      }
+    });
+  });
+
+  contenedor.querySelectorAll('.btn-accion-rechazar-resp').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const respuestaId = Number(btn.getAttribute('data-id'));
+      const nombreEstudiante = btn.getAttribute('data-estudiante') || 'el estudiante';
+
+      const motivo = window.prompt(`Ingrese el motivo del rechazo para la respuesta de ${nombreEstudiante}:`);
+      if (motivo === null) return;
+
+      const fila = btn.closest('tr');
+      if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = true));
+
+      try {
+        const resultado = await rechazarSolicitudFormulario(respuestaId, motivo);
+        if (resultado && resultado.ok === false) {
+          throw new Error(resultado.message || 'No fue posible rechazar la solicitud.');
+        }
+
+        mostrarExito({
+          titulo: 'Solicitud rechazada',
+          mensaje: 'La respuesta fue rechazada.'
+        });
+
+        if (formulario?.id) {
+          const res = await listarRespuestasFormularioEstudiantes(formulario.id);
+          const data = res?.data ?? res;
+          renderizarRespuestasFormulario(Array.isArray(data) ? data : [], formulario);
+        }
+      } catch (error) {
+        mostrarError({
+          titulo: 'No fue posible rechazar la respuesta',
+          mensaje: error?.message || 'Ocurrió un error al rechazar la respuesta.'
+        });
+        if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = false));
+      }
+    });
+  });
 }
 
 function renderizarFilaRespuesta(
-  respuesta
+  respuesta,
+  formulario
 ) {
   const datos =
     respuesta.datosNormalizadosJson;
@@ -860,6 +1039,47 @@ function renderizarFilaRespuesta(
       ? datos.asignaturasAprobadas.length
       : 0;
 
+  const codigos = Array.isArray(datos?.asignaturasAprobadas)
+    ? datos.asignaturasAprobadas.map((a) => a.codigo || `ID #${a.planAsignaturaId}`).join(', ')
+    : '';
+
+  const aprobadasHtml = aprobadas > 0
+    ? `<span title="${escapeHtml(codigos)}" style="cursor:help;"><strong>${aprobadas}</strong> asignaturas<small style="display:block;color:var(--text-muted);font-size:0.75rem;">${escapeHtml(codigos)}</small></span>`
+    : `<span class="text-muted">0 asignaturas</span>`;
+
+  const esPendiente =
+    respuesta.estado === 'PENDIENTE' ||
+    respuesta.estado === 'REQUIERE_REVISION';
+
+  const accionesHtml = esPendiente
+    ? `
+      <div class="sgpa-table-actions" style="display:inline-flex;gap:4px;">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary btn-accion-aprobar-resp"
+          data-id="${respuesta.id}"
+          data-estudiante="${escapeHtml(nombre)}"
+          title="Aprobar solicitud e incorporar materias"
+        >
+          <i data-lucide="check" aria-hidden="true"></i>
+          Aprobar
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-danger btn-accion-rechazar-resp"
+          data-id="${respuesta.id}"
+          data-estudiante="${escapeHtml(nombre)}"
+          title="Rechazar solicitud con motivo"
+        >
+          <i data-lucide="x" aria-hidden="true"></i>
+          Rechazar
+        </button>
+      </div>
+    `
+    : `
+      <span class="text-muted">—</span>
+    `;
+
   return `
     <tr>
       <td>
@@ -877,7 +1097,7 @@ function renderizarFilaRespuesta(
       </td>
 
       <td>
-        ${aprobadas}
+        ${aprobadasHtml}
       </td>
 
       <td>
@@ -901,6 +1121,10 @@ function renderizarFilaRespuesta(
           datos?.optativasNoDisciplinarias ||
           '—'
         )}
+      </td>
+
+      <td>
+        ${accionesHtml}
       </td>
     </tr>
   `;
@@ -981,17 +1205,93 @@ async function sincronizarFormulario(
   }
 }
 
+async function publicarFormulario(
+  formulario,
+  button
+) {
+  const aceptado = await confirmarAccion({
+    titulo: 'Publicar formulario',
+    mensaje: `¿Desea publicar el formulario "${formulario.titulo}"? Quedará disponible inmediatamente para recibir respuestas de los estudiantes mediante su enlace público institucional.`,
+    textoConfirmar: 'Publicar formulario',
+    peligro: false
+  });
+
+  if (!aceptado) return;
+
+  button.disabled = true;
+
+  try {
+    const res = await publicarFormularioEstudiantes(formulario.id);
+    if (res && res.ok === false) {
+      throw new Error(res.message || 'No fue posible publicar el formulario.');
+    }
+
+    mostrarExito({
+      titulo: 'Formulario publicado',
+      mensaje: `El formulario "${formulario.titulo}" ahora está disponible públicamente.`
+    });
+
+    await cargarFormularios();
+  } catch (error) {
+    mostrarError({
+      titulo: 'No fue posible publicar el formulario',
+      mensaje: error?.message || 'Ocurrió un error al publicar el formulario.'
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function regenerarTokenFormulario(
+  formulario,
+  button
+) {
+  const aceptado = await confirmarAccion({
+    titulo: 'Regenerar enlace público',
+    mensaje: `Al regenerar el enlace del formulario "${formulario.titulo}", el enlace anterior quedará INVALIDADO de inmediato y los estudiantes requerirán el nuevo enlace para responder. ¿Desea continuar?`,
+    textoConfirmar: 'Regenerar enlace',
+    peligro: true
+  });
+
+  if (!aceptado) return;
+
+  button.disabled = true;
+
+  try {
+    const res = await regenerarTokenFormularioEstudiantes(formulario.id);
+    if (res && res.ok === false) {
+      throw new Error(res.message || 'No fue posible regenerar el enlace público.');
+    }
+
+    mostrarExito({
+      titulo: 'Enlace regenerado',
+      mensaje: 'Se generó un nuevo enlace público. El enlace anterior ya no aceptará respuestas.'
+    });
+
+    await cargarFormularios();
+  } catch (error) {
+    mostrarError({
+      titulo: 'No fue posible regenerar el enlace',
+      mensaje: error?.message || 'Ocurrió un error al regenerar el enlace público.'
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function cerrarFormulario(
   formulario,
   button
 ) {
+  const esInterno = formulario.proveedor === 'INTERNO';
   const aceptado =
     await confirmarAccion({
       titulo:
         'Cerrar formulario',
 
-      mensaje:
-        `El formulario "${formulario.titulo}" dejará de aceptar nuevas respuestas. Las respuestas existentes se conservarán.`,
+      mensaje: esInterno
+        ? `El formulario institucional "${formulario.titulo}" dejará de aceptar respuestas de estudiantes de inmediato. Las respuestas registradas se conservarán.`
+        : `El formulario "${formulario.titulo}" dejará de aceptar nuevas respuestas. Las respuestas existentes se conservarán.`,
 
       textoConfirmar:
         'Cerrar formulario',
@@ -1017,33 +1317,37 @@ async function cerrarFormulario(
     }
 
     let sincronizacionFinal = null;
-    try {
-      const resultadoSync = await sincronizarFormularioEstudiantes(
-        formulario.id,
-      );
-      if (resultadoSync && resultadoSync.ok !== false) {
-        sincronizacionFinal = resultadoSync.data ?? resultadoSync;
+    if (!esInterno) {
+      try {
+        const resultadoSync = await sincronizarFormularioEstudiantes(
+          formulario.id,
+        );
+        if (resultadoSync && resultadoSync.ok !== false) {
+          sincronizacionFinal = resultadoSync.data ?? resultadoSync;
+        }
+      } catch (error) {
+        console.error(
+          'El formulario se cerró, pero falló la sincronización final:',
+          error,
+        );
       }
-    } catch (error) {
-      console.error(
-        'El formulario se cerró, pero falló la sincronización final:',
-        error,
-      );
     }
 
     mostrarExito({
       titulo: 'Formulario cerrado',
-      mensaje: sincronizacionFinal
-        ? (
-            'Google Forms dejó de aceptar nuevas respuestas. ' +
-            `La sincronización final detectó ${
-              sincronizacionFinal.nuevas ?? 0
-            } respuesta(s) nueva(s).`
-          )
-        : (
-            'Google Forms dejó de aceptar nuevas respuestas. ' +
-            'La información existente permanece disponible.'
-          ),
+      mensaje: esInterno
+        ? `El formulario institucional "${formulario.titulo}" fue cerrado y ya no acepta respuestas.`
+        : (sincronizacionFinal
+            ? (
+                'Google Forms dejó de aceptar nuevas respuestas. ' +
+                `La sincronización final detectó ${
+                  sincronizacionFinal.nuevas ?? 0
+                } respuesta(s) nueva(s).`
+              )
+            : (
+                'Google Forms dejó de aceptar nuevas respuestas. ' +
+                'La información existente permanece disponible.'
+              )),
     });
 
     await cargarFormularios();
@@ -1190,16 +1494,6 @@ async function abrirNuevoFormulario() {
     return;
   }
 
-  if (!estadoGoogle.conectado) {
-    mostrarError({
-      titulo: 'Google no conectado',
-      mensaje:
-        'Debe conectar una cuenta de Google antes de crear un formulario.'
-    });
-
-    return;
-  }
-
   const dialog =
     document.getElementById(
       'formularioEstudianteDialog'
@@ -1254,6 +1548,17 @@ async function abrirNuevoFormulario() {
 
   const body = `
     <label class="sgpa-form-wide">
+      <span>Modalidad del formulario</span>
+      <select id="formularioProveedor" name="proveedor" required>
+        <option value="INTERNO" selected>Formulario institucional SGPA (sin Google)</option>
+        <option value="GOOGLE_FORMS">Google Forms (requiere conexión Google)</option>
+      </select>
+      <small id="formularioProveedorAyuda" class="sgpa-field-help">
+        El formulario institucional usa el plan de estudios del SGPA y se publica en este servidor.
+      </small>
+    </label>
+
+    <label class="sgpa-form-wide">
       <span>
         Título del formulario
       </span>
@@ -1268,7 +1573,7 @@ async function abrirNuevoFormulario() {
       >
 
       <small class="sgpa-field-help">
-        Este será el título visible en Google Forms.
+        Este será el título visible para los estudiantes en el formulario web.
       </small>
     </label>
 
@@ -1282,12 +1587,12 @@ async function abrirNuevoFormulario() {
         name="descripcion"
         rows="3"
         maxlength="1000"
-        placeholder="Ej. Complete este formulario con sus datos y las asignaturas aprobadas hasta el período actual."
+        placeholder="Ej. Complete este formulario con sus datos personales y las asignaturas aprobadas hasta el período actual."
         required
       ></textarea>
 
       <small class="sgpa-field-help">
-        Esta descripción aparecerá debajo del título en Google Forms.
+        Esta descripción aparecerá en el encabezado del formulario institucional.
       </small>
     </label>
 
@@ -1348,7 +1653,7 @@ async function abrirNuevoFormulario() {
         'Nuevo formulario de estudiantes',
 
       description:
-        'Seleccione la carrera y el plan. El SGPA creará y publicará automáticamente el formulario en Google.',
+        'Seleccione la modalidad, la carrera y el plan de estudio.',
 
       body,
 
@@ -1362,7 +1667,7 @@ async function abrirNuevoFormulario() {
         'crearFormularioButton',
 
       submitText:
-        'Crear y publicar',
+        'Crear formulario',
 
       submitIcon:
         'file-plus'
@@ -1382,14 +1687,19 @@ async function abrirNuevoFormulario() {
       'formularioPlan'
     );
 
-  let planSeleccionadoTieneCursos = false;
+  const proveedorInput =
+    document.getElementById(
+      'formularioProveedor'
+    );
+
+  let planSeleccionadoValido = false;
   let versionConsultaPlan = 0;
 
   carreraInput?.addEventListener(
     'change',
     () => {
       versionConsultaPlan += 1;
-      planSeleccionadoTieneCursos = false;
+      planSeleccionadoValido = false;
       const carreraId =
         Number(
           carreraInput.value
@@ -1460,7 +1770,7 @@ async function abrirNuevoFormulario() {
 
       const versionActual = ++versionConsultaPlan;
 
-      planSeleccionadoTieneCursos = false;
+      planSeleccionadoValido = false;
 
       if (!resumen || !planId) {
         return;
@@ -1500,14 +1810,10 @@ async function abrirNuevoFormulario() {
             ? resultado.asignaturas
             : [];
 
-        const reales = asignaturas.filter(
-          (asignatura) =>
-            asignatura.activo === true &&
-            asignatura.cursoId != null &&
-            asignatura.curso != null
-        );
+        const proveedor = proveedorInput?.value;
+        const reales = asignaturasElegiblesParaFormulario(asignaturas, proveedor);
 
-        planSeleccionadoTieneCursos =
+        planSeleccionadoValido =
           reales.length > 0;
 
         const estructura = agruparAsignaturasVistaPrevia(reales);
@@ -1537,8 +1843,8 @@ async function abrirNuevoFormulario() {
                           .sort((a, b) => Number(a.orden || 0) - Number(b.orden || 0))
                           .map((asignatura) => `
                             <li>
-                              ${escapeHtml(asignatura.curso.nombre)}
-                              <small>${escapeHtml(asignatura.curso.codigo || '')}</small>
+                              ${escapeHtml(asignatura.curso?.nombre || asignatura.nombreReferencia || '')}
+                              <small>${escapeHtml(asignatura.curso?.codigo || asignatura.codigoReferencia || '')}</small>
                             </li>
                           `).join('')}
                       </ul>
@@ -1572,7 +1878,7 @@ async function abrirNuevoFormulario() {
                 ? `<div class="formularios-plan-preview-grid">${tarjetas}</div>`
                 : `
                     <p>
-                      Este plan no tiene asignaturas activas asociadas a cursos
+                      Este plan no tiene asignaturas compatibles con la modalidad seleccionada
                       y no puede utilizarse para generar el formulario.
                     </p>
                   `
@@ -1581,7 +1887,7 @@ async function abrirNuevoFormulario() {
         `;
       } catch (error) {
         if (!consultaSigueVigente()) return;
-        planSeleccionadoTieneCursos = false;
+        planSeleccionadoValido = false;
         resumen.innerHTML = `
           <div class="formularios-plan-preview formularios-plan-preview-warning">
             No fue posible consultar las asignaturas de este plan.
@@ -1591,6 +1897,16 @@ async function abrirNuevoFormulario() {
       }
     }
   );
+
+  proveedorInput?.addEventListener('change', () => {
+    const ayuda = document.getElementById('formularioProveedorAyuda');
+    if (ayuda) {
+      ayuda.textContent = proveedorInput.value === 'INTERNO'
+        ? 'El formulario institucional usa el plan de estudios del SGPA y se publica en este servidor.'
+        : 'Google Forms requiere una cuenta Google conectada y solo admite asignaturas vinculadas a Curso.';
+    }
+    if (planInput?.value) planInput.dispatchEvent(new Event('change'));
+  });
 
   document
     .getElementById(
@@ -1667,17 +1983,19 @@ async function abrirNuevoFormulario() {
             planInput.value
           );
 
+        const esInterno = proveedorInput?.value === 'INTERNO';
+
         if (
           !titulo ||
           !descripcion ||
           !carreraId ||
           !planEstudioId ||
-          !planSeleccionadoTieneCursos
+          !planSeleccionadoValido
         ) {
           if (errorBox) {
             errorBox.textContent =
-              planEstudioId && !planSeleccionadoTieneCursos
-                ? 'El plan seleccionado debe incluir al menos una asignatura activa asociada a un curso.'
+              planEstudioId && !planSeleccionadoValido
+                ? 'El plan seleccionado debe incluir asignaturas compatibles con la modalidad elegida.'
                 : 'Complete el título, la descripción, la carrera y el plan de estudio.';
 
             errorBox.classList.remove(
@@ -1704,7 +2022,7 @@ async function abrirNuevoFormulario() {
 
         crearButton.innerHTML = `
           <span class="formularios-btn-spinner" aria-hidden="true"></span>
-          <span>Creando y publicando...</span>
+          <span>Creando formulario...</span>
         `;
 
         const scrollContainer =
@@ -1725,19 +2043,22 @@ async function abrirNuevoFormulario() {
             'formularios-creando-notice';
           avisoCarga.innerHTML = `
             <span class="formularios-pulse-dot" aria-hidden="true"></span>
-            <span>Generando la estructura del formulario y publicando en Google Forms... Por favor espere.</span>
+            <span>${esInterno
+              ? 'Generando el formulario institucional...'
+              : 'Generando el formulario en Google Forms...'} Por favor espere.</span>
           `;
           scrollContainer.appendChild(avisoCarga);
         }
 
         try {
           const res =
-            await crearFormularioEstudiantes({
+            await crearFormularioEstudiantes(construirDatosCrearFormulario({
               titulo,
               descripcion,
               carreraId,
-              planEstudioId
-            });
+              planEstudioId,
+              proveedor: proveedorInput?.value
+            }));
 
           if (res && res.ok === false) {
             throw new Error(
@@ -1755,23 +2076,18 @@ async function abrirNuevoFormulario() {
             formulario?.estado === 'PUBLICADO' ||
             Boolean(formulario?.responderUri);
 
-          if (estaPublicado) {
-            mostrarExito({
-              titulo:
-                'Formulario publicado',
-              mensaje:
-                'El formulario fue creado y publicado correctamente en Google Forms.'
-            });
-          } else {
-            mostrarExito({
-              titulo:
-                'Formulario registrado',
-              mensaje:
-                'El formulario fue registrado en el sistema. Estado: ' +
-                (formulario?.estado || 'CREADO') +
-                '.'
-            });
-          }
+          mostrarExito({
+            titulo:
+              estaPublicado
+                ? 'Formulario publicado'
+                : 'Formulario creado',
+            mensaje:
+              estaPublicado
+                ? esInterno
+                  ? 'El formulario fue creado y publicado correctamente en el SGPA.'
+                  : 'El formulario fue creado y publicado correctamente en Google Forms.'
+                : `El formulario fue registrado. Estado: ${formulario?.estado || 'CREADO'}.`
+          });
 
           await cargarFormularios();
         } catch (error) {
@@ -1801,7 +2117,7 @@ async function abrirNuevoFormulario() {
 
           crearButton.innerHTML = `
             <i data-lucide="file-plus" aria-hidden="true"></i>
-            <span>Crear y publicar</span>
+            <span>Crear formulario</span>
           `;
 
           renderizarIconos();

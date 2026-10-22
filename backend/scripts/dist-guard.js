@@ -68,7 +68,11 @@ if (action === 'prune') {
   const child = spawn(process.execPath, [cli, 'start', '--watch', ...process.argv.slice(3)], {
     cwd: backend,
     stdio: 'inherit',
-    env: process.env,
+    env: {
+      ...process.env,
+      SGPA_START_PROFILE: 'development',
+      SGPA_RUNTIME_ENV: process.env.SGPA_RUNTIME_ENV || 'development',
+    },
   });
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
   child.on('exit', (code) => { watcher.close(); clearTimeout(pending); process.exit(code ?? 1); });

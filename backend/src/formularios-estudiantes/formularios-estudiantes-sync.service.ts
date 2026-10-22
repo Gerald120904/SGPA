@@ -9,6 +9,8 @@ import { Repository } from 'typeorm';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
 import { GoogleFormsClientService } from '../integraciones/google/google-forms-client.service';
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
+import { esInstantaneaCurricularInterna } from './types/instantanea-curricular-interna.type';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
 import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta-formulario.service';
@@ -62,7 +64,14 @@ export class FormulariosEstudiantesSyncService {
   async sincronizarFormulario(
     formulario: FormularioEstudiante,
   ): Promise<ResultadoSincronizacionFormulario> {
-    if (!formulario.googleFormId || !formulario.mapaPreguntas) {
+    if (formulario.proveedor === ProveedorFormulario.INTERNO) {
+      throw new BadRequestException(
+        'Los formularios internos no requieren sincronización externa con Google Forms.',
+      );
+    }
+
+    if (!formulario.googleFormId || !formulario.mapaPreguntas ||
+        esInstantaneaCurricularInterna(formulario.mapaPreguntas)) {
       throw new BadRequestException(
         'El formulario no posee una configuración válida de Google Forms',
       );

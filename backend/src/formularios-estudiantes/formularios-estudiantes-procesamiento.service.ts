@@ -3,17 +3,22 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, QueryFailedError, Repository } from 'typeorm';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
 import { EstudiantesImportacionService } from '../estudiantes/estudiantes-importacion.service';
+import { FuenteRegistroAcademico } from '../estudiantes/constants/fuente-registro-academico.constant';
 import { ImportarEstudiantesDto } from '../estudiantes/dto/importar-estudiantes.dto';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
+import { MotorRequisitosService } from '../planes-estudio/motor-requisitos/motor-requisitos.service';
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
+import { esInstantaneaCurricularInterna, validarSeleccionInstantanea } from './types/instantanea-curricular-interna.type';
 
 export interface ResultadoAprobacionRespuesta {
   respuestaId: number;
@@ -40,6 +45,9 @@ export class FormulariosEstudiantesProcesamientoService {
 
     private readonly estudiantesImportacionService: EstudiantesImportacionService,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
+    private readonly dataSource: DataSource,
+    @Optional()
+    private readonly motorRequisitosService?: MotorRequisitosService,
   ) {}
 
   async listarSolicitudes(
@@ -162,10 +170,9 @@ export class FormulariosEstudiantesProcesamientoService {
     const datos = respuesta.datosNormalizadosJson;
 
     if (!datos) {
-      respuesta.estado = EstadoRespuestaFormulario.ERROR;
-      respuesta.detalleError = 'La respuesta no posee datos normalizados.';
-      await this.respuestaRepo.save(respuesta);
-      throw new ConflictException(respuesta.detalleError);
+      const detalle = 'La respuesta no posee datos normalizados.';
+      await this.marcarRespuestaNoProcesable(respuesta, EstadoRespuestaFormulario.ERROR, detalle);
+      throw new ConflictException(detalle);
     }
 
     const periodo = await this.periodoRepo.findOne({
@@ -175,11 +182,9 @@ export class FormulariosEstudiantesProcesamientoService {
     });
 
     if (!periodo) {
-      respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-      respuesta.detalleError =
-        'El período de ingreso asociado a la respuesta ya no existe.';
-      await this.respuestaRepo.save(respuesta);
-      throw new ConflictException(respuesta.detalleError);
+      const detalle = 'El período de ingreso asociado a la respuesta ya no existe.';
+      await this.marcarRespuestaNoProcesable(respuesta, EstadoRespuestaFormulario.REQUIERE_REVISION, detalle);
+      throw new ConflictException(detalle);
     }
 
     const idsAsignaturas = datos.asignaturasAprobadas.map(
@@ -219,28 +224,68 @@ export class FormulariosEstudiantesProcesamientoService {
         continue;
       }
 
-      if (actual.cursoId === null || actual.curso === null) {
+      if (actual.cursoId === null && !actual.codigoReferencia?.trim()) {
+        erroresAsignaturas.push(
+          `La asignatura ${aprobada.codigo} ya no posee un código de referencia.`,
+        );
+        continue;
+      }
+
+      if (actual.cursoId !== null && actual.curso === null) {
         erroresAsignaturas.push(
           `La asignatura ${aprobada.codigo} ya no posee un curso asociado.`,
         );
         continue;
       }
 
-      if (actual.cursoId !== aprobada.cursoId) {
+      if ((actual.cursoId ?? 0) !== aprobada.cursoId) {
         erroresAsignaturas.push(
           `La asignatura ${aprobada.codigo} cambió su curso asociado.`,
         );
         continue;
       }
 
-      codigosCursos.push(actual.curso.codigo);
+      if (actual.cursoId === null && actual.codigoReferencia?.trim() !== aprobada.codigo) {
+        erroresAsignaturas.push(`La asignatura ${aprobada.codigo} cambió su código de referencia.`);
+        continue;
+      }
+
+      const codigoActual = actual.curso?.codigo ?? actual.codigoReferencia!.trim();
+      if (esInstantaneaCurricularInterna(respuesta.formulario.mapaPreguntas) &&
+          codigoActual !== aprobada.codigo) {
+        erroresAsignaturas.push(
+          `La asignatura ${aprobada.codigo} cambió su código desde la publicación del formulario.`,
+        );
+        continue;
+      }
+      codigosCursos.push(codigoActual);
     }
 
     if (erroresAsignaturas.length > 0) {
-      respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-      respuesta.detalleError = erroresAsignaturas.join(' ');
-      await this.respuestaRepo.save(respuesta);
-      throw new ConflictException(respuesta.detalleError);
+      const detalle = erroresAsignaturas.join(' ');
+      await this.marcarRespuestaNoProcesable(respuesta, EstadoRespuestaFormulario.REQUIERE_REVISION, detalle);
+      throw new ConflictException(detalle);
+    }
+
+    // Validación estricta del grafo de requisitos en el momento de la aprobación
+    if (idsAsignaturas.length > 0 &&
+        (this.motorRequisitosService || esInstantaneaCurricularInterna(respuesta.formulario.mapaPreguntas))) {
+      try {
+        if (esInstantaneaCurricularInterna(respuesta.formulario.mapaPreguntas)) {
+          validarSeleccionInstantanea(respuesta.formulario.mapaPreguntas, idsAsignaturas);
+        } else {
+          await this.motorRequisitosService!.validarSeleccionEstricta(
+            respuesta.formulario.planEstudioId,
+            idsAsignaturas,
+          );
+        }
+      } catch (error: any) {
+        const detalle =
+          error?.message ||
+          'La selección de asignaturas no satisface los requisitos académicos vigentes.';
+        await this.marcarRespuestaNoProcesable(respuesta, EstadoRespuestaFormulario.REQUIERE_REVISION, detalle);
+        throw new ConflictException(detalle);
+      }
     }
 
     const nombres = [datos.primerNombre, datos.segundoNombre]
@@ -265,30 +310,110 @@ export class FormulariosEstudiantesProcesamientoService {
       ],
     };
 
-    const resultado =
-      await this.estudiantesImportacionService.ejecutarDesdeGoogleForms(
-        usuarioId,
-        dto,
+    const fuente =
+      respuesta.formulario?.proveedor === ProveedorFormulario.INTERNO
+        ? FuenteRegistroAcademico.FORMULARIO_INTERNO
+        : FuenteRegistroAcademico.GOOGLE_FORMS;
+
+    let resultado;
+    try {
+      resultado = await this.dataSource.transaction(async (manager) => {
+        // La fila permanece bloqueada hasta confirmar historial y estado juntos.
+        const [actual] = (await manager.query(
+          'SELECT estado FROM respuestas_formularios_estudiantes WHERE id = ? FOR UPDATE',
+          [respuestaId],
+        )) as Array<{ estado: EstadoRespuestaFormulario }>;
+        if (
+          !actual ||
+          ![
+            EstadoRespuestaFormulario.PENDIENTE,
+            EstadoRespuestaFormulario.REQUIERE_REVISION,
+          ].includes(actual.estado)
+        ) {
+          throw new ConflictException('Esta solicitud ya fue revisada.');
+        }
+
+        const importacion =
+          await this.estudiantesImportacionService.ejecutarDesdeFormulario(
+            usuarioId,
+            dto,
+            fuente,
+            manager,
+          );
+        const filaImportada = importacion.filas[0];
+        if (!filaImportada || filaImportada.accion === 'ERROR') {
+          throw new ConflictException(
+            filaImportada?.errores?.join(' ') ||
+              'La respuesta requiere revisión manual.',
+          );
+        }
+
+        const fechaRevision = new Date();
+        const cambio = await manager.getRepository(RespuestaFormularioEstudiante).update(
+          {
+            id: respuestaId,
+            estado: In([
+              EstadoRespuestaFormulario.PENDIENTE,
+              EstadoRespuestaFormulario.REQUIERE_REVISION,
+            ]),
+          },
+          {
+            estado: EstadoRespuestaFormulario.PROCESADO,
+            revisadoPorUsuarioId: usuarioId,
+            revisadoAt: fechaRevision,
+            procesadoAt: fechaRevision,
+            motivoRechazo: null,
+            detalleError: null,
+          },
+        );
+        if (cambio.affected !== 1) {
+          throw new ConflictException('Esta solicitud ya fue revisada.');
+        }
+        return importacion;
+      });
+    } catch (err: any) {
+      if (
+        err instanceof ConflictException &&
+        err.message === 'Esta solicitud ya fue revisada.'
+      ) {
+        throw err;
+      }
+      const mensajeBruto = String(err?.message || '');
+      const esSensible =
+        err instanceof QueryFailedError ||
+        Boolean(err?.driverError) ||
+        /SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|token\s*=|password|hash/i.test(
+          mensajeBruto,
+        );
+      const detalleError = esSensible
+        ? 'Error interno en la base de datos durante la importación académica.'
+        : mensajeBruto || 'Error durante la importación académica de la respuesta.';
+      const revision = await this.respuestaRepo.update(
+        {
+          id: respuesta.id,
+          estado: In([
+            EstadoRespuestaFormulario.PENDIENTE,
+            EstadoRespuestaFormulario.REQUIERE_REVISION,
+          ]),
+        },
+        {
+          estado: EstadoRespuestaFormulario.REQUIERE_REVISION,
+          detalleError,
+        },
       );
-
-    const fila = resultado.filas[0];
-
-    if (!fila || fila.accion === 'ERROR') {
-      respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
-      respuesta.detalleError =
-        fila?.errores.join(' ') || 'La respuesta requiere revisión manual.';
-      await this.respuestaRepo.save(respuesta);
-      throw new ConflictException(respuesta.detalleError);
+      if (revision.affected === 1) {
+        respuesta.estado = EstadoRespuestaFormulario.REQUIERE_REVISION;
+        respuesta.detalleError = detalleError;
+      }
+      throw new ConflictException(detalleError);
     }
 
     respuesta.estado = EstadoRespuestaFormulario.PROCESADO;
     respuesta.revisadoPorUsuarioId = usuarioId;
     respuesta.revisadoAt = new Date();
-    respuesta.procesadoAt = new Date();
+    respuesta.procesadoAt = respuesta.revisadoAt;
     respuesta.motivoRechazo = null;
     respuesta.detalleError = null;
-
-    await this.respuestaRepo.save(respuesta);
 
     return {
       respuestaId: respuesta.id,
@@ -297,6 +422,28 @@ export class FormulariosEstudiantesProcesamientoService {
       actualizados: resultado.actualizados,
       aprobacionesNuevas: resultado.aprobacionesNuevas,
     };
+  }
+
+  private async marcarRespuestaNoProcesable(
+    respuesta: RespuestaFormularioEstudiante,
+    estado: EstadoRespuestaFormulario,
+    detalleError: string,
+  ): Promise<void> {
+    const cambio = await this.respuestaRepo.update(
+      {
+        id: respuesta.id,
+        estado: In([
+          EstadoRespuestaFormulario.PENDIENTE,
+          EstadoRespuestaFormulario.REQUIERE_REVISION,
+        ]),
+      },
+      { estado, detalleError },
+    );
+    if (cambio.affected !== 1) {
+      throw new ConflictException('Esta solicitud ya fue revisada.');
+    }
+    respuesta.estado = estado;
+    respuesta.detalleError = detalleError;
   }
 
   async rechazarRespuesta(
@@ -338,13 +485,43 @@ export class FormulariosEstudiantesProcesamientoService {
       );
     }
 
-    respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
-    respuesta.revisadoPorUsuarioId = usuarioId;
-    respuesta.revisadoAt = new Date();
-    respuesta.motivoRechazo = motivo?.trim() || null;
-    respuesta.procesadoAt = null;
+    if (typeof this.respuestaRepo.update === 'function') {
+      const updateResult = await this.respuestaRepo.update(
+        {
+          id: respuesta.id,
+          estado: In([
+            EstadoRespuestaFormulario.PENDIENTE,
+            EstadoRespuestaFormulario.REQUIERE_REVISION,
+          ]),
+        },
+        {
+          estado: EstadoRespuestaFormulario.RECHAZADO,
+          revisadoPorUsuarioId: usuarioId,
+          revisadoAt: new Date(),
+          motivoRechazo: motivo?.trim() || null,
+          procesadoAt: null,
+        },
+      );
 
-    await this.respuestaRepo.save(respuesta);
+      if (updateResult && updateResult.affected === 0) {
+        throw new ConflictException('Esta solicitud ya fue revisada.');
+      }
+
+      // Actualizar objeto en memoria para el retorno
+      respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
+      respuesta.revisadoPorUsuarioId = usuarioId;
+      respuesta.revisadoAt = new Date();
+      respuesta.motivoRechazo = motivo?.trim() || null;
+      respuesta.procesadoAt = null;
+    } else {
+      // Fallback para entornos de prueba sin dataSource
+      respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
+      respuesta.revisadoPorUsuarioId = usuarioId;
+      respuesta.revisadoAt = new Date();
+      respuesta.motivoRechazo = motivo?.trim() || null;
+      respuesta.procesadoAt = null;
+      await this.respuestaRepo.save(respuesta);
+    }
 
     return respuesta;
   }

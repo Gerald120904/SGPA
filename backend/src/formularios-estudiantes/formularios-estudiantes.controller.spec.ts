@@ -9,6 +9,7 @@ import { FormulariosEstudiantesController } from './formularios-estudiantes.cont
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
 
 describe('FormulariosEstudiantesController', () => {
   let controller: FormulariosEstudiantesController;
@@ -27,6 +28,11 @@ describe('FormulariosEstudiantesController', () => {
     listarSolicitudes: jest.Mock;
     aprobarRespuesta: jest.Mock;
     rechazarRespuesta: jest.Mock;
+    contarSolicitudesPorPlan: jest.Mock;
+  };
+  let persistService: {
+    publicarFormularioInterno: jest.Mock;
+    regenerarTokenPublico: jest.Mock;
   };
 
   beforeEach(() => {
@@ -47,11 +53,16 @@ describe('FormulariosEstudiantesController', () => {
       rechazarRespuesta: jest.fn(),
       contarSolicitudesPorPlan: jest.fn(),
     };
+    persistService = {
+      publicarFormularioInterno: jest.fn(),
+      regenerarTokenPublico: jest.fn(),
+    };
 
     controller = new FormulariosEstudiantesController(
       service as unknown as FormulariosEstudiantesService,
       syncService as unknown as FormulariosEstudiantesSyncService,
       procesamientoService as unknown as FormulariosEstudiantesProcesamientoService,
+      persistService as unknown as FormulariosInternosPersistenciaService,
     );
   });
 
@@ -369,6 +380,52 @@ describe('FormulariosEstudiantesController', () => {
         FormulariosEstudiantesController.prototype.contarSolicitudesPorPlan,
       );
       expect(permisos).toEqual([PermisoSistema.ESTUDIANTES_VER]);
+    });
+  });
+
+  describe('publicar', () => {
+    it('delega al persistService.publicarFormularioInterno con id y usuarioId de req.user.sub', async () => {
+      const mockReq = { user: { sub: 42 } } as any;
+      const resultadoEsperado = { id: 7, estado: 'PUBLICADO' };
+      persistService.publicarFormularioInterno.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.publicar(mockReq, 7);
+
+      expect(persistService.publicarFormularioInterno).toHaveBeenCalledWith(7, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('requiere permiso FORMULARIOS_ESTUDIANTES_GESTIONAR', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.publicar,
+      );
+      expect(permisos).toEqual([
+        PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
+      ]);
+    });
+  });
+
+  describe('regenerarToken', () => {
+    it('delega al persistService.regenerarTokenPublico con id y usuarioId de req.user.sub', async () => {
+      const mockReq = { user: { sub: 42 } } as any;
+      const resultadoEsperado = { id: 7, tokenPublico: 'nuevo-token' };
+      persistService.regenerarTokenPublico.mockResolvedValue(resultadoEsperado);
+
+      const res = await controller.regenerarToken(mockReq, 7);
+
+      expect(persistService.regenerarTokenPublico).toHaveBeenCalledWith(7, 42);
+      expect(res).toBe(resultadoEsperado);
+    });
+
+    it('requiere permiso FORMULARIOS_ESTUDIANTES_GESTIONAR', () => {
+      const permisos = reflector.get<PermisoSistema[]>(
+        PERMISOS_KEY,
+        FormulariosEstudiantesController.prototype.regenerarToken,
+      );
+      expect(permisos).toEqual([
+        PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR,
+      ]);
     });
   });
 });

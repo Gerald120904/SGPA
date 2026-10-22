@@ -20,6 +20,7 @@ import { RechazarRespuestaFormularioDto } from './dto/rechazar-respuesta-formula
 import { FormulariosEstudiantesProcesamientoService } from './formularios-estudiantes-procesamiento.service';
 import { FormulariosEstudiantesService } from './formularios-estudiantes.service';
 import { FormulariosEstudiantesSyncService } from './formularios-estudiantes-sync.service';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
 
 @Controller('formularios-estudiantes')
 @UseGuards(AuthGuard, PermisosGuard)
@@ -28,6 +29,7 @@ export class FormulariosEstudiantesController {
     private readonly formulariosService: FormulariosEstudiantesService,
     private readonly syncService: FormulariosEstudiantesSyncService,
     private readonly procesamientoService: FormulariosEstudiantesProcesamientoService,
+    private readonly formulariosInternosPersistenciaService: FormulariosInternosPersistenciaService,
   ) {}
 
   @Get()
@@ -104,6 +106,30 @@ export class FormulariosEstudiantesController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.formulariosService.cerrar(
+      id,
+      req.user!.sub,
+    );
+  }
+
+  @Post(':id/publicar')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
+  publicar(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.formulariosInternosPersistenciaService.publicarFormularioInterno(
+      id,
+      req.user!.sub,
+    );
+  }
+
+  @Post(':id/regenerar-token')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_GESTIONAR)
+  regenerarToken(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.formulariosInternosPersistenciaService.regenerarTokenPublico(
       id,
       req.user!.sub,
     );

@@ -171,17 +171,17 @@ describe('GoogleOauthService', () => {
         usadoAt: null,
       });
 
-      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockImplementation(() => Promise.resolve({
         tokens: {
           access_token: 'at_123',
           id_token: 'valid_id_token',
           refresh_token: undefined,
         },
-      } as any);
+      }));
 
-      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve({
         getPayload: () => ({ email: 'test@example.com', sub: 'sub-100' }),
-      } as any);
+      }));
 
       googleConexionRepo.findOne.mockResolvedValue(null);
 
@@ -212,13 +212,13 @@ describe('GoogleOauthService', () => {
         usadoAt: null,
       });
 
-      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockImplementation(() => Promise.resolve({
         tokens: {
           access_token: 'at_123',
           refresh_token: '1//refresh_token_abc',
           id_token: undefined,
         },
-      } as any);
+      }));
 
       await expect(
         service.procesarCallback('code123', 'state123'),
@@ -248,20 +248,20 @@ describe('GoogleOauthService', () => {
       };
       googleOauthEstadoRepo.findOne.mockResolvedValue(oauthEstadoMock);
 
-      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockImplementation(() => Promise.resolve({
         tokens: {
           access_token: 'at_123',
           refresh_token: '1//refresh_token_secret',
           id_token: 'valid_id_token',
         },
-      } as any);
+      }));
 
-      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve({
         getPayload: () => ({
           email: 'profesor@sgpa.cr',
           sub: 'google_subject_999',
         }),
-      } as any);
+      }));
 
       googleConexionRepo.findOne.mockResolvedValue(null);
 
@@ -309,20 +309,20 @@ describe('GoogleOauthService', () => {
         usadoAt: null,
       });
 
-      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockImplementation(() => Promise.resolve({
         tokens: {
           access_token: 'at_123',
           id_token: 'valid_id_token',
           refresh_token: undefined, // Google no devolvió refresh token en reconexión
         },
-      } as any);
+      }));
 
-      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve({
         getPayload: () => ({
           email: 'reconnect@sgpa.cr',
           sub: 'google_subject_888',
         }),
-      } as any);
+      }));
 
       const conexionPrevia = {
         id: 5,
@@ -365,19 +365,19 @@ describe('GoogleOauthService', () => {
         expiraAt: new Date(Date.now() + 60000),
         usadoAt: null,
       });
-      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockImplementation(() => Promise.resolve({
         tokens: {
           access_token: 'at_123',
           id_token: 'valid_id_token',
           refresh_token: undefined,
         },
-      } as any);
-      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+      }));
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve({
         getPayload: () => ({
           email: 'reconnect@sgpa.cr',
           sub: 'google_subject_888',
         }),
-      } as any);
+      }));
       googleConexionRepo.findOne.mockResolvedValue({
         id: 5,
         usuarioId: 30,
@@ -411,19 +411,19 @@ describe('GoogleOauthService', () => {
         expiraAt: new Date(Date.now() + 60000),
         usadoAt: null,
       });
-      jest.spyOn(OAuth2Client.prototype, 'getToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getToken').mockImplementation(() => Promise.resolve({
         tokens: {
           access_token: 'at_123',
           id_token: 'valid_id_token',
           refresh_token: 'refresh_nuevo',
         },
-      } as any);
-      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockResolvedValue({
+      }));
+      jest.spyOn(OAuth2Client.prototype, 'verifyIdToken').mockImplementation(() => Promise.resolve({
         getPayload: () => ({
           email: 'reconnect@sgpa.cr',
           sub: 'google_subject_888',
         }),
-      } as any);
+      }));
       const conexionPrevia = {
         id: 5,
         usuarioId: 30,
@@ -509,9 +509,9 @@ describe('GoogleOauthService', () => {
         activo: true,
       };
       googleConexionRepo.findOne.mockResolvedValue(conexion);
-      jest.spyOn(OAuth2Client.prototype, 'getAccessToken').mockResolvedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getAccessToken').mockImplementation(() => Promise.resolve({
         token: 'access_token',
-      } as any);
+      }));
 
       await expect(
         service.obtenerClienteAutorizado(15),
@@ -529,12 +529,12 @@ describe('GoogleOauthService', () => {
         revocadoAt: null,
       };
       googleConexionRepo.findOne.mockResolvedValue(conexion);
-      jest.spyOn(OAuth2Client.prototype, 'getAccessToken').mockRejectedValue({
+      jest.spyOn(OAuth2Client.prototype, 'getAccessToken').mockImplementation(() => Promise.reject({
         response: {
           status: 400,
           data: { error: 'invalid_grant' },
         },
-      });
+      }));
 
       await expect(service.obtenerClienteAutorizado(15)).rejects.toThrow(
         BadRequestException,
@@ -560,7 +560,7 @@ describe('GoogleOauthService', () => {
       googleConexionRepo.findOne.mockResolvedValue(conexion);
       jest
         .spyOn(OAuth2Client.prototype, 'getAccessToken')
-        .mockRejectedValue(errorTemporal);
+        .mockImplementation(() => Promise.reject(errorTemporal));
 
       await expect(service.obtenerClienteAutorizado(15)).rejects.toBe(
         errorTemporal,
@@ -574,7 +574,7 @@ describe('GoogleOauthService', () => {
     it('desconectar borra refresh token local e inactiva conexión', async () => {
       const revokeSpy = jest
         .spyOn(OAuth2Client.prototype, 'revokeToken')
-        .mockResolvedValue({} as any);
+        .mockImplementation(() => Promise.resolve({}));
 
       const plainToken = '1//refresh_token_para_borrar';
       const iv = crypto.randomBytes(12);
