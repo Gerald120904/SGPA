@@ -17,7 +17,7 @@ import { HorarioGrupo } from './horario-grupo.entity';
 
 @Entity({ name: 'grupos' })
 @Unique('uq_grupo_curso_periodo', ['cursoId', 'periodoId', 'numeroGrupo'])
-@Index('fk_grupo_periodo', ['periodoId'])
+@Index('idx_grupo_periodo', ['periodoId'])
 @Index('fk_grupo_profesor', ['profesorId'])
 @Check('chk_grupo_cupo', 'cupo_maximo > 0')
 export class Grupo {
@@ -47,14 +47,14 @@ export class Grupo {
   estado!: string;
 
   @ManyToOne(() => Curso, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
-  @JoinColumn({ name: 'curso_id' })
+  @JoinColumn({ name: 'curso_id', foreignKeyConstraintName: 'FK_grupo_curso' })
   curso!: Curso;
 
   @ManyToOne(() => PeriodoAcademico, {
     onDelete: 'RESTRICT',
     onUpdate: 'CASCADE',
   })
-  @JoinColumn({ name: 'periodo_id' })
+  @JoinColumn({ name: 'periodo_id', foreignKeyConstraintName: 'FK_grupo_periodo' })
   periodo!: PeriodoAcademico;
 
   @OneToMany(() => HorarioGrupo, (horario) => horario.grupo)

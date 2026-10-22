@@ -1,4 +1,5 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Usuario } from './usuario.entity';
 
 /** Una cuenta asistente conserva un único responsable, incluso tras desactivarse. */
 @Entity({ name: 'dependencias_usuario' })
@@ -15,6 +16,18 @@ export class DependenciaUsuario {
 
   @Column({ name: 'creado_por_usuario_id', type: 'int', unsigned: true })
   creadoPorUsuarioId!: number;
+
+  @ManyToOne(() => Usuario, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'asistente_id', foreignKeyConstraintName: 'FK_dependencia_asistente' })
+  asistente!: Usuario;
+
+  @ManyToOne(() => Usuario, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'coordinador_id', foreignKeyConstraintName: 'FK_dependencia_coordinador' })
+  coordinador!: Usuario;
+
+  @ManyToOne(() => Usuario, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'creado_por_usuario_id', foreignKeyConstraintName: 'FK_dependencia_creador' })
+  creador!: Usuario;
 
   @Column({ type: 'boolean', default: true })
   activo!: boolean;

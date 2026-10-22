@@ -1,8 +1,8 @@
 import { createHash } from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 
-type IdentidadMySql = {
+type MysqlIdentity = {
   base: string;
   puerto: number;
   directorio: string;
@@ -10,127 +10,195 @@ type IdentidadMySql = {
   soloLectura: number;
 };
 
-function configuracion(config: ConfigService, nombre: string): string {
-  return String(config.get<string>(nombre) ?? '').trim();
+type HistoryRow = { id: number; timestamp: string | number; name: string };
+
+function setting(config: ConfigService, name: string): string {
+  return String(config.get<string>(name) ?? '').trim();
 }
 
-function normalizarDirectorio(valor: string): string {
-  return valor.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+function normalizeDirectory(value: string): string {
+  return value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 }
 
-function nombresConfigurados(dataSource: DataSource): string[] {
-  const nombres = dataSource.migrations.map((migration) => migration.name);
-  if (
-    !nombres.length || nombres.some((nombre) => !nombre) ||
-    new Set(nombres).size !== nombres.length
-  ) {
-    throw new Error('La lista de migraciones TypeORM está vacía o duplicada.');
+export function configuredMigrationNames(dataSource: DataSource): string[] {
+  const names = dataSource.migrations.map((migration) => migration.name);
+  if (!names.length || names.some((name) => !name) || new Set(names).size !== names.length) {
+    throw new Error('La lista oficial de migraciones está vacía o contiene duplicados.');
   }
-  return nombres as string[];
+  return names as string[];
 }
 
-async function pendientes(dataSource: DataSource, nombres: string[]): Promise<string[]> {
-  const tablas = (await dataSource.query(
+async function baseTableCount(executor: DataSource | QueryRunner): Promise<number> {
+  const [row] = (await executor.query(
+    "SELECT COUNT(*) AS total FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' AND TABLE_NAME <> 'migrations'",
+  )) as Array<{ total: number | string }>;
+  return Number(row?.total ?? 0);
+}
+
+async function migrationTableExists(executor: DataSource | QueryRunner): Promise<boolean> {
+  const [row] = (await executor.query(
     "SELECT COUNT(*) AS total FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'migrations'",
   )) as Array<{ total: number | string }>;
-  if (Number(tablas[0]?.total) !== 1) {
+  return Number(row?.total) === 1;
+}
+
+export function validateMigrationHistory(rows: HistoryRow[], officialNames: string[]): Set<string> {
+  const names = rows.map((row) => row.name);
+  if (new Set(names).size !== names.length) {
+    throw new Error('El historial de migraciones contiene nombres duplicados.');
+  }
+  const timestamps = rows.map((row) => String(row.timestamp));
+  if (new Set(timestamps).size !== timestamps.length) {
+    throw new Error('El historial de migraciones contiene timestamps duplicados.');
+  }
+  const unknown = names.filter((name) => !officialNames.includes(name));
+  if (unknown.length) {
+    throw new Error(`El historial contiene migraciones ajenas a la lista oficial: ${unknown.join(', ')}.`);
+  }
+  for (const row of rows) {
+    const expectedTimestamp = row.name.match(/(\d{13})$/)?.[1];
+    if (!expectedTimestamp || expectedTimestamp !== String(row.timestamp)) {
+      throw new Error(`El historial es incompatible: timestamp incorrecto para ${row.name}.`);
+    }
+  }
+
+  const applied = new Set(names);
+  const baseline = officialNames[0];
+  const incremental = officialNames.slice(1);
+  let foundGap = false;
+  for (const name of incremental) {
+    if (!applied.has(name)) foundGap = true;
+    else if (foundGap) {
+      throw new Error(`Historial incompatible: ${name} figura aplicada después de una migración faltante.`);
+    }
+  }
+  // Existing installations may legitimately adopt the newly introduced baseline.
+  if (applied.has(baseline) && rows.length > 1) {
+    const baselineRows = rows.filter((row) => row.name === baseline);
+    if (baselineRows.length !== 1) throw new Error('La migración base está duplicada.');
+  }
+  return applied;
+}
+
+async function pending(
+  executor: DataSource | QueryRunner,
+  officialNames: string[],
+): Promise<string[]> {
+  if (!(await migrationTableExists(executor))) {
+    if ((await baseTableCount(executor)) === 0) return [...officialNames];
     throw new Error(
-      'La base no tiene tabla migrations. Requiere instalación inicial controlada; no se creará automáticamente al arrancar.',
+      'La base tiene tablas pero no posee un historial migrations. Requiere revisión controlada; no se modificó el esquema.',
     );
   }
-  const filas = (await dataSource.query('SELECT name FROM migrations')) as Array<{
-    name: string;
-  }>;
-  const aplicadas = new Set(filas.map((fila) => fila.name));
-  return nombres.filter((nombre) => !aplicadas.has(nombre));
+  const rows = (await executor.query(
+    'SELECT id, timestamp, name FROM migrations ORDER BY id',
+  )) as HistoryRow[];
+  const applied = validateMigrationHistory(rows, officialNames);
+  return officialNames.filter((name) => !applied.has(name));
 }
 
-async function comprobarEsquemaFormulario(dataSource: DataSource): Promise<void> {
-  const columnas = (await dataSource.query(
-    "SELECT COLUMN_NAME AS nombre, DATA_TYPE AS tipo, CHARACTER_MAXIMUM_LENGTH AS longitud, IS_NULLABLE AS nullable, COLUMN_DEFAULT AS defecto FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'formularios_estudiantes' AND COLUMN_NAME IN ('proveedor', 'token_publico')",
-  )) as Array<{
-    nombre: string;
-    tipo: string;
-    longitud: number | string;
-    nullable: string;
-    defecto: string | null;
-  }>;
-  const proveedor = columnas.find((columna) => columna.nombre === 'proveedor');
-  const token = columnas.find((columna) => columna.nombre === 'token_publico');
-  const indices = (await dataSource.query(
-    "SELECT INDEX_NAME AS nombre, COLUMN_NAME AS columna, NON_UNIQUE AS noUnico FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'formularios_estudiantes' AND INDEX_NAME = 'UQ_formularios_token_publico'",
-  )) as Array<{ nombre: string; columna: string; noUnico: number }>;
+function assertSafeDataSource(dataSource: DataSource): void {
+  if (dataSource.options.type !== 'mysql' || dataSource.options.synchronize !== false || dataSource.options.migrationsRun !== false) {
+    throw new Error('La ejecución segura requiere MySQL, synchronize=false y migrationsRun=false.');
+  }
+}
+
+function assertDevelopmentAuthorization(config: ConfigService): void {
   if (
-    proveedor?.tipo !== 'varchar' || Number(proveedor.longitud) !== 20 ||
-    proveedor.nullable !== 'NO' || proveedor.defecto !== 'GOOGLE_FORMS' ||
-    token?.tipo !== 'varchar' || Number(token.longitud) !== 64 ||
-    token.nullable !== 'YES' ||
-    indices.length !== 1 || indices[0].columna !== 'token_publico' ||
-    Number(indices[0].noUnico) !== 0
+    setting(config, 'SGPA_START_PROFILE') !== 'development' ||
+    setting(config, 'SGPA_RUNTIME_ENV') !== 'development' ||
+    setting(config, 'NODE_ENV') === 'production' ||
+    setting(config, 'SGPA_TEST_MODE').toLowerCase() === 'true'
   ) {
-    throw new Error('El esquema de formularios no coincide con la entidad y la migración; se canceló el arranque.');
+    throw new Error('La migración automática solo está permitida por start:dev en desarrollo.');
+  }
+  if (setting(config, 'SGPA_AUTO_MIGRATE_DEV').toLowerCase() !== 'true') {
+    throw new Error('Hay migraciones pendientes. Configure una vez SGPA_AUTO_MIGRATE_DEV=true y la identidad esperada del MySQL local.');
   }
 }
 
-async function comprobarAusenciaDeDdlParcial(
-  dataSource: DataSource,
-  nombresPendientes: string[],
-): Promise<void> {
-  if (!nombresPendientes.includes('AddInternalFormSupport2026102100000')) return;
-  const [columnas, indices] = await Promise.all([
-    dataSource.query(
-      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'formularios_estudiantes' AND COLUMN_NAME IN ('proveedor', 'token_publico')",
-    ) as Promise<unknown[]>,
-    dataSource.query(
-      "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'formularios_estudiantes' AND INDEX_NAME = 'UQ_formularios_token_publico'",
-    ) as Promise<unknown[]>,
-  ]);
-  if (columnas.length || indices.length) {
-    throw new Error('La migración de formularios está pendiente pero ya existen columnas o índice nuevos. Posible DDL parcial: inspeccione el esquema antes de reintentar.');
-  }
-}
-
-function comprobarAutorizacion(
+function assertIdentityAuthorized(
   dataSource: DataSource,
   config: ConfigService,
-  identidad: IdentidadMySql,
+  identity: MysqlIdentity,
 ): void {
-  if (
-    configuracion(config, 'SGPA_START_PROFILE') !== 'development' ||
-    configuracion(config, 'SGPA_RUNTIME_ENV') !== 'development' ||
-    configuracion(config, 'NODE_ENV') === 'production' ||
-    configuracion(config, 'SGPA_TEST_MODE').toLowerCase() === 'true'
-  ) {
-    throw new Error('Migración automática permitida solo en start:dev de desarrollo; QA y producción requieren despliegue explícito.');
-  }
-  if (configuracion(config, 'SGPA_AUTO_MIGRATE_DEV').toLowerCase() !== 'true') {
-    throw new Error('Hay migraciones pendientes. Configure la autorización de desarrollo SGPA_AUTO_MIGRATE_DEV y la identidad esperada, o ejecute el despliegue controlado.');
-  }
-  if (dataSource.options.type !== 'mysql' || dataSource.options.synchronize !== false || dataSource.options.migrationsRun !== false) {
-    throw new Error('La migración automática requiere MySQL, synchronize=false y migrationsRun=false.');
-  }
-  const host = String(dataSource.options.host ?? '').toLowerCase();
-  const puerto = Number(dataSource.options.port);
-  const esperados = {
-    base: configuracion(config, 'SGPA_AUTO_MIGRATE_DATABASE'),
-    host: configuracion(config, 'SGPA_AUTO_MIGRATE_HOST').toLowerCase(),
-    puerto: Number(configuracion(config, 'SGPA_AUTO_MIGRATE_PORT')),
-    directorio: configuracion(config, 'SGPA_AUTO_MIGRATE_DATADIR'),
-    uuid: configuracion(config, 'SGPA_AUTO_MIGRATE_SERVER_UUID').toLowerCase(),
+  const expected = {
+    base: setting(config, 'SGPA_AUTO_MIGRATE_DATABASE'),
+    host: setting(config, 'SGPA_AUTO_MIGRATE_HOST').toLowerCase(),
+    port: Number(setting(config, 'SGPA_AUTO_MIGRATE_PORT')),
+    directory: setting(config, 'SGPA_AUTO_MIGRATE_DATADIR'),
+    uuid: setting(config, 'SGPA_AUTO_MIGRATE_SERVER_UUID').toLowerCase(),
   };
+  const mysqlOptions = dataSource.options as typeof dataSource.options & { host?: string; port?: number };
+  const host = String(mysqlOptions.host ?? '').toLowerCase();
+  const port = Number(mysqlOptions.port);
   if (
-    !esperados.base || !esperados.host || !esperados.puerto ||
-    !esperados.directorio || !esperados.uuid ||
-    !['localhost', '127.0.0.1', '::1'].includes(host) ||
-    esperados.host !== host ||
-    esperados.base !== identidad.base ||
-    esperados.puerto !== puerto ||
-    esperados.puerto !== Number(identidad.puerto) ||
-    normalizarDirectorio(esperados.directorio) !== normalizarDirectorio(identidad.directorio) ||
-    esperados.uuid !== identidad.uuid.toLowerCase() ||
-    Number(identidad.soloLectura) !== 0
+    !expected.base || !expected.host || !expected.port || !expected.directory || !expected.uuid ||
+    !['localhost', '127.0.0.1', '::1'].includes(host) || expected.host !== host ||
+    expected.base !== identity.base || expected.port !== port || expected.port !== Number(identity.puerto) ||
+    normalizeDirectory(expected.directory) !== normalizeDirectory(identity.directorio) ||
+    expected.uuid !== identity.uuid.toLowerCase() || Number(identity.soloLectura) !== 0
   ) {
-    throw new Error('Identidad MySQL distinta de la autorización de desarrollo: base, host, puerto, directorio, UUID o modo de lectura. No se aplicó ninguna migración.');
+    throw new Error('La identidad de MySQL no coincide con la autorización local; no se aplicó ninguna migración.');
+  }
+}
+
+export type MigrationExecutionMode = 'development-startup' | 'manual';
+
+export async function executeSafeOfficialMigrations(
+  dataSource: DataSource,
+  config: ConfigService,
+  mode: MigrationExecutionMode,
+): Promise<string[]> {
+  if (!dataSource.isInitialized) throw new Error('La conexión TypeORM no está inicializada.');
+  assertSafeDataSource(dataSource);
+  const names = configuredMigrationNames(dataSource);
+  const initialPending = await pending(dataSource, names);
+  if (!initialPending.length) return [];
+
+  if (mode === 'development-startup') assertDevelopmentAuthorization(config);
+  else if (setting(config, 'NODE_ENV') === 'production') {
+    throw new Error('El ejecutor manual no se habilita en producción mediante este comando local.');
+  }
+
+  const [identity] = (await dataSource.query(
+    'SELECT DATABASE() AS base, @@port AS puerto, @@datadir AS directorio, @@server_uuid AS uuid, @@read_only AS soloLectura',
+  )) as MysqlIdentity[];
+  assertIdentityAuthorized(dataSource, config, identity);
+
+  const lockName = `sgpa-migrate-${createHash('sha256')
+    .update(`${identity.uuid}:${identity.base}`).digest('hex').slice(0, 40)}`;
+  const runner = dataSource.createQueryRunner();
+  await runner.connect();
+  let acquired = false;
+  try {
+    const [lock] = (await runner.query('SELECT GET_LOCK(?, 15) AS adquirido', [lockName])) as Array<{ adquirido: number }>;
+    if (Number(lock?.adquirido) !== 1) throw new Error('Otra instancia está migrando esta base.');
+    acquired = true;
+
+    const currentPending = await pending(runner, names);
+    if (!currentPending.length) return [];
+    const executed = await dataSource.runMigrations({ transaction: 'each' });
+    const executedNames = executed.map((migration) => migration.name);
+    const remaining = await pending(runner, names);
+    if (
+      executedNames.length !== currentPending.length ||
+      executedNames.some((name, index) => name !== currentPending[index]) ||
+      remaining.length
+    ) {
+      throw new Error('El resultado no coincide con la lista de migraciones pendientes.');
+    }
+    console.log(`Migraciones de desarrollo aplicadas: ${executedNames.join(', ')}`);
+    return executedNames;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`No se completaron las migraciones: ${message}. MySQL puede conservar DDL parcial; revise el esquema antes de reintentar.`);
+  } finally {
+    try {
+      if (acquired) await runner.query('SELECT RELEASE_LOCK(?) AS liberado', [lockName]);
+    } finally {
+      await runner.release();
+    }
   }
 }
 
@@ -138,61 +206,5 @@ export async function verificarMigracionesAntesDeEscuchar(
   dataSource: DataSource,
   config: ConfigService,
 ): Promise<string[]> {
-  if (!dataSource.isInitialized) {
-    throw new Error('La conexión TypeORM no está inicializada.');
-  }
-  const nombres = nombresConfigurados(dataSource);
-  const iniciales = await pendientes(dataSource, nombres);
-  if (!iniciales.length) {
-    await comprobarEsquemaFormulario(dataSource);
-    return [];
-  }
-  await comprobarAusenciaDeDdlParcial(dataSource, iniciales);
-
-  const [identidad] = (await dataSource.query(
-    'SELECT DATABASE() AS base, @@port AS puerto, @@datadir AS directorio, @@server_uuid AS uuid, @@read_only AS soloLectura',
-  )) as IdentidadMySql[];
-  comprobarAutorizacion(dataSource, config, identidad);
-
-  const bloqueo = `sgpa-migrate-${createHash('sha256')
-    .update(`${identidad.uuid}:${identidad.base}`)
-    .digest('hex')
-    .slice(0, 40)}`;
-  const queryRunner = dataSource.createQueryRunner();
-  await queryRunner.connect();
-  let adquirido = false;
-  try {
-    const [resultado] = (await queryRunner.query('SELECT GET_LOCK(?, 15) AS adquirido', [bloqueo])) as Array<{
-      adquirido: number;
-    }>;
-    if (Number(resultado?.adquirido) !== 1) {
-      throw new Error('Otra instancia está migrando esta base; se canceló el arranque.');
-    }
-    adquirido = true;
-    const actuales = await pendientes(dataSource, nombres);
-    if (!actuales.length) {
-      await comprobarEsquemaFormulario(dataSource);
-      return [];
-    }
-    await comprobarAusenciaDeDdlParcial(dataSource, actuales);
-    const ejecutadas = await dataSource.runMigrations({ transaction: 'each' });
-    const ejecutadasNombres = ejecutadas.map((item) => item.name);
-    const restantes = await pendientes(dataSource, nombres);
-    if (
-      ejecutadasNombres.length !== actuales.length ||
-      ejecutadasNombres.some((nombre, indice) => nombre !== actuales[indice]) ||
-      restantes.length
-    ) {
-      throw new Error('El resultado de migraciones no coincide con las pendientes; se canceló el arranque.');
-    }
-    await comprobarEsquemaFormulario(dataSource);
-    console.log(`Migraciones de desarrollo aplicadas: ${ejecutadasNombres.join(', ')}`);
-    return ejecutadasNombres;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`No se completaron las migraciones de desarrollo: ${message}. Revise el esquema antes de reintentar; MySQL DDL puede dejar cambios parciales.`);
-  } finally {
-    if (adquirido) await queryRunner.query('SELECT RELEASE_LOCK(?)', [bloqueo]);
-    await queryRunner.release();
-  }
+  return executeSafeOfficialMigrations(dataSource, config, 'development-startup');
 }

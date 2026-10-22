@@ -1,67 +1,19 @@
-const { assertOnlyQa004Qa005Pending, assertQa004Qa005Configured } =
-  require('../../scripts/run-migrations') as {
-    assertOnlyQa004Qa005Pending: (migrations: Array<{ name: string }>) => void;
-    assertQa004Qa005Configured: (migrations: Array<{ name: string }>) => void;
-  };
+const { assertManualConfirmation } = require('../../scripts/run-migrations') as {
+  assertManualConfirmation: (argv: string[], database: string | undefined) => void;
+};
 
-describe('runner de migraciones QA-004 y QA-005', () => {
-  const qa004 = { name: 'AddOptativeRuleCounts2026101500000' };
-  const qa005 = { name: 'AddAulaEquipmentInventory2026101600000' };
-  const outbox = { name: 'AddInvitationOutbox2026101700000' };
-  const jerarquia = { name: 'AddHierarchicalAccess2026101900000' };
-  const formularioInterno = { name: 'AddInternalFormSupport2026102100000' };
-  const ajena = { name: 'MigrationUnexpected2026101400000' };
-
-  it('acepta únicamente QA-004, QA-005, Outbox, Jerarquía y Formulario Interno configuradas y pendientes', () => {
-    expect(() =>
-      assertQa004Qa005Configured([
-        qa004,
-        qa005,
-        outbox,
-        jerarquia,
-        formularioInterno,
-      ]),
-    ).not.toThrow();
-    expect(() => assertOnlyQa004Qa005Pending([qa005])).not.toThrow();
-    expect(() =>
-      assertOnlyQa004Qa005Pending([outbox, jerarquia, formularioInterno]),
-    ).not.toThrow();
-    expect(() =>
-      assertOnlyQa004Qa005Pending([
-        qa004,
-        qa005,
-        outbox,
-        jerarquia,
-        formularioInterno,
-      ]),
-    ).not.toThrow();
-    expect(() => assertOnlyQa004Qa005Pending([])).not.toThrow();
+describe('runner manual de migraciones', () => {
+  it('exige --apply y confirmación exacta de la base', () => {
+    expect(() => assertManualConfirmation(['node', 'script'], 'sgpa')).toThrow('--apply');
+    expect(() => assertManualConfirmation(['node', 'script', '--apply'], 'sgpa')).toThrow('--confirm-database');
+    expect(() => assertManualConfirmation(
+      ['node', 'script', '--apply', '--confirm-database=otra'], 'sgpa',
+    )).toThrow('no coincide');
   });
 
-  it('rechaza configuraciones ausentes, duplicadas o con migraciones ajenas', () => {
-    expect(() => assertQa004Qa005Configured([])).toThrow(
-      'Migraciones configuradas inesperadas',
-    );
-    expect(() => assertQa004Qa005Configured([qa004, qa004])).toThrow(
-      'Migraciones configuradas inesperadas',
-    );
-    expect(() => assertQa004Qa005Configured([qa004, ajena])).toThrow(
-      'Migraciones configuradas inesperadas',
-    );
-    expect(() => assertQa004Qa005Configured([ajena])).toThrow(
-      'Migraciones configuradas inesperadas',
-    );
-  });
-
-  it('detiene la ejecución ante cualquier migración pendiente ajena o duplicada', () => {
-    expect(() => assertOnlyQa004Qa005Pending([ajena])).toThrow(
-      'Migraciones pendientes inesperadas',
-    );
-    expect(() => assertOnlyQa004Qa005Pending([qa004, ajena])).toThrow(
-      'Migraciones pendientes inesperadas',
-    );
-    expect(() => assertOnlyQa004Qa005Pending([qa005, qa005])).toThrow(
-      'Migraciones pendientes inesperadas',
-    );
+  it('acepta la confirmación manual exacta', () => {
+    expect(() => assertManualConfirmation(
+      ['node', 'script', '--apply', '--confirm-database=sgpa'], 'sgpa',
+    )).not.toThrow();
   });
 });

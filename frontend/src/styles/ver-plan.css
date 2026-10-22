@@ -415,20 +415,14 @@
    ========================================================= */
 
 .ver-plan-tools-grid {
-  width:
-    100%;
+  width: 100%;
 
-  display:
-    grid;
+  display: grid;
 
   grid-template-columns:
-    repeat(
-      7,
-      minmax(0, 1fr)
-    );
+    repeat(5, minmax(0, 1fr));
 
-  gap:
-    7px;
+  gap: 7px;
 }
 
 
@@ -450,7 +444,7 @@
     center;
 
   justify-content:
-    flex-start;
+    center;
 
   gap:
     8px;

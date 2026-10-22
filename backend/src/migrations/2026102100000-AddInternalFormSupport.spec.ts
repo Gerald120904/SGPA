@@ -121,13 +121,14 @@ describe('Migración AddInternalFormSupport2026102100000', () => {
         name: 'formularios_estudiantes',
         columns: [
           new TableColumn({ name: 'id', type: 'int' }),
-          new TableColumn({ name: 'proveedor', type: 'varchar' }),
-          new TableColumn({ name: 'token_publico', type: 'varchar' }),
+          new TableColumn({ name: 'proveedor', type: 'varchar', length: '20', default: "'GOOGLE_FORMS'" }),
+          new TableColumn({ name: 'token_publico', type: 'varchar', length: '64', isNullable: true }),
         ],
         indices: [
           new TableIndex({
             name: 'UQ_formularios_token_publico',
             columnNames: ['token_publico'],
+            isUnique: true,
           }),
         ],
       });

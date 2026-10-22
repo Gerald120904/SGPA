@@ -20,8 +20,11 @@ export class InvitacionOutbox {
   @Column({ name: 'usuario_id', type: 'int', unsigned: true, unique: true })
   usuarioId!: number;
 
-  @ManyToOne(() => Usuario, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'usuario_id' })
+  @ManyToOne(() => Usuario, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'usuario_id',
+    foreignKeyConstraintName: 'FK_invitacion_outbox_usuario',
+  })
   usuario!: Usuario;
 
   @Column({ name: 'token_hash', type: 'char', length: 64 })
@@ -58,9 +61,20 @@ export class InvitacionOutbox {
   })
   enviadoEn!: Date | null;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime', precision: 3 })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'datetime',
+    precision: 3,
+    default: () => 'CURRENT_TIMESTAMP(3)',
+  })
   createdAt!: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'datetime', precision: 3 })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'datetime',
+    precision: 3,
+    default: () => 'CURRENT_TIMESTAMP(3)',
+    onUpdate: 'CURRENT_TIMESTAMP(3)',
+  })
   updatedAt!: Date;
 }
