@@ -4,28 +4,36 @@ import { NestFactory } from '@nestjs/core';
 import { config as cargarEntorno } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
+import { acquireDevelopmentStartupGuard } from './config/development-startup-guard';
 import { synchronizeDevelopmentSchemaSafely } from './config/development-schema-sync';
+import { verificarMigracionesAntesDeEscuchar } from './migrations/startup-migrations';
 
 async function bootstrap() {
   cargarEntorno({ path: process.env.SGPA_ENV_FILE || '.env', quiet: true });
-  const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
+  const guard = await acquireDevelopmentStartupGuard(process.env);
+  let app;
   try {
-    await synchronizeDevelopmentSchemaSafely(
+    app = await NestFactory.create(AppModule);
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+
+    await verificarMigracionesAntesDeEscuchar(
       app.get(DataSource),
       app.get(ConfigService),
     );
+    await synchronizeDevelopmentSchemaSafely(app.get(DataSource), app.get(ConfigService));
+    await guard?.releasePort();
     await app.listen(process.env.PORT ?? 3000);
   } catch (error) {
-    await app.close();
+    if (app) await app.close();
     throw error;
+  } finally {
+    await guard?.close();
   }
 }
 
