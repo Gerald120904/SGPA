@@ -3,7 +3,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -13,8 +12,6 @@ import { Aula } from '../../aulas/entities/aula.entity';
 import { Grupo } from './grupo.entity';
 
 @Entity({ name: 'horarios_grupo' })
-@Index('fk_horario_grupo_grupo', ['grupoId'])
-@Index('fk_horario_grupo_aula', ['aulaId'])
 @Check('chk_horario_grupo_dia', 'dia_semana BETWEEN 1 AND 7')
 @Check('chk_horario_grupo_horas', 'hora_inicio < hora_fin')
 export class HorarioGrupo {

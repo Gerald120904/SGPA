@@ -1,4 +1,4 @@
-import { QueryRunner, Table } from 'typeorm';
+import { QueryRunner, Table, TableIndex } from 'typeorm';
 import { assertTableCompatible } from './schema-compatibility';
 
 function expected(): Table {
@@ -18,6 +18,14 @@ function expected(): Table {
 }
 
 describe('assertTableCompatible', () => {
+  it('acepta el índice implícito de MySQL que TypeORM omite al leer una FK', async () => {
+    const actual = expected();
+    const target = expected();
+    target.indices.push(new TableIndex({ name: 'idx_detalle_padre', columnNames: ['id'] }));
+    const runner = { getTable: jest.fn().mockResolvedValue(actual), query: jest.fn().mockResolvedValue([]) };
+    await expect(assertTableCompatible(runner as unknown as QueryRunner, target)).resolves.toBeUndefined();
+  });
+
   it('acepta columnas, PK, índices, FK y CHECK equivalentes', async () => {
     const table = expected();
     const runner = {

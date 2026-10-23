@@ -3,12 +3,12 @@ import { Usuario } from './usuario.entity';
 
 /** Una cuenta asistente conserva un único responsable, incluso tras desactivarse. */
 @Entity({ name: 'dependencias_usuario' })
-@Index('UQ_dependencia_asistente', ['asistenteId'], { unique: true })
+@Index('IDX_dependencia_coordinador', ['coordinadorId'])
 export class DependenciaUsuario {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
-  @Column({ name: 'asistente_id', type: 'int', unsigned: true })
+  @Column({ name: 'asistente_id', type: 'int', unsigned: true, unique: true })
   asistenteId!: number;
 
   @Column({ name: 'coordinador_id', type: 'int', unsigned: true })
