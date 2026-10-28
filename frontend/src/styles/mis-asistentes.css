@@ -1,47 +1,578 @@
-.mis-asistentes-page { display: grid; gap: 18px; }
-.mis-asistentes-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.mis-asistentes-header h2 { margin: 0; color: #4b1721; }
-.mis-asistentes-header p { margin: 5px 0 0; color: #667085; }
-.mis-asistentes-panel { margin-bottom: 16px; padding: 18px; background: #fff; border: 1px solid #e8d9dc; border-radius: 10px; }
-.mis-asistentes-panel h3 { margin: 0 0 10px; color: #6f1d2b; }
-.mis-asistentes-panel p { margin: 6px 0; }
-.mis-asistentes-panel ul { list-style: none; margin: 0; padding: 0; }
-.mis-asistentes-panel li { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #eee; }
-.mis-asistentes-solicitudes { display: grid; gap: 12px; }
-.mis-asistentes-solicitud { border: 1px solid #e8d9dc; border-radius: 8px; padding: 14px; }
-.mis-asistentes-solicitud-top, .mis-asistentes-actions { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.mis-asistentes-solicitud-top strong { color: #6f1d2b; }
-.mis-asistentes-propuesta { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.mis-asistentes-propuesta div { min-width: 0; }
-.mis-asistentes-propuesta dt { color: #667085; font-size: 12px; }
-.mis-asistentes-propuesta dd { margin: 2px 0; overflow-wrap: anywhere; }
-.mis-asistentes-actions { justify-content: flex-end; margin-top: 12px; }
-.mis-asistentes-cuenta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.mis-asistentes-cuenta label { display: grid; gap: 5px; }
-.mis-asistentes-delegacion { margin-top: 16px; }
-.mis-asistentes-delegacion > h4, .mis-asistentes-resumen h4 { margin: 0 0 10px; color: #6f1d2b; }
-.mis-asistentes-carreras { display: grid; gap: 12px; max-height: 38vh; overflow-y: auto; padding: 2px 5px 2px 2px; }
-.mis-asistentes-carrera { border: 1px solid #e8d9dc; border-radius: 8px; padding: 12px; }
-.mis-asistentes-carrera legend { color: #6f1d2b; font-weight: 600; }
-.mis-asistentes-seleccionar-todos { display: flex; align-items: center; gap: 7px; margin: 2px 0 10px; padding: 8px 10px; border: 1px solid #e8d9dc; border-radius: 6px; background: #f8f6f6; color: #6f1d2b; font-size: 12px; font-weight: 600; }
-.mis-asistentes-permisos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
-.mis-asistentes-modulo { padding: 9px; border: 1px solid #eee; border-radius: 6px; background: #fff; }
-.mis-asistentes-modulo > strong { display: block; margin-bottom: 7px; color: #4b1721; font-size: 12px; }
-.mis-asistentes-modulo > div { display: grid; gap: 6px; }
-.mis-asistentes-modulo label { display: flex; align-items: flex-start; gap: 7px; font-size: 12px; }
-.mis-asistentes-empty, .mis-asistentes-load-error { margin: 8px 0; padding: 12px; border: 1px solid #e8d9dc; border-radius: 7px; background: #f8f6f6; color: #667085; }
-.mis-asistentes-load-error { border-color: #d8a8b0; color: #842532; }
-.mis-asistentes-resumen { margin: 14px 0 4px; padding: 12px; border: 1px solid #e8d9dc; border-radius: 8px; background: #fafafa; }
-.mis-asistentes-resumen p { margin: 5px 0; font-size: 12px; }
-.mis-asistentes-resumen ul { margin: 8px 0 0; padding-left: 20px; font-size: 12px; }
-.mis-asistentes-alcances-resumen { display: grid; gap: 7px; }
-.mis-asistentes-alcances-resumen div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid #eee; }
-.mis-asistentes-alcances-resumen span { color: #667085; font-size: 12px; }
-.mis-asistentes-page input[type="checkbox"] { accent-color: #842532; }
-.mis-asistentes-page .usuarios-primary-button { background: #842532; }
-.mis-asistentes-page .usuarios-primary-button:hover:not(:disabled) { background: #681c27; }
+/* ============================================================
+   SGPA · ASISTENTES Y SOLICITUDES — DISEÑO INSTITUCIONAL
+   Estilos locales: no altera otros módulos, servicios ni permisos.
+   Reutiliza StatCard, StatusBadge y FormDialog del SGPA.
+   ============================================================ */
+
+.mis-asistentes-page {
+  --ma-red: var(--una-red, #cf2029);
+  --ma-red-dark: var(--una-red-dark, #b71922);
+  --ma-text: #1d2939;
+  --ma-muted: #667085;
+  --ma-border: #e5e9f0;
+  --ma-soft: #f8f9fb;
+  display: grid;
+  gap: 22px;
+  width: 100%;
+  min-width: 0;
+  padding-bottom: 24px;
+  color: var(--ma-text);
+}
+
+.mis-asistentes-page .hidden { display: none !important; }
+
+/* Encabezado y acciones */
+.mis-asistentes-page .mis-asistentes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  min-width: 0;
+}
+.mis-asistentes-page .mis-asistentes-heading { min-width: 0; }
+.mis-asistentes-page .mis-asistentes-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ma-red-dark);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.mis-asistentes-page .mis-asistentes-header h2 {
+  margin: 0;
+  color: var(--ma-text);
+  font-size: 24px;
+  font-weight: 720;
+  line-height: 1.25;
+}
+.mis-asistentes-page .mis-asistentes-header p {
+  margin: 7px 0 0;
+  color: var(--ma-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mis-asistentes-page .mis-asistentes-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 41px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 680;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.mis-asistentes-page .mis-asistentes-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.mis-asistentes-page .mis-asistentes-btn-primary {
+  background: var(--ma-red);
+  border-color: var(--ma-red);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(207, 32, 41, .14);
+}
+.mis-asistentes-page .mis-asistentes-btn-primary:hover:not(:disabled) {
+  background: var(--ma-red-dark);
+  border-color: var(--ma-red-dark);
+  transform: translateY(-1px);
+}
+.mis-asistentes-page .mis-asistentes-btn-secondary {
+  background: #fff;
+  border-color: #d5dae3;
+  color: #344054;
+}
+.mis-asistentes-page .mis-asistentes-btn-secondary:hover:not(:disabled) {
+  background: #f8f9fb;
+  border-color: #bac2cf;
+}
+.mis-asistentes-page button:disabled { opacity: .56; cursor: not-allowed; }
+.mis-asistentes-page button:focus-visible,
+.mis-asistentes-dialog button:focus-visible,
+.mis-asistentes-dialog input:focus-visible,
+.mis-asistentes-dialog textarea:focus-visible {
+  outline: 3px solid rgba(207, 32, 41, .23);
+  outline-offset: 2px;
+}
+
+/* Mensajes y carga; feedback existente conservado */
+.mis-asistentes-page .usuarios-feedback:not(.hidden) {
+  padding: 13px 16px;
+  border: 1px solid #c7e3d4;
+  border-radius: 10px;
+  background: #eefaf3;
+  color: #17683e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.mis-asistentes-page .usuarios-feedback.is-error:not(.hidden) {
+  border-color: #f0c9cd;
+  background: #fff2f2;
+  color: #a42332;
+}
+.mis-asistentes-page .mis-asistentes-loading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 28px;
+  border: 1px solid var(--ma-border);
+  border-radius: 15px;
+  background: #fff;
+  color: var(--ma-muted);
+  font-size: 13px;
+}
+.mis-asistentes-page .mis-asistentes-loading svg { width: 18px; height: 18px; color: var(--ma-red); }
+.mis-asistentes-page .mis-asistentes-content { display: grid; gap: 20px; min-width: 0; }
+
+/* Indicadores con StatCard reutilizable */
+.mis-asistentes-page .mis-asistentes-indicadores {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+.mis-asistentes-page .mis-asistentes-indicadores:has(> .stat-card:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 400px;
+}
+.mis-asistentes-page .mis-asistentes-indicadores .stat-card {
+  min-width: 0;
+  min-height: 114px;
+  padding: 18px;
+  border: 1px solid var(--ma-border);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, .025);
+}
+.mis-asistentes-page .mis-asistentes-indicadores .stat-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 12px;
+  background: #fdf0f1;
+  color: var(--ma-red);
+}
+.mis-asistentes-page .mis-asistentes-indicadores .stat-icon svg { width: 22px; height: 22px; }
+.mis-asistentes-page .mis-asistentes-indicadores .stat-card span { color: var(--ma-muted); }
+.mis-asistentes-page .mis-asistentes-indicadores .stat-card strong { color: var(--ma-text); }
+
+/* Secciones institucionales */
+.mis-asistentes-page .mis-asistentes-panel {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ma-border);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 2px 9px rgba(16, 24, 40, .025);
+}
+.mis-asistentes-page .mis-asistentes-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 24px 27px;
+  border-bottom: 1px solid #eef0f4;
+}
+.mis-asistentes-page .mis-asistentes-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 0;
+}
+.mis-asistentes-page .mis-asistentes-panel-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #fdf0f1;
+  color: var(--ma-red);
+}
+.mis-asistentes-page .mis-asistentes-panel-icon svg { width: 22px; height: 22px; }
+.mis-asistentes-page .mis-asistentes-panel h3 {
+  margin: 0;
+  color: var(--ma-text);
+  font-size: 17px;
+  font-weight: 730;
+  line-height: 1.3;
+}
+.mis-asistentes-page .mis-asistentes-panel-header p {
+  margin: 6px 0 0;
+  color: var(--ma-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.mis-asistentes-page .mis-asistentes-count {
+  flex: 0 0 auto;
+  padding: 8px 13px;
+  border: 1px solid #f1dce0;
+  border-radius: 99px;
+  background: #fff9fa;
+  color: #a42332;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* Carreras disponibles */
+.mis-asistentes-page .mis-asistentes-alcances-resumen,
+.mis-asistentes-page .mis-asistentes-lista {
+  display: grid;
+  margin: 0;
+  padding: 0 27px;
+  list-style: none;
+}
+.mis-asistentes-page .mis-asistentes-alcance,
+.mis-asistentes-page .mis-asistentes-persona {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 17px 0;
+  border-bottom: 1px solid #eef0f4;
+}
+.mis-asistentes-page .mis-asistentes-alcance:last-child,
+.mis-asistentes-page .mis-asistentes-persona:last-child { border-bottom: 0; }
+.mis-asistentes-page .mis-asistentes-alcance-icon,
+.mis-asistentes-page .mis-asistentes-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #ecd6da;
+  border-radius: 11px;
+  background: #faf1f2;
+  color: #9c2532;
+}
+.mis-asistentes-page .mis-asistentes-alcance-icon svg { width: 18px; height: 18px; }
+.mis-asistentes-page .mis-asistentes-avatar { font-size: 15px; font-weight: 750; }
+.mis-asistentes-page .mis-asistentes-alcance-detalle,
+.mis-asistentes-page .mis-asistentes-persona-detalle {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.mis-asistentes-page .mis-asistentes-alcance-detalle strong,
+.mis-asistentes-page .mis-asistentes-persona-detalle strong {
+  color: var(--ma-text);
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.mis-asistentes-page .mis-asistentes-alcance-detalle > span,
+.mis-asistentes-page .mis-asistentes-persona-detalle > span {
+  color: var(--ma-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Solicitudes y propuesta */
+.mis-asistentes-page .mis-asistentes-solicitudes {
+  display: grid;
+  gap: 15px;
+  padding: 23px 27px 27px;
+}
+.mis-asistentes-page .mis-asistentes-solicitud {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--ma-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, .025);
+}
+.mis-asistentes-page .mis-asistentes-solicitud-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.mis-asistentes-page .mis-asistentes-solicitud-top strong {
+  color: var(--ma-text);
+  font-size: 13.5px;
+  font-weight: 750;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.mis-asistentes-page .mis-asistentes-solicitud-top .sgpa-status-badge { flex: 0 0 auto; }
+.mis-asistentes-page .mis-asistentes-solicitud-meta {
+  margin: 9px 0 17px;
+  color: var(--ma-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.mis-asistentes-page .mis-asistentes-propuesta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.mis-asistentes-page .mis-asistentes-propuesta > div {
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid #edf0f4;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+.mis-asistentes-page .mis-asistentes-propuesta dt {
+  margin-bottom: 6px;
+  color: #778397;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .025em;
+}
+.mis-asistentes-page .mis-asistentes-propuesta dd {
+  margin: 0;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.mis-asistentes-page .mis-asistentes-motivo {
+  margin: 15px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #f3d3d6;
+  border-radius: 9px;
+  background: #fff5f5;
+  color: #912634;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mis-asistentes-page .mis-asistentes-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 17px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0f4;
+}
+
+/* Vacíos y errores; no se altera el contenido de los mensajes */
+.mis-asistentes-page .mis-asistentes-empty,
+.mis-asistentes-page .mis-asistentes-load-error {
+  margin: 22px 27px;
+  padding: 20px;
+  border: 1px dashed #dfe4eb;
+  border-radius: 11px;
+  background: #fafbfc;
+  color: var(--ma-muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.mis-asistentes-page .mis-asistentes-load-error {
+  border: 1px solid #eec9ce;
+  background: #fff3f4;
+  color: #912634;
+}
+
+/* FormDialog reutilizable: sólo personalización local */
+.mis-asistentes-dialog .sgpa-form { color: var(--ma-text, #1d2939); }
+.mis-asistentes-dialog .sgpa-form-header { padding-right: 60px; }
+.mis-asistentes-dialog .mis-asistentes-dialog-close {
+  position: absolute;
+  z-index: 3;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  background: #fff;
+  color: #667085;
+  cursor: pointer;
+}
+.mis-asistentes-dialog .mis-asistentes-dialog-close:hover { background: #fff5f6; color: #b42332; }
+.mis-asistentes-dialog .mis-asistentes-dialog-close svg { width: 17px; height: 17px; }
+.mis-asistentes-dialog .mis-asistentes-dialog-body { display: grid; gap: 22px; min-width: 0; }
+.mis-asistentes-dialog .mis-asistentes-cuenta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+/* Validaciones locales del alta; no se alteran formularios de solicitudes */
+.mis-asistentes-dialog .mis-asistentes-campos-ayuda {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.mis-asistentes-dialog .mis-asistentes-campos-ayuda span,
+.mis-asistentes-dialog .mis-asistentes-obligatorio { color: #c22432; font-weight: 800; }
+.mis-asistentes-dialog .mis-asistentes-opcional { color: #667085; font-weight: 500; }
+.mis-asistentes-dialog .mis-asistentes-campo-correo { grid-column: 1 / -1; }
+.mis-asistentes-dialog .mis-asistentes-cuenta input[aria-invalid="true"],
+.mis-asistentes-dialog .mis-asistentes-cuenta input[aria-invalid="true"]:focus {
+  border-color: #c22432;
+  background: #fffafb;
+  box-shadow: 0 0 0 2px rgba(194, 36, 50, .08);
+}
+.mis-asistentes-dialog .mis-asistentes-campo-error {
+  display: block;
+  color: #ad2531;
+  font-size: 11.5px;
+  font-weight: 550;
+  line-height: 1.45;
+}
+.mis-asistentes-dialog .mis-asistentes-campo-error[hidden] { display: none; }
+.mis-asistentes-dialog .mis-asistentes-cuenta label,
+.mis-asistentes-dialog .mis-asistentes-motivo-input {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+.mis-asistentes-dialog .mis-asistentes-cuenta input,
+.mis-asistentes-dialog .mis-asistentes-motivo-input textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d7dde5;
+  border-radius: 9px;
+  outline: none;
+  background: #fff;
+  color: #1d2939;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.mis-asistentes-dialog .mis-asistentes-motivo-input textarea { min-height: 116px; resize: vertical; }
+.mis-asistentes-dialog .mis-asistentes-cuenta input:focus,
+.mis-asistentes-dialog .mis-asistentes-motivo-input textarea:focus {
+  border-color: #d04450;
+  box-shadow: 0 0 0 3px rgba(207, 32, 41, .10);
+}
+.mis-asistentes-dialog .mis-asistentes-delegacion { min-width: 0; }
+.mis-asistentes-dialog .mis-asistentes-delegacion > h4,
+.mis-asistentes-dialog .mis-asistentes-resumen h4 {
+  margin: 0 0 14px;
+  color: #253044;
+  font-size: 13.5px;
+  font-weight: 750;
+}
+.mis-asistentes-dialog .mis-asistentes-carreras {
+  display: grid;
+  gap: 13px;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 2px 5px 2px 2px;
+}
+.mis-asistentes-dialog .mis-asistentes-carrera {
+  min-width: 0;
+  margin: 0;
+  padding: 15px;
+  border: 1px solid #dfe4eb;
+  border-radius: 11px;
+  background: #fff;
+}
+.mis-asistentes-dialog .mis-asistentes-carrera legend {
+  padding: 0 7px;
+  color: #253044;
+  font-size: 12.5px;
+  font-weight: 750;
+}
+.mis-asistentes-dialog .mis-asistentes-carrera legend label,
+.mis-asistentes-dialog .mis-asistentes-seleccionar-todos,
+.mis-asistentes-dialog .mis-asistentes-modulo label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.mis-asistentes-dialog input[type="checkbox"] { accent-color: var(--una-red, #cf2029); }
+.mis-asistentes-dialog .mis-asistentes-seleccionar-todos {
+  margin: 6px 0 14px;
+  padding: 11px 12px;
+  border: 1px solid #f0dadd;
+  border-radius: 9px;
+  background: #fff8f9;
+  color: #922938;
+  font-size: 11.5px;
+  font-weight: 730;
+}
+.mis-asistentes-dialog .mis-asistentes-permisos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+.mis-asistentes-dialog .mis-asistentes-modulo {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e8ecf2;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+.mis-asistentes-dialog .mis-asistentes-modulo > strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 750;
+}
+.mis-asistentes-dialog .mis-asistentes-modulo > div { display: grid; gap: 9px; }
+.mis-asistentes-dialog .mis-asistentes-modulo label { align-items: flex-start; font-size: 11.5px; color: #475467; }
+.mis-asistentes-dialog .mis-asistentes-resumen {
+  margin: 0;
+  padding: 18px;
+  border: 1px solid #e1e6ed;
+  border-radius: 11px;
+  background: #fafbfc;
+  color: #475467;
+}
+.mis-asistentes-dialog .mis-asistentes-resumen p,
+.mis-asistentes-dialog .mis-asistentes-resumen li { font-size: 12px; line-height: 1.7; }
+.mis-asistentes-dialog .mis-asistentes-resumen p { margin: 6px 0; }
+.mis-asistentes-dialog .mis-asistentes-resumen ul { margin: 10px 0 0; padding-left: 20px; }
+.mis-asistentes-dialog .mis-asistentes-empty {
+  margin: 5px 0;
+  padding: 14px;
+  border: 1px dashed #e2e5eb;
+  border-radius: 9px;
+  background: #f8f9fb;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 850px) {
+  .mis-asistentes-page .mis-asistentes-indicadores { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 700px) {
-  .mis-asistentes-header, .mis-asistentes-panel li { flex-direction: column; align-items: stretch; }
-  .mis-asistentes-cuenta { grid-template-columns: 1fr; }
-  .mis-asistentes-page .usuario-dialog { max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); overflow: auto; }
+  .mis-asistentes-page .mis-asistentes-header { flex-direction: column; align-items: stretch; }
+  .mis-asistentes-page .mis-asistentes-header .mis-asistentes-btn { align-self: flex-start; }
+  .mis-asistentes-page .mis-asistentes-indicadores { grid-template-columns: minmax(0, 1fr); }
+  .mis-asistentes-page .mis-asistentes-panel-header { align-items: flex-start; flex-wrap: wrap; padding: 18px; }
+  .mis-asistentes-page .mis-asistentes-panel-icon { width: 42px; height: 42px; flex-basis: 42px; }
+  .mis-asistentes-page .mis-asistentes-alcances-resumen,
+  .mis-asistentes-page .mis-asistentes-lista { padding: 0 18px; }
+  .mis-asistentes-page .mis-asistentes-solicitudes { padding: 17px 18px 20px; }
+  .mis-asistentes-page .mis-asistentes-solicitud { padding: 15px; }
+  .mis-asistentes-page .mis-asistentes-persona { flex-wrap: wrap; }
+  .mis-asistentes-page .mis-asistentes-persona .mis-asistentes-btn { margin-left: 55px; }
+  .mis-asistentes-page .mis-asistentes-propuesta { grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); }
+  .mis-asistentes-page .mis-asistentes-solicitud-top { align-items: flex-start; flex-wrap: wrap; }
+  .mis-asistentes-page .mis-asistentes-actions { flex-wrap: wrap; }
+  .mis-asistentes-page .mis-asistentes-empty,
+  .mis-asistentes-page .mis-asistentes-load-error { margin: 17px 18px; }
+  .mis-asistentes-dialog .mis-asistentes-cuenta { grid-template-columns: minmax(0, 1fr); }
+  .mis-asistentes-dialog .sgpa-form-scroll { padding: 18px; }
+  .mis-asistentes-dialog .sgpa-form-header { padding-right: 48px; }
 }

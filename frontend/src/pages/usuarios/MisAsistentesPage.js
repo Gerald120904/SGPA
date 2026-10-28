@@ -11,6 +11,10 @@ import {
 } from '../../services/solicitudes-cambio.service.js';
 import { escapeHtml } from '../../utils/html.js';
 import { confirmarAccion } from '../../utils/confirm.js';
+import { FormDialog } from '../../components/FormDialog.js';
+import { StatCard } from '../../components/StatCard.js';
+import { StatusBadge } from '../../components/StatusBadge.js';
+import { renderizarIconos } from '../../utils/icons.js';
 
 let instanciaActual = 0;
 
@@ -38,14 +42,84 @@ export function establecerSeleccionPermisosDisponibles(permisos, seleccionado) {
 
 export function MisAsistentesPage() {
   return `<section id="misAsistentesPage" class="module-view mis-asistentes-page">
-    <header class="mis-asistentes-header">
-      <div><h2>Asistentes y solicitudes</h2><p>Carreras delegadas y cambios pendientes de aprobación.</p></div>
-      <button type="button" id="crearAsistenteButton" class="usuarios-primary-button" disabled>Crear asistente</button>
+    <header class="mis-asistentes-header sgpa-toolbar">
+      <div class="mis-asistentes-heading">
+        <span class="mis-asistentes-eyebrow">Administración académica</span>
+        <h2>Asistentes y solicitudes</h2>
+        <p>Gestione las carreras delegadas y revise los cambios pendientes de aprobación.</p>
+      </div>
+      <button type="button" id="crearAsistenteButton" class="mis-asistentes-btn mis-asistentes-btn-primary" disabled>
+        <i data-lucide="user-plus" aria-hidden="true"></i><span>Crear asistente</span>
+      </button>
     </header>
-    <div id="misAsistentesFeedback" class="usuarios-feedback hidden" role="status"></div>
-    <div id="misAsistentesContenido" aria-live="polite">Cargando...</div>
-    <dialog id="misAsistentesDialog" class="usuario-dialog"><div id="misAsistentesDialogContenido"></div></dialog>
+    <div id="misAsistentesFeedback" class="usuarios-feedback hidden" role="status" aria-live="polite"></div>
+    <div id="misAsistentesContenido" class="mis-asistentes-content" aria-live="polite">
+      <div class="mis-asistentes-loading"><i data-lucide="loader-circle" aria-hidden="true"></i><span>Cargando información...</span></div>
+    </div>
+    <dialog id="misAsistentesDialog" class="sgpa-form-dialog sgpa-form-dialog-lg mis-asistentes-dialog">
+      <div id="misAsistentesDialogContenido"></div>
+    </dialog>
   </section>`;
+}
+
+// Validaciones de entrada para el alta de asistentes. No modifican la delegación
+// de carreras/permisos ni sustituyen las validaciones del backend.
+const LIMITES_ASISTENTE = Object.freeze({
+  cedula: 9,
+  nombres: 60,
+  apellido1: 50,
+  apellido2: 50,
+  correo: 150,
+});
+
+const NOMBRE_ASISTENTE_REGEX = /^[\p{L}\p{M}\s'-]+$/u;
+const CEDULA_ASISTENTE_REGEX = /^\d{1,9}$/;
+const CORREO_ASISTENTE_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function normalizarEntradaAsistente(campo, valor) {
+  const texto = String(valor ?? '');
+  if (campo === 'cedula') return texto.replace(/\D/g, '').slice(0, LIMITES_ASISTENTE.cedula);
+  if (campo === 'nombres' || campo === 'apellido1' || campo === 'apellido2') {
+    return texto.replace(/[^\p{L}\p{M}\s'-]/gu, '').slice(0, LIMITES_ASISTENTE[campo]);
+  }
+  return texto.slice(0, LIMITES_ASISTENTE.correo);
+}
+
+export function validarDatosAsistente(datos = {}) {
+  const cedula = String(datos.cedula ?? '').trim();
+  const nombres = String(datos.nombres ?? '').trim();
+  const apellido1 = String(datos.apellido1 ?? '').trim();
+  const apellido2 = String(datos.apellido2 ?? '').trim();
+  const correo = String(datos.correo ?? '').trim();
+  const errores = {};
+
+  if (!cedula) errores.cedula = 'La cédula es obligatoria.';
+  else if (cedula.length > LIMITES_ASISTENTE.cedula || !CEDULA_ASISTENTE_REGEX.test(cedula)) {
+    errores.cedula = 'La cédula debe contener solo números (máximo 9 dígitos, sin guiones).';
+  }
+
+  for (const [campo, nombre, obligatorio] of [
+    ['nombres', 'Los nombres', true],
+    ['apellido1', 'El primer apellido', true],
+    ['apellido2', 'El segundo apellido', false],
+  ]) {
+    const texto = { nombres, apellido1, apellido2 }[campo];
+    if (!texto && obligatorio) errores[campo] = `${nombre} es obligatorio.`;
+    else if (texto.length > LIMITES_ASISTENTE[campo]) {
+      errores[campo] = `${nombre} no puede superar ${LIMITES_ASISTENTE[campo]} caracteres.`;
+    } else if (texto && !NOMBRE_ASISTENTE_REGEX.test(texto)) {
+      errores[campo] = `${nombre} solo puede contener letras, espacios, guiones y apóstrofes.`;
+    }
+  }
+
+  if (!correo) errores.correo = 'El correo electrónico es obligatorio.';
+  else if (correo.length > LIMITES_ASISTENTE.correo) {
+    errores.correo = 'El correo electrónico no puede superar 150 caracteres.';
+  } else if (!CORREO_ASISTENTE_REGEX.test(correo)) {
+    errores.correo = 'Ingrese un correo electrónico válido (por ejemplo: nombre@dominio.com).';
+  }
+
+  return { valido: Object.keys(errores).length === 0, errores };
 }
 
 function verificar(resultado, mensaje) {
@@ -152,37 +226,70 @@ export async function iniciarMisAsistentesPage() {
       const nombres = new Map(estado.asistentes.map((a) => [Number(a.id), `${a.nombres} ${a.apellido1}`]));
       const carreras = new Map(estado.alcances.map((c) => [Number(c.id), c.nombre]));
       contenido.innerHTML = `
-        ${esAsistente ? '' : `<section class="mis-asistentes-panel"><h3>Mis carreras</h3>
-          ${estado.alcances.length
-            ? `<div class="mis-asistentes-alcances-resumen">${estado.alcances.map((c) => `
-                <div><strong>${escapeHtml(c.nombre)}</strong>
-                  ${Array.isArray(c.permisos) && c.permisos.length
-                    ? `<span>${c.permisos.length} permiso(s) delegable(s)</span>`
-                    : '<span>Esta carrera no tiene permisos disponibles para delegar.</span>'}
-                </div>`).join('')}</div>`
-            : '<p class="mis-asistentes-empty">No tenés carreras asignadas para delegar. Solicitá al administrador que configure tus carreras y permisos.</p>'}
+        <div class="mis-asistentes-indicadores" aria-label="Resumen de gestión">
+          ${esAsistente ? '' : `
+            ${StatCard({ icon: 'graduation-cap', title: 'Carreras asignadas', value: estado.alcances.length, description: 'Alcance de delegación' })}
+            ${StatCard({ icon: 'users', title: 'Asistentes registrados', value: estado.asistentes.length, description: 'Vinculados a su coordinación' })}
+          `}
+          ${StatCard({ icon: 'clipboard-list', title: esAsistente ? 'Mis solicitudes' : 'Solicitudes pendientes', value: estado.solicitudes.length, description: 'Registros de la consulta actual' })}
+        </div>
+        ${esAsistente ? '' : `
+          <section class="mis-asistentes-panel" aria-label="Carreras delegables">
+            <header class="mis-asistentes-panel-header">
+              <div class="mis-asistentes-panel-title"><span class="mis-asistentes-panel-icon"><i data-lucide="graduation-cap" aria-hidden="true"></i></span>
+                <div><h3>Mis carreras</h3><p>Carreras y permisos disponibles para delegar.</p></div>
+              </div>
+              <span class="mis-asistentes-count">${estado.alcances.length} ${estado.alcances.length === 1 ? 'carrera' : 'carreras'}</span>
+            </header>
+            ${estado.alcances.length
+              ? `<div class="mis-asistentes-alcances-resumen">${estado.alcances.map((c) => `
+                  <div class="mis-asistentes-alcance"><span class="mis-asistentes-alcance-icon"><i data-lucide="book-open" aria-hidden="true"></i></span>
+                    <div class="mis-asistentes-alcance-detalle"><strong>${escapeHtml(c.nombre)}</strong>
+                      ${Array.isArray(c.permisos) && c.permisos.length
+                        ? `<span>${c.permisos.length} permiso(s) delegable(s)</span>`
+                        : '<span>Esta carrera no tiene permisos disponibles para delegar.</span>'}
+                    </div>
+                  </div>`).join('')}</div>`
+              : '<p class="mis-asistentes-empty">No tenés carreras asignadas para delegar. Solicitá al administrador que configure tus carreras y permisos.</p>'}
           </section>
-          <section class="mis-asistentes-panel"><h3>Mis asistentes</h3>
-          ${estado.asistentes.length ? `<ul>${estado.asistentes.map((a) => `<li>
-            <span>${escapeHtml(`${a.nombres} ${a.apellido1}`)} · ${escapeHtml(a.correo)}</span>
-            <button type="button" data-action="editar-asistente" data-id="${a.id}" class="usuarios-secondary-button">Editar delegación</button>
-          </li>`).join('')}</ul>` : '<p>No hay asistentes asignados.</p>'}</section>`}
-        <section class="mis-asistentes-panel"><h3>${esAsistente ? 'Mis solicitudes' : 'Solicitudes de mis asistentes'}</h3>
+          <section class="mis-asistentes-panel" aria-label="Mis asistentes">
+            <header class="mis-asistentes-panel-header">
+              <div class="mis-asistentes-panel-title"><span class="mis-asistentes-panel-icon"><i data-lucide="users" aria-hidden="true"></i></span>
+                <div><h3>Mis asistentes</h3><p>Personas autorizadas y delegaciones académicas.</p></div>
+              </div>
+              <span class="mis-asistentes-count">${estado.asistentes.length} ${estado.asistentes.length === 1 ? 'asistente' : 'asistentes'}</span>
+            </header>
+            ${estado.asistentes.length ? `<ul class="mis-asistentes-lista">${estado.asistentes.map((a) => `<li class="mis-asistentes-persona">
+              <span class="mis-asistentes-avatar" aria-hidden="true">${escapeHtml((a.nombres || 'A').trim().charAt(0).toLocaleUpperCase('es-CR'))}</span>
+              <span class="mis-asistentes-persona-detalle"><strong>${escapeHtml(`${a.nombres} ${a.apellido1}`)}</strong><span>${escapeHtml(a.correo)}</span></span>
+              <button type="button" data-action="editar-asistente" data-id="${a.id}" class="mis-asistentes-btn mis-asistentes-btn-secondary">
+                <i data-lucide="pencil" aria-hidden="true"></i><span>Editar delegación</span>
+              </button>
+            </li>`).join('')}</ul>` : '<p class="mis-asistentes-empty">No hay asistentes asignados.</p>'}
+          </section>`}
+        <section class="mis-asistentes-panel" aria-label="Solicitudes de cambio">
+          <header class="mis-asistentes-panel-header">
+            <div class="mis-asistentes-panel-title"><span class="mis-asistentes-panel-icon"><i data-lucide="clipboard-list" aria-hidden="true"></i></span>
+              <div><h3>${esAsistente ? 'Mis solicitudes' : 'Solicitudes de mis asistentes'}</h3><p>Detalle de propuestas, estado y acciones disponibles.</p></div>
+            </div>
+            <span class="mis-asistentes-count">${estado.solicitudes.length} ${estado.solicitudes.length === 1 ? 'solicitud' : 'solicitudes'}</span>
+          </header>
           ${estado.solicitudes.length ? `<div class="mis-asistentes-solicitudes">${estado.solicitudes.map((s) => `
             <article class="mis-asistentes-solicitud">
               <div class="mis-asistentes-solicitud-top"><strong>${escapeHtml(s.modulo)} · ${escapeHtml(s.operacion)}</strong>
-                <span>${escapeHtml(s.estado)}</span></div>
-              <p>${esAsistente ? '' : `${escapeHtml(nombres.get(Number(s.solicitanteId)) || `Asistente #${s.solicitanteId}`)} · `}
+                ${StatusBadge({ label: s.estado, tone: s.estado === 'APROBADA' ? 'success' : s.estado === 'PENDIENTE' ? 'warning' : s.estado === 'RECHAZADA' || s.estado === 'INVALIDADA' ? 'danger' : 'neutral' })}</div>
+              <p class="mis-asistentes-solicitud-meta">${esAsistente ? '' : `${escapeHtml(nombres.get(Number(s.solicitanteId)) || `Asistente #${s.solicitanteId}`)} · `}
                 ${escapeHtml(carreras.get(Number(s.carreraId)) || `Carrera #${s.carreraId}`)} ·
                 ${escapeHtml(new Date(s.createdAt).toLocaleString('es-CR'))}</p>
               ${propuestaVisible(s)}
-              ${s.motivoRechazo ? `<p>Motivo: ${escapeHtml(s.motivoRechazo)}</p>` : ''}
+              ${s.motivoRechazo ? `<p class="mis-asistentes-motivo">Motivo: ${escapeHtml(s.motivoRechazo)}</p>` : ''}
               ${!esAsistente && s.estado === 'PENDIENTE' ? `<div class="mis-asistentes-actions">
-                <button type="button" data-action="aprobar" data-id="${s.id}" class="usuarios-primary-button">Aprobar</button>
-                <button type="button" data-action="rechazar" data-id="${s.id}" class="usuarios-secondary-button">Rechazar</button>
+                <button type="button" data-action="aprobar" data-id="${s.id}" class="mis-asistentes-btn mis-asistentes-btn-primary"><i data-lucide="circle-check" aria-hidden="true"></i><span>Aprobar</span></button>
+                <button type="button" data-action="rechazar" data-id="${s.id}" class="mis-asistentes-btn mis-asistentes-btn-secondary"><i data-lucide="circle-x" aria-hidden="true"></i><span>Rechazar</span></button>
               </div>` : ''}
-            </article>`).join('')}</div>` : '<p>No hay solicitudes.</p>'}
+            </article>`).join('')}</div>` : '<p class="mis-asistentes-empty">No hay solicitudes.</p>'}
         </section>`;
+      renderizarIconos();
       crearAsistenteButton.disabled = false;
     } catch (error) {
       if (sigueActiva()) {
@@ -268,29 +375,92 @@ export async function iniciarMisAsistentesPage() {
     if (!formulario.dataset.id) boton.disabled = seleccion.length === 0 || totalPermisos === 0;
   }
 
+  // Mensajes junto a los campos: esta validación se utiliza solo al crear.
+  function mostrarErrorCampoAsistente(formulario, nombre, texto) {
+    const entrada = formulario.querySelector(`.mis-asistentes-cuenta [name="${nombre}"]`);
+    const error = formulario.querySelector(`#asistenteError-${nombre}`);
+    if (!entrada || !error) return;
+    error.textContent = texto || '';
+    error.hidden = !texto;
+    if (texto) entrada.setAttribute('aria-invalid', 'true');
+    else entrada.removeAttribute('aria-invalid');
+  }
+
+  function validarCampoAsistente(formulario, nombre) {
+    const datos = Object.fromEntries(new FormData(formulario));
+    const { errores } = validarDatosAsistente(datos);
+    mostrarErrorCampoAsistente(formulario, nombre, errores[nombre]);
+  }
+
+  function validarFormularioAltaAsistente(formulario) {
+    formulario.dataset.intentoEnvio = 'true';
+    const { valido, errores } = validarDatosAsistente(
+      Object.fromEntries(new FormData(formulario)),
+    );
+    for (const nombre of Object.keys(LIMITES_ASISTENTE)) {
+      mostrarErrorCampoAsistente(formulario, nombre, errores[nombre]);
+    }
+    if (!valido) {
+      const primero = Object.keys(LIMITES_ASISTENTE).find((nombre) => errores[nombre]);
+      formulario.querySelector(`.mis-asistentes-cuenta [name="${primero}"]`)?.focus();
+    }
+    return valido;
+  }
+
   function abrirFormulario(id = null, asignadas = []) {
-    dialogoContenido.innerHTML = `<form id="formAsistente" data-id="${id || ''}" class="usuario-form">
-      <div class="usuario-dialog-header"><div><h3>${id ? 'Editar delegación' : 'Crear asistente'}</h3>
-        <p>Solo se muestran carreras y permisos que puede delegar.</p></div>
-        <button type="button" data-action="cerrar" class="usuarios-close-button" aria-label="Cerrar">×</button></div>
-      ${id ? '' : `<div class="mis-asistentes-cuenta">
-        <label>Cédula<input name="cedula" required maxlength="20"></label>
-        <label>Nombres<input name="nombres" required maxlength="100"></label>
-        <label>Primer apellido<input name="apellido1" required maxlength="100"></label>
-        <label>Segundo apellido<input name="apellido2" maxlength="100"></label>
-        <label>Correo<input name="correo" type="email" required maxlength="150"></label>
-      </div>`}
-      <section class="mis-asistentes-delegacion">
-        <h4>Carreras y permisos del asistente</h4>
-        <div class="mis-asistentes-carreras">${camposCarreras(asignadas)}</div>
-      </section>
-      <section id="resumenDelegacionAsistente" class="mis-asistentes-resumen"></section>
-      <div class="usuario-dialog-actions"><button type="button" data-action="cerrar" class="usuarios-secondary-button">Cancelar</button>
-        <button type="submit" class="usuarios-primary-button">${id ? 'Guardar delegación' : estado.configuracion.envioInvitacionHabilitado ? 'Crear e invitar' : 'Crear asistente'}</button></div>
-    </form>`;
+    dialogoContenido.innerHTML = FormDialog({
+      formId: 'formAsistente',
+      title: id ? 'Editar delegación' : 'Crear asistente',
+      description: 'Solo se muestran carreras y permisos que puede delegar.',
+      layout: 'custom',
+      formClass: 'mis-asistentes-form',
+      bodyClass: 'mis-asistentes-dialog-body',
+      body: `
+        <button type="button" data-action="cerrar" class="mis-asistentes-dialog-close" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
+        ${id ? '' : `<div class="mis-asistentes-cuenta">
+          <p class="mis-asistentes-campos-ayuda">Los campos marcados con <span aria-hidden="true">*</span> son obligatorios.</p>
+          <label class="mis-asistentes-campo">
+            <span>Cédula <span class="mis-asistentes-obligatorio" aria-hidden="true">*</span></span>
+            <input name="cedula" type="text" inputmode="numeric" required maxlength="9" autocomplete="off" aria-describedby="asistenteError-cedula" placeholder="Solo números, máximo 9 dígitos">
+            <small id="asistenteError-cedula" class="mis-asistentes-campo-error" role="alert" hidden></small>
+          </label>
+          <label class="mis-asistentes-campo">
+            <span>Nombres <span class="mis-asistentes-obligatorio" aria-hidden="true">*</span></span>
+            <input name="nombres" type="text" required maxlength="60" autocomplete="given-name" aria-describedby="asistenteError-nombres">
+            <small id="asistenteError-nombres" class="mis-asistentes-campo-error" role="alert" hidden></small>
+          </label>
+          <label class="mis-asistentes-campo">
+            <span>Primer apellido <span class="mis-asistentes-obligatorio" aria-hidden="true">*</span></span>
+            <input name="apellido1" type="text" required maxlength="50" autocomplete="family-name" aria-describedby="asistenteError-apellido1">
+            <small id="asistenteError-apellido1" class="mis-asistentes-campo-error" role="alert" hidden></small>
+          </label>
+          <label class="mis-asistentes-campo">
+            <span>Segundo apellido <span class="mis-asistentes-opcional">(opcional)</span></span>
+            <input name="apellido2" type="text" maxlength="50" aria-describedby="asistenteError-apellido2">
+            <small id="asistenteError-apellido2" class="mis-asistentes-campo-error" role="alert" hidden></small>
+          </label>
+          <label class="mis-asistentes-campo mis-asistentes-campo-correo">
+            <span>Correo electrónico <span class="mis-asistentes-obligatorio" aria-hidden="true">*</span></span>
+            <input name="correo" type="email" required maxlength="150" autocomplete="email" aria-describedby="asistenteError-correo" placeholder="nombre@dominio.com">
+            <small id="asistenteError-correo" class="mis-asistentes-campo-error" role="alert" hidden></small>
+          </label>
+        </div>`}
+        <section class="mis-asistentes-delegacion">
+          <h4>Carreras y permisos del asistente</h4>
+          <div class="mis-asistentes-carreras">${camposCarreras(asignadas)}</div>
+        </section>
+        <section id="resumenDelegacionAsistente" class="mis-asistentes-resumen"></section>
+      `,
+      footerHtml: `<button type="button" data-action="cerrar" class="sgpa-form-secondary">Cancelar</button>
+        <button type="submit" class="sgpa-form-primary"><i data-lucide="save" aria-hidden="true"></i>${id ? 'Guardar delegación' : estado.configuracion.envioInvitacionHabilitado ? 'Crear e invitar' : 'Crear asistente'}</button>`,
+    });
     const formulario = dialogoContenido.querySelector('#formAsistente');
+    formulario.dataset.id = String(id || '');
+    // Solo el alta usa mensajes propios en lugar de globos nativos del navegador.
+    if (!id) formulario.noValidate = true;
     formulario.querySelectorAll('.mis-asistentes-carrera').forEach(actualizarSelectorCarrera);
     actualizarResumenFormulario(formulario);
+    renderizarIconos();
     dialogo.showModal();
   }
 
@@ -319,16 +489,46 @@ export async function iniciarMisAsistentesPage() {
       return;
     }
     if (accion === 'rechazar') {
-      dialogoContenido.innerHTML = `<form id="formRechazo" data-id="${Number(boton.dataset.id)}" class="usuario-form">
-        <div class="usuario-dialog-header"><div><h3>Rechazar solicitud</h3>
-          <p>Indique el motivo para que el asistente pueda revisar su propuesta.</p></div>
-          <button type="button" data-action="cerrar" class="usuarios-close-button" aria-label="Cerrar">&times;</button></div>
-        <label>Motivo<textarea name="motivo" required minlength="3" maxlength="500" rows="4"></textarea></label>
-        <div class="usuario-dialog-actions"><button type="button" data-action="cerrar" class="usuarios-secondary-button">Cancelar</button>
-          <button type="submit" class="usuarios-primary-button">Rechazar solicitud</button></div>
-      </form>`;
+      dialogoContenido.innerHTML = FormDialog({
+        formId: 'formRechazo',
+        title: 'Rechazar solicitud',
+        description: 'Indique el motivo para que el asistente pueda revisar su propuesta.',
+        layout: 'custom',
+        formClass: 'mis-asistentes-form mis-asistentes-rechazo-form',
+        bodyClass: 'mis-asistentes-dialog-body',
+        body: `<button type="button" data-action="cerrar" class="mis-asistentes-dialog-close" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
+          <label class="mis-asistentes-motivo-input">Motivo<textarea name="motivo" required minlength="3" maxlength="500" rows="4"></textarea></label>`,
+        footerHtml: `<button type="button" data-action="cerrar" class="sgpa-form-secondary">Cancelar</button>
+          <button type="submit" class="sgpa-form-primary"><i data-lucide="circle-x" aria-hidden="true"></i>Rechazar solicitud</button>`,
+      });
+      dialogoContenido.querySelector('#formRechazo').dataset.id = String(Number(boton.dataset.id));
+      renderizarIconos();
       dialogo.showModal();
     }
+  });
+
+  // Impide caracteres ajenos al campo; muestra errores en el propio formulario.
+  pagina.addEventListener('input', (event) => {
+    const entrada = event.target;
+    if (!entrada.matches?.('#formAsistente .mis-asistentes-cuenta input')) return;
+    const formulario = entrada.closest('#formAsistente');
+    if (!formulario || formulario.dataset.id) return;
+    const normalizado = normalizarEntradaAsistente(entrada.name, entrada.value);
+    if (entrada.value !== normalizado) entrada.value = normalizado;
+    if (entrada.dataset.revisado === 'true' || formulario.dataset.intentoEnvio === 'true') {
+      validarCampoAsistente(formulario, entrada.name);
+    }
+  });
+
+  pagina.addEventListener('focusout', (event) => {
+    const entrada = event.target;
+    if (!entrada.matches?.('#formAsistente .mis-asistentes-cuenta input')) return;
+    const formulario = entrada.closest('#formAsistente');
+    if (!formulario || formulario.dataset.id) return;
+    entrada.value = entrada.value.trim();
+    if (entrada.name === 'correo') entrada.value = entrada.value.toLowerCase();
+    entrada.dataset.revisado = 'true';
+    validarCampoAsistente(formulario, entrada.name);
   });
 
   pagina.addEventListener('change', (event) => {
@@ -369,6 +569,7 @@ export async function iniciarMisAsistentesPage() {
     if (event.target.id !== 'formAsistente') return;
     event.preventDefault();
     const form = event.target;
+    if (!form.dataset.id && !validarFormularioAltaAsistente(form)) return;
     if (!form.reportValidity()) return;
     const boton = form.querySelector('[type="submit"]');
     const carreras = [...form.querySelectorAll('.mis-asistentes-carrera')]

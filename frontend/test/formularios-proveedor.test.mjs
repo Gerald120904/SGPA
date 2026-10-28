@@ -33,8 +33,14 @@ test('Google Forms conserva proveedor explícito y requiere materias con Curso e
 test('el diálogo presenta ambas modalidades y el IPC entrega el payload al endpoint administrativo', () => {
   const page = readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-  assert.match(page, /value="INTERNO" selected/);
-  assert.match(page, /value="GOOGLE_FORMS"/);
-  assert.match(page, /crearFormularioEstudiantes\(construirDatosCrearFormulario/);
+const pageCode = readFileSync(
+  new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url),
+  'utf8'
+);
+
+  assert.match(pageCode, /value="INTERNO"/);
+  assert.doesNotMatch(pageCode, /value="INTERNO" selected/);
+  assert.match(pageCode, /value="GOOGLE_FORMS"/);
+  assert.match(pageCode, /crearFormularioEstudiantes\(construirDatosCrearFormulario/);
   assert.match(main, /ipcMain\.handle\(\s*'formularios-estudiantes:crear',[\s\S]*?ejecutarPeticionAutenticada\('\/formularios-estudiantes', \{\s*method: 'POST',\s*body: datos/);
 });
