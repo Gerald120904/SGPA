@@ -45,6 +45,9 @@ let requisitosPlanCarrera = [];
 
 let instanciaActual = 0;
 
+const CURSOS_POR_PAGINA = 10;
+let paginaCursos = 1;
+
 function puedeGestionarCursos() {
   return usuarioTienePermiso(
     PERMISOS.CURSOS_GESTIONAR,
@@ -290,6 +293,76 @@ export function compararCursosPorEstadoYCodigo(a, b) {
 }
 
 /* =========================================================
+   PAGINACIÓN DE CURSOS (10 POR PÁGINA)
+   ========================================================= */
+
+export function calcularPaginacionCursos(totalCursos, paginaSolicitada = 1) {
+  const total = Number.isFinite(Number(totalCursos))
+    ? Math.max(0, Math.floor(Number(totalCursos)))
+    : 0;
+  const totalPaginas = Math.max(1, Math.ceil(total / CURSOS_POR_PAGINA));
+  const solicitada = Number(paginaSolicitada);
+  const pagina = Number.isInteger(solicitada)
+    ? Math.min(totalPaginas, Math.max(1, solicitada))
+    : 1;
+  const inicio = (pagina - 1) * CURSOS_POR_PAGINA;
+  const fin = Math.min(inicio + CURSOS_POR_PAGINA, total);
+
+  // Hasta cinco botones numéricos, sin generar cientos de controles.
+  const cantidadVisible = Math.min(totalPaginas, 5);
+  const primeraVisible = Math.max(
+    1,
+    Math.min(pagina - 2, totalPaginas - cantidadVisible + 1),
+  );
+  const paginasVisibles = Array.from(
+    { length: cantidadVisible },
+    (_, indice) => primeraVisible + indice,
+  );
+
+  return { total, pagina, totalPaginas, inicio, fin, paginasVisibles };
+}
+
+function renderizarPaginacionCursos({ total, pagina, totalPaginas, inicio, fin, paginasVisibles }) {
+  if (total === 0) return "";
+
+  return `
+    <nav class="plan-level-pagination" aria-label="Paginación del catálogo de cursos">
+      <div class="plan-level-pagination-info">
+        <span>CURSOS POR PÁGINA: ${CURSOS_POR_PAGINA}</span>
+        <strong>Mostrando ${inicio + 1}–${fin} de ${total} cursos</strong>
+      </div>
+
+      <div class="plan-level-pagination-controls">
+        <button class="plan-level-nav-button" type="button"
+          data-cursos-pagina="${pagina - 1}" aria-label="Página anterior"
+          ${pagina === 1 ? "disabled" : ""}>
+          <i data-lucide="chevron-left" aria-hidden="true"></i>
+          <span>Anterior</span>
+        </button>
+
+        <div class="plan-level-pagination-pages" aria-label="Páginas de cursos">
+          ${paginasVisibles.map((numero) => `
+            <button class="plan-level-page-button ${numero === pagina ? "is-active" : ""}"
+              type="button" data-cursos-pagina="${numero}"
+              aria-label="Página ${numero}"
+              ${numero === pagina ? 'aria-current="page"' : ""}>
+              ${numero}
+            </button>
+          `).join("")}
+        </div>
+
+        <button class="plan-level-nav-button" type="button"
+          data-cursos-pagina="${pagina + 1}" aria-label="Página siguiente"
+          ${pagina === totalPaginas ? "disabled" : ""}>
+          <span>Siguiente</span>
+          <i data-lucide="chevron-right" aria-hidden="true"></i>
+        </button>
+      </div>
+    </nav>
+  `;
+}
+
+/* =========================================================
    RENDER
    ========================================================= */
 
@@ -345,6 +418,7 @@ function renderizarCatalogo() {
     seccion.classList.add("hidden");
     heading.innerHTML = "";
     contenedor.innerHTML = "";
+    paginaCursos = 1;
     return;
   }
 
@@ -362,17 +436,17 @@ function renderizarCatalogo() {
         cursosCarrera.length,
     });
 
+  const cursosFiltrados = obtenerCursosFiltrados();
+  const paginacion = calcularPaginacionCursos(cursosFiltrados.length, paginaCursos);
+  paginaCursos = paginacion.pagina;
+
   contenedor.innerHTML =
     CursosTabla({
-      cursos:
-        obtenerCursosFiltrados(),
-      asignaturasPlan:
-        asignaturasPlanCarrera,
-      requisitosPlan:
-        requisitosPlanCarrera,
-      puedeGestionar:
-        puedeGestionarCursos(),
-    });
+      cursos: cursosFiltrados.slice(paginacion.inicio, paginacion.fin),
+      asignaturasPlan: asignaturasPlanCarrera,
+      requisitosPlan: requisitosPlanCarrera,
+      puedeGestionar: puedeGestionarCursos(),
+    }) + renderizarPaginacionCursos(paginacion);
 
   renderizarIconos();
 }
@@ -488,6 +562,7 @@ async function cargarDatos(instancia) {
 
 async function seleccionarCarrera(
   carreraId,
+  { conservarPagina = false, desplazar = true } = {},
 ) {
   const id = Number(carreraId);
 
@@ -499,6 +574,7 @@ async function seleccionarCarrera(
   }
 
   carreraSeleccionadaId = id;
+  if (!conservarPagina) paginaCursos = 1;
   planCarreraSeleccionado = null;
   asignaturasPlanCarrera = [];
   requisitosPlanCarrera = [];
@@ -587,16 +663,13 @@ async function seleccionarCarrera(
 
     renderizarCatalogo();
 
-    window.requestAnimationFrame(() => {
-      document
-        .getElementById(
-          "cursosCatalogo",
-        )
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-    });
+    if (desplazar) {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById("cursosCatalogo")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
   } catch (error) {
     mostrarError({
       titulo:
@@ -635,6 +708,7 @@ async function recargarCursos() {
   if (carreraSeleccionadaId) {
     await seleccionarCarrera(
       carreraSeleccionadaId,
+      { conservarPagina: true, desplazar: false },
     );
   } else {
     renderizarCatalogo();
@@ -1123,6 +1197,7 @@ export function iniciarCursosPage() {
   planCarreraSeleccionado = null;
   asignaturasPlanCarrera = [];
   requisitosPlanCarrera = [];
+  paginaCursos = 1;
 
   document
     .getElementById("nuevoCursoButton")
@@ -1170,17 +1245,17 @@ export function iniciarCursosPage() {
 
   document
     .getElementById("cursosBuscar")
-    ?.addEventListener(
-      "input",
-      renderizarCatalogo,
-    );
+    ?.addEventListener("input", () => {
+      paginaCursos = 1;
+      renderizarCatalogo();
+    });
 
   document
     .getElementById("cursosEstado")
-    ?.addEventListener(
-      "change",
-      renderizarCatalogo,
-    );
+    ?.addEventListener("change", () => {
+      paginaCursos = 1;
+      renderizarCatalogo();
+    });
 
   document
     .getElementById(
@@ -1207,6 +1282,7 @@ export function iniciarCursosPage() {
           estado.value = "TODOS";
         }
 
+        paginaCursos = 1;
         renderizarCatalogo();
       },
     );
@@ -1216,6 +1292,17 @@ export function iniciarCursosPage() {
     ?.addEventListener(
       "click",
       async (event) => {
+        const botonPagina = event.target.closest("[data-cursos-pagina]");
+        if (botonPagina) {
+          if (botonPagina.disabled) return;
+          const solicitada = Number(botonPagina.dataset.cursosPagina);
+          const { totalPaginas } = calcularPaginacionCursos(obtenerCursosFiltrados().length);
+          if (!Number.isInteger(solicitada) || solicitada < 1 || solicitada > totalPaginas) return;
+          paginaCursos = solicitada;
+          renderizarCatalogo();
+          return;
+        }
+
         const requisitoButton =
           event.target.closest(
             "[data-requisito-curso]",

@@ -30,27 +30,62 @@ test('1. Modales de todo el SGPA: AlertModal y confirm.js tienen diseño profesi
   assert.match(baseCss, /\.sgpa-confirm-neutral-mode/);
 });
 
-test('2, 3 y 4. Usuarios: Validaciones estrictas, no textos extraños, banner de invitación y rol amigable', () => {
-  const usuariosPageCode = readFileSync(new URL('../src/pages/usuarios/UsuariosPage.js', import.meta.url), 'utf8');
+
+test('2, 3 y 4. Usuarios: validaciones actuales, invitaciones y roles amigables', () => {
+  const usuariosPageCode = readFileSync(
+    new URL('../src/pages/usuarios/UsuariosPage.js', import.meta.url),
+    'utf8'
+  );
+
+  // Invitaciones y presentación de roles
   assert.match(usuariosPageCode, /usuario-invitacion-banner/);
   assert.match(usuariosPageCode, /Invitación por correo electrónico/);
-  assert.doesNotMatch(usuariosPageCode, /Este usuario posee el rol\s+ADMIN_GLOBAL\./);
-  assert.match(usuariosPageCode, /nombreVisibleRol\(ROLES\.ADMIN_GLOBAL\)/);
+  assert.doesNotMatch(
+    usuariosPageCode,
+    /Este usuario posee el rol\s+ADMIN_GLOBAL\./
+  );
+  assert.match(
+    usuariosPageCode,
+    /nombreVisibleRol\(ROLES\.ADMIN_GLOBAL\)/
+  );
 
-  // Validaciones de caracteres
-  assert.match(usuariosPageCode, /cedulaRegex/);
+  // Cédula: solamente números y máximo 9 dígitos
+  assert.match(
+    usuariosPageCode,
+    /const cedulaRegex\s*=\s*\/\^\\d\{1,9\}\$\//
+  );
+  assert.match(
+    usuariosPageCode,
+    /La cédula solo debe contener números \(máximo 9 dígitos, sin guiones\)\./
+  );
+  assert.match(usuariosPageCode, /cedula:\s*9\b/);
+
+  // Restricciones de longitud de los campos
+  assert.match(usuariosPageCode, /correo:\s*150\b/);
+  assert.match(usuariosPageCode, /nombres:\s*60\b/);
+  assert.match(usuariosPageCode, /apellido1:\s*50\b/);
+  assert.match(usuariosPageCode, /apellido2:\s*50\b/);
+
+  // Validaciones de nombres y correo
   assert.match(usuariosPageCode, /nombreRegex/);
   assert.match(usuariosPageCode, /correoRegex/);
-  assert.match(usuariosPageCode, /La cédula solo debe contener letras, números o guiones/);
-  assert.match(usuariosPageCode, /El nombre solo debe contener letras y espacios válidos/);
+  assert.match(
+    usuariosPageCode,
+    /El nombre solo debe contener letras y espacios válidos/
+  );
 
-  const crearDtoCode = readFileSync(new URL('../../backend/src/usuarios/dto/crear-usuario.dto.ts', import.meta.url), 'utf8');
-  assert.match(crearDtoCode, /@Matches\(\/\^\[a-zA-Z0-9-\]\+\$\//);
-  assert.match(crearDtoCode, /@Matches\(\/\^\[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\\s'-\]\+\$\//);
+  // Prevención de registros duplicados
+  assert.match(usuariosPageCode, /cedulaDuplicada/);
+  assert.match(usuariosPageCode, /correoDuplicado/);
 
-  const actualizarDtoCode = readFileSync(new URL('../../backend/src/usuarios/dto/actualizar-usuario.dto.ts', import.meta.url), 'utf8');
-  assert.match(actualizarDtoCode, /@Matches\(\/\^\[a-zA-Z0-9-\]\+\$\//);
+  // Restricción de caracteres y errores visuales
+  assert.match(
+    usuariosPageCode,
+    /anterior\.replace\(\/\\D\/g, ''\)/
+  );
+  assert.match(usuariosPageCode, /aria-invalid/);
 });
+
 
 test('5. Períodos Académicos: conserva el calendario nativo en los tres campos de fecha', () => {
   const periodosCode = readFileSync(new URL('../src/pages/periodos/PeriodosPage.js', import.meta.url), 'utf8');

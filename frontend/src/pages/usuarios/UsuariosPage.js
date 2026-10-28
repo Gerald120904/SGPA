@@ -641,18 +641,6 @@ export async function iniciarUsuariosPage() {
       const roles = obtenerRoles(usuario);
       const nombre = obtenerNombreCompleto(usuario);
       const inicial = nombre.trim().charAt(0).toUpperCase() || 'U';
-      const badges = roles.length
-        ? roles.map((rol) => `
-            <span title="${escapeHtml(rol.descripcion || rol.nombre)}">
-              ${StatusBadge({
-                label: nombreVisibleRol(rol.nombre),
-                tone: rol.nombre === ROLES.ADMIN_GLOBAL ? 'danger'
-                  : rol.nombre === ROLES.COORDINADOR ? 'warning'
-                  : rol.nombre === ROLES.PROFESOR ? 'info' : 'neutral',
-              })}
-            </span>
-          `).join('')
-        : '<span class="usuarios-no-role">Sin rol asignado</span>';
 
       return `
         <tr>
@@ -664,7 +652,16 @@ export async function iniciarUsuariosPage() {
             </div>
           </td>
           <td><span class="usuarios-correo">${escapeHtml(usuario.correo)}</span></td>
-          <td><div class="usuarios-role-list">${badges}</div></td>
+          <td>
+            <button class="usuarios-role-view-button" type="button"
+              data-action="ver-roles-permisos" data-user-id="${usuario.id}"
+              aria-label="Ver roles y permisos de ${escapeHtml(nombre)}"
+              title="Ver roles y permisos de ${escapeHtml(nombre)}">
+              <i data-lucide="eye" aria-hidden="true"></i>
+              <span>Ver</span>
+              <span class="usuarios-role-view-count" aria-label="${roles.length} roles asignados">${roles.length}</span>
+            </button>
+          </td>
           <td>${StatusBadge({
             label: usuario.activo ? 'Activo' : 'Inactivo',
             tone: usuario.activo ? 'success' : 'neutral',
@@ -1382,6 +1379,163 @@ export async function iniciarUsuariosPage() {
     });
   }
 
+  // PBI-87: consulta de roles y permisos en solo lectura.
+  // Reutiliza los endpoints actuales y el FormDialog; no cambia permisos.
+  function mostrarConsultaAccesos(usuario, permisosUsuario = [], alcance = null, errorAlcance = '') {
+    const roles = obtenerRoles(usuario);
+    const esAdminGlobal = roles.some((rol) => rol.nombre === ROLES.ADMIN_GLOBAL);
+    const esCoordinador = roles.some((rol) => rol.nombre === ROLES.COORDINADOR);
+    const codigos = Array.from(obtenerCodigosPermisos(permisosUsuario))
+      .sort((a, b) => a.localeCompare(b, 'es'));
+
+    const grupos = new Map();
+    const prefijos = [
+      ['FORMULARIOS_ESTUDIANTES_', 'Formularios de estudiantes'],
+      ['PLANES_ESTUDIO_', 'Planes de estudio'],
+      ['PERFILES_ACADEMICOS_', 'Perfiles académicos'],
+      ['PERFILES_DOCENTES_', 'Perfiles docentes'],
+      ['ESTRUCTURA_ACADEMICA_', 'Estructura académica'],
+      ['PROYECCION_', 'Proyección académica'],
+      ['OFERTA_', 'Oferta académica'],
+      ['ESTUDIANTES_', 'Estudiantes'],
+      ['PROFESORES_', 'Profesores'],
+      ['CURSOS_', 'Cursos'],
+      ['CARRERAS_', 'Carreras'],
+      ['OPTATIVAS_', 'Optativas'],
+      ['PERIODOS_', 'Períodos académicos'],
+      ['AULAS_', 'Aulas'],
+    ];
+    for (const codigo of codigos) {
+      const grupo = prefijos.find(([prefijo]) => codigo.startsWith(prefijo));
+      const etiqueta = grupo?.[1] || 'Otros permisos';
+      if (!grupos.has(etiqueta)) grupos.set(etiqueta, []);
+      grupos.get(etiqueta).push(codigo);
+    }
+
+    const nombre = obtenerNombreCompleto(usuario) || 'Usuario';
+    const resumenPermisos = esAdminGlobal
+      ? `<div class="usuarios-accesos-admin-note" role="note">
+           <i data-lucide="shield-check" aria-hidden="true"></i>
+           <div><strong>Acceso administrativo global</strong>
+             <p>Este rol dispone de acceso administrativo total. No depende de permisos granulares individuales.</p>
+           </div>
+         </div>`
+      : codigos.length
+        ? Array.from(grupos.entries()).map(([grupo, permisos]) => `
+            <section class="usuarios-accesos-permission-group">
+              <h5>${escapeHtml(grupo)} <span>${permisos.length}</span></h5>
+              <ul>${permisos.map((permiso) => `
+                <li title="${escapeHtml(permiso)}">
+                  <i data-lucide="circle-check" aria-hidden="true"></i>
+                  <div><strong>${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</strong>
+                    <small>${escapeHtml(permiso)}</small>
+                  </div>
+                </li>`).join('')}</ul>
+            </section>`).join('')
+        : `<p class="usuarios-accesos-empty">No hay permisos individuales registrados para este usuario.</p>`;
+
+    const carreras = new Map(estado.carreras.map((carrera) => [Number(carrera.id), carrera]));
+    const asignaciones = Array.isArray(alcance?.carreras) ? alcance.carreras : [];
+    const resumenAlcance = !esCoordinador ? '' : `
+      <section class="usuarios-accesos-section">
+        <div class="usuarios-accesos-section-header">
+          <i data-lucide="graduation-cap" aria-hidden="true"></i>
+          <div><h4>Permisos por carrera</h4>
+            <p>Alcance académico configurado específicamente para el coordinador.</p></div>
+        </div>
+        ${errorAlcance
+          ? `<p class="usuarios-accesos-warning" role="status">No fue posible consultar los permisos por carrera: ${escapeHtml(errorAlcance)}</p>`
+          : asignaciones.length
+            ? `<div class="usuarios-accesos-career-list">${asignaciones.map((asignacion) => {
+                const carrera = carreras.get(Number(asignacion.carreraId));
+                const permisos = Array.isArray(asignacion.permisos) ? asignacion.permisos : [];
+                return `<div class="usuarios-accesos-career">
+                  <strong>${escapeHtml(carrera?.nombre || `Carrera ${asignacion.carreraId}`)}</strong>
+                  <span>${permisos.length} ${permisos.length === 1 ? 'permiso' : 'permisos'}</span>
+                  <ul>${permisos.length ? permisos.map((permiso) => `
+                    <li>${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</li>`).join('')
+                    : '<li>Sin permisos configurados.</li>'}</ul>
+                </div>`;
+              }).join('')}</div>`
+            : '<p class="usuarios-accesos-empty">No hay carreras con permisos configurados.</p>'}
+      </section>`;
+
+    mostrarFormularioUsuario({
+      formId: 'usuarioConsultaAccesosForm',
+      title: 'Roles y permisos del usuario',
+      description: 'Consulta de solo lectura de los accesos registrados en el SGPA.',
+      userId: usuario.id,
+      body: `
+        <div class="usuarios-accesos-summary">
+          <span class="usuarios-accesos-avatar" aria-hidden="true">${escapeHtml(nombre.charAt(0).toUpperCase() || 'U')}</span>
+          <div>
+            <strong>${escapeHtml(nombre)}</strong>
+            <span>${escapeHtml(usuario.correo || '')}</span>
+            <small>${usuario.activo ? 'Cuenta activa' : 'Cuenta inactiva'}</small>
+          </div>
+        </div>
+        <section class="usuarios-accesos-section">
+          <div class="usuarios-accesos-section-header">
+            <i data-lucide="users" aria-hidden="true"></i>
+            <div><h4>Roles asignados <span class="usuarios-accesos-count">${roles.length}</span></h4>
+              <p>Perfiles asociados a la cuenta.</p></div>
+          </div>
+          <div class="usuarios-accesos-roles">
+            ${roles.length ? roles.map((rol) => `
+              <div class="usuarios-accesos-role">
+                <i data-lucide="shield-check" aria-hidden="true"></i>
+                <div><strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
+                  ${rol.descripcion ? `<small>${escapeHtml(rol.descripcion)}</small>` : ''}
+                </div>
+              </div>`).join('') : '<p class="usuarios-accesos-empty">Sin roles asignados.</p>'}
+          </div>
+        </section>
+        <section class="usuarios-accesos-section">
+          <div class="usuarios-accesos-section-header">
+            <i data-lucide="shield-check" aria-hidden="true"></i>
+            <div><h4>Permisos del sistema ${esAdminGlobal ? '' : `<span class="usuarios-accesos-count">${codigos.length}</span>`}</h4>
+              <p>${esAdminGlobal ? 'Privilegios asociados al rol administrador global.' : 'Permisos registrados para esta cuenta, agrupados por módulo.'}</p></div>
+          </div>
+          <div class="usuarios-accesos-permissions">${resumenPermisos}</div>
+        </section>
+        ${resumenAlcance}
+      `,
+      footerHtml: `
+        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">
+          Cerrar
+        </button>
+      `,
+    });
+  }
+
+  async function abrirConsultaAccesos(id) {
+    ocultarFeedback();
+    const [resultadoUsuario, resultadoPermisos] = await Promise.all([
+      obtenerUsuarioDetalle(id),
+      listarPermisosUsuario(id),
+    ]);
+    const usuario = mensajeResultado(resultadoUsuario, 'No fue posible consultar el usuario.').data;
+    const permisos = mensajeResultado(resultadoPermisos, 'No fue posible consultar los permisos.').permisos;
+    if (!sigueActiva()) return;
+
+    const esCoordinador = obtenerRoles(usuario).some((rol) => rol.nombre === ROLES.COORDINADOR);
+    let alcance = null;
+    let errorAlcance = '';
+    if (esCoordinador) {
+      try {
+        const resultado = mensajeResultado(
+          await obtenerCoordinadorJerarquia(id),
+          'No fue posible consultar el alcance académico.',
+        );
+        alcance = resultado.data;
+      } catch (error) {
+        errorAlcance = error?.message || 'Error de consulta';
+      }
+    }
+    if (!sigueActiva()) return;
+    mostrarConsultaAccesos(usuario, permisos, alcance, errorAlcance);
+  }
+
   async function abrirEdicion(
     id,
   ) {
@@ -1688,6 +1842,18 @@ export async function iniciarUsuariosPage() {
 
     if (accion === 'cerrar-dialogo') {
       dialogo.close();
+      return;
+    }
+
+    if (accion === 'ver-roles-permisos') {
+      try {
+        boton.disabled = true;
+        await abrirConsultaAccesos(id);
+      } catch (error) {
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
+      } finally {
+        if (boton.isConnected) boton.disabled = false;
+      }
       return;
     }
 
