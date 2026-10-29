@@ -43,7 +43,7 @@ test('no modifica permisos bloqueados', () => {
 });
 
 test('distingue carga, ausencia de carreras y carrera sin permisos', () => {
-  assert.match(pagina, /Cargando\.\.\./);
+  assert.match(pagina, /Cargando información\.\.\./);
   assert.match(pagina, /No tenés carreras asignadas para delegar/);
   assert.match(pagina, /Esta carrera no tiene permisos disponibles para delegar/);
   assert.match(pagina, /No fue posible cargar las carreras, permisos y solicitudes/);

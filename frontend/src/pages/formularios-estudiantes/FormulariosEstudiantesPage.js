@@ -85,6 +85,99 @@ let estadoGoogle = {
 
 let observadorFocusRegistrado = false;
 
+// Restricciones alineadas con CrearFormularioEstudianteDto del backend.
+// No intervienen en la creación ni en los servicios que ya utiliza el módulo.
+const LIMITES_FORMULARIO = Object.freeze({ titulo: 255, descripcion: 1000 });
+const MODALIDADES_FORMULARIO = new Set(['INTERNO', 'GOOGLE_FORMS']);
+const CAMPOS_FORMULARIO = Object.freeze({
+  proveedor: 'formularioProveedor',
+  titulo: 'formularioTitulo',
+  descripcion: 'formularioDescripcion',
+  carreraId: 'formularioCarrera',
+  planEstudioId: 'formularioPlan'
+});
+
+export function validarDatosNuevoFormulario(datos = {}) {
+  const errores = {};
+  const proveedor = String(datos.proveedor ?? '').trim();
+  const titulo = String(datos.titulo ?? '').trim();
+  const descripcion = String(datos.descripcion ?? '').trim();
+  const carreraId = Number(datos.carreraId);
+  const planEstudioId = Number(datos.planEstudioId);
+
+  if (!proveedor) errores.proveedor = 'Seleccione una modalidad del formulario.';
+  else if (!MODALIDADES_FORMULARIO.has(proveedor)) {
+    errores.proveedor = 'Seleccione una modalidad válida.';
+  }
+
+  if (!titulo) errores.titulo = 'El título del formulario es obligatorio.';
+  else if (titulo.length > LIMITES_FORMULARIO.titulo) {
+    errores.titulo = 'El título no puede superar 255 caracteres.';
+  }
+
+  // El backend vigente exige la descripción; no se hace opcional solo en frontend.
+  if (!descripcion) errores.descripcion = 'La descripción es obligatoria.';
+  else if (descripcion.length > LIMITES_FORMULARIO.descripcion) {
+    errores.descripcion = 'La descripción no puede superar 1000 caracteres.';
+  }
+
+  if (!Number.isSafeInteger(carreraId) || carreraId <= 0) {
+    errores.carreraId = 'Seleccione una carrera.';
+  }
+  if (!Number.isSafeInteger(planEstudioId) || planEstudioId <= 0) {
+    errores.planEstudioId = 'Seleccione un plan de estudio.';
+  }
+
+  return { valido: Object.keys(errores).length === 0, errores };
+}
+
+function obtenerDatosFormularioActual() {
+  const valor = (campo) => document.getElementById(CAMPOS_FORMULARIO[campo])?.value ?? '';
+  return {
+    proveedor: valor('proveedor'),
+    titulo: valor('titulo'),
+    descripcion: valor('descripcion'),
+    carreraId: valor('carreraId'),
+    planEstudioId: valor('planEstudioId')
+  };
+}
+
+function mostrarErroresCamposFormulario(errores, campos = Object.keys(CAMPOS_FORMULARIO)) {
+  for (const campo of campos) {
+    const input = document.getElementById(CAMPOS_FORMULARIO[campo]);
+    const mensaje = document.getElementById(`${CAMPOS_FORMULARIO[campo]}Error`);
+    if (!input || !mensaje) continue;
+    const error = errores[campo] || '';
+    if (error) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+    mensaje.textContent = error;
+    mensaje.classList.toggle('hidden', !error);
+  }
+}
+
+function registrarValidacionesCamposFormulario() {
+  const formulario = document.getElementById('nuevoFormularioEstudianteForm');
+  if (!formulario) return;
+  // Permite mostrar errores del SGPA; el navegador no intercepta el submit.
+  formulario.noValidate = true;
+  for (const [campo, id] of Object.entries(CAMPOS_FORMULARIO)) {
+    const input = document.getElementById(id);
+    if (!input) continue;
+    const validarCampo = () => {
+      const { errores } = validarDatosNuevoFormulario(obtenerDatosFormularioActual());
+      mostrarErroresCamposFormulario(errores, [campo]);
+    };
+    if (input.tagName === 'SELECT') input.addEventListener('change', validarCampo);
+    else {
+      input.addEventListener('blur', validarCampo);
+      input.addEventListener('input', () => {
+        if (input.getAttribute('aria-invalid') === 'true') validarCampo();
+      });
+    }
+  }
+}
+
+
 export function agruparAsignaturasVistaPrevia(asignaturas) {
   const estructura = new Map();
   asignaturas.forEach((asignatura) => {
@@ -130,9 +223,7 @@ export function FormulariosEstudiantesPage() {
     >
       <div class="formularios-toolbar">
         <div class="formularios-toolbar-heading">
-          <h2>
-            Formularios de estudiantes
-          </h2>
+          <h2>Formularios de estudiantes</h2>
 
           <p>
             Gestión de formularios para
@@ -422,17 +513,16 @@ function renderizarFilaFormulario(
             ? `
               <button
                 type="button"
-                class="formularios-secondary-button formularios-copy-button"
+                class="formularios-icon-button formularios-copy-button"
                 data-action="copiar-enlace"
                 data-id="${formulario.id}"
                 title="Copiar enlace para responder"
+                aria-label="Copiar enlace para responder"
               >
                 <i
                   data-lucide="copy"
                   aria-hidden="true"
                 ></i>
-
-                Copiar enlace
               </button>
             `
             : '—'
@@ -1555,19 +1645,21 @@ async function abrirNuevoFormulario() {
 
   const body = `
     <label class="sgpa-form-wide">
-      <span>Modalidad del formulario</span>
-      <select id="formularioProveedor" name="proveedor" required>
-        <option value="INTERNO" selected>Formulario institucional SGPA (sin Google)</option>
+      <span>Modalidad del formulario <span class="formularios-required" aria-hidden="true">*</span></span>
+      <select id="formularioProveedor" name="proveedor" aria-describedby="formularioProveedorAyuda formularioProveedorError" required>
+        <option value="" selected disabled>Seleccione una modalidad...</option>
+        <option value="INTERNO">Formulario institucional SGPA (sin Google)</option>
         <option value="GOOGLE_FORMS">Google Forms (requiere conexión Google)</option>
       </select>
       <small id="formularioProveedorAyuda" class="sgpa-field-help">
-        El formulario institucional usa el plan de estudios del SGPA y se publica en este servidor.
+        Seleccione si el formulario se publicará en SGPA o mediante Google Forms.
       </small>
+      <small id="formularioProveedorError" class="formularios-field-error hidden" role="alert"></small>
     </label>
 
     <label class="sgpa-form-wide">
       <span>
-        Título del formulario
+        Título del formulario <span class="formularios-required" aria-hidden="true">*</span>
       </span>
 
       <input
@@ -1575,18 +1667,20 @@ async function abrirNuevoFormulario() {
         name="titulo"
         type="text"
         maxlength="255"
+        aria-describedby="formularioTituloAyuda formularioTituloError"
         placeholder="Ej. Registro de estudiantes I Ciclo 2027"
         required
       >
 
-      <small class="sgpa-field-help">
-        Este será el título visible para los estudiantes en el formulario web.
+      <small id="formularioTituloAyuda" class="sgpa-field-help">
+        Título visible para los estudiantes. Máximo 255 caracteres.
       </small>
+      <small id="formularioTituloError" class="formularios-field-error hidden" role="alert"></small>
     </label>
 
     <label class="sgpa-form-wide">
       <span>
-        Descripción
+        Descripción <span class="formularios-required" aria-hidden="true">*</span>
       </span>
 
       <textarea
@@ -1594,23 +1688,26 @@ async function abrirNuevoFormulario() {
         name="descripcion"
         rows="3"
         maxlength="1000"
+        aria-describedby="formularioDescripcionAyuda formularioDescripcionError"
         placeholder="Ej. Complete este formulario con sus datos personales y las asignaturas aprobadas hasta el período actual."
         required
       ></textarea>
 
-      <small class="sgpa-field-help">
-        Esta descripción aparecerá en el encabezado del formulario institucional.
+      <small id="formularioDescripcionAyuda" class="sgpa-field-help">
+        Aparecerá en el encabezado del formulario institucional. Máximo 1000 caracteres.
       </small>
+      <small id="formularioDescripcionError" class="formularios-field-error hidden" role="alert"></small>
     </label>
 
     <label class="sgpa-form-wide">
       <span>
-        Carrera
+        Carrera <span class="formularios-required" aria-hidden="true">*</span>
       </span>
 
       <select
         id="formularioCarrera"
         name="carreraId"
+        aria-describedby="formularioCarreraError"
         required
       >
         <option
@@ -1623,16 +1720,18 @@ async function abrirNuevoFormulario() {
 
         ${opcionesCarreras}
       </select>
+      <small id="formularioCarreraError" class="formularios-field-error hidden" role="alert"></small>
     </label>
 
     <label class="sgpa-form-wide">
       <span>
-        Plan de estudio
+        Plan de estudio <span class="formularios-required" aria-hidden="true">*</span>
       </span>
 
       <select
         id="formularioPlan"
         name="planEstudioId"
+        aria-describedby="formularioPlanError"
         disabled
         required
       >
@@ -1643,6 +1742,7 @@ async function abrirNuevoFormulario() {
           Seleccione primero una carrera...
         </option>
       </select>
+      <small id="formularioPlanError" class="formularios-field-error hidden" role="alert"></small>
     </label>
 
     <div
@@ -1683,6 +1783,7 @@ async function abrirNuevoFormulario() {
   renderizarIconos();
   dialog.showModal();
   habilitarCierreExterior(dialog);
+  registrarValidacionesCamposFormulario();
 
   const carreraInput =
     document.getElementById(
@@ -1745,6 +1846,8 @@ async function abrirNuevoFormulario() {
 
       planInput.disabled =
         planesCarrera.length === 0;
+      // Al cambiar de carrera, el plan anterior deja de ser válido.
+      mostrarErroresCamposFormulario({}, ['planEstudioId']);
 
       const resumen =
         document.getElementById(
@@ -1780,6 +1883,15 @@ async function abrirNuevoFormulario() {
       planSeleccionadoValido = false;
 
       if (!resumen || !planId) {
+        return;
+      }
+
+      if (!MODALIDADES_FORMULARIO.has(proveedorInput?.value)) {
+        resumen.innerHTML = `
+          <div class="formularios-plan-preview formularios-plan-preview-warning">
+            Seleccione la modalidad antes de consultar las asignaturas del plan.
+          </div>
+        `;
         return;
       }
 
@@ -1974,6 +2086,10 @@ async function abrirNuevoFormulario() {
           return;
         }
 
+        const datosFormulario = obtenerDatosFormularioActual();
+        const validacion = validarDatosNuevoFormulario(datosFormulario);
+        mostrarErroresCamposFormulario(validacion.errores);
+
         const titulo =
           tituloInput.value.trim();
 
@@ -1992,24 +2108,21 @@ async function abrirNuevoFormulario() {
 
         const esInterno = proveedorInput?.value === 'INTERNO';
 
-        if (
-          !titulo ||
-          !descripcion ||
-          !carreraId ||
-          !planEstudioId ||
-          !planSeleccionadoValido
-        ) {
+        if (!validacion.valido || !planSeleccionadoValido) {
           if (errorBox) {
             errorBox.textContent =
-              planEstudioId && !planSeleccionadoValido
+              validacion.valido && !planSeleccionadoValido
                 ? 'El plan seleccionado debe incluir asignaturas compatibles con la modalidad elegida.'
-                : 'Complete el título, la descripción, la carrera y el plan de estudio.';
-
-            errorBox.classList.remove(
-              'hidden'
-            );
+                : 'Revise los campos marcados en rojo antes de continuar.';
+            errorBox.classList.remove('hidden');
           }
 
+          if (!validacion.valido) {
+            const primerCampo = Object.keys(CAMPOS_FORMULARIO).find(
+              (campo) => validacion.errores[campo]
+            );
+            document.getElementById(CAMPOS_FORMULARIO[primerCampo])?.focus();
+          }
           return;
         }
 
