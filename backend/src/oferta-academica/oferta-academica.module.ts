@@ -7,12 +7,14 @@ import { OfertaAcademicaController } from './oferta-academica.controller';
 import { OfertaAcademicaService } from './oferta-academica.service';
 import { Grupo } from './entities/grupo.entity';
 import { HorarioGrupo } from './entities/horario-grupo.entity';
+import { ProfesorLegado } from './entities/profesor-legado.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Grupo,
       HorarioGrupo,
+      ProfesorLegado,
       ReservaAula,
       IndisponibilidadAula,
     ]),
