@@ -5,6 +5,7 @@ import { PermisoSistema } from '../constants/permisos.constant';
 
 @Entity({ name: 'permisos_carrera' })
 @Index('UQ_permiso_carrera', ['usuarioId', 'carreraId', 'permiso'], { unique: true })
+@Index('IDX_permiso_carrera_alcance', ['carreraId', 'permiso'])
 export class PermisoCarrera {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;

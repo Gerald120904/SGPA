@@ -96,7 +96,14 @@ function findIndex(table: Table, expected: TableIndex): TableIndex | undefined {
     ...table.indices,
     ...table.uniques.map((unique) => new TableIndex({ name: unique.name, columnNames: unique.columnNames, isUnique: true })),
   ];
-  return indexes.find((index) => index.name === expected.name);
+  const named = indexes.find((index) => index.name === expected.name);
+  if (named) return named;
+  // MySQL creates an index for each foreign key. TypeORM omits those indexes
+  // from Table.indices when it reads an existing table.
+  if (!expected.isUnique && table.foreignKeys.some((key) => sameNames(key.columnNames, expected.columnNames))) {
+    return new TableIndex({ name: expected.name, columnNames: expected.columnNames });
+  }
+  return undefined;
 }
 
 function foreignKeyErrors(actual: TableForeignKey, expected: TableForeignKey): string[] {

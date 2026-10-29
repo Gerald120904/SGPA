@@ -28,6 +28,8 @@
     "db:roles:official": "node scripts/migrate-official-roles.js",
     "seed:test": "npm run build && node scripts/seed-test-data.js",
     "test:integration:sgpa": "node scripts/run-integration-audit.js",
+    "test:integration:schema-sync": "npm run build && node scripts/verify-development-schema-sync.js",
+    "test:integration:restored-schema": "npm run build && node scripts/verify-restored-sgpa-schema.js",
     "start:test": "npm run build && node scripts/run-test-backend.js",
     "seed:equipamientos": "node scripts/seed-equipamientos.js"
   },

@@ -3,7 +3,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -14,11 +13,10 @@ import {
 import { Curso } from '../../cursos/entities/curso.entity';
 import { PeriodoAcademico } from '../../periodos-academicos/entities/periodo-academico.entity';
 import { HorarioGrupo } from './horario-grupo.entity';
+import { ProfesorLegado } from './profesor-legado.entity';
 
 @Entity({ name: 'grupos' })
 @Unique('uq_grupo_curso_periodo', ['cursoId', 'periodoId', 'numeroGrupo'])
-@Index('idx_grupo_periodo', ['periodoId'])
-@Index('fk_grupo_profesor', ['profesorId'])
 @Check('chk_grupo_cupo', 'cupo_maximo > 0')
 export class Grupo {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
@@ -56,6 +54,10 @@ export class Grupo {
   })
   @JoinColumn({ name: 'periodo_id', foreignKeyConstraintName: 'FK_grupo_periodo' })
   periodo!: PeriodoAcademico;
+
+  @ManyToOne(() => ProfesorLegado, { nullable: true, onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({ name: 'profesor_id', foreignKeyConstraintName: 'fk_grupo_profesor' })
+  profesorLegado!: ProfesorLegado | null;
 
   @OneToMany(() => HorarioGrupo, (horario) => horario.grupo)
   horarios!: HorarioGrupo[];

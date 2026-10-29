@@ -117,7 +117,7 @@ function assertDevelopmentAuthorization(config: ConfigService): void {
   }
 }
 
-function assertIdentityAuthorized(
+export function assertIdentityAuthorized(
   dataSource: DataSource,
   config: ConfigService,
   identity: MysqlIdentity,
@@ -143,6 +143,11 @@ function assertIdentityAuthorized(
   }
 }
 
+export function officialSchemaLockName(identity: Pick<MysqlIdentity, 'uuid' | 'base'>): string {
+  return `sgpa-migrate-${createHash('sha256')
+    .update(`${identity.uuid}:${identity.base}`).digest('hex').slice(0, 40)}`;
+}
+
 export type MigrationExecutionMode = 'development-startup' | 'manual';
 
 export async function executeSafeOfficialMigrations(
@@ -166,8 +171,7 @@ export async function executeSafeOfficialMigrations(
   )) as MysqlIdentity[];
   assertIdentityAuthorized(dataSource, config, identity);
 
-  const lockName = `sgpa-migrate-${createHash('sha256')
-    .update(`${identity.uuid}:${identity.base}`).digest('hex').slice(0, 40)}`;
+  const lockName = officialSchemaLockName(identity);
   const runner = dataSource.createQueryRunner();
   await runner.connect();
   let acquired = false;
