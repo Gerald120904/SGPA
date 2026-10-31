@@ -53,6 +53,7 @@ describe('SalidasAcademicasController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -115,7 +116,9 @@ describe('SalidasAcademicasController', () => {
       sub: 1,
       correo: 'usuario@sgpa.local',
       roles: [rol],
-    });
+
+      rolActivo: rol,
+      av: 1,});
   };
 
   it('requiere autenticación', async () => {

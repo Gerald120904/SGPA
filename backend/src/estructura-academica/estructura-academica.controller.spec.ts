@@ -56,6 +56,7 @@ describe('EstructuraAcademicaController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: rolesActuales.map((r, i) => ({
                 usuarioId: where?.id ?? 1,
                 rolId: i + 1,
@@ -105,7 +106,9 @@ describe('EstructuraAcademicaController', () => {
       sub,
       correo: 'admin@sgpa.local',
       roles: rolesActuales,
-    });
+
+      rolActivo: rolesActuales[0],
+      av: 1,});
   }
 
   it('GET /estructura-academica/areas - permite a COORDINADOR legacy', async () => {

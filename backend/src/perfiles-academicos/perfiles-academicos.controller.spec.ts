@@ -62,6 +62,7 @@ describe('PerfilesAcademicosController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -127,7 +128,9 @@ describe('PerfilesAcademicosController', () => {
       sub: 1,
       correo: 'usuario@sgpa.local',
       roles: [rol],
-    });
+
+      rolActivo: rol,
+      av: 1,});
   }
 
   it('responde 401 sin JWT', async () => {

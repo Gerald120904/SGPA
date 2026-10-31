@@ -49,6 +49,7 @@ describe('UsuariosController', () => {
               return {
                 id: where?.id ?? 1,
                 activo: true,
+                versionAutenticacion: 1,
                 usuarioRoles: [
                   {
                     usuarioId: where?.id ?? 1,
@@ -102,19 +103,21 @@ describe('UsuariosController', () => {
     expect(usuariosService.listar).not.toHaveBeenCalled();
   });
 
-  it.each(['COORDINADOR', 'PROFESOR', 'ASISTENTE_ESTUDIANTIL'])(
-    'responde 403 para %s',
-    async (rol) => {
+  it.each([['COORDINADOR', 403], ['PROFESOR', 401], ['ASISTENTE_ESTUDIANTIL', 401]] as const)(
+    'responde con acceso denegado para %s',
+    async (rol, estado) => {
       const token = await jwtService.signAsync({
         sub: 2,
         correo: 'usuario@sgpa.local',
         roles: [rol],
-      });
+
+      rolActivo: rol,
+      av: 1,});
 
       await request(app.getHttpServer())
         .get('/usuarios')
         .set('Authorization', `Bearer ${token}`)
-        .expect(403);
+        .expect(estado);
 
       expect(usuariosService.listar).not.toHaveBeenCalled();
     },
@@ -125,7 +128,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .get('/usuarios')
@@ -140,7 +145,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
     const dto = {
       cedula: '111111111',
       nombres: 'Usuario',
@@ -161,7 +168,9 @@ describe('UsuariosController', () => {
   it('muestra una invitación pendiente sin afirmar que fue enviada', async () => {
     const token = await jwtService.signAsync({
       sub: 1, correo: 'admin@sgpa.local', roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
     await request(app.getHttpServer())
       .get('/usuarios/2/invitacion')
       .set('Authorization', `Bearer ${token}`)
@@ -172,10 +181,14 @@ describe('UsuariosController', () => {
   it('reintenta una invitación solo para ADMIN_GLOBAL', async () => {
     const admin = await jwtService.signAsync({
       sub: 1, correo: 'admin@sgpa.local', roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
     const coordinador = await jwtService.signAsync({
       sub: 2, correo: 'coord@sgpa.local', roles: ['COORDINADOR'],
-    });
+
+      rolActivo: 'COORDINADOR',
+      av: 1,});
     await request(app.getHttpServer())
       .post('/usuarios/2/invitacion/reintentar')
       .set('Authorization', `Bearer ${coordinador}`)
@@ -192,7 +205,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .get('/usuarios/2')
@@ -207,7 +222,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
     const dto = {
       nombres: 'Nombre actualizado',
       correo: 'actualizado@sgpa.local',
@@ -227,7 +244,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .post('/usuarios/2/roles')
@@ -243,7 +262,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .post('/usuarios')
@@ -266,7 +287,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .patch('/usuarios/2/estado')
@@ -282,7 +305,9 @@ describe('UsuariosController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .delete('/usuarios/2/roles/3')

@@ -58,6 +58,7 @@ describe('CursoRequisitosController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -110,7 +111,9 @@ describe('CursoRequisitosController', () => {
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
-    });
+
+      rolActivo: rol,
+      av: 1,});
   };
 
   it('GET /cursos/:cursoId/requisitos - lista requisitos con CURSOS_VER', async () => {

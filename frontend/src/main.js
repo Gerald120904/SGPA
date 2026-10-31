@@ -167,6 +167,36 @@ ipcMain.handle("auth:login", async (_event, credenciales) => {
   }
 });
 
+ipcMain.handle("auth:cambiar-rol-activo", async (_event, nuevoRol) => {
+  try {
+    const resultado = await ejecutarPeticionAutenticada("/auth/cambiar-rol-activo", {
+      method: "POST",
+      body: { rol: nuevoRol },
+    });
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    if (resultado.data?.accessToken) {
+      accessToken = resultado.data.accessToken;
+    }
+
+    return {
+      ok: true,
+      usuario: resultado.data?.usuario,
+      accessToken: resultado.data?.accessToken,
+    };
+  } catch (error) {
+    console.error("Error al cambiar rol activo en backend:", error);
+    return {
+      ok: false,
+      status: 0,
+      message: "No se pudo cambiar el rol activo.",
+    };
+  }
+});
+
 ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
   try {
     const response = await net.fetch(`${API_URL}/auth/recuperar-password`, {

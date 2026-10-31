@@ -80,6 +80,7 @@ export class PermisosService {
 
   async resolverPermisosEfectivosOpcionB(
     usuarioId: number,
+    rolActivo?: RolSistema,
   ): Promise<Set<PermisoSistema>> {
     const usuario = await this.usuarioRepository.findOne({
       where: { id: usuarioId },
@@ -102,22 +103,27 @@ export class PermisosService {
       return new Set();
     }
 
-    if (rolesActivos.includes(RolSistema.ADMIN_GLOBAL)) {
+    const rolesEvaluar = rolActivo
+      ? (rolesActivos.includes(rolActivo) ? [rolActivo] : [])
+      : rolesActivos;
+    if (rolesEvaluar.length === 0) return new Set();
+
+    if (rolesEvaluar.includes(RolSistema.ADMIN_GLOBAL)) {
       return new Set(PERMISOS_SISTEMA);
     }
 
-    if (this.permisoCarreraRepository && rolesActivos.some((rol) =>
+    if (this.permisoCarreraRepository && rolesEvaluar.some((rol) =>
       rol === RolSistema.COORDINADOR || rol === RolSistema.ASISTENTE_ESTUDIANTIL)) {
       const porCarrera = await this.permisoCarreraRepository.find({ where: { usuarioId, activo: true } });
       const efectivos = new Set<PermisoSistema>(porCarrera.map((p) => p.permiso));
-      if (rolesActivos.includes(RolSistema.PROFESOR)) {
+      if (rolesEvaluar.includes(RolSistema.PROFESOR)) {
         for (const p of PERMISOS_PREDETERMINADOS_POR_ROL[RolSistema.PROFESOR]) efectivos.add(p);
       }
       return efectivos;
     }
 
     const base = new Set<PermisoSistema>();
-    for (const rol of rolesActivos) {
+    for (const rol of rolesEvaluar) {
       const plantilla = PERMISOS_PREDETERMINADOS_POR_ROL[rol] || [];
       for (const p of plantilla) {
         base.add(p);
@@ -162,13 +168,14 @@ export class PermisosService {
   async usuarioTienePermisos(
     usuarioId: number,
     permisos: PermisoSistema[],
+    rolActivo?: RolSistema,
   ): Promise<boolean> {
     if (!permisos.length) {
       return true;
     }
 
-    if (this.esPoliticaOpcionBActiva()) {
-      const efectivos = await this.resolverPermisosEfectivosOpcionB(usuarioId);
+    if (this.esPoliticaOpcionBActiva() || rolActivo) {
+      const efectivos = await this.resolverPermisosEfectivosOpcionB(usuarioId, rolActivo);
       return permisos.every((permiso) => efectivos.has(permiso));
     }
 
@@ -208,13 +215,15 @@ export class PermisosService {
   async obtenerPermisosEfectivos(
     usuarioId: number,
     roles: RolSistema[],
+    rolActivo?: RolSistema,
   ): Promise<PermisoSistema[]> {
-    if (roles.includes(RolSistema.ADMIN_GLOBAL)) {
+    const rolesEvaluar = rolActivo ? (roles.includes(rolActivo) ? [rolActivo] : []) : roles;
+    if (rolesEvaluar.includes(RolSistema.ADMIN_GLOBAL)) {
       return [...PERMISOS_SISTEMA];
     }
 
-    if (this.esPoliticaOpcionBActiva()) {
-      const efectivos = await this.resolverPermisosEfectivosOpcionB(usuarioId);
+    if (this.esPoliticaOpcionBActiva() || rolActivo) {
+      const efectivos = await this.resolverPermisosEfectivosOpcionB(usuarioId, rolActivo);
       return Array.from(efectivos).sort();
     }
 

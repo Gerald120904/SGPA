@@ -36,9 +36,9 @@ describe('AuthGuard', () => {
   });
 
   it('mantiene el bloqueo jerarquico tras revocar la ultima carrera del coordinador', async () => {
-    jwtService.verifyAsync.mockResolvedValue({ sub: 2, correo: 'coord@sgpa.local' });
+    jwtService.verifyAsync.mockResolvedValue({ sub: 2, correo: 'coord@sgpa.local', rolActivo: 'COORDINADOR', av: 1 });
     usuarioRepository.findOne.mockResolvedValue({
-      id: 2, activo: true,
+      id: 2, activo: true, versionAutenticacion: 1,
       usuarioRoles: [{ rol: { nombre: 'COORDINADOR', activo: true } }],
     });
     guard = new AuthGuard(
@@ -128,7 +128,7 @@ describe('AuthGuard', () => {
   describe('validación de estado y roles en base de datos (QA-002 y QA-003)', () => {
     it('rechaza un token anterior cuando el asistente perdió su dependencia', async () => {
       jwtService.verifyAsync.mockResolvedValue({ sub: 3, correo: 'asistente@una.cr', roles: ['ASISTENTE_ESTUDIANTIL'] });
-      usuarioRepository.findOne.mockResolvedValue({ id: 3, activo: true,
+      usuarioRepository.findOne.mockResolvedValue({ id: 3, activo: true, versionAutenticacion: 1,
         usuarioRoles: [{ rol: { nombre: 'ASISTENTE_ESTUDIANTIL', activo: true } }] });
       const dependencias = { findOne: jest.fn().mockResolvedValue(null) };
       guard = new AuthGuard(jwtService as unknown as JwtService,
@@ -140,6 +140,7 @@ describe('AuthGuard', () => {
     });
     it('lanza UnauthorizedException si el usuario no existe en la base de datos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 999,
         correo: 'inexistente@sgpa.local',
         roles: ['PROFESOR'],
@@ -161,13 +162,14 @@ describe('AuthGuard', () => {
 
     it('lanza UnauthorizedException si la cuenta del usuario está inactiva', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 15,
         correo: 'desactivado@sgpa.local',
         roles: ['COORDINADOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 15,
-        activo: false,
+        activo: false, versionAutenticacion: 1,
         usuarioRoles: [
           {
             usuarioId: 15,
@@ -186,13 +188,14 @@ describe('AuthGuard', () => {
 
     it('lanza UnauthorizedException si el usuario no tiene ningún rol asignado en base de datos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 20,
         correo: 'sinroles@sgpa.local',
         roles: ['COORDINADOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 20,
-        activo: true,
+        activo: true, versionAutenticacion: 1,
         usuarioRoles: [],
       });
 
@@ -205,13 +208,14 @@ describe('AuthGuard', () => {
 
     it('lanza UnauthorizedException si todos los roles asignados al usuario están inactivos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 21,
         correo: 'rolesinactivos@sgpa.local',
         roles: ['COORDINADOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 21,
-        activo: true,
+        activo: true, versionAutenticacion: 1,
         usuarioRoles: [
           {
             usuarioId: 21,
@@ -230,13 +234,14 @@ describe('AuthGuard', () => {
 
     it('reemplaza los roles antiguos del token por los roles reales vigentes de la base de datos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 5,
         correo: 'usuario@sgpa.local',
         roles: ['ADMIN_GLOBAL', 'COORDINADOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 5,
-        activo: true,
+        activo: true, versionAutenticacion: 1,
         usuarioRoles: [
           {
             usuarioId: 5,
@@ -259,13 +264,14 @@ describe('AuthGuard', () => {
 
     it('soporta usuarios con múltiples roles activos simultáneos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 8,
         correo: 'multirrol@sgpa.local',
         roles: ['PROFESOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 8,
-        activo: true,
+        activo: true, versionAutenticacion: 1,
         usuarioRoles: [
           {
             usuarioId: 8,
@@ -291,13 +297,14 @@ describe('AuthGuard', () => {
 
     it('revoca privilegios de ADMIN_GLOBAL inmediatamente al ser retirado en base de datos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'ADMIN_GLOBAL',
         sub: 1,
         correo: 'exadmin@sgpa.local',
         roles: ['ADMIN_GLOBAL'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 1,
-        activo: true,
+        activo: true, versionAutenticacion: 1,
         usuarioRoles: [
           {
             usuarioId: 1,
@@ -308,24 +315,19 @@ describe('AuthGuard', () => {
       });
 
       const context = crearContexto('Bearer token-admin-revocado');
-      const request = context.switchToHttp().getRequest();
-
-      const resultado = await guard.canActivate(context);
-
-      expect(resultado).toBe(true);
-      expect(request.user.roles).toEqual(['PROFESOR']);
-      expect(request.user.roles.includes('ADMIN_GLOBAL')).toBe(false);
+      await expect(guard.canActivate(context)).rejects.toThrow(UnauthorizedException);
     });
 
     it('excluye roles inactivos cuando el usuario tiene roles mixtos', async () => {
       jwtService.verifyAsync.mockResolvedValue({
+        av: 1, rolActivo: 'PROFESOR',
         sub: 12,
         correo: 'mixto@sgpa.local',
         roles: ['COORDINADOR', 'PROFESOR'],
       });
       usuarioRepository.findOne.mockResolvedValue({
         id: 12,
-        activo: true,
+        activo: true, versionAutenticacion: 1,
         usuarioRoles: [
           {
             usuarioId: 12,

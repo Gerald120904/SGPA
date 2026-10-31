@@ -18,6 +18,7 @@ import { LoginDto } from './dto/login.dto';
 import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { AceptarInvitacionDto } from './dto/aceptar-invitacion.dto';
+import { CambiarRolActivoDto } from './dto/cambiar-rol-activo.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -91,6 +92,23 @@ form.addEventListener('submit', async (event) => {
     return this.authService.aceptarInvitacion(dto);
   }
 
+
+  @UseGuards(AuthGuard)
+  @Post('cambiar-rol-activo')
+  @HttpCode(HttpStatus.OK)
+  cambiarRolActivo(@Req() request: Request, @Body() dto: CambiarRolActivoDto) {
+    const user = request.user;
+    if (!user) {
+      throw new UnauthorizedException('Usuario no autenticado');
+    }
+    return this.authService.cambiarRolActivo(user.sub, dto, user.av);
+  }
+
+  @Get('identidad')
+  obtenerIdentidad() {
+    return this.authService.obtenerIdentidad();
+  }
+
   @UseGuards(AuthGuard)
   @Get('perfil')
   perfil(@Req() request: Request) {
@@ -98,6 +116,6 @@ form.addEventListener('submit', async (event) => {
     if (!user) {
       throw new UnauthorizedException('Usuario no autenticado');
     }
-    return this.authService.perfil(user.sub);
+    return this.authService.perfil(user.sub, user.rolActivo);
   }
 }

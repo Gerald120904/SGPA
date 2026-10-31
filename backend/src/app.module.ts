@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -23,6 +23,7 @@ import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
 import { GoogleModule } from './integraciones/google/google.module';
 import { FormulariosEstudiantesModule } from './formularios-estudiantes/formularios-estudiantes.module';
 import { crearConfiguracionBaseDatos } from './config/database.config';
+import { iniciarContextoRolActivo } from './auth/active-role-context';
 
 @Module({
   imports: [
@@ -57,4 +58,8 @@ import { crearConfiguracionBaseDatos } from './config/database.config';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(iniciarContextoRolActivo).forRoutes('*');
+  }
+}

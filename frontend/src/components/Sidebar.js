@@ -8,7 +8,8 @@ import {
 
 import {
   formatearRol,
-  obtenerRolPrincipal
+  obtenerRolActivo,
+  obtenerEspaciosDisponibles
 } from '../app/session.js';
 
 import {
@@ -67,17 +68,24 @@ export function Sidebar({
     'A';
 
 
-  const rolPrincipal =
-    obtenerRolPrincipal(
+  const rolActivo =
+    obtenerRolActivo(
       usuario
     );
 
+  const espacios =
+    obtenerEspaciosDisponibles(
+      usuario
+    );
+
+  const rolesEfectivos =
+    rolActivo ? [rolActivo] : [];
 
   const modulosVisibles =
     MODULES.filter(
       (module) =>
         puedeAcceder(
-          roles,
+          rolesEfectivos,
           module.id,
           permisos,
         )
@@ -170,6 +178,21 @@ export function Sidebar({
 
       </div>
 
+      ${espacios.length > 1 ? `
+      <div class="sidebar-space-selector" style="padding: 0.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <label for="selectEspacioActivo" style="font-size: 0.75rem; color: #a0aec0; display: block; margin-bottom: 0.25rem;">
+          Espacio Activo
+        </label>
+        <select id="selectEspacioActivo" class="space-selector-dropdown" style="width: 100%; background: #2d3748; color: #fff; border: 1px solid #4a5568; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+          ${espacios.map((espacio) => `
+            <option value="${escapeHtml(espacio)}" ${espacio === rolActivo ? 'selected' : ''}>
+              ${escapeHtml(formatearRol(espacio))}
+            </option>
+          `).join('')}
+        </select>
+      </div>
+      ` : ''}
+
 
       <!-- =============================================== -->
       <!-- NAVEGACIÓN -->
@@ -204,7 +227,7 @@ export function Sidebar({
             <span>
               ${escapeHtml(
                 formatearRol(
-                  rolPrincipal
+                  rolActivo || 'Sin espacio activo'
                 )
               )}
             </span>

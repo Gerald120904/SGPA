@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { DependenciaUsuario } from '../../usuarios/entities/dependencia-usuario.entity';
 import { RolSistema } from '../constants/roles.constants';
+import { establecerRolActivo } from '../active-role-context';
 
 declare global {
   namespace Express {
@@ -21,6 +22,8 @@ declare global {
         sub: number;
         correo: string;
         roles: string[];
+        rolActivo?: string;
+        av: number;
         iat?: number;
         exp?: number;
         jerarquiaConfigurada?: boolean;
@@ -55,6 +58,8 @@ export class AuthGuard implements CanActivate {
       roles?: string[];
       iat?: number;
       exp?: number;
+      rolActivo?: RolSistema;
+      av?: number;
     };
 
     try {
@@ -72,6 +77,10 @@ export class AuthGuard implements CanActivate {
       );
     }
 
+    if (!payload.rolActivo || !Number.isSafeInteger(payload.av) || (payload.av as number) < 1) {
+      throw new UnauthorizedException('Token anterior al control de sesión. Inicie sesión nuevamente.');
+    }
+
     const usuario = await this.usuarioRepository.findOne({
       where: { id: sub },
       relations: {
@@ -82,6 +91,7 @@ export class AuthGuard implements CanActivate {
       select: {
         id: true,
         activo: true,
+        versionAutenticacion: true,
         usuarioRoles: {
           usuarioId: true,
           rolId: true,
@@ -102,6 +112,10 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
+    if (usuario.versionAutenticacion !== payload.av) {
+      throw new UnauthorizedException('Sesión reemplazada. Inicie sesión nuevamente.');
+    }
+
     const rolesVigentes = (usuario.usuarioRoles ?? [])
       .filter((ur) => ur.rol && ur.rol.activo === true)
       .map((ur) => ur.rol.nombre);
@@ -110,8 +124,17 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Usuario sin roles asignados o activos');
     }
 
+    const rolActivoPayload = payload.rolActivo;
+    if (!rolesVigentes.includes(rolActivoPayload)) {
+      throw new UnauthorizedException(
+        'El rol activo ya no está asignado o no está vigente.',
+      );
+    }
+
+    const rolActivo = rolActivoPayload;
+
     let jerarquiaConfigurada = false;
-    if (rolesVigentes.includes(RolSistema.ASISTENTE_ESTUDIANTIL)) {
+    if (rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL) {
       if (rolesVigentes.includes(RolSistema.COORDINADOR) || rolesVigentes.includes(RolSistema.ADMIN_GLOBAL)) {
         throw new UnauthorizedException('Combinación de roles jerárquicos no permitida');
       }
@@ -132,7 +155,7 @@ export class AuthGuard implements CanActivate {
       }
     }
 
-    if (rolesVigentes.includes(RolSistema.COORDINADOR)) {
+    if (rolActivo === RolSistema.COORDINADOR) {
       if (!this.dependenciaRepository && process.env.NODE_ENV !== 'test') {
         throw new UnauthorizedException('Alcance jerarquico no disponible');
       }
@@ -144,8 +167,11 @@ export class AuthGuard implements CanActivate {
       ...payload,
       sub,
       roles: Array.from(new Set(rolesVigentes)),
+      rolActivo,
       jerarquiaConfigurada,
     } as Express.Request['user'];
+
+    establecerRolActivo(sub, rolActivo);
 
     return true;
   }
