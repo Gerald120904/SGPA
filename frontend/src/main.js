@@ -5,8 +5,12 @@ import started from "electron-squirrel-startup";
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
+import { fetchBackendSeguro, verificarIdentidadBackend } from './electron/backend-identity.js';
 
 const API_URL = process.env.SGPA_API_URL || "http://127.0.0.1:3000";
+const EXPECTED_DATABASE = process.env.SGPA_EXPECTED_DATABASE || (app.isPackaged ? 'sgpa' : 'sgpa_isolated_audit');
+const consultarBackend = (route, options) => fetchBackendSeguro(
+  (url, requestOptions) => net.fetch(url, requestOptions), API_URL, EXPECTED_DATABASE, route, options);
 let accessToken = null;
 
 const HOSTS_OAUTH_GOOGLE_PERMITIDOS = new Set(["accounts.google.com"]);
@@ -67,7 +71,7 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
   }
 
   try {
-    const response = await net.fetch(`${API_URL}${ruta}`, {
+    const response = await consultarBackend(ruta, {
       method,
       headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -130,7 +134,7 @@ if (started) {
 
 ipcMain.handle("auth:login", async (_event, credenciales) => {
   try {
-    const response = await net.fetch(`${API_URL}/auth/login`, {
+    const response = await consultarBackend('/auth/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -197,9 +201,26 @@ ipcMain.handle("auth:cambiar-rol-activo", async (_event, nuevoRol) => {
   }
 });
 
+ipcMain.handle("app:verificar-identidad", async () => {
+  try {
+    const data = await verificarIdentidadBackend(
+      (url, requestOptions) => net.fetch(url, requestOptions), API_URL, EXPECTED_DATABASE);
+    return {
+      ok: true,
+      identidad: data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      message: `No se pudo verificar la identidad del backend en ${API_URL}: ${error.message}`,
+    };
+  }
+});
+
 ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
   try {
-    const response = await net.fetch(`${API_URL}/auth/recuperar-password`, {
+    const response = await consultarBackend('/auth/recuperar-password', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -240,7 +261,7 @@ ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
 
 ipcMain.handle("auth:restablecer-password", async (_event, datos) => {
   try {
-    const response = await net.fetch(`${API_URL}/auth/restablecer-password`, {
+    const response = await consultarBackend('/auth/restablecer-password', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -288,7 +309,7 @@ ipcMain.handle("auth:perfil", async () => {
   }
 
   try {
-    const response = await net.fetch(`${API_URL}/auth/perfil`, {
+    const response = await consultarBackend('/auth/perfil', {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("sgpa", {
   obtenerPerfil: () => ipcRenderer.invoke("auth:perfil"),
   logout: () => ipcRenderer.invoke("auth:logout"),
   cambiarRolActivo: (rol) => ipcRenderer.invoke("auth:cambiar-rol-activo", rol),
+  verificarIdentidadBackend: () => ipcRenderer.invoke("app:verificar-identidad"),
   listarUsuarios: () => ipcRenderer.invoke("usuarios:listar"),
   obtenerUsuario: (id) => ipcRenderer.invoke("usuarios:obtener", id),
   crearUsuario: (datos) => ipcRenderer.invoke("usuarios:crear", datos),
