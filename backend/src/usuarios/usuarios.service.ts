@@ -866,4 +866,30 @@ export class UsuariosService {
     });
   }
 
+  async obtenerImpactoDesactivacion(id: number) {
+    const usuario = await this.obtenerPorId(id);
+    const dependencias = await this.dataSource.getRepository(DependenciaUsuario).find({
+      where: { coordinadorId: id, activo: true },
+      relations: { asistente: true },
+    });
+    const solicitudesPendientes = await this.dataSource.getRepository(SolicitudCambio).count({
+      where: [
+        { coordinadorId: id, estado: 'PENDIENTE' },
+        { coordinadorId: id, estado: 'CORREGIDA' },
+        { coordinadorId: id, estado: 'DEVUELTA_PARA_CORRECCION' },
+      ],
+    });
+    return {
+      usuarioId: id,
+      nombreCompleto: `${usuario.nombres} ${usuario.apellido1} ${usuario.apellido2 || ''}`.trim(),
+      asistentesAfectados: dependencias.map((d: DependenciaUsuario) => ({
+        id: d.asistente.id,
+        nombreCompleto: `${d.asistente.nombres} ${d.asistente.apellido1} ${d.asistente.apellido2 || ''}`.trim(),
+        correo: d.asistente.correo,
+      })),
+      totalAsistentes: dependencias.length,
+      solicitudesPendientes,
+    };
+  }
+
 }

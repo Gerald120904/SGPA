@@ -102,4 +102,11 @@ export class UsuariosController {
   ) {
     return this.usuariosService.revocarRol(id, rolId, request.user!.sub);
   }
+
+  @Get(':id/impacto-desactivacion')
+  @Roles(RolSistema.ADMIN_GLOBAL)
+  obtenerImpactoDesactivacion(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.obtenerImpactoDesactivacion(id);
+  }
+
 }

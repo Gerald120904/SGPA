@@ -209,7 +209,7 @@ export class JerarquiaUsuariosService {
           await this.sincronizarLegacy(manager, p.usuarioId);
         }
       }
-      const pendientes = await manager.getRepository(SolicitudCambio).find({ where: { coordinadorId, estado: 'PENDIENTE' } });
+      const pendientes = await manager.getRepository(SolicitudCambio).find({ where: [{ coordinadorId, estado: 'PENDIENTE' }, { coordinadorId, estado: 'CORREGIDA' }, { coordinadorId, estado: 'DEVUELTA_PARA_CORRECCION' }] });
       for (const solicitud of pendientes) {
         const requerido = solicitud.modulo === 'ESTUDIANTES' ? PermisoSistema.ESTUDIANTES_GESTIONAR :
           solicitud.modulo === 'CURSOS' ? PermisoSistema.CURSOS_GESTIONAR :
@@ -217,7 +217,7 @@ export class JerarquiaUsuariosService {
         const carrerasSolicitud = solicitud.modulo === 'CURSOS' && Array.isArray(solicitud.datosPropuestos.carrerasAfectadas) ?
           solicitud.datosPropuestos.carrerasAfectadas as number[] : [solicitud.carreraId];
         if (!requerido || carrerasSolicitud.some((id) => !permitidos.has(`${id}:${requerido}`))) {
-          solicitud.estado = 'INVALIDADA';
+          solicitud.estado = 'BLOQUEADA_POR_REVOCACION';
           solicitud.resueltoEn = new Date();
           solicitud.resueltoPorUsuarioId = actorId;
           await manager.getRepository(SolicitudCambio).save(solicitud);

@@ -8,6 +8,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Permisos } from '../permisos/decorators/permisos.decorator';
@@ -24,8 +25,8 @@ export class CarrerasController {
 
   @Get()
   @Permisos(PermisoSistema.CARRERAS_VER)
-  listar() {
-    return this.carrerasService.listar();
+  listar(@UsuarioActualId() usuarioId: number) {
+    return this.carrerasService.listar(usuarioId);
   }
 
   @Get(':id')
