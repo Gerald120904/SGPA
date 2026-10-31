@@ -28,6 +28,7 @@ import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academ
 import { CursosModule } from '../cursos/cursos.module';
 import { PlanesEstudioModule } from '../planes-estudio/planes-estudio.module';
 import { OptativasModule } from '../optativas/optativas.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
 @Module({
   imports: [
@@ -54,10 +55,10 @@ import { OptativasModule } from '../optativas/optativas.module';
     CursosModule,
     PlanesEstudioModule,
     OptativasModule,
+    NotificacionesModule,
   ],
   controllers: [UsuariosController, JerarquiaUsuariosController, SolicitudesCambioController],
   providers: [UsuariosService, InvitacionOutboxService, JerarquiaUsuariosService, SolicitudesCambioService],
   exports: [UsuariosService],
 })
 export class UsuariosModule {}
-

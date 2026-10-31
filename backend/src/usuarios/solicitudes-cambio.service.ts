@@ -39,6 +39,8 @@ import { RegistrarResultadoAcademicoDto } from '../estudiantes/dto/registrar-res
 import { ImportarEstudiantesDto } from '../estudiantes/dto/importar-estudiantes.dto';
 import { EstudiantesImportacionService } from '../estudiantes/estudiantes-importacion.service';
 import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { RolSistema } from '../auth/constants/roles.constants';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
 import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
@@ -65,6 +67,8 @@ export class SolicitudesCambioService {
     private readonly optativas?: OptativasService,
     @Optional()
     private readonly estudiantesImportacion?: EstudiantesImportacionService,
+    @Optional()
+    private readonly notificaciones?: NotificacionesService,
   ) {}
 
   private async registrarPropuestaPlan(solicitanteId: number, carreraId: number, operacion: string,
@@ -791,7 +795,7 @@ export class SolicitudesCambioService {
       const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
       if (solicitud.coordinadorId !== coordinadorId) throw new ForbiddenException('Solicitud de otro coordinador.');
-      if (solicitud.estado !== 'PENDIENTE') throw new ConflictException('La solicitud ya fue resuelta.');
+      if (solicitud.estado !== 'PENDIENTE' && solicitud.estado !== 'CORREGIDA') throw new ConflictException('La solicitud ya fue resuelta o no está lista para aprobación.');
       const permiso = solicitud.modulo === 'ESTUDIANTES' ? PermisoSistema.ESTUDIANTES_GESTIONAR :
         solicitud.modulo === 'CURSOS' ? PermisoSistema.CURSOS_GESTIONAR :
         solicitud.modulo === 'PLANES_ESTUDIO' ? PermisoSistema.PLANES_ESTUDIO_GESTIONAR :
@@ -1049,6 +1053,17 @@ export class SolicitudesCambioService {
       solicitud.resueltoPorUsuarioId = coordinadorId;
       solicitud.resultadoAplicado = resultado;
       await repo.save(solicitud);
+      if (this.notificaciones) {
+        await this.notificaciones.crear({
+          usuarioId: solicitud.solicitanteId,
+          carreraId: solicitud.carreraId,
+          titulo: 'Solicitud aprobada',
+          mensaje: `Tu solicitud #${solicitud.id} (${solicitud.modulo} - ${solicitud.operacion}) fue aprobada con éxito.`,
+          tipo: 'EXITO',
+          enlace: `/solicitudes/${solicitud.id}`,
+          metadatos: { solicitudId: solicitud.id },
+        }).catch(() => null);
+      }
       await manager.getRepository(AuditoriaJerarquia).save({
         actorUsuarioId: coordinadorId, objetivoUsuarioId: solicitud.solicitanteId,
         accion: 'APROBAR_SOLICITUD', detalle: { solicitudId, ...resultado, modulo: solicitud.modulo,
@@ -1065,7 +1080,7 @@ export class SolicitudesCambioService {
       const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
       if (solicitud.coordinadorId !== coordinadorId) throw new ForbiddenException('Solicitud de otro coordinador.');
-      if (solicitud.estado !== 'PENDIENTE') throw new ConflictException('La solicitud ya fue resuelta.');
+      if (solicitud.estado !== 'PENDIENTE' && solicitud.estado !== 'CORREGIDA' && solicitud.estado !== 'DEVUELTA_PARA_CORRECCION') throw new ConflictException('La solicitud ya fue resuelta.');
       if (!(await this.alcance.puedeAdministrarAsistente(coordinadorId, solicitud.solicitanteId))) {
         throw new ForbiddenException('El asistente no pertenece al coordinador.');
       }
@@ -1074,6 +1089,17 @@ export class SolicitudesCambioService {
       solicitud.resueltoEn = new Date();
       solicitud.resueltoPorUsuarioId = coordinadorId;
       await repo.save(solicitud);
+      if (this.notificaciones) {
+        await this.notificaciones.crear({
+          usuarioId: solicitud.solicitanteId,
+          carreraId: solicitud.carreraId,
+          titulo: 'Solicitud rechazada',
+          mensaje: `Tu solicitud #${solicitud.id} (${solicitud.modulo} - ${solicitud.operacion}) fue rechazada. Motivo: ${solicitud.motivoRechazo}`,
+          tipo: 'ERROR',
+          enlace: `/solicitudes/${solicitud.id}`,
+          metadatos: { solicitudId: solicitud.id },
+        }).catch(() => null);
+      }
       await manager.getRepository(AuditoriaJerarquia).save({
         actorUsuarioId: coordinadorId, objetivoUsuarioId: solicitud.solicitanteId,
         accion: 'RECHAZAR_SOLICITUD', detalle: { solicitudId, motivo: solicitud.motivoRechazo },
@@ -1081,4 +1107,182 @@ export class SolicitudesCambioService {
       return solicitud;
     });
   }
+
+  async devolverParaCorreccion(coordinadorId: number, solicitudId: number, observaciones: string) {
+    if (!observaciones || !observaciones.trim()) {
+      throw new BadRequestException('Las observaciones de devolución son obligatorias.');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Usuario).findOne({ where: { id: coordinadorId }, lock: { mode: 'pessimistic_write' } });
+      const repo = manager.getRepository(SolicitudCambio);
+      const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
+      if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
+      if (solicitud.coordinadorId !== coordinadorId) throw new ForbiddenException('Solicitud de otro coordinador.');
+      if (solicitud.estado !== 'PENDIENTE' && solicitud.estado !== 'CORREGIDA') {
+        throw new ConflictException('Solo se pueden devolver solicitudes pendientes o corregidas.');
+      }
+      if (!(await this.alcance.puedeAdministrarAsistente(coordinadorId, solicitud.solicitanteId))) {
+        throw new ForbiddenException('El asistente no pertenece al coordinador.');
+      }
+
+      solicitud.estado = 'DEVUELTA_PARA_CORRECCION';
+      solicitud.observacionesDevolucion = observaciones.trim();
+      solicitud.resueltoEn = new Date();
+      solicitud.resueltoPorUsuarioId = coordinadorId;
+      await repo.save(solicitud);
+
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: coordinadorId,
+        objetivoUsuarioId: solicitud.solicitanteId,
+        accion: 'DEVOLVER_SOLICITUD',
+        detalle: { solicitudId, observaciones: solicitud.observacionesDevolucion },
+      });
+
+      if (this.notificaciones) {
+        await this.notificaciones.crear({
+          usuarioId: solicitud.solicitanteId,
+          carreraId: solicitud.carreraId,
+          titulo: 'Solicitud devuelta para corrección',
+          mensaje: `Tu solicitud #${solicitud.id} (${solicitud.modulo} - ${solicitud.operacion}) fue devuelta. Observaciones: ${solicitud.observacionesDevolucion}`,
+          tipo: 'ADVERTENCIA',
+          enlace: `/solicitudes/${solicitud.id}`,
+          metadatos: { solicitudId: solicitud.id },
+        }).catch(() => null);
+      }
+
+      return solicitud;
+    });
+  }
+
+  async editarSolicitud(asistenteId: number, solicitudId: number, datosActualizados: Record<string, unknown>) {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Usuario).findOne({ where: { id: asistenteId }, lock: { mode: 'pessimistic_write' } });
+      const repo = manager.getRepository(SolicitudCambio);
+      const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
+      if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
+      if (solicitud.solicitanteId !== asistenteId) throw new ForbiddenException('No puedes editar solicitudes de otro usuario.');
+      if (solicitud.estado !== 'PENDIENTE' && solicitud.estado !== 'DEVUELTA_PARA_CORRECCION') {
+        throw new ConflictException('Solo se pueden editar solicitudes pendientes o devueltas para corrección.');
+      }
+
+      const historial = Array.isArray(solicitud.historialVersiones) ? [...solicitud.historialVersiones] : [];
+      historial.push({
+        fecha: new Date(),
+        datosPropuestos: solicitud.datosPropuestos,
+        estadoAnterior: solicitud.estado,
+        observacionesDevolucion: solicitud.observacionesDevolucion,
+      });
+
+      solicitud.historialVersiones = historial;
+      solicitud.datosPropuestos = { ...solicitud.datosPropuestos, ...datosActualizados };
+      solicitud.estado = solicitud.estado === 'DEVUELTA_PARA_CORRECCION' ? 'CORREGIDA' : 'PENDIENTE';
+      await repo.save(solicitud);
+
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: asistenteId,
+        objetivoUsuarioId: asistenteId,
+        accion: 'EDITAR_SOLICITUD',
+        detalle: { solicitudId, estadoNuevo: solicitud.estado },
+      });
+
+      if (this.notificaciones) {
+        await this.notificaciones.crear({
+          usuarioId: solicitud.coordinadorId,
+          carreraId: solicitud.carreraId,
+          titulo: 'Solicitud actualizada por asistente',
+          mensaje: `El asistente actualizó la solicitud #${solicitud.id} (${solicitud.modulo} - ${solicitud.operacion}) quedando en estado ${solicitud.estado}.`,
+          tipo: 'INFO',
+          enlace: `/solicitudes/${solicitud.id}`,
+          metadatos: { solicitudId: solicitud.id },
+        }).catch(() => null);
+      }
+
+      return solicitud;
+    });
+  }
+
+  async cancelar(asistenteId: number, solicitudId: number, motivo?: string) {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Usuario).findOne({ where: { id: asistenteId }, lock: { mode: 'pessimistic_write' } });
+      const repo = manager.getRepository(SolicitudCambio);
+      const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
+      if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
+      if (solicitud.solicitanteId !== asistenteId) throw new ForbiddenException('No puedes cancelar solicitudes de otro usuario.');
+      if (solicitud.estado !== 'PENDIENTE' && solicitud.estado !== 'DEVUELTA_PARA_CORRECCION') {
+        throw new ConflictException('Solo se pueden cancelar solicitudes pendientes o devueltas para corrección.');
+      }
+
+      solicitud.estado = 'CANCELADA';
+      solicitud.motivoCancelacion = motivo ? motivo.trim() : null;
+      solicitud.resueltoEn = new Date();
+      solicitud.resueltoPorUsuarioId = asistenteId;
+      await repo.save(solicitud);
+
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: asistenteId,
+        objetivoUsuarioId: asistenteId,
+        accion: 'CANCELAR_SOLICITUD',
+        detalle: { solicitudId, motivo: solicitud.motivoCancelacion },
+      });
+
+      if (this.notificaciones) {
+        await this.notificaciones.crear({
+          usuarioId: solicitud.coordinadorId,
+          carreraId: solicitud.carreraId,
+          titulo: 'Solicitud cancelada por asistente',
+          mensaje: `La solicitud #${solicitud.id} fue cancelada por el solicitante.${motivo ? ' Motivo: ' + motivo.trim() : ''}`,
+          tipo: 'INFO',
+          enlace: `/solicitudes/${solicitud.id}`,
+          metadatos: { solicitudId: solicitud.id },
+        }).catch(() => null);
+      }
+
+      return solicitud;
+    });
+  }
+
+  async reasignar(adminId: number, solicitudId: number, nuevoCoordinadorId: number) {
+    return this.dataSource.transaction(async (manager) => {
+      const repo = manager.getRepository(SolicitudCambio);
+      const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
+      if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
+
+      const nuevoCoord = await manager.getRepository(Usuario).findOne({
+        where: { id: nuevoCoordinadorId, activo: true },
+        relations: { usuarioRoles: { rol: true } },
+      });
+      if (!nuevoCoord) throw new NotFoundException('El nuevo coordinador no existe o está inactivo.');
+      const tieneRolCoord = nuevoCoord.usuarioRoles.some((r) => r.rol.nombre === RolSistema.COORDINADOR);
+      if (!tieneRolCoord) throw new BadRequestException('El usuario destino debe tener el rol de COORDINADOR.');
+
+      const anteriorCoordinadorId = solicitud.coordinadorId;
+      solicitud.coordinadorId = nuevoCoordinadorId;
+      solicitud.estado = 'PENDIENTE';
+      solicitud.resueltoEn = null;
+      solicitud.resueltoPorUsuarioId = null;
+      await repo.save(solicitud);
+
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: adminId,
+        objetivoUsuarioId: nuevoCoordinadorId,
+        accion: 'REASIGNAR_SOLICITUD',
+        detalle: { solicitudId, anteriorCoordinadorId, nuevoCoordinadorId },
+      });
+
+      if (this.notificaciones) {
+        await this.notificaciones.crear({
+          usuarioId: nuevoCoordinadorId,
+          carreraId: solicitud.carreraId,
+          titulo: 'Solicitud reasignada',
+          mensaje: `Se te ha reasignado la solicitud #${solicitud.id} (${solicitud.modulo} - ${solicitud.operacion}).`,
+          tipo: 'INFO',
+          enlace: `/solicitudes/${solicitud.id}`,
+          metadatos: { solicitudId: solicitud.id },
+        }).catch(() => null);
+      }
+
+      return solicitud;
+    });
+  }
+
 }

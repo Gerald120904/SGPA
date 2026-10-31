@@ -486,6 +486,38 @@ ipcMain.handle('solicitudes:rechazar', async (_event, id, motivo) =>
     method: 'POST', body: { motivo },
   }));
 
+ipcMain.handle('solicitudes:devolver', async (_event, id, observaciones) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/devolver`, {
+    method: 'POST', body: { observaciones },
+  }));
+
+ipcMain.handle('solicitudes:cancelar', async (_event, id, motivo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/cancelar`, {
+    method: 'POST', body: { motivo },
+  }));
+
+ipcMain.handle('solicitudes:editar', async (_event, id, datosPropuestos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/editar`, {
+    method: 'PATCH', body: { datosPropuestos },
+  }));
+
+ipcMain.handle('solicitudes:reasignar', async (_event, id, nuevoCoordinadorId) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/reasignar`, {
+    method: 'PATCH', body: { nuevoCoordinadorId },
+  }));
+
+ipcMain.handle('notificaciones:listar', async (_event, soloNoLeidas) =>
+  ejecutarPeticionAutenticada(`/notificaciones${soloNoLeidas ? '?soloNoLeidas=true' : ''}`));
+
+ipcMain.handle('notificaciones:contar-no-leidas', async () =>
+  ejecutarPeticionAutenticada('/notificaciones/no-leidas/conteo'));
+
+ipcMain.handle('notificaciones:marcar-leida', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/notificaciones/${id}/leida`, { method: 'PATCH' }));
+
+ipcMain.handle('notificaciones:marcar-todas-leidas', async () =>
+  ejecutarPeticionAutenticada('/notificaciones/marcar-todas-leidas', { method: 'PATCH' }));
+
 ipcMain.handle("roles:listar", async () => {
   return ejecutarPeticionAutenticada("/roles");
 });

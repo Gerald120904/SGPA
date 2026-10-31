@@ -22,6 +22,7 @@ import { EstructuraAcademicaModule } from './estructura-academica/estructura-aca
 import { PlanesEstudioModule } from './planes-estudio/planes-estudio.module';
 import { GoogleModule } from './integraciones/google/google.module';
 import { FormulariosEstudiantesModule } from './formularios-estudiantes/formularios-estudiantes.module';
+import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { crearConfiguracionBaseDatos } from './config/database.config';
 import { iniciarContextoRolActivo } from './auth/active-role-context';
 
@@ -54,6 +55,7 @@ import { iniciarContextoRolActivo } from './auth/active-role-context';
     OfertaAcademicaModule,
     GoogleModule,
     FormulariosEstudiantesModule,
+    NotificacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,8 +1,10 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
 export class RechazarSolicitudDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MinLength(3)
+  @IsNotEmpty()
   @MaxLength(500)
   motivo!: string;
 }

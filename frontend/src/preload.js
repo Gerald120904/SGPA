@@ -71,6 +71,14 @@ contextBridge.exposeInMainWorld("sgpa", {
   aprobarSolicitudCambio: (id) => ipcRenderer.invoke('solicitudes:aprobar', id),
   rechazarSolicitudCambio: (id, motivo) => ipcRenderer.invoke('solicitudes:rechazar', id, motivo),
 
+  devolverSolicitudCambio: (id, observaciones) => ipcRenderer.invoke('solicitudes:devolver', id, observaciones),
+  cancelarSolicitudCambio: (id, motivo) => ipcRenderer.invoke('solicitudes:cancelar', id, motivo),
+  editarSolicitudCambio: (id, datosPropuestos) => ipcRenderer.invoke('solicitudes:editar', id, datosPropuestos),
+  reasignarSolicitudCambio: (id, nuevoCoordinadorId) => ipcRenderer.invoke('solicitudes:reasignar', id, nuevoCoordinadorId),
+  listarNotificaciones: (soloNoLeidas) => ipcRenderer.invoke('notificaciones:listar', soloNoLeidas),
+  contarNotificacionesNoLeidas: () => ipcRenderer.invoke('notificaciones:contar-no-leidas'),
+  marcarNotificacionLeida: (id) => ipcRenderer.invoke('notificaciones:marcar-leida', id),
+  marcarTodasNotificacionesLeidas: () => ipcRenderer.invoke('notificaciones:marcar-todas-leidas'),
   listarCatalogoPermisos: () =>
     ipcRenderer.invoke(
       "permisos:catalogo",
