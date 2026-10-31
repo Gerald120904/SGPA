@@ -29,6 +29,18 @@ export class CrearPeriodoAcademicoDto {
   fechaLimiteDisponibilidad!: string;
 
   @IsOptional()
+  @IsDateString()
+  fechaAperturaActualizacionDocente?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaLimiteEntregaDocente?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaLimiteRevisionDocente?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(500)
   observaciones?: string;

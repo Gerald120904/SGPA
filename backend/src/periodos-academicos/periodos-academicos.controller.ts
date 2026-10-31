@@ -59,4 +59,11 @@ export class PeriodosAcademicosController {
   ) {
     return this.periodosAcademicosService.cambiarEstado(id, dto.estado);
   }
+
+  @Post('transiciones-automaticas')
+  @Permisos(PermisoSistema.PERIODOS_GESTIONAR)
+  ejecutarTransicionesAutomaticas() {
+    return this.periodosAcademicosService.ejecutarTransicionesAutomaticas();
+  }
+
 }

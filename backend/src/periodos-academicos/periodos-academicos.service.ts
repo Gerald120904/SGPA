@@ -3,6 +3,8 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,7 +14,8 @@ import { CrearPeriodoAcademicoDto } from './dto/crear-periodo-academico.dto';
 import { PeriodoAcademico } from './entities/periodo-academico.entity';
 
 @Injectable()
-export class PeriodosAcademicosService {
+export class PeriodosAcademicosService implements OnApplicationBootstrap, OnModuleDestroy {
+  private timerTransiciones: NodeJS.Timeout | null = null;
   constructor(
     @InjectRepository(PeriodoAcademico)
     private readonly periodoRepository: Repository<PeriodoAcademico>,
@@ -363,6 +366,9 @@ export class PeriodosAcademicosService {
       fechaInicio: dto.fechaInicio,
       fechaFin: dto.fechaFin,
       fechaLimiteDisponibilidad: dto.fechaLimiteDisponibilidad,
+      ...(dto.fechaAperturaActualizacionDocente ? { fechaAperturaActualizacionDocente: dto.fechaAperturaActualizacionDocente } : {}),
+      ...(dto.fechaLimiteEntregaDocente ? { fechaLimiteEntregaDocente: dto.fechaLimiteEntregaDocente } : {}),
+      ...(dto.fechaLimiteRevisionDocente ? { fechaLimiteRevisionDocente: dto.fechaLimiteRevisionDocente } : {}),
       estado: EstadoPeriodoAcademico.BORRADOR,
       observaciones: dto.observaciones?.trim() || null,
     });
@@ -409,6 +415,15 @@ export class PeriodosAcademicosService {
     if (dto.observaciones !== undefined) {
       periodo.observaciones = dto.observaciones?.trim() || null;
     }
+    if (dto.fechaAperturaActualizacionDocente !== undefined) {
+      periodo.fechaAperturaActualizacionDocente = dto.fechaAperturaActualizacionDocente || null;
+    }
+    if (dto.fechaLimiteEntregaDocente !== undefined) {
+      periodo.fechaLimiteEntregaDocente = dto.fechaLimiteEntregaDocente || null;
+    }
+    if (dto.fechaLimiteRevisionDocente !== undefined) {
+      periodo.fechaLimiteRevisionDocente = dto.fechaLimiteRevisionDocente || null;
+    }
 
     try {
       return await this.periodoRepository.save(periodo);
@@ -440,5 +455,70 @@ export class PeriodosAcademicosService {
     periodo.estado = nuevoEstado;
 
     return this.periodoRepository.save(periodo);
+  }
+
+  async ejecutarTransicionesAutomaticas(): Promise<{
+    cerrados: string[];
+    iniciados: string[];
+  }> {
+    const hoy = this.obtenerFechaActualLocal();
+    const cerrados: string[] = [];
+    const iniciados: string[] = [];
+
+    // 1. Cerrar período EN_CURSO si hoy > fechaFin
+    const periodoEnCurso = await this.periodoRepository.findOne({
+      where: { estado: EstadoPeriodoAcademico.EN_CURSO },
+    });
+    if (periodoEnCurso && hoy > periodoEnCurso.fechaFin) {
+      periodoEnCurso.estado = EstadoPeriodoAcademico.CERRADO;
+      await this.periodoRepository.save(periodoEnCurso);
+      cerrados.push(periodoEnCurso.codigo);
+    }
+
+    // 2. Si no hay período EN_CURSO (o se cerró), iniciar período EN_PREPARACION si hoy >= fechaInicio
+    const cursoActivo = await this.periodoRepository.findOne({
+      where: { estado: EstadoPeriodoAcademico.EN_CURSO },
+    });
+    if (!cursoActivo) {
+      const periodoEnPrep = await this.periodoRepository.findOne({
+        where: { estado: EstadoPeriodoAcademico.EN_PREPARACION },
+      });
+      if (periodoEnPrep && hoy >= periodoEnPrep.fechaInicio && hoy <= periodoEnPrep.fechaFin) {
+        periodoEnPrep.estado = EstadoPeriodoAcademico.EN_CURSO;
+        await this.periodoRepository.save(periodoEnPrep);
+        iniciados.push(periodoEnPrep.codigo);
+      }
+    }
+
+    return { cerrados, iniciados };
+  }
+
+  async onApplicationBootstrap(): Promise<void> {
+    if (process.env.SGPA_TEST_MODE?.trim().toLowerCase() === 'true' || process.env.NODE_ENV === 'test' ||
+        ['sgpa_test', 'sgpa_isolated_audit'].includes(process.env.DB_DATABASE ?? '')) {
+      return;
+    }
+    try {
+      await this.ejecutarTransicionesAutomaticas();
+    } catch {
+      // Ignorar excepciones al arranque para no impedir inicio del servicio
+    }
+    this.timerTransiciones = setInterval(async () => {
+      try {
+        await this.ejecutarTransicionesAutomaticas();
+      } catch {
+        // Ignorar errores transitorios de temporizador
+      }
+    }, 60 * 60 * 1000);
+    if (typeof this.timerTransiciones.unref === 'function') {
+      this.timerTransiciones.unref();
+    }
+  }
+
+  onModuleDestroy(): void {
+    if (this.timerTransiciones) {
+      clearInterval(this.timerTransiciones);
+      this.timerTransiciones = null;
+    }
   }
 }

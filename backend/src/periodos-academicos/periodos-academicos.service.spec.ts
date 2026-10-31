@@ -868,4 +868,98 @@ describe('PeriodosAcademicosService', () => {
 
     expect(periodoRepository.findOne).toHaveBeenCalledTimes(1);
   });
+
+  it('ejecuta transiciones automáticas cerrando períodos vencidos e iniciando en preparación', async () => {
+    jest.spyOn(service as any, 'obtenerFechaActualLocal').mockReturnValue('2027-07-01');
+
+    const periodoCurso = crearPeriodo({
+      codigo: '2027-C1',
+      estado: EstadoPeriodoAcademico.EN_CURSO,
+      fechaFin: '2027-06-25',
+    });
+    const periodoPrep = crearPeriodo({
+      codigo: '2027-C2',
+      estado: EstadoPeriodoAcademico.EN_PREPARACION,
+      fechaInicio: '2027-07-01',
+      fechaFin: '2027-12-01',
+    });
+
+    periodoRepository.findOne
+      .mockResolvedValueOnce(periodoCurso) // 1. find EN_CURSO
+      .mockResolvedValueOnce(null)          // 2. find EN_CURSO after closing
+      .mockResolvedValueOnce(periodoPrep);  // 3. find EN_PREPARACION
+
+    periodoRepository.save.mockImplementation(async (entidad) => entidad);
+
+    const resultado = await service.ejecutarTransicionesAutomaticas();
+    expect(resultado.cerrados).toContain('2027-C1');
+    expect(resultado.iniciados).toContain('2027-C2');
+    expect(periodoCurso.estado).toBe(EstadoPeriodoAcademico.CERRADO);
+    expect(periodoPrep.estado).toBe(EstadoPeriodoAcademico.EN_CURSO);
+  });
+
+  it('no inicia un período en preparación cuya fecha de fin ya pasó', async () => {
+    jest.spyOn(service as any, 'obtenerFechaActualLocal').mockReturnValue('2027-07-01');
+    periodoRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(crearPeriodo({
+        estado: EstadoPeriodoAcademico.EN_PREPARACION,
+        fechaInicio: '2027-02-15',
+        fechaFin: '2027-06-25',
+      }));
+
+    await expect(service.ejecutarTransicionesAutomaticas()).resolves.toEqual({ cerrados: [], iniciados: [] });
+    expect(periodoRepository.save).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { SGPA_TEST_MODE: 'true', NODE_ENV: 'development', DB_DATABASE: 'sgpa_test' },
+    { SGPA_TEST_MODE: ' TRUE ', NODE_ENV: 'development', DB_DATABASE: 'sgpa_test' },
+    { SGPA_TEST_MODE: 'false', NODE_ENV: 'test', DB_DATABASE: 'sgpa' },
+    { SGPA_TEST_MODE: 'false', NODE_ENV: 'development', DB_DATABASE: 'sgpa_isolated_audit' },
+  ])('no consulta ni escribe períodos al arrancar en entorno de pruebas %j', async (entorno) => {
+    const anteriores = {
+      SGPA_TEST_MODE: process.env.SGPA_TEST_MODE,
+      NODE_ENV: process.env.NODE_ENV,
+      DB_DATABASE: process.env.DB_DATABASE,
+    };
+    Object.assign(process.env, entorno);
+    try {
+      const spy = jest.spyOn(service, 'ejecutarTransicionesAutomaticas');
+      await service.onApplicationBootstrap();
+      expect(spy).not.toHaveBeenCalled();
+      expect(periodoRepository.findOne).not.toHaveBeenCalled();
+      expect(periodoRepository.save).not.toHaveBeenCalled();
+      expect((service as any).timerTransiciones).toBeNull();
+    } finally {
+      for (const [clave, valor] of Object.entries(anteriores)) {
+        if (valor === undefined) delete process.env[clave];
+        else process.env[clave] = valor;
+      }
+      service.onModuleDestroy();
+    }
+  });
+
+  it('ejecuta transiciones institucionales en onApplicationBootstrap y limpia el temporizador', async () => {
+    const anteriores = {
+      SGPA_TEST_MODE: process.env.SGPA_TEST_MODE,
+      NODE_ENV: process.env.NODE_ENV,
+      DB_DATABASE: process.env.DB_DATABASE,
+    };
+    Object.assign(process.env, { SGPA_TEST_MODE: 'false', NODE_ENV: 'production', DB_DATABASE: 'sgpa' });
+    try {
+      const spy = jest.spyOn(service, 'ejecutarTransicionesAutomaticas').mockResolvedValue({ cerrados: [], iniciados: [] });
+      await service.onApplicationBootstrap();
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect((service as any).timerTransiciones).not.toBeNull();
+    } finally {
+      service.onModuleDestroy();
+      for (const [clave, valor] of Object.entries(anteriores)) {
+        if (valor === undefined) delete process.env[clave];
+        else process.env[clave] = valor;
+      }
+    }
+    expect((service as any).timerTransiciones).toBeNull();
+  });
 });

@@ -55,6 +55,7 @@ describe('PeriodosAcademicosController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -116,7 +117,9 @@ describe('PeriodosAcademicosController', () => {
       sub: 1,
       correo: 'usuario@sgpa.local',
       roles: [rol],
-    });
+
+      rolActivo: rol,
+      av: 1,});
   }
 
   it('responde 401 al listar sin JWT', async () => {
@@ -149,6 +152,7 @@ describe('PeriodosAcademicosController', () => {
     expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(
       1,
       [PermisoSistema.PERIODOS_VER],
+      'ASISTENTE_ESTUDIANTIL',
     );
     expect(periodosAcademicosService.listar).toHaveBeenCalledTimes(1);
   });
