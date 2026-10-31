@@ -16,7 +16,7 @@ export function registrarEstudiantesImportacionIpc({
       const resultado = await dialog.showOpenDialog({
         title: "Seleccionar estudiantes",
         properties: ["openFile"],
-        filters: [{ name: "Archivo Excel", extensions: ["xlsx"] }],
+        filters: [{ name: "Archivo Excel o CSV", extensions: ["xlsx", "csv"] }],
       });
       if (resultado.canceled || !resultado.filePaths.length)
         return { ok: false, cancelado: true };
@@ -24,7 +24,7 @@ export function registrarEstudiantesImportacionIpc({
       if ((await fs.stat(filePath)).size > MAXIMO_EXCEL) {
         return {
           ok: false,
-          message: "El archivo Excel supera el límite de 5 MB.",
+          message: "El archivo supera el límite de 5 MB.",
         };
       }
       return {
@@ -33,10 +33,10 @@ export function registrarEstudiantesImportacionIpc({
         datos: await leerArchivoEstudiantesExcel(filePath),
       };
     } catch (error) {
-      console.error("Error leyendo Excel de estudiantes:", error);
+      console.error("Error leyendo archivo de estudiantes:", error);
       return {
         ok: false,
-        message: error?.message || "No fue posible leer el archivo Excel.",
+        message: error?.message || "No fue posible leer el archivo de estudiantes.",
       };
     }
   });

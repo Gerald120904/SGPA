@@ -2636,6 +2636,17 @@ ipcMain.handle(
   },
 );
 
+ipcMain.handle('estudiantes:reingresar', async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/reingresar`, { method: 'POST' });
+});
+
+ipcMain.handle('estudiantes:graduar', async (_event, id, observacion) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/graduar`, {
+    method: 'POST',
+    body: { observacion },
+  });
+});
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1440,

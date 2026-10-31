@@ -200,10 +200,24 @@ describe('EstudiantesImportacionService', () => {
     expect(resultado.filas[0].errores[0]).toContain('período');
   });
 
-  it('rechaza un estudiante existente en otra carrera o plan', async () => {
+  it('rechaza un estudiante existente en otro plan de la misma carrera y permite si es de otra carrera', async () => {
     estudianteRepository.find.mockResolvedValue([
       {
         id: 8,
+        cedula: '001234567',
+        correoInstitucional: 'ana@una.ac.cr',
+        carreraId: 1,
+        planEstudioId: 88,
+        periodoIngresoId: 3,
+      } as Estudiante,
+    ]);
+    const resultado = await service.validar(9, dto());
+    expect(resultado.filas[0].errores[0]).toContain('otro plan dentro de esta carrera');
+
+    // Si pertenece a otra carrera, se permite matricular en la carrera actual como CREAR
+    estudianteRepository.find.mockResolvedValue([
+      {
+        id: 99,
         cedula: '001234567',
         correoInstitucional: 'ana@una.ac.cr',
         carreraId: 99,
@@ -211,8 +225,9 @@ describe('EstudiantesImportacionService', () => {
         periodoIngresoId: 3,
       } as Estudiante,
     ]);
-    const resultado = await service.validar(9, dto());
-    expect(resultado.filas[0].errores[0]).toContain('otra carrera o plan');
+    const resultadoOtraCarrera = await service.validar(9, dto());
+    expect(resultadoOtraCarrera.filas[0].errores).toHaveLength(0);
+    expect(resultadoOtraCarrera.filas[0].accion).toBe('CREAR');
   });
 
   it('clasifica como ACTUALIZAR si añade aprobaciones a un estudiante compatible', async () => {

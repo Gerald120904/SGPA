@@ -138,4 +138,24 @@ export class EstudiantesController {
       consulta.periodoReferenciaId,
     );
   }
+
+  @Post(':id/reingresar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  reingresar(
+    @UsuarioActualId() usuarioId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.estudiantesService.reingresar(usuarioId, id);
+  }
+
+  @Post(':id/graduar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  graduar(
+    @UsuarioActualId() usuarioId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto?: { observacion?: string },
+  ) {
+    return this.estudiantesService.graduarEstudiante(usuarioId, id, dto?.observacion);
+  }
+
 }

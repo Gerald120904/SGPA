@@ -107,6 +107,34 @@ describe('EstudiantesService', () => {
     );
   });
 
+  it('permite consultar el expediente graduado a un usuario autorizado', async () => {
+    const graduado = { ...estudiante, estado: EstadoEstudiante.GRADUADO } as Estudiante;
+    estudiantes.findOne.mockResolvedValue(graduado);
+    historialAcademico.find.mockResolvedValue([]);
+
+    await expect(service.obtenerPorId(3, graduado.id)).resolves.toEqual(graduado);
+    await expect(service.listarHistorialAcademico(3, graduado.id)).resolves.toEqual([]);
+    expect(estudiantes.save).not.toHaveBeenCalled();
+  });
+
+  it('deniega la lectura de un graduado fuera del alcance autorizado', async () => {
+    estudiantes.findOne.mockResolvedValue({ ...estudiante, estado: EstadoEstudiante.GRADUADO });
+    alcance.tieneAlcanceSobreCarrera.mockResolvedValue(false);
+
+    await expect(service.obtenerPorId(3, estudiante.id)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('mantiene bloqueadas las modificaciones ordinarias del expediente graduado', async () => {
+    estudiantes.findOne.mockResolvedValue({ ...estudiante, estado: EstadoEstudiante.GRADUADO });
+
+    await expect(service.actualizar(3, estudiante.id, { nombres: 'Otro' })).rejects.toThrow(ConflictException);
+    await expect(service.cambiarEstado(3, estudiante.id, EstadoEstudiante.ACTIVO)).rejects.toThrow(ConflictException);
+    await expect(service.cambiarPlan(3, estudiante.id, { planNuevoId: 11, periodoCambioId: 4 })).rejects.toThrow(ConflictException);
+    expect(estudiantes.save).not.toHaveBeenCalled();
+    expect(estudiantes.update).not.toHaveBeenCalled();
+    expect(historialPlanes.save).not.toHaveBeenCalled();
+  });
+
   it('el asistente no escribe datos oficiales desde el endpoint directo', async () => {
     alcanceJerarquico.tipoCuentaJerarquica.mockResolvedValue('ASISTENTE_ESTUDIANTIL');
     await expect(service.crear(3, { carreraId: 1 } as any)).rejects.toThrow(ForbiddenException);

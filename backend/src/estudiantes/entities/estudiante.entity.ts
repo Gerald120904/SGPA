@@ -14,13 +14,14 @@ import { PlanEstudio } from '../../planes-estudio/entities/plan-estudio.entity';
 import { EstadoEstudiante } from '../constants/estado-estudiante.constant';
 
 @Entity({ name: 'estudiantes' })
+@Index('UQ_estudiantes_carrera_cedula', ['carreraId', 'cedula'], { unique: true })
 @Index('IDX_estudiantes_carrera', ['carreraId'])
 @Index('IDX_estudiantes_plan', ['planEstudioId'])
 export class Estudiante {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
-  @Column({ type: 'varchar', length: 30, unique: true })
+  @Column({ type: 'varchar', length: 30 })
   cedula!: string;
 
   @Column({ type: 'varchar', length: 100 })
@@ -36,7 +37,6 @@ export class Estudiante {
     name: 'correo_institucional',
     type: 'varchar',
     length: 150,
-    unique: true,
   })
   correoInstitucional!: string;
 
@@ -54,6 +54,15 @@ export class Estudiante {
 
   @Column({ type: 'varchar', length: 20, default: EstadoEstudiante.ACTIVO })
   estado!: EstadoEstudiante;
+
+  @Column({ name: 'fecha_graduacion', type: 'datetime', nullable: true })
+  fechaGraduacion!: Date | null;
+
+  @Column({ name: 'graduado_por_usuario_id', type: 'int', unsigned: true, nullable: true })
+  graduadoPorUsuarioId!: number | null;
+
+  @Column({ name: 'observacion_graduacion', type: 'varchar', length: 500, nullable: true })
+  observacionGraduacion!: string | null;
 
   @ManyToOne(() => Carrera, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
   @JoinColumn({ name: 'carrera_id' })

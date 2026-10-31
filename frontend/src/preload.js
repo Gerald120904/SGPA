@@ -872,4 +872,8 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke('estudiantes:progreso', id, periodoReferenciaId),
   registrarResultadoAcademicoEstudiante: (id, datos) =>
     ipcRenderer.invoke('estudiantes:registrar-resultado', id, datos),
+  reingresarEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:reingresar', id),
+  graduarEstudiante: (id, observacion) =>
+    ipcRenderer.invoke('estudiantes:graduar', id, observacion),
 });
