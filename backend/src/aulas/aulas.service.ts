@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -44,6 +45,8 @@ import { fechaHoraInstitucionalDesdeTextoLocal } from './fecha-hora-instituciona
 import { Equipamiento } from './entities/equipamiento.entity';
 import { IndisponibilidadAula } from './entities/indisponibilidad-aula.entity';
 import { ReservaAula } from './entities/reserva-aula.entity';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { Notificacion } from '../notificaciones/entities/notificacion.entity';
 
 @Injectable()
 export class AulasService {
@@ -73,6 +76,9 @@ export class AulasService {
     private readonly periodosAcademicosService: PeriodosAcademicosService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly notificacionesService?: NotificacionesService,
+    @Optional()
+    private readonly ocupacionManager?: EntityManager,
   ) {}
 
   private enTransaccionOcupacion = false;
@@ -107,6 +113,8 @@ export class AulasService {
               manager.getRepository(DisponibilidadAula),
               this.periodosAcademicosService,
               this.dataSource,
+              new NotificacionesService(manager.getRepository(Notificacion)),
+              manager,
             );
             servicio.enTransaccionOcupacion = true;
             return operacion(servicio);
@@ -1623,7 +1631,179 @@ export class AulasService {
       },
     });
 
+    if (!this.notificacionesService) throw new ServiceUnavailableException('Servicio de notificaciones no disponible.');
+    await this.notificarAfectacionesIndisponibilidad(aula, guardada, inicio, fin, motivo);
+
     return guardada;
+  }
+
+
+  async obtenerSesionesAfectadasPorIndisponibilidad(
+    aulaId: number,
+    inicio: Date,
+    fin: Date,
+  ): Promise<
+    Array<{
+      horarioId: number;
+      grupoId: number;
+      numeroGrupo: string;
+      cursoCodigo: string;
+      cursoNombre: string;
+      carreraId: number | null;
+      docenteUsuarioId: number | null;
+      docenteNombre: string | null;
+      fecha: string;
+      horaInicio: string;
+      horaFin: string;
+    }>
+  > {
+    const executor = this.ocupacionManager ?? this.dataSource;
+    const rows: any[] = await executor.query(
+          `SELECT
+            hg.id AS horarioId,
+            hg.grupo_id AS grupoId,
+            hg.aula_id AS aulaId,
+            hg.dia_semana AS diaSemana,
+            hg.hora_inicio AS horaInicio,
+            hg.hora_fin AS horaFin,
+            g.numero_grupo AS numeroGrupo,
+            g.profesor_id AS profesorId,
+            c.codigo AS cursoCodigo,
+            c.nombre AS cursoNombre,
+            cc.carrera_id AS carreraId,
+            u_prof.id AS docenteUsuarioId,
+            COALESCE(CONCAT(u_prof.nombres, ' ', u_prof.apellido1), CONCAT(p.nombres, ' ', p.apellido1)) AS docenteNombre,
+            pa.fecha_inicio AS periodoInicio,
+            pa.fecha_fin AS periodoFin
+          FROM horarios_grupo hg
+          INNER JOIN grupos g ON g.id = hg.grupo_id
+          INNER JOIN periodos_academicos pa ON pa.id = g.periodo_id
+          LEFT JOIN cursos c ON c.id = g.curso_id
+          LEFT JOIN (SELECT curso_id, CASE WHEN COUNT(*) = 1 THEN MIN(carrera_id) ELSE NULL END AS carrera_id
+            FROM curso_carreras GROUP BY curso_id) cc ON cc.curso_id = c.id
+          LEFT JOIN profesores p ON p.id = g.profesor_id
+          LEFT JOIN usuarios u_prof ON (u_prof.cedula = p.cedula OR u_prof.correo = p.correo) AND u_prof.activo = 1
+          WHERE hg.aula_id = ?`,
+          [aulaId],
+        );
+
+    const sesionesAfectadas: Array<{
+      horarioId: number;
+      grupoId: number;
+      numeroGrupo: string;
+      cursoCodigo: string;
+      cursoNombre: string;
+      carreraId: number | null;
+      docenteUsuarioId: number | null;
+      docenteNombre: string | null;
+      fecha: string;
+      horaInicio: string;
+      horaFin: string;
+    }> = [];
+
+    const iterador = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+    const finDia = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
+    const fechaPeriodo = (value: unknown): string | null => {
+      if (!value) return null;
+      if (value instanceof Date) {
+        return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+      }
+      return String(value).slice(0, 10);
+    };
+
+    while (iterador.getTime() <= finDia.getTime()) {
+      const anio = iterador.getFullYear();
+      const mes = String(iterador.getMonth() + 1).padStart(2, '0');
+      const dia = String(iterador.getDate()).padStart(2, '0');
+      const fechaStr = `${anio}-${mes}-${dia}`;
+      const diaSemana = this.obtenerDiaSemana(fechaStr);
+
+      for (const row of rows) {
+        if (Number(row.diaSemana) === diaSemana &&
+          (!row.periodoInicio || fechaStr >= fechaPeriodo(row.periodoInicio)!) &&
+          (!row.periodoFin || fechaStr <= fechaPeriodo(row.periodoFin)!)) {
+          const horaInicioStr = String(row.horaInicio || '00:00:00').padStart(8, '0');
+          const horaFinStr = String(row.horaFin || '00:00:00').padStart(8, '0');
+          const [hIni, mIni, sIni] = horaInicioStr.split(':').map(Number);
+          const [hFin, mFin, sFin] = horaFinStr.split(':').map(Number);
+
+          const sesionInicio = new Date(iterador.getFullYear(), iterador.getMonth(), iterador.getDate(), hIni, mIni, sIni || 0);
+          const sesionFin = new Date(iterador.getFullYear(), iterador.getMonth(), iterador.getDate(), hFin, mFin, sFin || 0);
+
+          if (sesionInicio.getTime() < fin.getTime() && sesionFin.getTime() > inicio.getTime()) {
+            sesionesAfectadas.push({
+              horarioId: Number(row.horarioId),
+              grupoId: Number(row.grupoId),
+              numeroGrupo: String(row.numeroGrupo || ''),
+              cursoCodigo: String(row.cursoCodigo || ''),
+              cursoNombre: String(row.cursoNombre || ''),
+              carreraId: row.carreraId ? Number(row.carreraId) : null,
+              docenteUsuarioId: row.docenteUsuarioId ? Number(row.docenteUsuarioId) : null,
+              docenteNombre: row.docenteNombre ? String(row.docenteNombre) : null,
+              fecha: fechaStr,
+              horaInicio: horaInicioStr,
+              horaFin: horaFinStr,
+            });
+          }
+        }
+      }
+
+      iterador.setDate(iterador.getDate() + 1);
+    }
+
+    return sesionesAfectadas;
+  }
+
+  async notificarAfectacionesIndisponibilidad(
+    aula: Aula,
+    indisponibilidad: IndisponibilidadAula,
+    inicio: Date,
+    fin: Date,
+    motivo: string,
+  ): Promise<number> {
+    if (!this.notificacionesService) throw new ServiceUnavailableException('Servicio de notificaciones no disponible.');
+
+    const sesiones = await this.obtenerSesionesAfectadasPorIndisponibilidad(
+      aula.id,
+      inicio,
+      fin,
+    );
+
+    const notificados = new Set<string>();
+    let conteoNotificaciones = 0;
+
+    for (const sesion of sesiones) {
+      if (!sesion.docenteUsuarioId) continue;
+      const dedupeKey = `${sesion.docenteUsuarioId}-${sesion.horarioId}-${sesion.fecha}`;
+      if (notificados.has(dedupeKey)) continue;
+      notificados.add(dedupeKey);
+
+      await this.notificacionesService.crear({
+        claveIdempotencia: `aula:${indisponibilidad.id}:${sesion.docenteUsuarioId}:${sesion.horarioId}:${sesion.fecha}`,
+        usuarioId: sesion.docenteUsuarioId,
+        carreraId: sesion.carreraId,
+        tipo: 'INDISPONIBILIDAD_AULA',
+        titulo: 'Afectación de aula por indisponibilidad',
+        mensaje: `Se ha registrado una indisponibilidad en el aula ${aula.codigo || aula.nombre || aula.id} por motivo: "${motivo}". Su clase de ${sesion.cursoNombre || sesion.cursoCodigo || 'curso'} (Grupo ${sesion.numeroGrupo}) programada para el ${sesion.fecha} de ${sesion.horaInicio.slice(0, 5)} a ${sesion.horaFin.slice(0, 5)} ha sido afectada. Por favor gestione un aula alterna o coordine la reprogramación de la sesión.`,
+        metadatos: {
+          indisponibilidadId: indisponibilidad.id,
+          aulaId: aula.id,
+          aulaCodigo: aula.codigo,
+          cursoCodigo: sesion.cursoCodigo,
+          cursoNombre: sesion.cursoNombre,
+          grupoId: sesion.grupoId,
+          numeroGrupo: sesion.numeroGrupo,
+          horarioId: sesion.horarioId,
+          fecha: sesion.fecha,
+          horaInicio: sesion.horaInicio,
+          horaFin: sesion.horaFin,
+          motivo,
+        },
+      });
+      conteoNotificaciones++;
+    }
+
+    return conteoNotificaciones;
   }
 
   async actualizarIndisponibilidadAula(
