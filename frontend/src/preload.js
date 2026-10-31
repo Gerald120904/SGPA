@@ -83,6 +83,8 @@ contextBridge.exposeInMainWorld("sgpa", {
   listarEquivalenciasPlanes: (planOrigenId, planDestinoId) => ipcRenderer.invoke('equivalencias:listar-planes', planOrigenId, planDestinoId),
   sugerirEquivalenciasEstudiante: (estudianteId, nuevoPlanId) => ipcRenderer.invoke('equivalencias:sugerir', estudianteId, nuevoPlanId),
   aplicarEquivalenciasEstudiante: (estudianteId, datos) => ipcRenderer.invoke('equivalencias:aplicar', estudianteId, datos),
+  copiarCursosPerfil: (perfilId, perfilOrigenId) => ipcRenderer.invoke('perfiles-academicos:copiar-cursos', perfilId, perfilOrigenId),
+
   listarCatalogoPermisos: () =>
     ipcRenderer.invoke(
       "permisos:catalogo",

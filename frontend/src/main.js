@@ -530,6 +530,9 @@ ipcMain.handle('equivalencias:sugerir', async (_event, estudianteId, nuevoPlanId
 ipcMain.handle('equivalencias:aplicar', async (_event, estudianteId, datos) =>
   ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/aplicar/estudiante/${estudianteId}`, { method: 'POST', body: datos }));
 
+ipcMain.handle('perfiles-academicos:copiar-cursos', async (_event, perfilId, perfilOrigenId) =>
+  ejecutarPeticionAutenticada(`/perfiles-academicos/${perfilId}/copiar-cursos/${perfilOrigenId}`, { method: 'POST' }));
+
 ipcMain.handle("roles:listar", async () => {
   return ejecutarPeticionAutenticada("/roles");
 });
