@@ -51,6 +51,7 @@ describe('EstudiantesController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: rolesActuales.map((r, i) => ({
                 usuarioId: where?.id ?? 1,
                 rolId: i + 1,
@@ -91,7 +92,9 @@ describe('EstudiantesController', () => {
     } else {
       rolesActuales = ['COORDINADOR'];
     }
-    return jwt.signAsync({ sub: 3, correo: 'gestor@una.cr', roles: rolesActuales });
+    return jwt.signAsync({ sub: 3, correo: 'gestor@una.cr', roles: rolesActuales,
+      rolActivo: rolesActuales[0],
+      av: 1,});
   };
 
   it('requiere autenticación', async () => {

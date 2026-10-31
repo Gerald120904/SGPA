@@ -31,7 +31,9 @@ export function guardarSesion(
   sesionActual = {
 
     usuario:
-      resultado?.usuario || null
+      resultado?.usuario || null,
+    rolActivo:
+      resultado?.usuario?.rolActivo || null
 
   };
 
@@ -170,7 +172,7 @@ export function tieneRolValido(
 
 
 /* =========================================================
-   ROL PRINCIPAL
+   ROL PRINCIPAL Y ESPACIO ACTIVO
    ========================================================= */
 
 export function obtenerRolPrincipal(
@@ -199,6 +201,76 @@ export function obtenerRolPrincipal(
 
 
   return null;
+
+}
+
+
+export function obtenerRolActivo(
+  usuario = obtenerUsuario()
+) {
+
+  if (sesionActual?.rolActivo) {
+
+    const roles =
+      obtenerRolesUsuario(
+        usuario
+      );
+
+    if (roles.includes(sesionActual.rolActivo)) {
+
+      return sesionActual.rolActivo;
+
+    }
+
+  }
+
+  return null;
+
+}
+
+
+export async function cambiarRolActivo(
+  nuevoRol,
+  usuario = obtenerUsuario()
+) {
+
+  const roles =
+    obtenerRolesUsuario(
+      usuario
+    );
+
+  if (!roles.includes(nuevoRol)) {
+    return false;
+  }
+
+  if (typeof window !== 'undefined' && window.sgpa && typeof window.sgpa.cambiarRolActivo === 'function') {
+    const res = await window.sgpa.cambiarRolActivo(nuevoRol);
+    if (!res || !res.ok) {
+      throw new Error(res?.message || 'No fue posible cambiar al espacio seleccionado en el backend.');
+    }
+    if (res.usuario) {
+      if (!sesionActual) {
+        sesionActual = {};
+      }
+      sesionActual.usuario = res.usuario;
+      sesionActual.rolActivo = nuevoRol;
+      if (res.accessToken) {
+        sesionActual.token = res.accessToken;
+      }
+      return true;
+    }
+  }
+
+  throw new Error('El cambio de rol requiere una conexión verificada con el backend.');
+
+}
+
+
+export function obtenerEspaciosDisponibles(
+  usuario = obtenerUsuario()
+) {
+
+  return obtenerRolesUsuario(usuario);
 
 }
 
@@ -332,17 +404,10 @@ export function usuarioTienePermiso(
   }
 
 
-  const roles =
-    obtenerRolesUsuario(
-      usuario,
-    );
+  const rolActivo = obtenerRolActivo(usuario);
+  if (!rolActivo) return false;
 
-
-  if (
-    roles.includes(
-      ROLES.ADMIN_GLOBAL,
-    )
-  ) {
+  if (rolActivo === ROLES.ADMIN_GLOBAL) {
     return true;
   }
 

@@ -63,6 +63,27 @@ export class PeriodoAcademico {
   fechaLimiteDisponibilidad!: string;
 
   @Column({
+    name: 'fecha_apertura_actualizacion_docente',
+    type: 'date',
+    nullable: true,
+  })
+  fechaAperturaActualizacionDocente!: string | null;
+
+  @Column({
+    name: 'fecha_limite_entrega_docente',
+    type: 'date',
+    nullable: true,
+  })
+  fechaLimiteEntregaDocente!: string | null;
+
+  @Column({
+    name: 'fecha_limite_revision_docente',
+    type: 'date',
+    nullable: true,
+  })
+  fechaLimiteRevisionDocente!: string | null;
+
+  @Column({
     type: 'varchar',
     length: 30,
     default: EstadoPeriodoAcademico.BORRADOR,

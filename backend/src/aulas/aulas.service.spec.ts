@@ -20,6 +20,7 @@ import { PeriodosAcademicosService } from '../periodos-academicos/periodos-acade
 import { EstadoPeriodoAcademico } from '../periodos-academicos/constants/estado-periodo-academico.constant';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { AulasService } from './aulas.service';
+import { Notificacion } from '../notificaciones/entities/notificacion.entity';
 
 describe('AulasService', () => {
   let service: AulasService;
@@ -268,6 +269,7 @@ describe('AulasService', () => {
       [ReservaAula, reservaAulaRepository],
       [AuditoriaAula, auditoriaAulaRepository],
       [DisponibilidadAula, disponibilidadAulaRepository],
+      [Notificacion, { create: jest.fn((dto) => dto), save: jest.fn(async (dto) => dto) }],
     ]);
     consultaBloqueo = jest.fn().mockResolvedValue([{ id: 1 }]);
     const manager = {
@@ -293,6 +295,7 @@ describe('AulasService', () => {
       disponibilidadAulaRepository as unknown as Repository<DisponibilidadAula>,
       periodosAcademicosService as unknown as PeriodosAcademicosService,
       dataSource as unknown as DataSource,
+      { crear: jest.fn(async (dto) => dto) } as any,
     );
 
     jest.clearAllMocks();

@@ -197,13 +197,72 @@ export class FormulariosEstudiantesSyncService {
       );
     }
 
-    return this.respuestaRepo.find({
+    const respuestas = await this.respuestaRepo.find({
       where: {
         formularioId,
+      },
+      relations: {
+        revisadoPor: true,
       },
       order: {
         createdAt: 'DESC',
       },
     });
+
+    this.enriquecerNombresAsignaturas(respuestas, formulario);
+
+    return respuestas;
+  }
+
+  private enriquecerNombresAsignaturas(
+    respuestas: RespuestaFormularioEstudiante[],
+    formulario: FormularioEstudiante,
+  ): void {
+    if (!respuestas || respuestas.length === 0) return;
+
+    const nombresPorCodigo = new Map<string, string>();
+    const nombresPorPlanAsigId = new Map<number, string>();
+
+    const mapa = formulario.mapaPreguntas;
+    if (esInstantaneaCurricularInterna(mapa)) {
+      for (const asig of mapa.asignaturas) {
+        if (asig.nombre) {
+          nombresPorCodigo.set(asig.codigo, asig.nombre);
+          nombresPorPlanAsigId.set(asig.id, asig.nombre);
+        }
+      }
+    } else if (mapa && typeof mapa === 'object' && 'asignaturasAprobadas' in mapa) {
+      const mapaAny = mapa as any;
+      if (Array.isArray(mapaAny.asignaturasAprobadas?.grupos)) {
+        for (const grupo of mapaAny.asignaturasAprobadas.grupos) {
+          if (grupo.opciones) {
+            for (const [etiqueta, opt] of Object.entries(grupo.opciones as Record<string, any>)) {
+              let nombre = opt.nombre;
+              if (!nombre && etiqueta.includes(' - ')) {
+                nombre = etiqueta.split(' - ').slice(1).join(' - ').trim();
+              }
+              if (nombre) {
+                if (opt.codigo) nombresPorCodigo.set(opt.codigo, nombre);
+                if (opt.planAsignaturaId) nombresPorPlanAsigId.set(opt.planAsignaturaId, nombre);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const resp of respuestas) {
+      const asignaturas = resp.datosNormalizadosJson?.asignaturasAprobadas;
+      if (Array.isArray(asignaturas)) {
+        for (const asig of asignaturas) {
+          if (asig && typeof asig === 'object' && !asig.nombre) {
+            asig.nombre =
+              nombresPorPlanAsigId.get(asig.planAsignaturaId) ||
+              nombresPorCodigo.get(asig.codigo) ||
+              undefined;
+          }
+        }
+      }
+    }
   }
 }

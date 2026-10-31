@@ -86,6 +86,7 @@ describe('ProfesoresController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: rolesActuales.map((r, i) => ({
                 usuarioId: where?.id ?? 1,
                 rolId: i + 1,
@@ -176,13 +177,14 @@ describe('ProfesoresController', () => {
 
   let rolesActuales: string[] = ['ADMIN_GLOBAL'];
 
-  async function crearToken(roles: string[], sub = 10) {
+  async function crearToken(roles: string[], sub = 10, rolActivo?: string) {
     rolesActuales = roles && roles.length > 0 ? roles : ['ADMIN_GLOBAL'];
     return jwtService.signAsync({
       sub,
       correo: 'usuario@sgpa.local',
       roles: rolesActuales,
-    });
+      rolActivo: rolActivo ?? rolesActuales[0],
+      av: 1,});
   }
 
   it('responde 401 sin JWT', async () => {
@@ -239,7 +241,7 @@ describe('ProfesoresController', () => {
   });
 
   it('permite usuario con roles múltiples incluyendo PROFESOR usar su perfil', async () => {
-    const token = await crearToken(['ASISTENTE_ESTUDIANTIL', 'PROFESOR']);
+    const token = await crearToken(['ASISTENTE_ESTUDIANTIL', 'PROFESOR'], 10, 'PROFESOR');
 
     await request(app.getHttpServer())
       .get('/profesores/mi-perfil')

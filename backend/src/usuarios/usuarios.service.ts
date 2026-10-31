@@ -789,6 +789,23 @@ export class UsuariosService {
     });
   }
 
+  async rotarVersionAutenticacion(id: number, versionEsperada: number): Promise<number> {
+    if (!Number.isSafeInteger(versionEsperada) || versionEsperada < 0) {
+      throw new BadRequestException('Versión de autenticación inválida.');
+    }
+    const resultado = await this.usuarioRepository.createQueryBuilder()
+      .update(Usuario)
+      .set({ versionAutenticacion: () => 'version_autenticacion + 1' })
+      .where('id = :id AND version_autenticacion = :version AND activo = 1', {
+        id, version: versionEsperada,
+      })
+      .execute();
+    if (resultado.affected !== 1) {
+      throw new ConflictException('La sesión cambió. Inicie sesión nuevamente.');
+    }
+    return versionEsperada + 1;
+  }
+
   async guardarRecuperacionPassword(
     id: number,
     tokenHash: string,
@@ -803,6 +820,7 @@ export class UsuariosService {
   async actualizarPassword(id: number, passwordHash: string): Promise<void> {
     await this.usuarioRepository.update(id, {
       passwordHash,
+      versionAutenticacion: () => 'version_autenticacion + 1',
       passwordResetTokenHash: null,
       passwordResetExpiresAt: null,
     });
@@ -847,4 +865,31 @@ export class UsuariosService {
       passwordResetExpiresAt: null,
     });
   }
+
+  async obtenerImpactoDesactivacion(id: number) {
+    const usuario = await this.obtenerPorId(id);
+    const dependencias = await this.dataSource.getRepository(DependenciaUsuario).find({
+      where: { coordinadorId: id, activo: true },
+      relations: { asistente: true },
+    });
+    const solicitudesPendientes = await this.dataSource.getRepository(SolicitudCambio).count({
+      where: [
+        { coordinadorId: id, estado: 'PENDIENTE' },
+        { coordinadorId: id, estado: 'CORREGIDA' },
+        { coordinadorId: id, estado: 'DEVUELTA_PARA_CORRECCION' },
+      ],
+    });
+    return {
+      usuarioId: id,
+      nombreCompleto: `${usuario.nombres} ${usuario.apellido1} ${usuario.apellido2 || ''}`.trim(),
+      asistentesAfectados: dependencias.map((d: DependenciaUsuario) => ({
+        id: d.asistente.id,
+        nombreCompleto: `${d.asistente.nombres} ${d.asistente.apellido1} ${d.asistente.apellido2 || ''}`.trim(),
+        correo: d.asistente.correo,
+      })),
+      totalAsistentes: dependencias.length,
+      solicitudesPendientes,
+    };
+  }
+
 }

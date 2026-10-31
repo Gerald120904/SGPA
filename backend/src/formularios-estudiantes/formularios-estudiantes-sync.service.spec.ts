@@ -354,6 +354,9 @@ describe('FormulariosEstudiantesSyncService', () => {
 
       expect(respuestaRepo.find).toHaveBeenCalledWith({
         where: { formularioId: 1 },
+        relations: {
+          revisadoPor: true,
+        },
         order: { createdAt: 'DESC' },
       });
       expect(res).toBe(mockRespuestas);

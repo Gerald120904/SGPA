@@ -9,6 +9,7 @@ import { AulaEquipamiento } from './entities/aula-equipamiento.entity';
 import { Equipamiento } from './entities/equipamiento.entity';
 import { IndisponibilidadAula } from './entities/indisponibilidad-aula.entity';
 import { PeriodosAcademicosModule } from '../periodos-academicos/periodos-academicos.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { AuditoriaAula } from './entities/auditoria-aula.entity';
 import { DisponibilidadAula } from './entities/disponibilidad-aula.entity';
 import { ReservaAula } from './entities/reserva-aula.entity';
@@ -30,6 +31,7 @@ import { AulasAnalisisAcademicoService } from './aulas-analisis-academico.servic
     PermisosModule,
     PeriodosAcademicosModule,
     OfertaAcademicaModule,
+    NotificacionesModule,
   ],
   controllers: [AulasController],
   providers: [AulasService, AulasAnalisisAcademicoService],

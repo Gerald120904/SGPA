@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("auth:restablecer-password", datos),
   obtenerPerfil: () => ipcRenderer.invoke("auth:perfil"),
   logout: () => ipcRenderer.invoke("auth:logout"),
+  cambiarRolActivo: (rol) => ipcRenderer.invoke("auth:cambiar-rol-activo", rol),
+  verificarIdentidadBackend: () => ipcRenderer.invoke("app:verificar-identidad"),
   listarUsuarios: () => ipcRenderer.invoke("usuarios:listar"),
   obtenerUsuario: (id) => ipcRenderer.invoke("usuarios:obtener", id),
   crearUsuario: (datos) => ipcRenderer.invoke("usuarios:crear", datos),
@@ -68,6 +70,20 @@ contextBridge.exposeInMainWorld("sgpa", {
   listarSolicitudesPendientesCambio: () => ipcRenderer.invoke('solicitudes:pendientes'),
   aprobarSolicitudCambio: (id) => ipcRenderer.invoke('solicitudes:aprobar', id),
   rechazarSolicitudCambio: (id, motivo) => ipcRenderer.invoke('solicitudes:rechazar', id, motivo),
+
+  devolverSolicitudCambio: (id, observaciones) => ipcRenderer.invoke('solicitudes:devolver', id, observaciones),
+  cancelarSolicitudCambio: (id, motivo) => ipcRenderer.invoke('solicitudes:cancelar', id, motivo),
+  editarSolicitudCambio: (id, datosPropuestos) => ipcRenderer.invoke('solicitudes:editar', id, datosPropuestos),
+  reasignarSolicitudCambio: (id, nuevoCoordinadorId) => ipcRenderer.invoke('solicitudes:reasignar', id, nuevoCoordinadorId),
+  listarNotificaciones: (soloNoLeidas) => ipcRenderer.invoke('notificaciones:listar', soloNoLeidas),
+  contarNotificacionesNoLeidas: () => ipcRenderer.invoke('notificaciones:contar-no-leidas'),
+  marcarNotificacionLeida: (id) => ipcRenderer.invoke('notificaciones:marcar-leida', id),
+  marcarTodasNotificacionesLeidas: () => ipcRenderer.invoke('notificaciones:marcar-todas-leidas'),
+  crearEquivalenciaPlan: (datos) => ipcRenderer.invoke('equivalencias:crear', datos),
+  listarEquivalenciasPlanes: (planOrigenId, planDestinoId) => ipcRenderer.invoke('equivalencias:listar-planes', planOrigenId, planDestinoId),
+  sugerirEquivalenciasEstudiante: (estudianteId, nuevoPlanId) => ipcRenderer.invoke('equivalencias:sugerir', estudianteId, nuevoPlanId),
+  aplicarEquivalenciasEstudiante: (estudianteId, datos) => ipcRenderer.invoke('equivalencias:aplicar', estudianteId, datos),
+  copiarCursosPerfil: (perfilId, perfilOrigenId) => ipcRenderer.invoke('perfiles-academicos:copiar-cursos', perfilId, perfilOrigenId),
 
   listarCatalogoPermisos: () =>
     ipcRenderer.invoke(
@@ -862,4 +878,8 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke('estudiantes:progreso', id, periodoReferenciaId),
   registrarResultadoAcademicoEstudiante: (id, datos) =>
     ipcRenderer.invoke('estudiantes:registrar-resultado', id, datos),
+  reingresarEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:reingresar', id),
+  graduarEstudiante: (id, observacion) =>
+    ipcRenderer.invoke('estudiantes:graduar', id, observacion),
 });

@@ -21,12 +21,16 @@ import { EstructuraAcademicaService } from '../estructura-academica/estructura-a
 import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
+import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
+import { TipoPlanAsignatura } from '../planes-estudio/constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from '../planes-estudio/constants/tipo-requisito.constant';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { PlanRequisito } from '../planes-estudio/entities/plan-requisito.entity';
+import { ReglaOptativaPlan } from '../planes-estudio/entities/regla-optativa-plan.entity';
 import { EstadoEstudiante } from './constants/estado-estudiante.constant';
 import { FuenteRegistroAcademico } from './constants/fuente-registro-academico.constant';
+import { OrigenAcademico } from './constants/origen-academico.constant';
 import { ResultadoAcademico } from './constants/resultado-academico.constant';
 import { ActualizarEstudianteDto } from './dto/actualizar-estudiante.dto';
 import { CambiarPlanEstudianteDto } from './dto/cambiar-plan-estudiante.dto';
@@ -155,6 +159,12 @@ export class EstudiantesService {
     return estudiante;
   }
 
+  private validarExpedienteEditable(estudiante: Estudiante): void {
+    if (estudiante.estado === EstadoEstudiante.GRADUADO) {
+      throw new ConflictException('El expediente de un estudiante graduado no puede modificarse.');
+    }
+  }
+
   async crear(usuarioId: number, dto: CrearEstudianteDto) {
     await this.validarEscrituraJerarquica(usuarioId, dto.carreraId);
     const cedula = this.normalizarRequerido(dto.cedula, 'La cédula');
@@ -170,7 +180,7 @@ export class EstudiantesService {
       dto.planEstudioId,
       dto.periodoIngresoId,
     );
-    await this.validarDuplicados(cedula, correoInstitucional);
+    await this.validarDuplicados(dto.carreraId, cedula, correoInstitucional);
     const estudiante = this.estudianteRepository.create({
       cedula,
       nombres,
@@ -199,8 +209,8 @@ export class EstudiantesService {
     const nombres = this.normalizarRequerido(dto.nombres, 'Los nombres');
     const apellido1 = this.normalizarRequerido(dto.apellido1, 'El primer apellido');
     const correoInstitucional = dto.correoInstitucional.trim().toLowerCase();
-    await this.validarDuplicados(cedula, correoInstitucional);
     const repo = manager.getRepository(Estudiante);
+    await this.validarDuplicados(dto.carreraId, cedula, correoInstitucional, undefined, repo);
     try {
       const guardado = await repo.save(repo.create({
         cedula, nombres, apellido1, apellido2: dto.apellido2?.trim() || null,
@@ -225,6 +235,8 @@ export class EstudiantesService {
       if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
       await this.validarAlcance(usuarioId, estudiante.carreraId);
       await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+      this.validarExpedienteEditable(estudiante);
+
       await this.aplicarActualizacion(estudiante, dto, repo);
     });
     return this.obtenerPorId(usuarioId, id);
@@ -251,6 +263,7 @@ export class EstudiantesService {
     }
     await this.validarAlcance(coordinadorId, carreraId);
     await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    this.validarExpedienteEditable(estudiante);
     await this.aplicarActualizacion(estudiante, dto, repo);
     return id;
   }
@@ -264,11 +277,11 @@ export class EstudiantesService {
         : this.normalizarRequerido(dto.cedula, 'La cédula');
     const correo = dto.correoInstitucional?.trim().toLowerCase();
     if (cedula && cedula !== estudiante.cedula) {
-      await this.validarDuplicados(cedula, undefined, id, repo);
+      await this.validarDuplicados(estudiante.carreraId, cedula, undefined, id, repo);
       estudiante.cedula = cedula;
     }
     if (correo && correo !== estudiante.correoInstitucional) {
-      await this.validarDuplicados(undefined, correo, id, repo);
+      await this.validarDuplicados(estudiante.carreraId, estudiante.cedula, correo, id, repo);
       estudiante.correoInstitucional = correo;
     }
     if (dto.nombres !== undefined)
@@ -296,6 +309,7 @@ export class EstudiantesService {
       if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
       await this.validarAlcance(usuarioId, estudiante.carreraId);
       await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+      this.validarExpedienteEditable(estudiante);
       estudiante.estado = estado;
       await repo.save(estudiante);
     });
@@ -312,6 +326,7 @@ export class EstudiantesService {
     }
     await this.validarAlcance(coordinadorId, carreraId);
     await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    this.validarExpedienteEditable(estudiante);
     estudiante.estado = estado;
     await repo.save(estudiante);
     return id;
@@ -337,6 +352,8 @@ export class EstudiantesService {
     dto: RegistrarResultadoAcademicoDto,
   ) {
     const estudiante = await this.obtenerPorId(usuarioId, estudianteId);
+    this.validarExpedienteEditable(estudiante);
+
     await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
     const asignatura = await this.planAsignaturaRepository.findOne({
       where: { id: dto.planAsignaturaId },
@@ -395,6 +412,7 @@ export class EstudiantesService {
     }
     await this.validarAlcance(coordinadorId, carreraId);
     await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    this.validarExpedienteEditable(estudiante);
 
     const planAsignaturaRepo = manager.getRepository(PlanAsignatura);
     const asignatura = await planAsignaturaRepo.findOne({
@@ -459,6 +477,7 @@ export class EstudiantesService {
   ) {
     const estudiante = await this.obtenerPorId(usuarioId, estudianteId);
     await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+    this.validarExpedienteEditable(estudiante);
     if (estudiante.planEstudioId === dto.planNuevoId)
       throw new ConflictException('El estudiante ya pertenece a ese plan.');
     const planNuevo = await this.planRepository.findOne({
@@ -523,6 +542,7 @@ export class EstudiantesService {
     }
     await this.validarAlcance(coordinadorId, carreraId);
     await this.validarEscrituraJerarquica(coordinadorId, carreraId);
+    this.validarExpedienteEditable(estudiante);
     if (estudiante.planEstudioId === dto.planNuevoId) {
       throw new ConflictException('El estudiante ya pertenece a ese plan.');
     }
@@ -891,29 +911,34 @@ export class EstudiantesService {
   }
 
   private async validarDuplicados(
+    carreraId: number,
     cedula?: string,
     correoInstitucional?: string,
     excluirId?: number,
     repo: Repository<Estudiante> = this.estudianteRepository,
   ) {
     const id = excluirId ? Not(excluirId) : undefined;
-    if (
-      cedula &&
-      (await repo.findOne({
-        where: { cedula, ...(id && { id }) },
-      }))
-    ) {
-      throw new ConflictException('Ya existe un estudiante con esa cédula.');
+    if (cedula) {
+      const existeEnCarrera = await repo.findOne({
+        where: { carreraId, cedula, ...(id && { id }) },
+      });
+      if (existeEnCarrera) {
+        throw new ConflictException('El estudiante con esta cédula ya está registrado en esta carrera.');
+      }
     }
-    if (
-      correoInstitucional &&
-      (await repo.findOne({
-        where: { correoInstitucional, ...(id && { id }) },
-      }))
-    ) {
-      throw new ConflictException(
-        'Ya existe un estudiante con ese correo institucional.',
-      );
+    if (correoInstitucional) {
+      const existeConOtroCedula = await repo.findOne({
+        where: {
+          correoInstitucional,
+          ...(cedula ? { cedula: Not(cedula) } : {}),
+          ...(id && { id }),
+        },
+      });
+      if (existeConOtroCedula) {
+        throw new ConflictException(
+          'Ya existe otro estudiante con ese correo institucional.',
+        );
+      }
     }
   }
 
@@ -930,4 +955,110 @@ export class EstudiantesService {
     }
     throw error;
   }
+
+  async reingresar(usuarioId: number, id: number) {
+    const estudiante = await this.obtenerPorId(usuarioId, id);
+    await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+    if (estudiante.estado === EstadoEstudiante.ACTIVO) {
+      throw new ConflictException('El estudiante ya se encuentra activo.');
+    }
+    if (estudiante.estado === EstadoEstudiante.GRADUADO) {
+      throw new ConflictException('Un estudiante graduado no puede reingresar bajo el mismo expediente.');
+    }
+    const plan = await this.planRepository.findOne({ where: { id: estudiante.planEstudioId } });
+    const planInactivo = !plan || !plan.activo;
+
+    estudiante.estado = EstadoEstudiante.ACTIVO;
+    await this.estudianteRepository.save(estudiante);
+
+    return {
+      estudiante: await this.obtenerPorId(usuarioId, id),
+      advertencia: planInactivo
+        ? 'El plan de estudio original del estudiante se encuentra inactivo. Se recomienda registrar un cambio de plan.'
+        : null,
+      requiereCambioPlan: planInactivo,
+    };
+  }
+
+  async graduarEstudiante(usuarioId: number, id: number, observacion?: string) {
+    const estudiante = await this.obtenerPorId(usuarioId, id);
+    await this.validarEscrituraJerarquica(usuarioId, estudiante.carreraId);
+    if (estudiante.estado === EstadoEstudiante.GRADUADO) {
+      throw new ConflictException('El estudiante ya se encuentra graduado.');
+    }
+    const asignaturas = await this.planAsignaturaRepository.find({
+      where: { planEstudioId: estudiante.planEstudioId, activo: true },
+      relations: { curso: true },
+    });
+    const historial = await this.historialAcademicoRepository.find({
+      where: { estudianteId: id, resultado: ResultadoAcademico.APROBADO },
+      relations: { planAsignatura: true },
+    });
+    const aprobadasIds = new Set(historial.map((h) => h.planAsignaturaId));
+    const cursosAprobadosIds = new Set(
+      historial.filter((h) => h.planAsignatura?.cursoId != null).map((h) => h.planAsignatura.cursoId!),
+    );
+    const faltantes = asignaturas.filter(
+      (a) => !aprobadasIds.has(a.id) && (!a.cursoId || !cursosAprobadosIds.has(a.cursoId)),
+    );
+    if (faltantes.length > 0) {
+      throw new BadRequestException(
+        `El estudiante no cumple los requisitos de graduación: le faltan ${faltantes.length} asignaturas por aprobar.`,
+      );
+    }
+
+    // Verificación de créditos totales requeridos por el plan
+    const creditosTotalesPlan = asignaturas.reduce(
+      (sum, a) => sum + (Number(a.creditos) || 0),
+      0,
+    );
+    const creditosAprobados = historial.reduce(
+      (sum, h) => sum + (Number(h.planAsignatura?.creditos) || 0),
+      0,
+    );
+    if (creditosTotalesPlan > 0 && creditosAprobados < creditosTotalesPlan) {
+      throw new BadRequestException(
+        `El estudiante no cumple los requisitos de graduación: créditos aprobados insuficientes (${creditosAprobados} de ${creditosTotalesPlan} requeridos).`,
+      );
+    }
+
+    // Verificación de cumplimiento de regla de optativas si el plan la tiene configurada
+    const reglaRepo = this.dataSource.getRepository(ReglaOptativaPlan);
+    const reglaOptativas = await reglaRepo.findOne({
+      where: { planEstudioId: estudiante.planEstudioId },
+    });
+    if (reglaOptativas) {
+      const optativasAprobadas = historial.filter(
+        (h) => h.planAsignatura?.tipo === TipoPlanAsignatura.OPTATIVA,
+      );
+      const cantDisciplinarias = optativasAprobadas.filter(
+        (h) => h.planAsignatura?.tipoOptativa === TipoOptativa.DISCIPLINARIA,
+      ).length;
+      const cantAbiertas = optativasAprobadas.filter(
+        (h) => h.planAsignatura?.tipoOptativa === TipoOptativa.ABIERTA,
+      ).length;
+      const cantSede = optativasAprobadas.filter(
+        (h) => h.planAsignatura?.tipoOptativa === TipoOptativa.SEDE,
+      ).length;
+
+      if (
+        cantDisciplinarias < (reglaOptativas.cantidadDisciplinarias || 0) ||
+        cantAbiertas < (reglaOptativas.cantidadAbiertas || 0) ||
+        cantSede < (reglaOptativas.cantidadSede || 0)
+      ) {
+        throw new BadRequestException(
+          'El estudiante no cumple los requisitos de graduación: no cumple con la distribución de optativas requeridas por el plan.',
+        );
+      }
+    }
+
+    estudiante.estado = EstadoEstudiante.GRADUADO;
+    estudiante.fechaGraduacion = new Date();
+    estudiante.graduadoPorUsuarioId = usuarioId;
+    estudiante.observacionGraduacion = observacion?.trim() || null;
+    await this.estudianteRepository.save(estudiante);
+
+    return this.obtenerPorId(usuarioId, id);
+  }
+
 }

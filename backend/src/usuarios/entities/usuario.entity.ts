@@ -57,6 +57,9 @@ export class Usuario {
   })
   passwordHash!: string;
 
+  @Column({ name: 'version_autenticacion', type: 'int', unsigned: true, default: 0 })
+  versionAutenticacion!: number;
+
   @Column({
     name: 'password_reset_token_hash',
     type: 'varchar',

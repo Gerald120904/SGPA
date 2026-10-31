@@ -28,7 +28,11 @@ async function bootstrap() {
     );
     await synchronizeDevelopmentSchemaSafely(app.get(DataSource), app.get(ConfigService));
     await guard?.releasePort();
-    await app.listen(process.env.PORT ?? 3000);
+    const port = process.env.PORT ?? 3000;
+    await app.listen(port);
+    const config = app.get(ConfigService);
+    const dbName = config.get<string>('DB_DATABASE');
+    console.log(`[SGPA] Servidor backend escuchando en http://127.0.0.1:${port} (Base de datos: ${dbName})`);
   } catch (error) {
     if (app) await app.close();
     throw error;

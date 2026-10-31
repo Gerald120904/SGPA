@@ -80,6 +80,7 @@ import {
 
 import {
   guardarSesion,
+  cambiarRolActivo,
   obtenerUsuario,
   obtenerRolesUsuario,
   obtenerPermisosUsuario,
@@ -295,6 +296,27 @@ function mostrarAplicacion() {
 
 
   renderizarIconos();
+
+  const selectorEspacio = document.getElementById('selectEspacioActivo');
+  if (selectorEspacio) {
+    selectorEspacio.addEventListener('change', async (event) => {
+      const nuevoRol = event.target.value;
+      selectorEspacio.disabled = true;
+      try {
+        const ok = await cambiarRolActivo(nuevoRol);
+        if (ok) {
+          reemplazarRuta('/home');
+          mostrarAplicacion();
+        } else {
+          alert('No fue posible cambiar al espacio seleccionado.');
+          mostrarAplicacion();
+        }
+      } catch (err) {
+        alert(err.message || 'Error al cambiar de espacio.');
+        mostrarAplicacion();
+      }
+    });
+  }
 
 
   desmontarRouter();

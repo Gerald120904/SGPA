@@ -347,7 +347,7 @@ export class EstudiantesImportacionService {
               { correoInstitucional: In(correos) },
             ],
           })
-        : [],
+        : [] as Estudiante[],
       this.planAsignaturaRepository.find({
         where: { planEstudioId: dto.planEstudioId, activo: true },
         relations: { curso: true },
@@ -376,7 +376,7 @@ export class EstudiantesImportacionService {
 
     return normalizadas.map((fila): FilaValidada => {
       const errores: string[] = [];
-      const existente = porCedula.get(fila.cedula);
+      const existente = estudiantes.find((item) => item.cedula === fila.cedula && item.carreraId === dto.carreraId);
       const existentePorCorreo = porCorreo.get(fila.datos.correoInstitucional);
       const periodo = periodosPorCodigo.get(fila.periodoIngresoCodigo);
       if ((conteoCedulas.get(fila.cedula) ?? 0) > 1)
@@ -390,11 +390,10 @@ export class EstudiantesImportacionService {
         errores.push('El correo institucional pertenece a otra cédula.');
       if (
         existente &&
-        (existente.carreraId !== dto.carreraId ||
-          existente.planEstudioId !== dto.planEstudioId)
+        existente.planEstudioId !== dto.planEstudioId
       ) {
         errores.push(
-          'El estudiante ya pertenece a otra carrera o plan; requiere revisión manual.',
+          'El estudiante ya pertenece a otro plan dentro de esta carrera; requiere revisión manual.',
         );
       }
       if (existente && periodo && existente.periodoIngresoId !== periodo.id)

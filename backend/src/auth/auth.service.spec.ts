@@ -16,6 +16,7 @@ describe('AuthService', () => {
     buscarPorCorreo: jest.fn(),
     buscarPorId: jest.fn(),
     actualizarUltimoAcceso: jest.fn(),
+    rotarVersionAutenticacion: jest.fn(),
     guardarRecuperacionPassword: jest.fn(),
     actualizarPassword: jest.fn(),
     limpiarRecuperacionPassword: jest.fn(),
@@ -49,6 +50,7 @@ describe('AuthService', () => {
     permisosService.obtenerPermisosEfectivos.mockResolvedValue([
       PermisoSistema.PERIODOS_VER,
     ]);
+    usuariosService.rotarVersionAutenticacion.mockResolvedValue(1);
   });
 
   it('should return access token and user roles for a valid login', async () => {
@@ -63,6 +65,7 @@ describe('AuthService', () => {
       apellido2: null,
       correo: 'admin@una.ac.cr',
       passwordHash: hashedPassword,
+      versionAutenticacion: 0,
       activo: true,
       usuarioRoles: [{ rol: { nombre: 'ADMIN_GLOBAL', activo: true } }],
     });
@@ -78,6 +81,8 @@ describe('AuthService', () => {
       sub: 1,
       correo: 'admin@una.ac.cr',
       roles: ['ADMIN_GLOBAL'],
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,
     });
     expect(usuariosService.actualizarUltimoAcceso).toHaveBeenCalledWith(1);
     expect(result).toEqual({
@@ -90,6 +95,7 @@ describe('AuthService', () => {
         apellido2: null,
         correo: 'admin@una.ac.cr',
         roles: ['ADMIN_GLOBAL'],
+        rolActivo: 'ADMIN_GLOBAL',
         permisos: [PermisoSistema.PERIODOS_VER],
       },
     });
@@ -107,6 +113,7 @@ describe('AuthService', () => {
       apellido2: null,
       correo: 'usuario@una.ac.cr',
       passwordHash: hashedPassword,
+      versionAutenticacion: 0,
       activo: true,
       usuarioRoles: [
         {
@@ -141,6 +148,7 @@ describe('AuthService', () => {
       apellido2: null,
       correo: 'multi@una.ac.cr',
       passwordHash: hashedPassword,
+      versionAutenticacion: 0,
       activo: true,
       usuarioRoles: [
         { rol: { nombre: 'PROFESOR', activo: true } },
@@ -161,6 +169,8 @@ describe('AuthService', () => {
       sub: 3,
       correo: 'multi@una.ac.cr',
       roles: ['PROFESOR', 'COORDINADOR'],
+      rolActivo: 'PROFESOR',
+      av: 1,
     });
   });
 

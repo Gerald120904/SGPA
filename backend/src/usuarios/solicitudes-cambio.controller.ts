@@ -33,6 +33,10 @@ import { CrearOptativaDto } from '../optativas/dto/crear-optativa.dto';
 import { ActualizarOptativaDto } from '../optativas/dto/actualizar-optativa.dto';
 import { CambiarEstadoOptativaDto } from '../optativas/dto/cambiar-estado-optativa.dto';
 import { RechazarSolicitudDto } from './dto/rechazar-solicitud.dto';
+import { DevolverSolicitudDto } from './dto/devolver-solicitud.dto';
+import { EditarSolicitudDto } from './dto/editar-solicitud.dto';
+import { CancelarSolicitudDto } from './dto/cancelar-solicitud.dto';
+import { ReasignarSolicitudDto } from './dto/reasignar-solicitud.dto';
 import { SolicitudesCambioService } from './solicitudes-cambio.service';
 
 @Controller('solicitudes-cambio')
@@ -289,4 +293,45 @@ export class SolicitudesCambioController {
   rechazar(@Req() request: Request, @Param('id', ParseIntPipe) id: number, @Body() dto: RechazarSolicitudDto) {
     return this.solicitudes.rechazar(request.user!.sub, id, dto.motivo);
   }
+
+  @Post(':id/devolver')
+  @Roles(RolSistema.COORDINADOR)
+  devolver(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: DevolverSolicitudDto,
+  ) {
+    return this.solicitudes.devolverParaCorreccion(request.user!.sub, id, dto.observaciones);
+  }
+
+  @Put(':id/editar')
+  @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
+  editar(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: EditarSolicitudDto,
+  ) {
+    return this.solicitudes.editarSolicitud(request.user!.sub, id, dto.datosActualizados);
+  }
+
+  @Post(':id/cancelar')
+  @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
+  cancelar(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CancelarSolicitudDto,
+  ) {
+    return this.solicitudes.cancelar(request.user!.sub, id, dto.motivo);
+  }
+
+  @Post(':id/reasignar')
+  @Roles(RolSistema.ADMIN_GLOBAL)
+  reasignar(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReasignarSolicitudDto,
+  ) {
+    return this.solicitudes.reasignar(request.user!.sub, id, dto.nuevoCoordinadorId);
+  }
+
 }

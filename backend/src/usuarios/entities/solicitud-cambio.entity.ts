@@ -2,7 +2,16 @@ import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, Primary
 import { Carrera } from '../../carreras/entities/carrera.entity';
 import { Usuario } from './usuario.entity';
 
-export type EstadoSolicitudCambio = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | 'CANCELADA' | 'INVALIDADA';
+export type EstadoSolicitudCambio =
+  | 'PENDIENTE'
+  | 'DEVUELTA_PARA_CORRECCION'
+  | 'CORREGIDA'
+  | 'APROBADA'
+  | 'RECHAZADA'
+  | 'CANCELADA'
+  | 'BLOQUEADA_POR_REVOCACION'
+  | 'REASIGNADA'
+  | 'INVALIDADA';
 
 @Entity({ name: 'solicitudes_cambio' })
 @Index('IDX_solicitud_responsable_estado', ['coordinadorId', 'estado'])
@@ -47,7 +56,7 @@ export class SolicitudCambio {
   @Column({ name: 'huella_original', type: 'char', length: 64, nullable: true })
   huellaOriginal!: string | null;
 
-  @Column({ type: 'varchar', length: 16 })
+  @Column({ type: 'varchar', length: 32 })
   estado!: EstadoSolicitudCambio;
 
   @Column({ name: 'resuelto_en', type: 'datetime', nullable: true })
@@ -62,6 +71,15 @@ export class SolicitudCambio {
 
   @Column({ name: 'motivo_rechazo', type: 'varchar', length: 500, nullable: true })
   motivoRechazo!: string | null;
+
+  @Column({ name: 'observaciones_devolucion', type: 'varchar', length: 500, nullable: true })
+  observacionesDevolucion!: string | null;
+
+  @Column({ name: 'motivo_cancelacion', type: 'varchar', length: 500, nullable: true })
+  motivoCancelacion!: string | null;
+
+  @Column({ name: 'historial_versiones', type: 'json', nullable: true })
+  historialVersiones!: Array<Record<string, unknown>> | null;
 
   @Column({ name: 'correlacion_id', type: 'char', length: 36, unique: true })
   correlacionId!: string;

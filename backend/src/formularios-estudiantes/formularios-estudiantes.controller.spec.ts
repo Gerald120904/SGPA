@@ -3,6 +3,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PERMISOS_KEY } from '../permisos/decorators/permisos.decorator';
+import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { CrearFormularioEstudianteDto } from './dto/crear-formulario-estudiante.dto';
 import { RechazarRespuestaFormularioDto } from './dto/rechazar-respuesta-formulario.dto';
 import { FormulariosEstudiantesController } from './formularios-estudiantes.controller';
@@ -171,6 +172,7 @@ describe('FormulariosEstudiantesController', () => {
         descripcion: 'Descripción del formulario para estudiantes',
         carreraId: 1,
         planEstudioId: 2,
+        proveedor: ProveedorFormulario.INTERNO,
       };
 
       const resultadoEsperado = { id: 99, titulo: 'Formulario 2026' };

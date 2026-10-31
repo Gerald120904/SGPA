@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { RolSistema } from '../auth/constants/roles.constants';
+import { rolActivoDePeticion } from '../auth/active-role-context';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { TipoAsignacionAcademica } from '../estructura-academica/constants/tipo-asignacion-academica.constant';
 import { AsignacionAcademica } from '../estructura-academica/entities/asignacion-academica.entity';
@@ -26,9 +27,17 @@ export class AlcanceJerarquicoService {
       relations: { usuarioRoles: { rol: true } },
     });
     if (!usuario) return null;
-    return { roles: new Set((usuario.usuarioRoles ?? [])
+    const roles = new Set((usuario.usuarioRoles ?? [])
       .filter((rel) => rel.rol?.activo)
-      .map((rel) => rel.rol.nombre)) };
+      .map((rel) => rel.rol.nombre));
+    const activo = rolActivoDePeticion(id);
+    if (activo) {
+      return { roles: roles.has(activo) ? new Set([activo]) : new Set<string>() };
+    }
+    // Fuera de una petición autenticada, una cuenta multirrol no recibe
+    // el alcance global por el mero hecho de conservar ADMIN_GLOBAL.
+    if (roles.size > 1) roles.delete(RolSistema.ADMIN_GLOBAL);
+    return { roles };
   }
 
   async tipoCuentaJerarquica(id: number): Promise<'COORDINADOR' | 'ASISTENTE_ESTUDIANTIL' | null> {

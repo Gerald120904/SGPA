@@ -1,5 +1,9 @@
+import { maxLength } from 'class-validator';
+import { MailService } from '../mail/mail.service';
 import {
+  BadRequestException,
   ConflictException,
+  Logger,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -30,6 +34,7 @@ export interface ResultadoAprobacionRespuesta {
 
 @Injectable()
 export class FormulariosEstudiantesProcesamientoService {
+  private readonly logger = new Logger(FormulariosEstudiantesProcesamientoService.name);
   constructor(
     @InjectRepository(FormularioEstudiante)
     private readonly formularioRepo: Repository<FormularioEstudiante>,
@@ -48,6 +53,8 @@ export class FormulariosEstudiantesProcesamientoService {
     private readonly dataSource: DataSource,
     @Optional()
     private readonly motorRequisitosService?: MotorRequisitosService,
+    @Optional()
+    private readonly mailService?: MailService,
   ) {}
 
   async listarSolicitudes(
@@ -67,7 +74,7 @@ export class FormulariosEstudiantesProcesamientoService {
       return [];
     }
 
-    return await this.respuestaRepo.find({
+    const solicitudes = await this.respuestaRepo.find({
       where: {
         estado: In([
           EstadoRespuestaFormulario.PENDIENTE,
@@ -83,11 +90,20 @@ export class FormulariosEstudiantesProcesamientoService {
           carrera: true,
           planEstudio: true,
         },
+        revisadoPor: true,
       },
       order: {
         createdAt: 'DESC',
       },
     });
+
+    for (const sol of solicitudes) {
+      if (sol.formulario?.mapaPreguntas) {
+        this.enriquecerNombresRespuesta(sol, sol.formulario);
+      }
+    }
+
+    return solicitudes;
   }
 
   async contarSolicitudesPorPlan(
@@ -138,7 +154,9 @@ export class FormulariosEstudiantesProcesamientoService {
         id: respuestaId,
       },
       relations: {
-        formulario: true,
+        formulario: {
+          carrera: true,
+        },
       },
     });
 
@@ -449,7 +467,7 @@ export class FormulariosEstudiantesProcesamientoService {
   async rechazarRespuesta(
     respuestaId: number,
     usuarioId: number,
-    motivo?: string,
+    motivo: string,
   ): Promise<RespuestaFormularioEstudiante> {
     const respuesta = await this.respuestaRepo.findOne({
       where: {
@@ -485,6 +503,19 @@ export class FormulariosEstudiantesProcesamientoService {
       );
     }
 
+    const motivoLimpio = typeof motivo === 'string' ? motivo.trim() : '';
+    if (!motivoLimpio) {
+      throw new BadRequestException(
+        'El motivo de rechazo es obligatorio y no puede consistir únicamente en espacios en blanco.',
+      );
+    }
+
+    if (!maxLength(motivoLimpio, 500)) {
+      throw new BadRequestException(
+        'El motivo de rechazo no puede superar los 500 caracteres.',
+      );
+    }
+
     if (typeof this.respuestaRepo.update === 'function') {
       const updateResult = await this.respuestaRepo.update(
         {
@@ -498,7 +529,7 @@ export class FormulariosEstudiantesProcesamientoService {
           estado: EstadoRespuestaFormulario.RECHAZADO,
           revisadoPorUsuarioId: usuarioId,
           revisadoAt: new Date(),
-          motivoRechazo: motivo?.trim() || null,
+          motivoRechazo: motivoLimpio,
           procesadoAt: null,
         },
       );
@@ -511,18 +542,92 @@ export class FormulariosEstudiantesProcesamientoService {
       respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
       respuesta.revisadoPorUsuarioId = usuarioId;
       respuesta.revisadoAt = new Date();
-      respuesta.motivoRechazo = motivo?.trim() || null;
+      respuesta.motivoRechazo = motivoLimpio;
       respuesta.procesadoAt = null;
     } else {
       // Fallback para entornos de prueba sin dataSource
       respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
       respuesta.revisadoPorUsuarioId = usuarioId;
       respuesta.revisadoAt = new Date();
-      respuesta.motivoRechazo = motivo?.trim() || null;
+      respuesta.motivoRechazo = motivoLimpio;
       respuesta.procesadoAt = null;
       await this.respuestaRepo.save(respuesta);
     }
 
+    // Notificación por correo al estudiante (Corrección 3)
+    const correoEstudiante = respuesta.datosNormalizadosJson?.correoEstudiantil;
+    if (correoEstudiante && this.mailService) {
+      const nombreEstudiante = [
+        respuesta.datosNormalizadosJson?.primerNombre,
+        respuesta.datosNormalizadosJson?.primerApellido,
+      ].filter(Boolean).join(' ') || 'Estudiante';
+
+      try {
+        await this.mailService.enviarNotificacionRechazoSolicitud(
+          correoEstudiante,
+          nombreEstudiante,
+          {
+            solicitudId: respuesta.id,
+            tituloFormulario: respuesta.formulario?.titulo || 'Formulario estudiantil',
+            carreraNombre: respuesta.formulario?.carrera?.nombre,
+            motivoRechazo: motivoLimpio,
+          },
+        );
+      } catch (mailError) {
+        this.logger.error(
+          `No fue posible enviar correo de rechazo a ${correoEstudiante} para respuesta #${respuesta.id}: ${mailError?.message}`,
+        );
+      }
+    }
+
     return respuesta;
+  }
+
+  private enriquecerNombresRespuesta(
+    respuesta: RespuestaFormularioEstudiante,
+    formulario: FormularioEstudiante,
+  ): void {
+    const mapa = formulario.mapaPreguntas;
+    const asignaturas = respuesta.datosNormalizadosJson?.asignaturasAprobadas;
+    if (!Array.isArray(asignaturas) || asignaturas.length === 0) return;
+
+    const nombresPorCodigo = new Map<string, string>();
+    const nombresPorPlanAsigId = new Map<number, string>();
+
+    if (esInstantaneaCurricularInterna(mapa)) {
+      for (const asig of mapa.asignaturas) {
+        if (asig.nombre) {
+          nombresPorCodigo.set(asig.codigo, asig.nombre);
+          nombresPorPlanAsigId.set(asig.id, asig.nombre);
+        }
+      }
+    } else if (mapa && typeof mapa === 'object' && 'asignaturasAprobadas' in mapa) {
+      const mapaAny = mapa as any;
+      if (Array.isArray(mapaAny.asignaturasAprobadas?.grupos)) {
+        for (const grupo of mapaAny.asignaturasAprobadas.grupos) {
+          if (grupo.opciones) {
+            for (const [etiqueta, opt] of Object.entries(grupo.opciones as Record<string, any>)) {
+              let nombre = opt.nombre;
+              if (!nombre && etiqueta.includes(' - ')) {
+                nombre = etiqueta.split(' - ').slice(1).join(' - ').trim();
+              }
+              if (nombre) {
+                if (opt.codigo) nombresPorCodigo.set(opt.codigo, nombre);
+                if (opt.planAsignaturaId) nombresPorPlanAsigId.set(opt.planAsignaturaId, nombre);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const asig of asignaturas) {
+      if (asig && typeof asig === 'object' && !asig.nombre) {
+        asig.nombre =
+          nombresPorPlanAsigId.get(asig.planAsignaturaId) ||
+          nombresPorCodigo.get(asig.codigo) ||
+          undefined;
+      }
+    }
   }
 }

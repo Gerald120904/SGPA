@@ -1,11 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 import { ActualizarCarreraDto } from './dto/actualizar-carrera.dto';
 import { CrearCarreraDto } from './dto/crear-carrera.dto';
 import { Carrera } from './entities/carrera.entity';
@@ -15,6 +17,7 @@ export class CarrerasService {
   constructor(
     @InjectRepository(Carrera)
     private readonly carreraRepository: Repository<Carrera>,
+    private readonly alcanceJerarquico: AlcanceJerarquicoService,
   ) {}
 
   private async obtenerEntidadPorId(id: number): Promise<Carrera> {
@@ -76,7 +79,22 @@ export class CarrerasService {
     throw error;
   }
 
-  async listar(): Promise<Carrera[]> {
+  async listar(usuarioId: number): Promise<Carrera[]> {
+    if (!Number.isSafeInteger(usuarioId) || usuarioId <= 0 || !this.alcanceJerarquico) {
+      throw new ForbiddenException('No se pudo verificar el alcance de carreras.');
+    }
+    const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
+    if (tipo) {
+      const autorizadas = await this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuarioId);
+      if (!autorizadas.length) {
+        return [];
+      }
+      return this.carreraRepository.find({
+        where: { id: In(autorizadas) },
+        order: { nombre: 'ASC' },
+      });
+    }
+
     return this.carreraRepository.find({
       order: {
         nombre: 'ASC',

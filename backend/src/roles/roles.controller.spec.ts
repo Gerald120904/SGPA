@@ -41,6 +41,7 @@ describe('RolesController', () => {
               return {
                 id: where?.id ?? 1,
                 activo: true,
+                versionAutenticacion: 1,
                 usuarioRoles: [
                   {
                     usuarioId: where?.id ?? 1,
@@ -82,7 +83,9 @@ describe('RolesController', () => {
       sub: 2,
       correo: 'coordinador@sgpa.local',
       roles: ['COORDINADOR'],
-    });
+
+      rolActivo: 'COORDINADOR',
+      av: 1,});
 
     await request(app.getHttpServer())
       .get('/roles')
@@ -102,7 +105,9 @@ describe('RolesController', () => {
       sub: 1,
       correo: 'admin@sgpa.local',
       roles: ['ADMIN_GLOBAL'],
-    });
+
+      rolActivo: 'ADMIN_GLOBAL',
+      av: 1,});
 
     await request(app.getHttpServer())
       .get('/roles')

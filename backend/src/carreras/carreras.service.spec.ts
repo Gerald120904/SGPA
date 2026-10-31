@@ -1,14 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 import { CarrerasService } from './carreras.service';
 import { Carrera } from './entities/carrera.entity';
 
 describe('CarrerasService', () => {
   let service: CarrerasService;
+  let alcance: { tipoCuentaJerarquica: jest.Mock; obtenerCarrerasAutorizadas: jest.Mock };
 
   let carreraRepository: {
     find: jest.Mock;
@@ -38,8 +43,13 @@ describe('CarrerasService', () => {
       update: jest.fn(),
     };
 
+    alcance = {
+      tipoCuentaJerarquica: jest.fn().mockResolvedValue(null),
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([]),
+    };
     service = new CarrerasService(
       carreraRepository as unknown as Repository<Carrera>,
+      alcance as unknown as AlcanceJerarquicoService,
     );
 
     jest.clearAllMocks();
@@ -57,7 +67,7 @@ describe('CarrerasService', () => {
 
     carreraRepository.find.mockResolvedValue(carreras);
 
-    const resultado = await service.listar();
+    const resultado = await service.listar(1);
 
     expect(carreraRepository.find).toHaveBeenCalledWith({
       order: {
@@ -211,5 +221,55 @@ describe('CarrerasService', () => {
     });
 
     expect(resultado.activo).toBe(false);
+  });
+
+  it('filtra carreras autorizadas para un usuario jerárquico', async () => {
+    const mockAlcance = {
+      tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR'),
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([1]),
+    };
+    const serviceJerarquico = new CarrerasService(
+      carreraRepository as unknown as Repository<Carrera>,
+      mockAlcance as any,
+    );
+    const carreras = [crearCarrera({ id: 1 })];
+    carreraRepository.find.mockResolvedValue(carreras);
+
+    const resultado = await serviceJerarquico.listar(10);
+    expect(mockAlcance.obtenerCarrerasAutorizadas).toHaveBeenCalledWith(10);
+    expect(resultado).toEqual(carreras);
+  });
+
+  it('retorna arreglo vacío si el usuario jerárquico no tiene carreras autorizadas', async () => {
+    const mockAlcance = {
+      tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR'),
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([]),
+    };
+    const serviceJerarquico = new CarrerasService(
+      carreraRepository as unknown as Repository<Carrera>,
+      mockAlcance as any,
+    );
+
+    const resultado = await serviceJerarquico.listar(10);
+    expect(resultado).toEqual([]);
+    expect(carreraRepository.find).not.toHaveBeenCalled();
+  });
+  it('deniega la lista si falta el proveedor de alcance o el usuario autenticado', async () => {
+    const sinProveedor = new CarrerasService(
+      carreraRepository as unknown as Repository<Carrera>,
+      undefined as unknown as AlcanceJerarquicoService,
+    );
+    await expect(sinProveedor.listar(10)).rejects.toThrow(ForbiddenException);
+    await expect(service.listar(0)).rejects.toThrow(ForbiddenException);
+    expect(carreraRepository.find).not.toHaveBeenCalled();
+  });
+
+  it('NestJS exige resolver el proveedor de alcance al crear CarrerasService', async () => {
+    await expect(Test.createTestingModule({
+      providers: [
+        CarrerasService,
+        { provide: getRepositoryToken(Carrera), useValue: carreraRepository },
+      ],
+    }).compile()).rejects.toThrow();
   });
 });

@@ -90,7 +90,7 @@ describe('SolicitudesCambioService', () => {
     const auditoriaRepo = { save: jest.fn(async (dato) => dato) };
     const dependenciasRepo = { findOne: jest.fn(async () => ({ coordinadorId: 1, asistenteId: 3, activo: true })) };
     const manager = { getRepository: (entidad: unknown) => entidad === SolicitudCambio ? solicitudRepo :
-      entidad === Usuario ? { findOne: jest.fn().mockResolvedValue({ id: 1 }) } : auditoriaRepo };
+      entidad === Usuario ? { findOne: jest.fn().mockResolvedValue({ id: 1, usuarioRoles: [{ rol: { nombre: 'COORDINADOR' } }] }) } : auditoriaRepo };
     const dataSource = { transaction: jest.fn(async (fn) => fn(manager)) };
     alcance = {
       puedeEjecutar: jest.fn().mockResolvedValue(true),
@@ -566,4 +566,40 @@ describe('SolicitudesCambioService', () => {
       expect.anything(),
     );
   });
+
+  it('permite devolver una solicitud para corrección y luego editarla por el asistente', async () => {
+    const solicitud = await service.proponerCrearPlan(3, { codigo: 'P-TEST', nombre: 'Plan Test', grado: 'BACHILLERATO', carreraId: 10 } as any);
+    expect(solicitud.estado).toBe('PENDIENTE');
+
+    // Devolver para corrección
+    const devuelta = await service.devolverParaCorreccion(1, solicitud.id, 'Falta ajustar el grado académico');
+    expect(devuelta.estado).toBe('DEVUELTA_PARA_CORRECCION');
+    expect(devuelta.observacionesDevolucion).toBe('Falta ajustar el grado académico');
+
+    // Editar por el asistente
+    const editada = await service.editarSolicitud(3, solicitud.id, { grado: 'LICENCIATURA' });
+    expect(editada.estado).toBe('CORREGIDA');
+    expect(editada.datosPropuestos.grado).toBe('LICENCIATURA');
+    expect(editada.historialVersiones).toHaveLength(1);
+
+    // Ahora el coordinador puede aprobarla
+    await service.aprobar(1, editada.id);
+    expect(editada.estado).toBe('APROBADA');
+  });
+
+  it('permite cancelar una solicitud por el asistente y reasignar una solicitud bloqueada', async () => {
+    // 1. Cancelar
+    const sol1 = await service.proponerCrearPlan(3, { codigo: 'P-CANCEL', nombre: 'Plan Cancel', grado: 'BACHILLERATO', carreraId: 10 } as any);
+    const cancelada = await service.cancelar(3, sol1.id, 'Ya no es requerida');
+    expect(cancelada.estado).toBe('CANCELADA');
+    expect(cancelada.motivoCancelacion).toBe('Ya no es requerida');
+
+    // 2. Reasignar
+    const sol2 = await service.proponerCrearPlan(3, { codigo: 'P-REASIGN', nombre: 'Plan Reasign', grado: 'BACHILLERATO', carreraId: 10 } as any);
+    sol2.estado = 'BLOQUEADA_POR_REVOCACION';
+    const reasignada = await service.reasignar(999, sol2.id, 2);
+    expect(reasignada.coordinadorId).toBe(2);
+    expect(reasignada.estado).toBe('PENDIENTE');
+  });
+
 });

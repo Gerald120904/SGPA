@@ -11,13 +11,13 @@ describe('RolesGuard', () => {
 
   let guard: RolesGuard;
 
-  const crearContexto = (roles?: string[]) =>
+  const crearContexto = (roles?: string[], rolActivo?: RolSistema) =>
     ({
       getHandler: jest.fn(),
       getClass: jest.fn(),
       switchToHttp: () => ({
         getRequest: () => ({
-          user: roles ? { roles } : undefined,
+          user: roles ? { roles, rolActivo: rolActivo ?? roles[0] } : undefined,
         }),
       }),
     }) as unknown as ExecutionContext;
@@ -38,7 +38,7 @@ describe('RolesGuard', () => {
     const context = {
       getHandler: jest.fn(), getClass: jest.fn().mockReturnValue(class OtroController {}),
       switchToHttp: () => ({ getRequest: () => ({
-        user: { roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true },
+        user: { roles: [RolSistema.COORDINADOR], rolActivo: RolSistema.COORDINADOR, jerarquiaConfigurada: true },
       }) }),
     } as unknown as ExecutionContext;
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
@@ -57,7 +57,7 @@ describe('RolesGuard', () => {
 
     expect(
       guard.canActivate(
-        crearContexto([RolSistema.PROFESOR, RolSistema.COORDINADOR]),
+        crearContexto([RolSistema.PROFESOR, RolSistema.COORDINADOR], RolSistema.COORDINADOR),
       ),
     ).toBe(true);
   });

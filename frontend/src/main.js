@@ -5,8 +5,12 @@ import started from "electron-squirrel-startup";
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
+import { fetchBackendSeguro, verificarIdentidadBackend } from './electron/backend-identity.js';
 
 const API_URL = process.env.SGPA_API_URL || "http://127.0.0.1:3000";
+const EXPECTED_DATABASE = process.env.SGPA_EXPECTED_DATABASE || (app.isPackaged ? 'sgpa' : 'sgpa_isolated_audit');
+const consultarBackend = (route, options) => fetchBackendSeguro(
+  (url, requestOptions) => net.fetch(url, requestOptions), API_URL, EXPECTED_DATABASE, route, options);
 let accessToken = null;
 
 const HOSTS_OAUTH_GOOGLE_PERMITIDOS = new Set(["accounts.google.com"]);
@@ -67,7 +71,7 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
   }
 
   try {
-    const response = await net.fetch(`${API_URL}${ruta}`, {
+    const response = await consultarBackend(ruta, {
       method,
       headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -130,7 +134,7 @@ if (started) {
 
 ipcMain.handle("auth:login", async (_event, credenciales) => {
   try {
-    const response = await net.fetch(`${API_URL}/auth/login`, {
+    const response = await consultarBackend('/auth/login', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -167,9 +171,56 @@ ipcMain.handle("auth:login", async (_event, credenciales) => {
   }
 });
 
+ipcMain.handle("auth:cambiar-rol-activo", async (_event, nuevoRol) => {
+  try {
+    const resultado = await ejecutarPeticionAutenticada("/auth/cambiar-rol-activo", {
+      method: "POST",
+      body: { rol: nuevoRol },
+    });
+
+    if (!resultado.ok) {
+      return resultado;
+    }
+
+    if (resultado.data?.accessToken) {
+      accessToken = resultado.data.accessToken;
+    }
+
+    return {
+      ok: true,
+      usuario: resultado.data?.usuario,
+      accessToken: resultado.data?.accessToken,
+    };
+  } catch (error) {
+    console.error("Error al cambiar rol activo en backend:", error);
+    return {
+      ok: false,
+      status: 0,
+      message: "No se pudo cambiar el rol activo.",
+    };
+  }
+});
+
+ipcMain.handle("app:verificar-identidad", async () => {
+  try {
+    const data = await verificarIdentidadBackend(
+      (url, requestOptions) => net.fetch(url, requestOptions), API_URL, EXPECTED_DATABASE);
+    return {
+      ok: true,
+      identidad: data,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      message: `No se pudo verificar la identidad del backend en ${API_URL}: ${error.message}`,
+    };
+  }
+});
+
 ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
   try {
-    const response = await net.fetch(`${API_URL}/auth/recuperar-password`, {
+    const response = await consultarBackend('/auth/recuperar-password', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -210,7 +261,7 @@ ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
 
 ipcMain.handle("auth:restablecer-password", async (_event, datos) => {
   try {
-    const response = await net.fetch(`${API_URL}/auth/restablecer-password`, {
+    const response = await consultarBackend('/auth/restablecer-password', {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -258,7 +309,7 @@ ipcMain.handle("auth:perfil", async () => {
   }
 
   try {
-    const response = await net.fetch(`${API_URL}/auth/perfil`, {
+    const response = await consultarBackend('/auth/perfil', {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -434,6 +485,53 @@ ipcMain.handle('solicitudes:rechazar', async (_event, id, motivo) =>
   ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/rechazar`, {
     method: 'POST', body: { motivo },
   }));
+
+ipcMain.handle('solicitudes:devolver', async (_event, id, observaciones) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/devolver`, {
+    method: 'POST', body: { observaciones },
+  }));
+
+ipcMain.handle('solicitudes:cancelar', async (_event, id, motivo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/cancelar`, {
+    method: 'POST', body: { motivo },
+  }));
+
+ipcMain.handle('solicitudes:editar', async (_event, id, datosPropuestos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/editar`, {
+    method: 'PATCH', body: { datosPropuestos },
+  }));
+
+ipcMain.handle('solicitudes:reasignar', async (_event, id, nuevoCoordinadorId) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/${id}/reasignar`, {
+    method: 'PATCH', body: { nuevoCoordinadorId },
+  }));
+
+ipcMain.handle('notificaciones:listar', async (_event, soloNoLeidas) =>
+  ejecutarPeticionAutenticada(`/notificaciones${soloNoLeidas ? '?soloNoLeidas=true' : ''}`));
+
+ipcMain.handle('notificaciones:contar-no-leidas', async () =>
+  ejecutarPeticionAutenticada('/notificaciones/no-leidas/conteo'));
+
+ipcMain.handle('notificaciones:marcar-leida', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/notificaciones/${id}/leida`, { method: 'PATCH' }));
+
+ipcMain.handle('notificaciones:marcar-todas-leidas', async () =>
+  ejecutarPeticionAutenticada('/notificaciones/marcar-todas-leidas', { method: 'PATCH' }));
+
+ipcMain.handle('equivalencias:crear', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/planes-estudio/equivalencias', { method: 'POST', body: datos }));
+
+ipcMain.handle('equivalencias:listar-planes', async (_event, planOrigenId, planDestinoId) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/planes?planOrigenId=${planOrigenId}&planDestinoId=${planDestinoId}`));
+
+ipcMain.handle('equivalencias:sugerir', async (_event, estudianteId, nuevoPlanId) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/sugerencias/estudiante/${estudianteId}?nuevoPlanId=${nuevoPlanId}`));
+
+ipcMain.handle('equivalencias:aplicar', async (_event, estudianteId, datos) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/aplicar/estudiante/${estudianteId}`, { method: 'POST', body: datos }));
+
+ipcMain.handle('perfiles-academicos:copiar-cursos', async (_event, perfilId, perfilOrigenId) =>
+  ejecutarPeticionAutenticada(`/perfiles-academicos/${perfilId}/copiar-cursos/${perfilOrigenId}`, { method: 'POST' }));
 
 ipcMain.handle("roles:listar", async () => {
   return ejecutarPeticionAutenticada("/roles");
@@ -2552,6 +2650,17 @@ ipcMain.handle(
     );
   },
 );
+
+ipcMain.handle('estudiantes:reingresar', async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/reingresar`, { method: 'POST' });
+});
+
+ipcMain.handle('estudiantes:graduar', async (_event, id, observacion) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/graduar`, {
+    method: 'POST',
+    body: { observacion },
+  });
+});
 
 const createWindow = () => {
   const mainWindow = new BrowserWindow({

@@ -69,6 +69,7 @@ describe('GoogleOauthController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -168,6 +169,7 @@ describe('GoogleOauthController', () => {
         {
           sub: 1,
           roles: [RolSistema.ADMIN_GLOBAL],
+          rolActivo: RolSistema.ADMIN_GLOBAL,
         },
       );
 
@@ -184,6 +186,7 @@ describe('GoogleOauthController', () => {
         {
           sub: 10,
           roles: [RolSistema.PROFESOR],
+          rolActivo: RolSistema.PROFESOR,
         },
       );
 

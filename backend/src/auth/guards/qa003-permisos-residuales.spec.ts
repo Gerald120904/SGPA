@@ -91,12 +91,13 @@ describe('QA-003 Fase 3 — Análisis de Permisos Residuales', () => {
       sub: usuarioId,
       correo: 'docente.coordinador@sgpa.local',
       roles: [RolSistema.PROFESOR, RolSistema.COORDINADOR],
+      rolActivo: RolSistema.PROFESOR, av: 1,
     };
 
     // Estado real en MySQL: COORDINADOR fue revocado de usuario_roles, solo queda PROFESOR
     const estadoUsuarioMySQL = {
       id: usuarioId,
-      activo: true,
+      activo: true, versionAutenticacion: 1,
       usuarioRoles: [
         {
           usuarioId,
@@ -171,7 +172,7 @@ describe('QA-003 Fase 3 — Análisis de Permisos Residuales', () => {
       expect(permisosOk).toBe(true);
       expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(usuarioId, [
         PermisoSistema.ESTUDIANTES_VER,
-      ]);
+      ], RolSistema.PROFESOR);
     });
   });
 });

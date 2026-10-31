@@ -253,6 +253,7 @@ export class FormulariosPublicosService {
             planAsignaturaId: id,
             cursoId: asignatura.cursoId ?? 0,
             codigo: asignatura.codigo,
+            nombre: asignatura.nombre,
           };
         })
       : asignaturasEntities.map((ent) => ({
@@ -262,6 +263,10 @@ export class FormulariosPublicosService {
           ent.codigoReferencia?.trim() ||
           ent.curso?.codigo?.trim() ||
           `ASIG-${ent.id}`,
+        nombre:
+          ent.curso?.nombre?.trim() ||
+          ent.nombreReferencia?.trim() ||
+          undefined,
       }));
 
     const datosNormalizados: DatosNormalizadosFormulario = {

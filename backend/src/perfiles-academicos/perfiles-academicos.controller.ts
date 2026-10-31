@@ -44,8 +44,7 @@ export class PerfilesAcademicosController {
     if (!user || typeof user.sub !== 'number') {
       throw new UnauthorizedException('Usuario no autenticado.');
     }
-    const esAdminGlobal =
-      Array.isArray(user.roles) && user.roles.includes(RolSistema.ADMIN_GLOBAL);
+    const esAdminGlobal = user.rolActivo === RolSistema.ADMIN_GLOBAL;
     return { sub: user.sub, esAdminGlobal };
   }
 
@@ -153,5 +152,17 @@ export class PerfilesAcademicosController {
   ) {
     const { sub, esAdminGlobal } = this.obtenerUsuario(request);
     await this.service.desasociarCurso(perfilId, cursoId, sub, esAdminGlobal);
+  }
+
+  @Post(':perfilId/copiar-cursos/:perfilOrigenId')
+  @UseGuards(PermisosGuard)
+  @Permisos(PermisoSistema.PERFILES_ACADEMICOS_GESTIONAR)
+  copiarCursos(
+    @Param('perfilId', ParseIntPipe) perfilId: number,
+    @Param('perfilOrigenId', ParseIntPipe) perfilOrigenId: number,
+    @Req() request: Request,
+  ) {
+    const { sub, esAdminGlobal } = this.obtenerUsuario(request);
+    return this.service.copiarCursosDePerfil(perfilId, perfilOrigenId, sub, esAdminGlobal);
   }
 }

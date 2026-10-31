@@ -715,4 +715,39 @@ describe('PerfilesAcademicosService', () => {
       ).toHaveBeenCalledWith(10, 2);
     });
   });
+
+  describe('COPIAR CURSOS ENTRE PERFILES', () => {
+    it('copia cursos válidos de un perfil a otro sin duplicar', async () => {
+      const perfilDestino = { id: 10, carreraId: 1, activo: true } as PerfilAcademico;
+      const perfilOrigen = { id: 20, carreraId: 1, activo: true } as PerfilAcademico;
+
+      perfilRepository.findOne
+        .mockResolvedValueOnce(perfilDestino)
+        .mockResolvedValueOnce(perfilOrigen);
+
+      profesorPerfilRepository.count.mockResolvedValue(0);
+
+      const cursoValido = { id: 101, activo: true, carreras: [{ id: 1 }] } as Curso;
+      const relOrigen = { cursoId: 101, curso: cursoValido, activo: true };
+
+      cursoPerfilRepository.find.mockResolvedValue([relOrigen]);
+      cursoPerfilRepository.findOne.mockResolvedValue(null);
+      cursoPerfilRepository.create.mockReturnValue({
+        perfilAcademicoId: 10,
+        cursoId: 101,
+        activo: true,
+      });
+      cursoPerfilRepository.save.mockResolvedValue({});
+
+      const resultado = await service.copiarCursosDePerfil(10, 20, 1, true);
+      expect(resultado).toEqual({ copiados: 1, omitidos: 0 });
+      expect(cursoPerfilRepository.save).toHaveBeenCalled();
+    });
+
+    it('rechaza copiar si el origen y destino son el mismo', async () => {
+      await expect(service.copiarCursosDePerfil(10, 10, 1, true)).rejects.toThrow(
+        'El perfil de origen y destino no pueden ser el mismo.',
+      );
+    });
+  });
 });

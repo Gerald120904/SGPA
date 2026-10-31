@@ -61,6 +61,7 @@ describe('OptativasController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -108,7 +109,9 @@ describe('OptativasController', () => {
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
-    });
+
+      rolActivo: rol,
+      av: 1,});
   };
 
   it('GET /optativas - lista las optativas', async () => {

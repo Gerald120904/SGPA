@@ -9,6 +9,8 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { LoginDto } from './dto/login.dto';
+import { CambiarRolActivoDto } from './dto/cambiar-rol-activo.dto';
+import { ConfigService } from '@nestjs/config';
 import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { AceptarInvitacionDto } from './dto/aceptar-invitacion.dto';
@@ -25,6 +27,7 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly permisosService: PermisosService,
     @Optional() private readonly alcanceJerarquico?: AlcanceJerarquicoService,
+    @Optional() private readonly configService?: ConfigService,
   ) {}
 
   private obtenerRolesValidos(
@@ -86,15 +89,26 @@ export class AuthService {
       throw new UnauthorizedException('La cuenta asistente no tiene coordinador responsable activo.');
     }
 
+    const rolActivo = [RolSistema.PROFESOR, RolSistema.ASISTENTE_ESTUDIANTIL,
+      RolSistema.COORDINADOR, RolSistema.ADMIN_GLOBAL]
+      .find((rol) => roles.includes(rol));
+    if (!rolActivo) throw new UnauthorizedException('Sin rol activo válido.');
+
     const permisos = await this.permisosService.obtenerPermisosEfectivos(
       usuario.id,
       roles,
+      rolActivo,
     );
 
+    const versionAutenticacion = await this.usuariosService.rotarVersionAutenticacion(
+      usuario.id, usuario.versionAutenticacion,
+    );
     const payload = {
       sub: usuario.id,
       correo: usuario.correo,
       roles,
+      rolActivo,
+      av: versionAutenticacion,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -111,6 +125,7 @@ export class AuthService {
         apellido2: usuario.apellido2,
         correo: usuario.correo,
         roles,
+        rolActivo,
         permisos,
       },
     };
@@ -201,7 +216,86 @@ export class AuthService {
     );
   }
 
-  async perfil(usuarioId: number) {
+
+  async cambiarRolActivo(usuarioId: number, dto: CambiarRolActivoDto, versionActual: number) {
+    const usuario = await this.usuariosService.buscarPorId(usuarioId);
+
+    if (!usuario || !usuario.activo) {
+      throw new UnauthorizedException('Usuario inactivo o no encontrado');
+    }
+
+    const rolesVigentes = this.obtenerRolesValidos(usuario.usuarioRoles ?? []);
+
+    if (!rolesVigentes.includes(dto.rol)) {
+      throw new BadRequestException(
+        'El usuario no posee el rol solicitado o no está vigente.',
+      );
+    }
+
+    if (
+      dto.rol === RolSistema.ASISTENTE_ESTUDIANTIL &&
+      (!this.alcanceJerarquico ||
+        !(await this.alcanceJerarquico.tieneCoordinadorResponsableActivo(usuario.id)))
+    ) {
+      throw new UnauthorizedException(
+        'La cuenta asistente no tiene coordinador responsable activo.',
+      );
+    }
+
+    const permisos = await this.permisosService.obtenerPermisosEfectivos(
+      usuario.id,
+      rolesVigentes,
+      dto.rol,
+    );
+
+    const versionAutenticacion = await this.usuariosService.rotarVersionAutenticacion(
+      usuario.id, versionActual,
+    );
+    const payload = {
+      sub: usuario.id,
+      correo: usuario.correo,
+      roles: rolesVigentes,
+      rolActivo: dto.rol,
+      av: versionAutenticacion,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return {
+      accessToken,
+      usuario: {
+        id: usuario.id,
+        cedula: usuario.cedula,
+        nombres: usuario.nombres,
+        apellido1: usuario.apellido1,
+        apellido2: usuario.apellido2,
+        correo: usuario.correo,
+        roles: rolesVigentes,
+        rolActivo: dto.rol,
+        permisos,
+      },
+    };
+  }
+
+  obtenerIdentidad() {
+    const database =
+      this.configService?.get<string>('DB_DATABASE') ||
+      process.env.DB_DATABASE ||
+      'sgpa';
+    const entorno =
+      this.configService?.get<string>('NODE_ENV') ||
+      process.env.NODE_ENV ||
+      'development';
+
+    return {
+      app: 'SGPA',
+      database,
+      entorno,
+      modoAislado: database === 'sgpa_isolated_audit',
+    };
+  }
+
+  async perfil(usuarioId: number, rolActivo?: RolSistema | string) {
     const usuario = await this.usuariosService.buscarPorId(usuarioId);
 
     if (!usuario || !usuario.activo) {
@@ -216,9 +310,14 @@ export class AuthService {
       );
     }
 
+    if (!rolActivo || !roles.includes(rolActivo as RolSistema)) {
+      throw new UnauthorizedException('El rol activo ya no está vigente.');
+    }
+
     const permisos = await this.permisosService.obtenerPermisosEfectivos(
       usuario.id,
       roles,
+      rolActivo as RolSistema,
     );
 
     return {
@@ -229,6 +328,7 @@ export class AuthService {
       apellido2: usuario.apellido2,
       correo: usuario.correo,
       roles,
+      rolActivo,
       permisos,
     };
   }

@@ -56,6 +56,7 @@ describe('PlanReglasOptativasController', () => {
             findOne: jest.fn().mockImplementation(async ({ where }) => ({
               id: where?.id ?? 1,
               activo: true,
+              versionAutenticacion: 1,
               usuarioRoles: [
                 {
                   usuarioId: where?.id ?? 1,
@@ -117,7 +118,9 @@ describe('PlanReglasOptativasController', () => {
       sub: 1,
       email: 'admin@correo.una.ac.cr',
       roles: [rol],
-    });
+
+      rolActivo: rol,
+      av: 1,});
   };
 
   it('GET /planes-estudio/:planId/regla-optativas - obtiene la regla del plan con PLANES_ESTUDIO_VER', async () => {

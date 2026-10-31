@@ -272,6 +272,7 @@ describe('SGPA Fase 5 — Integración Administrativa del Motor en Electron (22 
       descripcion: 'Registro de estudiantes',
       carreraId: 1,
       planEstudioId: 10,
+      proveedor: ProveedorFormulario.INTERNO,
     };
 
     const resultado = await service.crear(adminUsuarioId, dto);
@@ -291,6 +292,7 @@ describe('SGPA Fase 5 — Integración Administrativa del Motor en Electron (22 
       descripcion: 'Plan inexistente',
       carreraId: 1,
       planEstudioId: 999,
+      proveedor: ProveedorFormulario.INTERNO,
     };
 
     await expect(service.crear(adminUsuarioId, dto)).rejects.toThrow(
@@ -307,6 +309,7 @@ describe('SGPA Fase 5 — Integración Administrativa del Motor en Electron (22 
       descripcion: 'Sin permisos',
       carreraId: 1,
       planEstudioId: 10,
+      proveedor: ProveedorFormulario.INTERNO,
     };
 
     await expect(service.crear(adminUsuarioId, dto)).rejects.toThrow(

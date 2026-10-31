@@ -19,12 +19,13 @@ describe('PermisosGuard', () => {
     );
   });
 
-  function crearContexto(user: any, method?: string, clase?: string): ExecutionContext {
+  function crearContexto(user: any, method?: string, clase?: string, params?: Record<string, string>): ExecutionContext {
+    if (user && !user.rolActivo && user.roles?.length === 1) user.rolActivo = user.roles[0];
     return {
       getHandler: jest.fn(),
       getClass: jest.fn().mockReturnValue(clase ? { name: clase } : undefined),
       switchToHttp: jest.fn().mockReturnValue({
-        getRequest: jest.fn().mockReturnValue({ user, method }),
+        getRequest: jest.fn().mockReturnValue({ user, method, params }),
       }),
     } as unknown as ExecutionContext;
   }
@@ -43,6 +44,16 @@ describe('PermisosGuard', () => {
       sub: 2, roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true,
     });
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+  });
+
+  it('deniega una carrera concreta si falta el proveedor de alcance', async () => {
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.CARRERAS_VER]);
+    const context = crearContexto(
+      { sub: 2, roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true },
+      'GET', 'CarrerasController', { id: '99' },
+    );
+    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
   });
 
   it('lanza ForbiddenException si no hay usuario en request', async () => {
@@ -85,7 +96,7 @@ describe('PermisosGuard', () => {
     expect(result).toBe(true);
     expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(10, [
       PermisoSistema.ATESTADOS_VALIDAR,
-    ]);
+    ], RolSistema.COORDINADOR);
   });
 
   it('gestionar Cursos permite su lectura jerárquica, sin habilitar escritura del asistente', async () => {
@@ -131,7 +142,7 @@ describe('PermisosGuard', () => {
     );
     expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(1, [
       PermisoSistema.PERFILES_DOCENTES_VALIDAR,
-    ]);
+    ], RolSistema.PROFESOR);
   });
 
   it('permite acceso si ADMIN_GLOBAL fue revocado pero el usuario posee permisos específicos asignados', async () => {
@@ -149,6 +160,6 @@ describe('PermisosGuard', () => {
     expect(result).toBe(true);
     expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(1, [
       PermisoSistema.PROFESORES_VER,
-    ]);
+    ], RolSistema.PROFESOR);
   });
 });

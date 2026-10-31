@@ -21,9 +21,14 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const usuario = request.user;
 
+    const rolActivo = usuario?.rolActivo as RolSistema | undefined;
+    if (usuario && !rolActivo) {
+      throw new ForbiddenException('Falta un rol activo autorizado.');
+    }
+
     if (usuario?.jerarquiaConfigurada === true &&
-      !usuario.roles?.includes(RolSistema.ADMIN_GLOBAL) &&
-      (usuario.roles?.includes(RolSistema.COORDINADOR) || usuario.roles?.includes(RolSistema.ASISTENTE_ESTUDIANTIL)) &&
+      rolActivo !== RolSistema.ADMIN_GLOBAL &&
+      (rolActivo === RolSistema.COORDINADOR || rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL) &&
       !['JerarquiaUsuariosController', 'SolicitudesCambioController'].includes(context.getClass()?.name)) {
       throw new ForbiddenException('Esta ruta no verifica aún el alcance por carrera.');
     }
@@ -32,19 +37,17 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    if (!usuario || !Array.isArray(usuario.roles)) {
+    if (!usuario || !rolActivo) {
       throw new ForbiddenException(
         'El usuario no posee permisos para realizar esta operación.',
       );
     }
 
-    const autorizado = usuario.roles.some((rol: string) =>
-      rolesPermitidos.includes(rol as RolSistema),
-    );
+    const autorizado = rolesPermitidos.includes(rolActivo as RolSistema);
 
     if (!autorizado) {
       throw new ForbiddenException(
-        'El usuario no posee permisos para realizar esta operación.',
+        'El usuario no posee permisos para realizar esta operación desde el rol activo.',
       );
     }
 

@@ -517,4 +517,82 @@ export class PerfilesAcademicosService {
 
     await this.cursoPerfilRepository.remove(relacion);
   }
+
+  async copiarCursosDePerfil(
+    perfilDestinoId: number,
+    perfilOrigenId: number,
+    usuarioId: number,
+    esAdminGlobal: boolean,
+  ): Promise<{ copiados: number; omitidos: number }> {
+    if (perfilDestinoId === perfilOrigenId) {
+      throw new BadRequestException(
+        'El perfil de origen y destino no pueden ser el mismo.',
+      );
+    }
+    const perfilDestino = await this.obtenerPorId(perfilDestinoId);
+    const perfilOrigen = await this.obtenerPorId(perfilOrigenId);
+
+    await this.validarAlcanceCarrera(
+      usuarioId,
+      esAdminGlobal,
+      perfilDestino.carreraId,
+    );
+    await this.validarAlcanceCarrera(
+      usuarioId,
+      esAdminGlobal,
+      perfilOrigen.carreraId,
+    );
+
+    if (!perfilDestino.activo) {
+      throw new BadRequestException(
+        'No se pueden copiar cursos a un perfil académico inactivo.',
+      );
+    }
+    await this.validarPerfilNoUtilizado(perfilDestinoId);
+
+    const cursosOrigen = await this.cursoPerfilRepository.find({
+      where: { perfilAcademicoId: perfilOrigenId, activo: true },
+      relations: { curso: { carreras: true } },
+    });
+
+    let copiados = 0;
+    let omitidos = 0;
+
+    for (const rel of cursosOrigen) {
+      const curso = rel.curso;
+      if (!curso || !curso.activo) {
+        omitidos++;
+        continue;
+      }
+      const perteneceACarrera = (curso.carreras ?? []).some(
+        (c) => c.id === perfilDestino.carreraId,
+      );
+      if (!perteneceACarrera) {
+        omitidos++;
+        continue;
+      }
+      const existente = await this.cursoPerfilRepository.findOne({
+        where: { perfilAcademicoId: perfilDestinoId, cursoId: curso.id },
+      });
+      if (existente) {
+        if (!existente.activo) {
+          existente.activo = true;
+          await this.cursoPerfilRepository.save(existente);
+          copiados++;
+        } else {
+          omitidos++;
+        }
+      } else {
+        const nuevo = this.cursoPerfilRepository.create({
+          perfilAcademicoId: perfilDestinoId,
+          cursoId: curso.id,
+          activo: true,
+        });
+        await this.cursoPerfilRepository.save(nuevo);
+        copiados++;
+      }
+    }
+
+    return { copiados, omitidos };
+  }
 }

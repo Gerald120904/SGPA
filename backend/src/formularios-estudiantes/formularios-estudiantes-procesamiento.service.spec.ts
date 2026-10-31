@@ -34,6 +34,9 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
     tieneAlcanceSobreCarrera: jest.Mock;
     obtenerCarreraIdsConAlcance: jest.Mock;
   };
+  let mailService: {
+    enviarNotificacionRechazoSolicitud: jest.Mock;
+  };
 
   const usuarioId = 10;
   const respuestaId = 1;
@@ -130,6 +133,10 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       obtenerCarreraIdsConAlcance: jest.fn().mockResolvedValue([2]),
     };
 
+    mailService = {
+      enviarNotificacionRechazoSolicitud: jest.fn().mockResolvedValue(undefined),
+    };
+
     service = new FormulariosEstudiantesProcesamientoService(
       formularioRepo as never,
       respuestaRepo as never,
@@ -145,6 +152,8 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
           }),
         ),
       } as never,
+      undefined,
+      mailService,
     );
   });
 
@@ -179,6 +188,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
             carrera: true,
             planEstudio: true,
           },
+          revisadoPor: true,
         },
         order: {
           createdAt: 'DESC',
@@ -215,6 +225,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
             carrera: true,
             planEstudio: true,
           },
+          revisadoPor: true,
         },
         order: {
           createdAt: 'DESC',
@@ -469,6 +480,36 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       expect(
         estudiantesImportacionService.ejecutarDesdeFormulario,
       ).not.toHaveBeenCalled();
+    });
+
+    it('notifica al estudiante por correo al rechazar la solicitud', async () => {
+      const mockRespuesta = { ...mockRespuestaBase };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+
+      await service.rechazarRespuesta(respuestaId, usuarioId, 'Falta requisito de matemática');
+
+      expect(mailService.enviarNotificacionRechazoSolicitud).toHaveBeenCalledWith(
+        'ana@est.una.ac.cr',
+        'Ana Vargas',
+        expect.objectContaining({
+          solicitudId: respuestaId,
+          motivoRechazo: 'Falta requisito de matemática',
+        }),
+      );
+    });
+
+    it('no revierte el rechazo confirmado en BD si el envío del correo falla', async () => {
+      const mockRespuesta = { ...mockRespuestaBase };
+      respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
+      mailService.enviarNotificacionRechazoSolicitud.mockRejectedValueOnce(
+        new Error('SMTP Connection timeout'),
+      );
+
+      const res = await service.rechazarRespuesta(respuestaId, usuarioId, 'Documentos incompletos');
+
+      expect(res.estado).toBe(EstadoRespuestaFormulario.RECHAZADO);
+      expect(mockRespuesta.motivoRechazo).toBe('Documentos incompletos');
+      expect(mailService.enviarNotificacionRechazoSolicitud).toHaveBeenCalled();
     });
 
     it('PROCESADO + rechazar: lanza ConflictException', async () => {

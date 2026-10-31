@@ -189,10 +189,16 @@ export class NormalizadorRespuestaFormularioService {
         );
       }
 
+      let nombre = asignatura.nombre;
+      if (!nombre && etiqueta.includes(' - ')) {
+        nombre = etiqueta.split(' - ').slice(1).join(' - ').trim();
+      }
+
       return {
         planAsignaturaId: asignatura.planAsignaturaId,
         cursoId: asignatura.cursoId,
         codigo: asignatura.codigo,
+        nombre: nombre || undefined,
       };
     });
   }

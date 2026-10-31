@@ -237,6 +237,18 @@ describe('SGPA-QA-003: Implementación y Pruebas Automatizadas de la Opción B',
       service.activarPoliticaOpcionB(true);
     });
 
+    it('no usa otros roles ni excepciones si el rol activo solicitado fue revocado', async () => {
+      usuarioRepository.findOne.mockResolvedValue({ id: usuarioId, activo: true,
+        usuarioRoles: [{ rol: { nombre: RolSistema.PROFESOR, activo: true } }] });
+      usuarioPermisoExcepcionRepository.find.mockResolvedValue([
+        { usuarioId, permiso: PermisoSistema.AULAS_GESTIONAR, tipo: 'CONCEDER' },
+      ]);
+      await expect(service.usuarioTienePermisos(usuarioId,
+        [PermisoSistema.AULAS_GESTIONAR], RolSistema.COORDINADOR)).resolves.toBe(false);
+      expect(await service.obtenerPermisosEfectivos(usuarioId,
+        [RolSistema.PROFESOR, RolSistema.COORDINADOR], RolSistema.COORDINADOR)).toEqual([]);
+    });
+
     it('respeta excepciones legítimas CONCEDER fuera de la plantilla del rol', async () => {
       usuarioRepository.findOne.mockResolvedValue({
         id: usuarioId,
