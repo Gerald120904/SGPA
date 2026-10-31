@@ -297,41 +297,27 @@ describe('FormulariosEstudiantesService', () => {
   });
 
   describe('crear', () => {
-    it('delega al motor interno por defecto cuando proveedor no se especifica o es INTERNO sin llamar a Google', async () => {
-      planAsignaturaRepo.find.mockResolvedValue(
-        mockPlanAsignaturas.filter((asignatura) => asignatura.cursoId !== null),
-      );
-      const mockFormularioInterno = {
-        id: 55,
-        titulo: 'Formulario Interno SGPA',
-        proveedor: ProveedorFormulario.INTERNO,
-        estado: EstadoFormularioEstudiante.CREANDO,
-      };
-      formulariosInternosPersistenciaService.crearFormularioInterno.mockResolvedValue(
-        mockFormularioInterno,
-      );
-
-      const dtoInterno: CrearFormularioEstudianteDto = {
+    it('rechaza la creación si proveedor no se especifica o no es válido', async () => {
+      const dtoSinProveedor = {
         titulo: 'Formulario Interno SGPA',
         descripcion: 'Formulario institucional',
         carreraId: 1,
         planEstudioId: 2,
-      };
+      } as any;
 
-      const resultado = await service.crear(usuarioId, dtoInterno);
-
-      expect(
-        formulariosInternosPersistenciaService.crearFormularioInterno,
-      ).toHaveBeenCalledWith(
-        usuarioId,
-        expect.objectContaining({
-          titulo: 'Formulario Interno SGPA',
-          carreraId: 1,
-          planEstudioId: 2,
-        }),
+      await expect(service.crear(usuarioId, dtoSinProveedor)).rejects.toThrow(
+        BadRequestException,
       );
+      await expect(service.crear(usuarioId, dtoSinProveedor)).rejects.toThrow(
+        'La modalidad del formulario es obligatoria y debe ser INTERNO o GOOGLE_FORMS',
+      );
+      await expect(
+        service.crear(usuarioId, { ...dtoSinProveedor, proveedor: 'INVALIDO' as any }),
+      ).rejects.toThrow(
+        'La modalidad del formulario es obligatoria y debe ser INTERNO o GOOGLE_FORMS',
+      );
+      expect(formulariosInternosPersistenciaService.crearFormularioInterno).not.toHaveBeenCalled();
       expect(googleFormsClient.crearFormulario).not.toHaveBeenCalled();
-      expect(resultado).toBe(mockFormularioInterno);
     });
 
     it('INTERNO explícito publica sin intentar crear un Google Form', async () => {

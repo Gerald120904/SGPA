@@ -9,6 +9,7 @@ import {
 
 import {
   mostrarError,
+  mostrarAdvertencia,
   mostrarExito
 } from '../../components/AlertModal.js';
 
@@ -85,7 +86,8 @@ import {
 } from '../../utils/confirm.js';
 
 import {
-  escapeHtml
+  escapeHtml,
+  calcularLongitudTexto
 } from '../../utils/html.js';
 
 import {
@@ -3096,7 +3098,7 @@ async function abrirCambiarPlanEstudiante(
               id="motivoCambioPlan"
               maxlength="500"
               rows="3"
-              placeholder="Opcional"
+              placeholder="Ingrese la justificación del rechazo (obligatorio, máximo 500 caracteres)" required
             ></textarea>
           </label>
         `
@@ -5259,14 +5261,14 @@ function abrirRechazarSolicitud(
       body: `
         <label class="sgpa-form-wide">
           <span>
-            Motivo
+            Motivo del rechazo <span class="text-danger">*</span>
           </span>
 
           <textarea
             id="motivoRechazoSolicitud"
-            maxlength="500"
             rows="3"
-            placeholder="Opcional"
+            placeholder="Ingrese la justificación del rechazo (obligatorio, máximo 500 caracteres)"
+            required
           ></textarea>
         </label>
       `
@@ -5307,6 +5309,23 @@ function abrirRechazarSolicitud(
             )
             .value
             .trim();
+
+        if (!motivo) {
+          mostrarAdvertencia({
+            titulo: 'Motivo obligatorio',
+            mensaje: 'El motivo de rechazo es obligatorio y no puede consistir únicamente en espacios en blanco.'
+          });
+          return;
+        }
+
+        const longitudMotivo = calcularLongitudTexto(motivo);
+        if (longitudMotivo > 500) {
+          mostrarAdvertencia({
+            titulo: 'Límite de caracteres excedido',
+            mensaje: `El motivo de rechazo no puede superar los 500 caracteres (longitud ingresada: ${longitudMotivo}).`
+          });
+          return;
+        }
 
         try {
           const resultado =
@@ -5392,10 +5411,12 @@ function abrirDetalleSolicitud(
     datos.asignaturasAprobadas.length > 0
       ? datos.asignaturasAprobadas
           .map(
-            (a) =>
-              a.codigo ||
-              a.planAsignaturaId
+            (a) => {
+              const cod = a.codigo || (a.planAsignaturaId ? `ID #${a.planAsignaturaId}` : '');
+              return a.nombre ? `${cod} — ${a.nombre}` : cod;
+            }
           )
+          .filter(Boolean)
           .join(', ')
       : 'Ninguna reportada';
 
@@ -5553,10 +5574,45 @@ function abrirDetalleSolicitud(
         }
 
         ${
+          solicitud.motivoRechazo
+            ? `
+              <label class="sgpa-form-wide">
+                <span>Motivo de rechazo</span>
+                <textarea
+                  class="estudiantes-error-textarea"
+                  style="border-color:var(--danger, #ef4444);background:#fef2f2;color:#991b1b;"
+                  rows="2"
+                  readonly
+                >${escapeHtml(solicitud.motivoRechazo)}</textarea>
+              </label>
+              ${
+                solicitud.revisadoPor || solicitud.revisadoAt
+                  ? `
+                    <label class="sgpa-form-wide">
+                      <span>Revisión</span>
+                      <input
+                        type="text"
+                        value="${escapeHtml(
+                          [
+                            solicitud.revisadoPor?.nombreCompleto || solicitud.revisadoPor?.email || '',
+                            solicitud.revisadoAt ? formatearFechaHora(solicitud.revisadoAt) : ''
+                          ].filter(Boolean).join(' — ')
+                        )}"
+                        readonly
+                      >
+                    </label>
+                  `
+                  : ''
+              }
+            `
+            : ''
+        }
+
+        ${
           solicitud.detalleError
             ? `
               <label class="sgpa-form-wide">
-                <span>Detalle de revisión / error</span>
+                <span>Detalle de error técnico</span>
                 <textarea
                   class="estudiantes-error-textarea"
                   rows="2"

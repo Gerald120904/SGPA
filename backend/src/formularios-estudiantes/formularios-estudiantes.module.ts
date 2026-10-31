@@ -1,3 +1,4 @@
+import { MailModule } from '../mail/mail.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
@@ -44,6 +45,7 @@ import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta
     PlanesEstudioModule,
     PeriodosAcademicosModule,
     EstructuraAcademicaModule,
+    MailModule,
   ],
   controllers: [
     FormulariosEstudiantesController,

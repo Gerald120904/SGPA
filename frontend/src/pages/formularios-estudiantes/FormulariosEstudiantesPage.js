@@ -29,6 +29,7 @@ import {
 
 import {
   mostrarError,
+  mostrarAdvertencia,
   mostrarExito
 } from '../../components/AlertModal.js';
 
@@ -41,7 +42,8 @@ import {
 } from '../../app/session.js';
 
 import {
-  escapeHtml
+  escapeHtml,
+  calcularLongitudTexto
 } from '../../utils/html.js';
 
 import {
@@ -1062,14 +1064,30 @@ function renderizarRespuestasFormulario(
       const respuestaId = Number(btn.getAttribute('data-id'));
       const nombreEstudiante = btn.getAttribute('data-estudiante') || 'el estudiante';
 
-      const motivo = window.prompt(`Ingrese el motivo del rechazo para la respuesta de ${nombreEstudiante}:`);
+      const motivo = window.prompt(`Ingrese el motivo del rechazo para la respuesta de ${nombreEstudiante} (obligatorio, máximo 500 caracteres):`);
       if (motivo === null) return;
+      const motivoLimpio = motivo.trim();
+      if (!motivoLimpio) {
+        mostrarAdvertencia({
+          titulo: 'Motivo obligatorio',
+          mensaje: 'El motivo de rechazo es obligatorio y no puede consistir únicamente en espacios en blanco.'
+        });
+        return;
+      }
+      const longitudMotivo = calcularLongitudTexto(motivoLimpio);
+      if (longitudMotivo > 500) {
+        mostrarAdvertencia({
+          titulo: 'Límite de caracteres excedido',
+          mensaje: `El motivo de rechazo no puede superar los 500 caracteres (longitud ingresada: ${longitudMotivo}).`
+        });
+        return;
+      }
 
       const fila = btn.closest('tr');
       if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = true));
 
       try {
-        const resultado = await rechazarSolicitudFormulario(respuestaId, motivo);
+        const resultado = await rechazarSolicitudFormulario(respuestaId, motivoLimpio);
         if (resultado && resultado.ok === false) {
           throw new Error(resultado.message || 'No fue posible rechazar la solicitud.');
         }
@@ -1130,7 +1148,13 @@ function renderizarFilaRespuesta(
       : 0;
 
   const codigos = Array.isArray(datos?.asignaturasAprobadas)
-    ? datos.asignaturasAprobadas.map((a) => a.codigo || `ID #${a.planAsignaturaId}`).join(', ')
+    ? datos.asignaturasAprobadas
+        .map((a) => {
+          const cod = a.codigo || (a.planAsignaturaId ? `ID #${a.planAsignaturaId}` : '');
+          return a.nombre ? `${cod} — ${a.nombre}` : cod;
+        })
+        .filter(Boolean)
+        .join(', ')
     : '';
 
   const aprobadasHtml = aprobadas > 0
@@ -1200,7 +1224,7 @@ function renderizarFilaRespuesta(
       <td>
         ${escapeHtml(
           formatearFechaHora(
-            respuesta.procesadoAt
+            respuesta.procesadoAt || respuesta.revisadoAt
           )
         )}
       </td>

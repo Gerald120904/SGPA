@@ -274,8 +274,8 @@ describe('FormulariosPublicosService (Subfases 3A, 3B, 3C)', () => {
         expect.objectContaining({
           datosNormalizadosJson: expect.objectContaining({
             asignaturasAprobadas: [
-              { planAsignaturaId: 101, cursoId: 201, codigo: 'PROG-I' },
-              { planAsignaturaId: 102, cursoId: 202, codigo: 'PROG-II' },
+              { planAsignaturaId: 101, cursoId: 201, codigo: 'PROG-I', nombre: 'Programación I' },
+              { planAsignaturaId: 102, cursoId: 202, codigo: 'PROG-II', nombre: 'Programación II' },
             ],
           }),
         }),

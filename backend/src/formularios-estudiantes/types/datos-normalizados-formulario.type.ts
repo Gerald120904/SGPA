@@ -2,6 +2,7 @@ export interface AsignaturaAprobadaFormulario {
   planAsignaturaId: number;
   cursoId: number;
   codigo: string;
+  nombre?: string;
 }
 
 export interface DatosNormalizadosFormulario {

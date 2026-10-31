@@ -328,7 +328,16 @@ export class FormulariosEstudiantesService {
 
     // El importador resuelve Curso o codigoReferencia. Las asignaturas generales
     // y optativas legítimas pueden no tener un Curso vinculado.
-    if (dto.proveedor !== ProveedorFormulario.GOOGLE_FORMS) {
+    if (
+      !dto.proveedor ||
+      !Object.values(ProveedorFormulario).includes(dto.proveedor)
+    ) {
+      throw new BadRequestException(
+        'La modalidad del formulario es obligatoria y debe ser INTERNO o GOOGLE_FORMS',
+      );
+    }
+
+    if (dto.proveedor === ProveedorFormulario.INTERNO) {
       if (planAsignaturas.length === 0) {
         throw new BadRequestException(
           'El plan de estudio no posee asignaturas activas',
@@ -435,7 +444,7 @@ export class FormulariosEstudiantesService {
         number,
         Map<
           string,
-          { planAsignaturaId: number; cursoId: number; codigo: string }
+          { planAsignaturaId: number; cursoId: number; codigo: string; nombre?: string }
         >
       >
     >();
@@ -447,20 +456,21 @@ export class FormulariosEstudiantesService {
           number,
           Map<
             string,
-            { planAsignaturaId: number; cursoId: number; codigo: string }
+            { planAsignaturaId: number; cursoId: number; codigo: string; nombre?: string }
           >
         >();
       const opcionesCiclo =
         opcionesNivel.get(asignatura.ciclo) ??
         new Map<
           string,
-          { planAsignaturaId: number; cursoId: number; codigo: string }
+          { planAsignaturaId: number; cursoId: number; codigo: string; nombre?: string }
         >();
       const curso = asignatura.curso!;
       opcionesCiclo.set(`${curso.codigo} - ${curso.nombre}`, {
         planAsignaturaId: asignatura.id,
         cursoId: asignatura.cursoId!,
         codigo: curso.codigo,
+        nombre: curso.nombre,
       });
       opcionesNivel.set(asignatura.ciclo, opcionesCiclo);
       grupos.set(asignatura.nivel, opcionesNivel);
@@ -481,7 +491,7 @@ export class FormulariosEstudiantesService {
       clave: string;
       opciones: Record<
         string,
-        { planAsignaturaId: number; cursoId: number; codigo: string }
+        { planAsignaturaId: number; cursoId: number; codigo: string; nombre?: string }
       >;
     }> = [];
     let itemIndex = 0;

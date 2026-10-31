@@ -87,8 +87,8 @@ describe('NormalizadorRespuestaFormularioService', () => {
       contacto: '88887777',
       periodoIngresoId: 10,
       asignaturasAprobadas: [
-        { planAsignaturaId: 101, cursoId: 201, codigo: 'EIF201' },
-        { planAsignaturaId: 102, cursoId: 202, codigo: 'MAT001' },
+        { planAsignaturaId: 101, cursoId: 201, codigo: 'EIF201', nombre: 'Programación I' },
+        { planAsignaturaId: 102, cursoId: 202, codigo: 'MAT001', nombre: 'Cálculo I' },
       ],
       optativasNoDisciplinarias: null,
       requiereRevisionOptativas: false,

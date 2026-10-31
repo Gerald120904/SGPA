@@ -2,6 +2,7 @@ export interface OpcionAsignaturaFormulario {
   planAsignaturaId: number;
   cursoId: number;
   codigo: string;
+  nombre?: string;
 }
 
 interface PreguntaFormulario {
