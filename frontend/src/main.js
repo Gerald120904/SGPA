@@ -518,6 +518,18 @@ ipcMain.handle('notificaciones:marcar-leida', async (_event, id) =>
 ipcMain.handle('notificaciones:marcar-todas-leidas', async () =>
   ejecutarPeticionAutenticada('/notificaciones/marcar-todas-leidas', { method: 'PATCH' }));
 
+ipcMain.handle('equivalencias:crear', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/planes-estudio/equivalencias', { method: 'POST', body: datos }));
+
+ipcMain.handle('equivalencias:listar-planes', async (_event, planOrigenId, planDestinoId) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/planes?planOrigenId=${planOrigenId}&planDestinoId=${planDestinoId}`));
+
+ipcMain.handle('equivalencias:sugerir', async (_event, estudianteId, nuevoPlanId) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/sugerencias/estudiante/${estudianteId}?nuevoPlanId=${nuevoPlanId}`));
+
+ipcMain.handle('equivalencias:aplicar', async (_event, estudianteId, datos) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/aplicar/estudiante/${estudianteId}`, { method: 'POST', body: datos }));
+
 ipcMain.handle("roles:listar", async () => {
   return ejecutarPeticionAutenticada("/roles");
 });

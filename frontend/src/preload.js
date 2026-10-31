@@ -79,6 +79,10 @@ contextBridge.exposeInMainWorld("sgpa", {
   contarNotificacionesNoLeidas: () => ipcRenderer.invoke('notificaciones:contar-no-leidas'),
   marcarNotificacionLeida: (id) => ipcRenderer.invoke('notificaciones:marcar-leida', id),
   marcarTodasNotificacionesLeidas: () => ipcRenderer.invoke('notificaciones:marcar-todas-leidas'),
+  crearEquivalenciaPlan: (datos) => ipcRenderer.invoke('equivalencias:crear', datos),
+  listarEquivalenciasPlanes: (planOrigenId, planDestinoId) => ipcRenderer.invoke('equivalencias:listar-planes', planOrigenId, planDestinoId),
+  sugerirEquivalenciasEstudiante: (estudianteId, nuevoPlanId) => ipcRenderer.invoke('equivalencias:sugerir', estudianteId, nuevoPlanId),
+  aplicarEquivalenciasEstudiante: (estudianteId, datos) => ipcRenderer.invoke('equivalencias:aplicar', estudianteId, datos),
   listarCatalogoPermisos: () =>
     ipcRenderer.invoke(
       "permisos:catalogo",
