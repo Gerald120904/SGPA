@@ -9,6 +9,9 @@ import { EnsureOfficialRoles2026102201000 } from './2026102201000-EnsureOfficial
 import { ConsolidatedAuditRestructuring2026103000000 } from './2026103000000-ConsolidatedAuditRestructuring';
 import { AddAuthenticationVersion2026103001000 } from './2026103001000-AddAuthenticationVersion';
 import { AddNotificationIdempotency2026103002000 } from './2026103002000-AddNotificationIdempotency';
+import { AddEstudiantesRevisionYAuditoria2026103100000 } from './2026103100000-AddEstudiantesRevisionYAuditoria';
+import { AddSolicitudesActivasEstudiantes2026110100000 } from './2026110100000-AddSolicitudesActivasEstudiantes';
+import { AddPlanesEstudioTransicionesYAuditoria2026110101000 } from './2026110101000-AddPlanesEstudioTransicionesYAuditoria';
 
 export const OFFICIAL_MIGRATIONS = [
   InitializeOrAdoptSchema2026101400000,
@@ -22,6 +25,9 @@ export const OFFICIAL_MIGRATIONS = [
   ConsolidatedAuditRestructuring2026103000000,
   AddAuthenticationVersion2026103001000,
   AddNotificationIdempotency2026103002000,
+  AddEstudiantesRevisionYAuditoria2026103100000,
+  AddSolicitudesActivasEstudiantes2026110100000,
+  AddPlanesEstudioTransicionesYAuditoria2026110101000,
 ] as const;
 
 export const OFFICIAL_MIGRATION_NAMES = OFFICIAL_MIGRATIONS.map(
