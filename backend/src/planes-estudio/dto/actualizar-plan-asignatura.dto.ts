@@ -100,4 +100,9 @@ export class ActualizarPlanAsignaturaDto {
   @IsString()
   @MaxLength(120)
   nombreReferencia?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  motivoCambioNombre?: string;
 }

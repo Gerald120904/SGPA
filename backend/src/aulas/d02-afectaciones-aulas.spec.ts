@@ -65,7 +65,7 @@ describe('D-02: Afectación de horarios y notificación docente por indisponibil
       query: jest.fn().mockResolvedValue([{ id: 10 }]),
       getRepository: jest.fn((entity) => entity === Notificacion ? notificationRepo : {}),
     };
-    dataSource.transaction.mockImplementation(async (_level, callback) => callback(manager));
+    dataSource.transaction.mockImplementation(async (_level: unknown, callback: (transactionManager: typeof manager) => Promise<unknown>) => callback(manager));
     await (service as any).ejecutarOcupacionEnTransaccion([10], async (inside: AulasService) => {
       expect((inside as any).notificacionesService).toBeInstanceOf(NotificacionesService);
       expect((inside as any).ocupacionManager).toBe(manager);
@@ -284,7 +284,7 @@ describe('D-02: Afectación de horarios y notificación docente por indisponibil
     (service as any).enTransaccionOcupacion = true;
 
     const dto = {
-      tipo: TipoIndisponibilidadAula.EVENTO,
+      tipo: TipoIndisponibilidadAula.OTRO,
       fechaHoraInicio: '2026-11-02T08:00:00',
       fechaHoraFin: '2026-11-02T12:00:00',
       motivo: 'Charla institucional',

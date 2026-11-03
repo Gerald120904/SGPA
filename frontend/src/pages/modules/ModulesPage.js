@@ -8,7 +8,7 @@ import {
 
 import {
   obtenerUsuario,
-  obtenerRolesUsuario,
+  obtenerRolesEfectivos,
   obtenerPermisosUsuario,
 } from '../../app/session.js';
 
@@ -35,7 +35,7 @@ export function ModulesPage() {
 
 
   const roles =
-    obtenerRolesUsuario(
+    obtenerRolesEfectivos(
       usuario
     );
 
@@ -77,21 +77,23 @@ export function ModulesPage() {
 
 
   /* =======================================================
-     GENERAR CARDS
+     GENERAR CARDS O ESTADO VACÍO
      ======================================================= */
 
-  const cards =
-    modulosDisponibles
-      .map(
-        (module) => {
-
-          return ModuleCard({
-            module
-          });
-
-        }
-      )
-      .join('');
+  const contenido = modulosDisponibles.length > 0
+    ? `
+      <div class="modules-dashboard-grid system-modules-grid">
+        ${modulosDisponibles.map((module) => ModuleCard({ module })).join('')}
+      </div>
+    `
+    : `
+      <div class="modules-dashboard-empty" role="status">
+        <i data-lucide="circle-alert" class="empty-icon" aria-hidden="true"></i>
+        <h3>Sin módulos asignados</h3>
+        <p>No tiene módulos asignados para su rol actual.</p>
+        <small>Si considera que esto es un error, contacte a la administración del sistema.</small>
+      </div>
+    `;
 
 
   /* =======================================================
@@ -128,14 +130,10 @@ export function ModulesPage() {
 
 
       <!-- =============================================== -->
-      <!-- GRID DE MÓDULOS -->
+      <!-- CONTENIDO DE MÓDULOS -->
       <!-- =============================================== -->
 
-      <div class="modules-dashboard-grid system-modules-grid">
-
-        ${cards}
-
-      </div>
+      ${contenido}
 
     </section>
   `;

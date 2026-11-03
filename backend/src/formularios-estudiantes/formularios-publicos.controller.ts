@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -29,7 +30,16 @@ export class FormulariosPublicosController {
    * Retorna el formulario, la carrera, el plan y el catálogo ordenado por nivel y ciclo.
    */
   @Get(':token')
-  async consultarFormulario(@Param('token') token: string) {
+  async consultarFormulario(
+    @Param('token') token: string,
+    @Query('preview_token') previewToken?: string,
+  ) {
+    if (previewToken) {
+      return await this.formulariosPublicosService.consultarFormularioPublico(
+        token,
+        previewToken,
+      );
+    }
     return await this.formulariosPublicosService.consultarFormularioPublico(
       token,
     );
@@ -50,7 +60,15 @@ export class FormulariosPublicosController {
   async enviarRespuesta(
     @Param('token') token: string,
     @Body() dto: EnviarRespuestaPublicaDto,
+    @Query('preview_token') previewToken?: string,
   ) {
+    if (previewToken) {
+      return await this.formulariosPublicosService.registrarRespuestaPublica(
+        token,
+        dto,
+        previewToken,
+      );
+    }
     return await this.formulariosPublicosService.registrarRespuestaPublica(
       token,
       dto,

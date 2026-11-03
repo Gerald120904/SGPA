@@ -3,6 +3,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendDir = path.resolve(testDir, '..');
@@ -83,6 +84,74 @@ const registeredHandlers = ipcSources.flatMap(({ source }) => [
   ...extraerManejadoresLiterales(source),
   ...extraerManejadoresDinamicos(source),
 ]);
+
+test('la bandeja de estudiantes envía solo los filtros aceptados por el DTO', async () => {
+  const inicio = mainSource.indexOf("ipcMain.handle('estudiantes-revision:bandeja'");
+  const fin = mainSource.indexOf("ipcMain.handle('estudiantes-revision:detalle'", inicio);
+  assert.ok(inicio >= 0 && fin > inicio);
+  const handlers = new Map();
+  let ruta;
+  vm.runInNewContext(mainSource.slice(inicio, fin), {
+    ipcMain: { handle: (canal, fn) => handlers.set(canal, fn) },
+    URLSearchParams,
+    ejecutarPeticionAutenticada: async (url) => { ruta = url; return { ok: true }; },
+  });
+  await handlers.get('estudiantes-revision:bandeja')(null, {
+    carreraId: 2, planEstudioId: 3, fuente: 'EXCEL', estado: 'PENDIENTE',
+    texto: 'Ana Soto', origen: 'LEGACY', estadoRevision: 'OTRO',
+  });
+  const url = new URL(ruta, 'http://sgpa.local');
+  assert.equal(url.pathname, '/estudiantes/bandeja-revision');
+  assert.deepEqual([...url.searchParams.entries()], [
+    ['carreraId', '2'], ['planEstudioId', '3'], ['fuente', 'EXCEL'],
+    ['estado', 'PENDIENTE'], ['texto', 'Ana Soto'],
+  ]);
+});
+
+test('los cuatro canales de equivalencias respetan rutas, cuerpo y errores del backend', async () => {
+  const start = mainSource.indexOf("ipcMain.handle('equivalencias:crear'");
+  const end = mainSource.indexOf("ipcMain.handle('perfiles-academicos:copiar-cursos'", start);
+  assert.ok(start >= 0 && end > start);
+
+  const handlers = new Map();
+  const requests = [];
+  vm.runInNewContext(mainSource.slice(start, end), {
+    ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+    ejecutarPeticionAutenticada: async (route, options) => {
+      requests.push({ route, options });
+      return { ok: true, data: { route } };
+    },
+  });
+
+  await handlers.get('equivalencias:crear')(null, { planOrigenId: 1 });
+  await handlers.get('equivalencias:listar-planes')(null, 1, 2);
+  await handlers.get('equivalencias:sugerir')(null, 3, 4);
+  const applied = await handlers.get('equivalencias:aplicar')(null, 3, { equivalenciaIds: [10, 11] });
+
+  assert.deepEqual(requests.map(({ route }) => route), [
+    '/planes-estudio/equivalencias',
+    '/planes-estudio/equivalencias?planOrigenId=1&planDestinoId=2',
+    '/planes-estudio/equivalencias/sugerencias/3?planNuevoId=4',
+    '/planes-estudio/equivalencias/aplicar',
+  ]);
+  assert.equal(requests[0].options.method, 'POST');
+  assert.equal(requests[3].options.method, 'POST');
+  assert.deepEqual(JSON.parse(JSON.stringify(requests[3].options.body)), {
+    estudianteId: 3,
+    equivalenciaIds: [10, 11],
+  });
+  assert.equal(applied.ok, true);
+
+  for (const [studentId, data] of [[0, { equivalenciaIds: [10] }], [3, {}], [3, { equivalenciaIds: [] }], [3, { equivalenciaIds: [0] }]]) {
+    const result = await handlers.get('equivalencias:aplicar')(null, studentId, data);
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+      ok: false,
+      status: 400,
+      message: 'Estudiante y equivalencias válidas son obligatorios.',
+    });
+  }
+  assert.equal(requests.length, 4);
+});
 
 test('cada método requerido por los servicios existe en preload', async () => {
   const serviceSources = await leerFuentesJs(path.join(srcDir, 'services'));
@@ -222,7 +291,7 @@ test('shell.openExternal recibe URLs de OAuth o formularios validadas', () => {
   assert.match(mainSource, /url\.protocol !== ["']https:["']/);
   assert.match(mainSource, /HOSTS_OAUTH_GOOGLE_PERMITIDOS/);
   assert.match(mainSource, /validarUrlExternaFormulario\(\s*urlResuelta,/);
-  assert.match(mainSource, /SGPA_PUBLIC_URL \|\| API_URL/);
+  assert.match(mainSource, /SGPA_PUBLIC_URL \|\| apiUrl/);
 });
 
 test('cada API de Electron utilizada en main está importada', () => {

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Carrera } from '../../carreras/entities/carrera.entity';
 import { GradoAcademico } from '../../carreras/constants/grado-academico.constant';
+import { EstadoPlanEstudio } from '../constants/estado-plan-estudio.constant';
 
 @Entity({ name: 'planes_estudio' })
 @Index('UQ_planes_estudio_carrera_codigo', ['carreraId', 'codigo'], {
@@ -59,6 +60,12 @@ export class PlanEstudio {
     default: true,
   })
   activo!: boolean;
+
+  @Column({ type: 'varchar', length: 20, default: EstadoPlanEstudio.VIGENTE })
+  estado!: EstadoPlanEstudio;
+
+  @Column({ name: 'motivo_ultimo_cambio', type: 'text', nullable: true })
+  motivoUltimoCambio!: string | null;
 
   @ManyToOne(() => Carrera, {
     onDelete: 'RESTRICT',

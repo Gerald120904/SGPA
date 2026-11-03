@@ -157,3 +157,74 @@ export async function registrarResultadoAcademicoEstudiante(
       datos
     );
 }
+
+
+export async function reingresarEstudiante(id, datos = {}) {
+  validarApi('reingresarEstudiante');
+  return window.sgpa.reingresarEstudiante(id, datos);
+}
+
+export async function graduarEstudiante(id, observacion) {
+  validarApi('graduarEstudiante');
+  return window.sgpa.graduarEstudiante(id, observacion);
+}
+
+export async function evaluarGraduacionEstudiante(id) {
+  validarApi('evaluarGraduacionEstudiante');
+  return window.sgpa.evaluarGraduacionEstudiante(id);
+}
+
+export async function confirmarGraduacionEstudiante(id, observacion) {
+  validarApi('confirmarGraduacionEstudiante');
+  return window.sgpa.confirmarGraduacionEstudiante(id, observacion);
+}
+
+export async function obtenerDiagnosticoReingreso(id) {
+  validarApi('obtenerDiagnosticoReingreso');
+  return window.sgpa.obtenerDiagnosticoReingreso(id);
+}
+
+export async function compararPlanesEstudiante(id, planNuevoId) {
+  validarApi('compararPlanesEstudiante');
+  return window.sgpa.compararPlanesEstudiante(id, planNuevoId);
+}
+
+export async function corregirResultadoAcademicoEstudiante(id, historialId, datos) {
+  validarApi('corregirResultadoAcademicoEstudiante');
+  return window.sgpa.corregirResultadoAcademicoEstudiante(id, historialId, datos);
+}
+
+export async function listarCorreccionesHistorialEstudiante(id) {
+  validarApi('listarCorreccionesHistorialEstudiante');
+  return window.sgpa.listarCorreccionesHistorialEstudiante(id);
+}
+
+export async function listarBandejaRevisionEstudiantes(filtros = {}) {
+  validarApi('listarBandejaRevisionEstudiantes');
+  return window.sgpa.listarBandejaRevisionEstudiantes(filtros);
+}
+
+export async function obtenerRegistroRevisionEstudiante(id) {
+  validarApi('obtenerRegistroRevisionEstudiante');
+  return window.sgpa.obtenerRegistroRevisionEstudiante(id);
+}
+
+export async function cargarLoteExcelRevision(payload) {
+  validarApi('cargarLoteExcelRevision');
+  return window.sgpa.cargarLoteExcelRevision(payload);
+}
+
+export async function aprobarRegistrosRevision(registroIds) {
+  validarApi('aprobarRegistrosRevision');
+  return window.sgpa.aprobarRegistrosRevision(registroIds);
+}
+
+export async function rechazarRegistrosRevision(rechazos) {
+  validarApi('rechazarRegistrosRevision');
+  return window.sgpa.rechazarRegistrosRevision(rechazos);
+}
+
+export async function devolverRegistrosRevision(registroIds, observacion) {
+  validarApi('devolverRegistrosRevision');
+  return window.sgpa.devolverRegistrosRevision(registroIds, observacion);
+}

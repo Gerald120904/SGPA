@@ -12,7 +12,8 @@ import {
   regenerarTokenFormularioEstudiantes,
   obtenerUrlPublicaFormulario,
   aceptarSolicitudFormulario,
-  rechazarSolicitudFormulario
+  rechazarSolicitudFormulario,
+  obtenerTicketVistaPreviaFormulario
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -459,9 +460,17 @@ function renderizarFilaFormulario(
     ERROR: 'danger'
   };
 
+  const estadoLabels = {
+    PUBLICADO: 'PUBLICADO',
+    CERRADO: 'CERRADO',
+    CREANDO: 'BORRADOR',
+    CREADO: 'BORRADOR',
+    ERROR: 'ERROR'
+  };
+
   const estadoBadge =
     StatusBadge({
-      label: formulario.estado || 'Sin estado',
+      label: estadoLabels[formulario.estado] || formulario.estado || 'Sin estado',
       tone:
         tonosEstado[formulario.estado] ||
         'neutral'
@@ -576,7 +585,27 @@ function renderizarFilaFormulario(
           }
 
           ${
-            puedeGestionar && esInterno && formulario.estado === 'CREADO'
+            esInterno && formulario.responderUri
+              ? `
+                <button
+                  type="button"
+                  class="formularios-icon-button"
+                  data-action="vista-previa"
+                  data-id="${formulario.id}"
+                  title="Vista previa del formulario (modo simulación)"
+                  aria-label="Vista previa del formulario"
+                >
+                  <i
+                    data-lucide="eye"
+                    aria-hidden="true"
+                  ></i>
+                </button>
+              `
+              : ''
+          }
+
+          ${
+            puedeGestionar && esInterno && (formulario.estado === 'CREADO' || formulario.estado === 'CREANDO')
               ? `
                 <button
                   type="button"
@@ -783,6 +812,38 @@ async function manejarAccionFormulario(event) {
         await abrirEnlaceFormularioEstudiantes(
           formulario.responderUri
         );
+      }
+      break;
+
+    case 'vista-previa':
+      if (formulario.id) {
+        try {
+          let previewUrl = null;
+          if (typeof obtenerTicketVistaPreviaFormulario === 'function') {
+            const ticketRes = await obtenerTicketVistaPreviaFormulario(formulario.id);
+            if (ticketRes?.data?.url) {
+              previewUrl = ticketRes.data.url;
+            } else if (ticketRes?.url) {
+              previewUrl = ticketRes.url;
+            }
+          }
+          if (!previewUrl && formulario.responderUri) {
+            previewUrl = formulario.responderUri.includes('?')
+              ? `${formulario.responderUri}&preview=true`
+              : `${formulario.responderUri}?preview=true`;
+          }
+          if (previewUrl) {
+            await abrirEnlaceFormularioEstudiantes(previewUrl);
+          }
+        } catch (err) {
+          console.error('Error al generar vista previa segura:', err);
+          if (formulario.responderUri) {
+            const fallbackUrl = formulario.responderUri.includes('?')
+              ? `${formulario.responderUri}&preview=true`
+              : `${formulario.responderUri}?preview=true`;
+            await abrirEnlaceFormularioEstudiantes(fallbackUrl);
+          }
+        }
       }
       break;
 

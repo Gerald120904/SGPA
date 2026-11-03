@@ -78,4 +78,14 @@ export class SalidasAcademicasController {
   ) {
     return this.service.cambiarEstado(planId, id, dto.activo);
   }
+
+  @Get(':salidaId/evaluar/:estudianteId')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_VER)
+  evaluarSalidaEstudiante(
+    @Param('planId', ParseIntPipe) planId: number,
+    @Param('salidaId', ParseIntPipe) salidaId: number,
+    @Param('estudianteId', ParseIntPipe) estudianteId: number,
+  ) {
+    return this.service.evaluarSalidaEstudiante(planId, salidaId, estudianteId);
+  }
 }

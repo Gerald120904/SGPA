@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -13,11 +14,12 @@ export type EstadoInvitacion =
   'PENDIENTE' | 'EN_PROCESO' | 'ENVIADA' | 'INCIERTA' | 'ACEPTADA' | 'CADUCADA';
 
 @Entity({ name: 'invitacion_outbox' })
+@Index('UQ_c908f31ae39be47c676a4d3ec91', ['usuarioId'], { unique: true })
 export class InvitacionOutbox {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
 
-  @Column({ name: 'usuario_id', type: 'int', unsigned: true, unique: true })
+  @Column({ name: 'usuario_id', type: 'int', unsigned: true })
   usuarioId!: number;
 
   @ManyToOne(() => Usuario, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })

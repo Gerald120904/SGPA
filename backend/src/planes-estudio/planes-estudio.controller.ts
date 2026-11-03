@@ -9,13 +9,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
-import { PermisoSistema } from '../permisos/constants/permisos.constant';
-import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
+import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
+import { PlanesEstudioService } from './planes-estudio.service';
+import { CrearPlanEstudioDto } from './dto/crear-plan-estudio.dto';
 import { ActualizarPlanEstudioDto } from './dto/actualizar-plan-estudio.dto';
 import { CambiarEstadoPlanEstudioDto } from './dto/cambiar-estado-plan-estudio.dto';
-import { CrearPlanEstudioDto } from './dto/crear-plan-estudio.dto';
-import { PlanesEstudioService } from './planes-estudio.service';
 import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 
@@ -56,7 +56,11 @@ export class PlanesEstudioController {
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoPlanEstudioDto,
+    @UsuarioActualId() usuarioId?: number,
   ) {
-    return this.planesEstudioService.cambiarEstado(id, dto.activo);
+    if (dto.estado !== undefined || dto.motivo !== undefined) {
+      return this.planesEstudioService.cambiarEstado(id, dto, usuarioId);
+    }
+    return this.planesEstudioService.cambiarEstado(id, dto.activo!);
   }
 }

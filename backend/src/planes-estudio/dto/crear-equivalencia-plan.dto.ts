@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
 
 export class CrearEquivalenciaPlanDto {
   @IsInt()
@@ -9,9 +9,14 @@ export class CrearEquivalenciaPlanDto {
   @IsPositive()
   planOrigenId!: number;
 
+  @IsOptional()
   @IsInt()
   @IsPositive()
-  asignaturaOrigenId!: number;
+  asignaturaOrigenId?: number;
+
+  @IsOptional()
+  @IsArray()
+  asignaturasOrigenIds?: number[];
 
   @IsInt()
   @IsPositive()
@@ -21,9 +26,18 @@ export class CrearEquivalenciaPlanDto {
   @IsPositive()
   planDestinoId!: number;
 
+  @IsOptional()
   @IsInt()
   @IsPositive()
-  asignaturaDestinoId!: number;
+  asignaturaDestinoId?: number;
+
+  @IsOptional()
+  @IsArray()
+  asignaturasDestinoIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  tipoEquivalencia?: 'INDIVIDUAL' | 'N_A_1' | '1_A_N';
 
   @IsOptional()
   @IsString()

@@ -47,6 +47,101 @@ export class EquivalenciasService {
       throw new ForbiddenException('No tiene permisos para gestionar equivalencias en la carrera destino.');
     }
 
+    // Support N:1 composite equivalence
+    if (dto.tipoEquivalencia === 'N_A_1' || (dto.asignaturasOrigenIds && dto.asignaturasOrigenIds.length > 1)) {
+      const origenIds = dto.asignaturasOrigenIds || (dto.asignaturaOrigenId ? [dto.asignaturaOrigenId] : []);
+      if (!origenIds.length) {
+        throw new BadRequestException('Se requieren asignaturas de origen para equivalencia N a 1.');
+      }
+      if (!dto.asignaturaDestinoId) {
+        throw new BadRequestException('Se requiere una asignatura de destino para equivalencia N a 1.');
+      }
+      const asigDestino = await this.planAsignaturaRepo.findOne({
+        where: { id: dto.asignaturaDestinoId, planEstudioId: dto.planDestinoId },
+      });
+      if (!asigDestino) {
+        throw new BadRequestException('La asignatura de destino no pertenece al plan de destino.');
+      }
+
+      const groupId = `COMP_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const creadas: EquivalenciaPlan[] = [];
+
+      for (let i = 0; i < origenIds.length; i++) {
+        const origId = origenIds[i];
+        const asigOrigen = await this.planAsignaturaRepo.findOne({
+          where: { id: origId, planEstudioId: dto.planOrigenId },
+        });
+        if (!asigOrigen) {
+          throw new BadRequestException(`La asignatura de origen #${origId} no pertenece al plan de origen.`);
+        }
+
+        const tag = `[COMPUESTA_N1:${groupId}:${i + 1}:${origenIds.length}:${JSON.stringify(origenIds)}]`;
+        const justif = dto.justificacion?.trim() ? `${tag} ${dto.justificacion.trim()}` : tag;
+
+        const entidad = this.equivalenciaRepo.create({
+          carreraOrigenId: dto.carreraOrigenId,
+          planOrigenId: dto.planOrigenId,
+          asignaturaOrigenId: origId,
+          carreraDestinoId: dto.carreraDestinoId,
+          planDestinoId: dto.planDestinoId,
+          asignaturaDestinoId: dto.asignaturaDestinoId,
+          justificacion: justif,
+          autorizadoPorUsuarioId: usuarioId,
+          activo: true,
+        });
+        creadas.push(await this.equivalenciaRepo.save(entidad));
+      }
+      return creadas[0];
+    }
+
+    // Support 1:N composite equivalence
+    if (dto.tipoEquivalencia === '1_A_N' || (dto.asignaturasDestinoIds && dto.asignaturasDestinoIds.length > 1)) {
+      const destIds = dto.asignaturasDestinoIds || (dto.asignaturaDestinoId ? [dto.asignaturaDestinoId] : []);
+      if (!destIds.length) {
+        throw new BadRequestException('Se requieren asignaturas de destino para equivalencia 1 a N.');
+      }
+      if (!dto.asignaturaOrigenId) {
+        throw new BadRequestException('Se requiere una asignatura de origen para equivalencia 1 a N.');
+      }
+      const asigOrigen = await this.planAsignaturaRepo.findOne({
+        where: { id: dto.asignaturaOrigenId, planEstudioId: dto.planOrigenId },
+      });
+      if (!asigOrigen) {
+        throw new BadRequestException('La asignatura de origen no pertenece al plan de origen.');
+      }
+
+      const groupId = `COMP1N_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const creadas: EquivalenciaPlan[] = [];
+
+      for (let i = 0; i < destIds.length; i++) {
+        const dId = destIds[i];
+        const asigDestino = await this.planAsignaturaRepo.findOne({
+          where: { id: dId, planEstudioId: dto.planDestinoId },
+        });
+        if (!asigDestino) {
+          throw new BadRequestException(`La asignatura de destino #${dId} no pertenece al plan de destino.`);
+        }
+
+        const tag = `[COMPUESTA_1N:${groupId}:${i + 1}:${destIds.length}:${JSON.stringify(destIds)}]`;
+        const justif = dto.justificacion?.trim() ? `${tag} ${dto.justificacion.trim()}` : tag;
+
+        const entidad = this.equivalenciaRepo.create({
+          carreraOrigenId: dto.carreraOrigenId,
+          planOrigenId: dto.planOrigenId,
+          asignaturaOrigenId: dto.asignaturaOrigenId,
+          carreraDestinoId: dto.carreraDestinoId,
+          planDestinoId: dto.planDestinoId,
+          asignaturaDestinoId: dId,
+          justificacion: justif,
+          autorizadoPorUsuarioId: usuarioId,
+          activo: true,
+        });
+        creadas.push(await this.equivalenciaRepo.save(entidad));
+      }
+      return creadas[0];
+    }
+
+    // Standard 1:1
     const [asigOrigen, asigDestino] = await Promise.all([
       this.planAsignaturaRepo.findOne({
         where: { id: dto.asignaturaOrigenId, planEstudioId: dto.planOrigenId },
@@ -97,6 +192,44 @@ export class EquivalenciasService {
     });
   }
 
+  async eliminar(usuarioId: number, id: number): Promise<{ success: boolean; eliminadas: number }> {
+    const eq = await this.equivalenciaRepo.findOne({
+      where: { id, activo: true },
+    });
+    if (!eq) {
+      throw new NotFoundException('Equivalencia no encontrada o ya inactiva.');
+    }
+
+    const puede = await this.alcance.puedeEjecutar(
+      usuarioId,
+      PermisoSistema.PLANES_ESTUDIO_GESTIONAR,
+      eq.carreraDestinoId,
+    );
+    if (!puede) {
+      throw new ForbiddenException('No tiene permisos para eliminar equivalencias en la carrera destino.');
+    }
+
+    let eliminadas = 1;
+    const matchGroup = eq.justificacion?.match(/\[COMPUESTA_(?:N1|1N):([^:]+):/);
+    if (matchGroup && matchGroup[1]) {
+      const groupId = matchGroup[1];
+      const grupo = await this.equivalenciaRepo.find({
+        where: { planOrigenId: eq.planOrigenId, planDestinoId: eq.planDestinoId, activo: true },
+      });
+      const relacionadas = grupo.filter((e) => e.justificacion && e.justificacion.includes(`:${groupId}:`));
+      for (const rel of relacionadas) {
+        rel.activo = false;
+        await this.equivalenciaRepo.save(rel);
+      }
+      eliminadas = relacionadas.length || 1;
+    } else {
+      eq.activo = false;
+      await this.equivalenciaRepo.save(eq);
+    }
+
+    return { success: true, eliminadas };
+  }
+
   async sugerirEquivalenciasParaEstudiante(
     usuarioId: number,
     estudianteId: number,
@@ -145,7 +278,7 @@ export class EquivalenciasService {
     const sugerencias = equivalencias.filter((eq) => {
       const tieneAprobadaPorId = aprobadasOrigenIds.has(eq.asignaturaOrigenId);
       const tieneAprobadaPorCurso =
-        eq.asignaturaOrigen.cursoId != null && cursosAprobadosIds.has(eq.asignaturaOrigen.cursoId);
+        eq.asignaturaOrigen?.cursoId != null && cursosAprobadosIds.has(eq.asignaturaOrigen.cursoId);
       return tieneAprobadaPorId || tieneAprobadaPorCurso;
     });
 
@@ -158,15 +291,15 @@ export class EquivalenciasService {
         equivalenciaId: eq.id,
         origen: {
           asignaturaId: eq.asignaturaOrigenId,
-          codigo: eq.asignaturaOrigen.curso?.codigo || eq.asignaturaOrigen.codigoReferencia,
-          nombre: eq.asignaturaOrigen.curso?.nombre || eq.asignaturaOrigen.nombreReferencia || 'Sin nombre',
-          creditos: eq.asignaturaOrigen.creditos,
+          codigo: eq.asignaturaOrigen?.curso?.codigo || eq.asignaturaOrigen?.codigoReferencia,
+          nombre: eq.asignaturaOrigen?.curso?.nombre || eq.asignaturaOrigen?.nombreReferencia || 'Sin nombre',
+          creditos: eq.asignaturaOrigen?.creditos,
         },
         destino: {
           asignaturaId: eq.asignaturaDestinoId,
-          codigo: eq.asignaturaDestino.curso?.codigo || eq.asignaturaDestino.codigoReferencia,
-          nombre: eq.asignaturaDestino.curso?.nombre || eq.asignaturaDestino.nombreReferencia || 'Sin nombre',
-          creditos: eq.asignaturaDestino.creditos,
+          codigo: eq.asignaturaDestino?.curso?.codigo || eq.asignaturaDestino?.codigoReferencia,
+          nombre: eq.asignaturaDestino?.curso?.nombre || eq.asignaturaDestino?.nombreReferencia || 'Sin nombre',
+          creditos: eq.asignaturaDestino?.creditos,
         },
         justificacion: eq.justificacion,
       })),
@@ -233,5 +366,46 @@ export class EquivalenciasService {
         aplicadas,
       };
     });
+  }
+  async autorizar(usuarioId: number, id: number): Promise<EquivalenciaPlan> {
+    const eq = await this.equivalenciaRepo.findOne({
+      where: { id },
+      relations: { planDestino: true },
+    });
+    if (!eq) throw new NotFoundException('Equivalencia no encontrada.');
+
+    const puede = await this.alcance.puedeEjecutar(
+      usuarioId,
+      PermisoSistema.PLANES_ESTUDIO_GESTIONAR,
+      eq.carreraDestinoId,
+    );
+    if (!puede) throw new ForbiddenException('No tiene permisos para autorizar equivalencias en la carrera destino.');
+
+    eq.activo = true;
+    eq.autorizadoPorUsuarioId = usuarioId;
+    return this.equivalenciaRepo.save(eq);
+  }
+
+  async rechazar(usuarioId: number, id: number, motivo: string): Promise<EquivalenciaPlan> {
+    const eq = await this.equivalenciaRepo.findOne({
+      where: { id },
+      relations: { planDestino: true },
+    });
+    if (!eq) throw new NotFoundException('Equivalencia no encontrada.');
+
+    const puede = await this.alcance.puedeEjecutar(
+      usuarioId,
+      PermisoSistema.PLANES_ESTUDIO_GESTIONAR,
+      eq.carreraDestinoId,
+    );
+    if (!puede) throw new ForbiddenException('No tiene permisos para rechazar equivalencias en la carrera destino.');
+
+    if (!motivo || motivo.trim().length < 5) {
+      throw new BadRequestException('El motivo de rechazo de la equivalencia es obligatorio (mínimo 5 caracteres).');
+    }
+
+    eq.activo = false;
+    eq.justificacion = `[RECHAZADA: ${motivo.trim()}] ${eq.justificacion || ''}`.substring(0, 500);
+    return this.equivalenciaRepo.save(eq);
   }
 }

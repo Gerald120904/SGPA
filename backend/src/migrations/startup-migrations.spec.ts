@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
-import { executeSafeOfficialMigrations, validateMigrationHistory, verificarMigracionesAntesDeEscuchar } from './startup-migrations';
+import { executeSafeOfficialMigrations, validateMigrationHistory, verificarMigracionesAntesDeEscuchar, verificarMigracionesSinAplicar } from './startup-migrations';
 
 const MIGRATION = 'Change2026101500000';
 
@@ -38,7 +38,7 @@ function scenario(options: {
     query: jest.fn(async (sql: string, params?: unknown[]) => {
       if (sql.includes('GET_LOCK')) return [{ adquirido: 1 }];
       if (sql.includes('RELEASE_LOCK')) return [{ liberado: 1 }];
-      return query(sql, params);
+      return query(sql);
     }),
     release: jest.fn().mockResolvedValue(undefined),
   };
@@ -58,6 +58,16 @@ function scenario(options: {
 }
 
 describe('migraciones automáticas antes de escuchar', () => {
+  it('verifica sgpa sin aplicar migraciones aunque la migración automática esté autorizada', async () => {
+    const alDia = scenario({ authorized: true, applied: [MIGRATION] });
+    await expect(verificarMigracionesSinAplicar(alDia.dataSource)).resolves.toBeUndefined();
+    expect(alDia.runMigrations).not.toHaveBeenCalled();
+
+    const pendiente = scenario({ authorized: true });
+    await expect(verificarMigracionesSinAplicar(pendiente.dataSource))
+      .rejects.toThrow('No se aplicó ninguna migración');
+    expect(pendiente.runMigrations).not.toHaveBeenCalled();
+  });
   it('rechaza huecos lógicos aunque los nombres y timestamps sean oficiales', () => {
     const official = ['Base2026101400000', 'First2026101500000', 'Second2026101600000'];
     expect(() => validateMigrationHistory([

@@ -73,6 +73,21 @@ describe('FormulariosPublicosWebController', () => {
     expect(bodySent).toContain('SGPA');
   });
 
+  it('debe renderizar el banner de vista previa si preview es true', () => {
+    let bodySent: string | undefined;
+    const mockResponse = {
+      setHeader: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      type: jest.fn().mockReturnThis(),
+      send: jest.fn((body: string) => {
+        bodySent = body;
+      }),
+    } as unknown as Response;
+
+    controller.mostrarFormularioPublico(validToken, mockResponse, 'true');
+    expect(bodySent).toContain('MODO VISTA PREVIA');
+  });
+
   it('debe retornar 400 Bad Request cuando el token es inválido o no tiene 64 caracteres hex', () => {
     const headers: Record<string, string> = {};
     let statusSet: number | undefined;

@@ -9,6 +9,7 @@ import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { CursoOptativo } from '../optativas/entities/curso-optativo.entity';
 import { TipoPlanAsignatura } from '../planes-estudio/constants/tipo-plan-asignatura.constant';
+import { EstadoPlanEstudio } from '../planes-estudio/constants/estado-plan-estudio.constant';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { CursosService } from './cursos.service';
@@ -82,6 +83,8 @@ describe('CursosService', () => {
     nombre: 'Plan 2026',
     descripcion: null,
     activo: true,
+    estado: EstadoPlanEstudio.VIGENTE,
+    motivoUltimoCambio: null,
     carrera,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),

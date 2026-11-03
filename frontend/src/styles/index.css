@@ -2152,17 +2152,35 @@ button {
    SIDEBAR CONTRAÍDO
    ========================================================= */
 
-.sidebar-collapsed .sidebar-header {
-  justify-content: center;
-
-  padding-left: 10px;
-  padding-right: 10px;
+.sidebar-collapsed .sidebar-header,
+.sidebar.collapsed .sidebar-header,
+#sidebar.collapsed .sidebar-header,
+.app-shell.sidebar-collapsed .sidebar-header {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  height: auto !important;
+  min-height: 80px !important;
+  padding: 10px 4px 8px 4px !important;
+  gap: 8px !important;
 }
 
 
-.sidebar-collapsed .sidebar-header-brand,
+.sidebar-collapsed .sidebar-header-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
 .sidebar-collapsed .sidebar-logo {
-  display: none;
+  display: block !important;
+  width: 36px !important;
+  max-width: 36px !important;
+  height: auto;
+  max-height: 36px;
+  object-fit: contain;
 }
 
 
@@ -2461,7 +2479,6 @@ button {
    * si el usuario contrae el menú.
    */
 
-  .sidebar-collapsed .sidebar-header-brand,
   .sidebar-collapsed .sidebar-context,
   .sidebar-collapsed .nav-section-title,
   .sidebar-collapsed .nav-item span,
@@ -2535,4 +2552,99 @@ button {
       1fr;
   }
 
+}
+
+
+/* Selector de rol activo en modo contraído */
+.sidebar-collapsed .sidebar-role-container,
+.sidebar.collapsed .sidebar-role-container,
+#sidebar.collapsed .sidebar-role-container,
+.app-shell.sidebar-collapsed .sidebar-role-container {
+  padding: 10px 4px !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.sidebar-collapsed .role-selector-expanded,
+.sidebar.collapsed .role-selector-expanded,
+#sidebar.collapsed .role-selector-expanded,
+.app-shell.sidebar-collapsed .role-selector-expanded {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  position: absolute !important;
+  pointer-events: none !important;
+}
+
+.sidebar-collapsed .role-selector-collapsed,
+.sidebar.collapsed .role-selector-collapsed,
+#sidebar.collapsed .role-selector-collapsed,
+.app-shell.sidebar-collapsed .role-selector-collapsed {
+  display: flex !important;
+  visibility: visible !important;
+  width: 100% !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 0 !important;
+}
+
+.sidebar:not(.collapsed) .role-selector-expanded,
+.app-shell:not(.sidebar-collapsed) .sidebar:not(.collapsed) .role-selector-expanded {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+.sidebar:not(.collapsed) .role-selector-collapsed,
+.app-shell:not(.sidebar-collapsed) .sidebar:not(.collapsed) .role-selector-collapsed {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+
+/* Estado vacío institucional del Panel de gestión */
+.modules-dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  margin: 24px 0;
+  color: #475569;
+}
+
+.modules-dashboard-empty .empty-icon {
+  width: 48px;
+  height: 48px;
+  color: #ba141a;
+  margin-bottom: 16px;
+}
+
+.modules-dashboard-empty h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.modules-dashboard-empty p {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin: 0 0 8px 0;
+}
+
+.modules-dashboard-empty small {
+  font-size: 0.825rem;
+  color: #94a3b8;
 }

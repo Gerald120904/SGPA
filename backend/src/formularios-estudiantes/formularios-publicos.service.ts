@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Optional,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -11,6 +12,7 @@ import { createHash } from 'node:crypto';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { MotorRequisitosService } from '../planes-estudio/motor-requisitos/motor-requisitos.service';
+import { EstudiantesService } from '../estudiantes/estudiantes.service';
 import { PoliticaCorrequisito } from '../planes-estudio/motor-requisitos/types/motor-reglas.types';
 import { EstadoFormularioEstudiante } from './constants/estado-formulario-estudiante.constant';
 import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
@@ -53,6 +55,8 @@ export class FormulariosPublicosService {
 
     private readonly persistenciaInternaService: FormulariosInternosPersistenciaService,
     private readonly motorRequisitosService: MotorRequisitosService,
+    @Optional()
+    private readonly estudiantesService?: EstudiantesService,
   ) {}
 
   /**
@@ -60,7 +64,7 @@ export class FormulariosPublicosService {
    * Entrega únicamente la información necesaria para el estudiante y el catálogo
    * reactivo calculado por el motor académico.
    */
-  async consultarFormularioPublico(token: string) {
+  async consultarFormularioPublico(token: string, previewToken?: string) {
     this.validarFormatoToken(token);
 
     const formulario = await this.formularioRepo.findOne({
@@ -80,13 +84,18 @@ export class FormulariosPublicosService {
       );
     }
 
-    if (formulario.estado === EstadoFormularioEstudiante.CERRADO) {
+    const esVistaPreviaValida = Boolean(
+      previewToken &&
+      this.persistenciaInternaService.validarTicketVistaPrevia(token.trim(), previewToken, formulario.id)
+    );
+
+    if (formulario.estado === EstadoFormularioEstudiante.CERRADO && !esVistaPreviaValida) {
       throw new BadRequestException(
         'El formulario se encuentra cerrado y no acepta nuevas respuestas.',
       );
     }
 
-    if (formulario.estado !== EstadoFormularioEstudiante.PUBLICADO) {
+    if (formulario.estado !== EstadoFormularioEstudiante.PUBLICADO && !esVistaPreviaValida) {
       throw new BadRequestException(
         'El formulario no se encuentra disponible actualmente.',
       );
@@ -100,8 +109,11 @@ export class FormulariosPublicosService {
       },
     });
 
-    // Obtener catálogo jerárquico por niveles y ciclos
-    const opciones = { politicaCorrequisito: PoliticaCorrequisito.BLOQUEAR_REVISION };
+    // Obtener catálogo jerárquico por niveles y ciclos incluyendo asignaturas históricas del plan
+    const opciones = {
+      politicaCorrequisito: PoliticaCorrequisito.INFORMATIVO,
+      permitirInactivas: true,
+    };
     const catalogo = esInstantaneaCurricularInterna(formulario.mapaPreguntas)
       ? catalogoDesdeInstantanea(formulario.mapaPreguntas, opciones)
       : (await this.motorRequisitosService.obtenerCatalogoFormulario(
@@ -143,6 +155,7 @@ export class FormulariosPublicosService {
   async registrarRespuestaPublica(
     token: string,
     dto: EnviarRespuestaPublicaDto,
+    previewToken?: string,
   ) {
     if (!dto.idempotencyKey || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(dto.idempotencyKey)) {
       throw new BadRequestException('La clave del intento de envío debe ser un UUID válido.');
@@ -152,7 +165,7 @@ export class FormulariosPublicosService {
     const clave = `${token}:${dto.idempotencyKey}:${this.generarFingerprintRespuesta(token, dto)}`;
     const enCurso = this.enviosEnCurso.get(clave);
     if (enCurso) return enCurso;
-    const operacion = this.registrarRespuestaPublicaSinDuplicado(token, dto);
+    const operacion = this.registrarRespuestaPublicaSinDuplicado(token, dto, previewToken);
     this.enviosEnCurso.set(clave, operacion);
     try {
       return await operacion;
@@ -166,6 +179,7 @@ export class FormulariosPublicosService {
   private async registrarRespuestaPublicaSinDuplicado(
     token: string,
     dto: EnviarRespuestaPublicaDto,
+    previewToken?: string,
   ) {
     this.validarFormatoToken(token);
 
@@ -188,16 +202,17 @@ export class FormulariosPublicosService {
       );
     }
 
-    if (formulario.estado === EstadoFormularioEstudiante.CERRADO) {
-      throw new BadRequestException(
-        'El formulario se encuentra cerrado y no acepta nuevas respuestas.',
-      );
-    }
+    const esVistaPreviaValida = Boolean(
+      previewToken &&
+      this.persistenciaInternaService.validarTicketVistaPrevia(token.trim(), previewToken, formulario.id)
+    );
 
     if (formulario.estado !== EstadoFormularioEstudiante.PUBLICADO) {
-      throw new BadRequestException(
-        'El formulario no se encuentra disponible actualmente.',
-      );
+      if (!esVistaPreviaValida) {
+        throw new BadRequestException(
+          'El formulario se encuentra en borrador o cerrado y no acepta respuestas oficiales.',
+        );
+      }
     }
 
     // 1. Validar que el período de ingreso exista
@@ -211,17 +226,60 @@ export class FormulariosPublicosService {
       );
     }
 
-    // 3. Validación estricta del motor de requisitos académicos (Zero-Trust Backend)
+    // Validar pertenencia estricta de asignaturas al plan de estudios del formulario
+    if (dto.asignaturasAprobadasIds.length > 0 && typeof this.planAsignaturaRepo.count === 'function') {
+      const asignaturasEnPlan = await this.planAsignaturaRepo.count({
+        where: {
+          id: In(dto.asignaturasAprobadasIds),
+          planEstudioId: formulario.planEstudioId,
+        },
+      });
+      if (asignaturasEnPlan !== dto.asignaturasAprobadasIds.length) {
+        throw new BadRequestException(
+          'Una o más asignaturas seleccionadas no pertenecen al plan de estudios del formulario.',
+        );
+      }
+    }
+
+    // 3. Integración con expediente oficial existente para validación de prerrequisitos
+    let asignaturasHistorial: number[] = [];
+    if (this.estudiantesService && typeof this.estudiantesService.obtenerAsignaturasAprobadasPorCedula === 'function') {
+      asignaturasHistorial = await this.estudiantesService.obtenerAsignaturasAprobadasPorCedula(
+        formulario.carreraId,
+        dto.identificacion.trim(),
+      ).catch(() => []);
+    }
+
+    const aprobadasParaMotor = [
+      ...new Set([...dto.asignaturasAprobadasIds, ...asignaturasHistorial]),
+    ];
+
+    const opciones = {
+      politicaCorrequisito: PoliticaCorrequisito.INFORMATIVO,
+      permitirInactivas: true,
+    };
+    const advertenciasCorrequisitos: string[] = [];
+    let requiereRevisionPrerrequisitos = false;
+
     try {
-      const opciones = { politicaCorrequisito: PoliticaCorrequisito.BLOQUEAR_REVISION };
-      if (esInstantaneaCurricularInterna(formulario.mapaPreguntas)) {
-        validarSeleccionInstantanea(
-          formulario.mapaPreguntas, dto.asignaturasAprobadasIds, opciones,
-        );
-      } else {
-        await this.motorRequisitosService.validarSeleccionEstricta(
-          formulario.planEstudioId, dto.asignaturasAprobadasIds, opciones,
-        );
+      const resultadoMotor = esInstantaneaCurricularInterna(formulario.mapaPreguntas)
+        ? validarSeleccionInstantanea(formulario.mapaPreguntas, aprobadasParaMotor, opciones)
+        : await this.motorRequisitosService.validarSeleccionEstricta(
+            formulario.planEstudioId, dto.asignaturasAprobadasIds, opciones,
+          );
+
+      for (const asig of (resultadoMotor?.asignaturas || [])) {
+        if (asig.aprobada) {
+          for (const req of asig.detallesRequisitos || []) {
+            if (req.tipo === 'CORREQUISITO' && !req.cumplido) {
+              const correqCodigo = req.codigo ?? `#${req.requisitoAsignaturaId}`;
+              const correqNombre = req.nombre ? ` (${req.nombre})` : '';
+              advertenciasCorrequisitos.push(
+                `Advertencia: Has seleccionado ${asig.codigo} (${asig.nombre}), que tiene como correquisito ${correqCodigo}${correqNombre}. Si aprobaste ambas, asegúrate de marcar también ${correqCodigo}. Si sólo aprobaste una, puedes continuar.`,
+              );
+            }
+          }
+        }
       }
     } catch (error) {
       if (error instanceof BadRequestException) {
@@ -231,6 +289,15 @@ export class FormulariosPublicosService {
       throw new InternalServerErrorException(
         'No se pudo verificar la coherencia académica de las asignaturas seleccionadas.',
       );
+    }
+
+    // Modo simulación de vista previa: no persiste datos en base de datos
+    if (esVistaPreviaValida && formulario.estado !== EstadoFormularioEstudiante.PUBLICADO) {
+      return {
+        mensaje: 'Simulación de vista previa completada con éxito. En modo simulación no se persisten respuestas en la base de datos.',
+        codigoConfirmacion: 'SIM-PREVIEW-EXITO',
+        estado: 'SIMULADO',
+      };
     }
 
     // 4. Normalizar datos académicos
@@ -256,7 +323,7 @@ export class FormulariosPublicosService {
             nombre: asignatura.nombre,
           };
         })
-      : asignaturasEntities.map((ent) => ({
+      : (asignaturasEntities || []).map((ent) => ({
         planAsignaturaId: ent.id,
         cursoId: ent.cursoId ?? 0,
         codigo:
@@ -269,6 +336,9 @@ export class FormulariosPublicosService {
           undefined,
       }));
 
+    const requiereRevisionFinal =
+      Boolean(dto.optativasNoDisciplinarias?.trim()) || requiereRevisionPrerrequisitos;
+
     const datosNormalizados: DatosNormalizadosFormulario = {
       primerNombre: dto.primerNombre.trim(),
       segundoNombre: dto.segundoNombre?.trim() || null,
@@ -280,7 +350,8 @@ export class FormulariosPublicosService {
       periodoIngresoId: dto.periodoIngresoId,
       asignaturasAprobadas,
       optativasNoDisciplinarias: dto.optativasNoDisciplinarias?.trim() || null,
-      requiereRevisionOptativas: Boolean(dto.optativasNoDisciplinarias?.trim()),
+      requiereRevisionOptativas: requiereRevisionFinal,
+      advertenciasCorrequisitos: advertenciasCorrequisitos.length > 0 ? advertenciasCorrequisitos : undefined,
     };
 
     // 5. Persistir mediante el servicio de persistencia interna
@@ -302,7 +373,7 @@ export class FormulariosPublicosService {
       datosNormalizadosJson: datosNormalizados,
     });
 
-    if (!respuesta.idempotente) this.logger.log(`Respuesta interna registrada: ID #${respuesta.id}`);
+    if (respuesta && !respuesta.idempotente) this.logger.log(`Respuesta interna registrada: ID #${respuesta.id}`);
 
     return {
       mensaje: 'Su respuesta ha sido registrada satisfactoriamente.',

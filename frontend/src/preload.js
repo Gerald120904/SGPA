@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("sgpa", {
   logout: () => ipcRenderer.invoke("auth:logout"),
   cambiarRolActivo: (rol) => ipcRenderer.invoke("auth:cambiar-rol-activo", rol),
   verificarIdentidadBackend: () => ipcRenderer.invoke("app:verificar-identidad"),
+  obtenerBackendConfig: () => ipcRenderer.invoke('app:backend-config'),
+  configurarBackend: (url) => ipcRenderer.invoke('app:configurar-backend', url),
   listarUsuarios: () => ipcRenderer.invoke("usuarios:listar"),
   obtenerUsuario: (id) => ipcRenderer.invoke("usuarios:obtener", id),
   crearUsuario: (datos) => ipcRenderer.invoke("usuarios:crear", datos),
@@ -41,6 +43,9 @@ contextBridge.exposeInMainWorld("sgpa", {
   proponerCambioPlanEstudiante: (id, datos) => ipcRenderer.invoke('solicitudes:proponer-cambio-plan-estudiante', id, datos),
   proponerResultadoEstudiante: (id, datos) => ipcRenderer.invoke('solicitudes:proponer-resultado-estudiante', id, datos),
   proponerImportacionEstudiantes: (datos) => ipcRenderer.invoke('solicitudes:proponer-importacion-estudiantes', datos),
+  proponerRevisionBandejaEstudiantes: (datos) => ipcRenderer.invoke('solicitudes:proponer-revision-bandeja-estudiantes', datos),
+  proponerReingresoEstudiante: (id, datos) => ipcRenderer.invoke('solicitudes:proponer-reingreso-estudiante', id, datos),
+  proponerCorreccionResultado: (id, datos) => ipcRenderer.invoke('solicitudes:proponer-correccion-resultado', id, datos),
   proponerCrearCurso: (datos) => ipcRenderer.invoke('solicitudes:proponer-curso', datos),
   proponerActualizarCurso: (id, datos) => ipcRenderer.invoke('solicitudes:proponer-actualizacion-curso', id, datos),
   proponerEstadoCurso: (id, activo) => ipcRenderer.invoke('solicitudes:proponer-estado-curso', id, activo),
@@ -83,6 +88,7 @@ contextBridge.exposeInMainWorld("sgpa", {
   listarEquivalenciasPlanes: (planOrigenId, planDestinoId) => ipcRenderer.invoke('equivalencias:listar-planes', planOrigenId, planDestinoId),
   sugerirEquivalenciasEstudiante: (estudianteId, nuevoPlanId) => ipcRenderer.invoke('equivalencias:sugerir', estudianteId, nuevoPlanId),
   aplicarEquivalenciasEstudiante: (estudianteId, datos) => ipcRenderer.invoke('equivalencias:aplicar', estudianteId, datos),
+  eliminarEquivalenciaPlan: (id) => ipcRenderer.invoke('equivalencias:eliminar', id),
   copiarCursosPerfil: (perfilId, perfilOrigenId) => ipcRenderer.invoke('perfiles-academicos:copiar-cursos', perfilId, perfilOrigenId),
 
   listarCatalogoPermisos: () =>
@@ -213,8 +219,8 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("planes-estudio:crear", datos),
   actualizarPlanEstudio: (id, datos) =>
     ipcRenderer.invoke("planes-estudio:actualizar", id, datos),
-  cambiarEstadoPlanEstudio: (id, activo) =>
-    ipcRenderer.invoke("planes-estudio:cambiar-estado", id, activo),
+  cambiarEstadoPlanEstudio: (id, activo, motivo) =>
+    ipcRenderer.invoke("planes-estudio:cambiar-estado", id, activo, motivo),
   obtenerReglaOptativasPlan: (planId) =>
     ipcRenderer.invoke("plan-reglas-optativas:obtener", planId),
   guardarReglaOptativasPlan: (planId, datos) =>
@@ -266,6 +272,16 @@ contextBridge.exposeInMainWorld("sgpa", {
       salidaId,
       datos,
     ),
+  evaluarSalidaAcademica: (salidaId, estudianteId) =>
+    ipcRenderer.invoke("salidas-academicas:evaluar", salidaId, estudianteId),
+  consultarPoblacionTransicion: (planOrigenId, carreraId) =>
+    ipcRenderer.invoke("transiciones-curriculares:poblacion", planOrigenId, carreraId),
+  simularTransicionCurricular: (datos) =>
+    ipcRenderer.invoke("transiciones-curriculares:simular", datos),
+  ejecutarTransicionCurricular: (datos) =>
+    ipcRenderer.invoke("transiciones-curriculares:ejecutar", datos),
+  listarLotesTransicionCurricular: (carreraId, planOrigenId, planDestinoId) =>
+    ipcRenderer.invoke("transiciones-curriculares:lotes", carreraId, planOrigenId, planDestinoId),
   obtenerResumenPlan: (planId) =>
     ipcRenderer.invoke("plan-resumen:obtener", planId),
   validarPlanEstudio: (planId) =>
@@ -851,6 +867,8 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke('formularios-estudiantes:respuestas', id),
   abrirEnlaceFormularioEstudiantes: (url) =>
     ipcRenderer.invoke('formularios-estudiantes:abrir-enlace', url),
+  obtenerTicketVistaPreviaFormulario: (id) =>
+    ipcRenderer.invoke('formularios-estudiantes:ticket-vista-previa', id),
   obtenerUrlPublicaFormulario: (responderUri) =>
     ipcRenderer.invoke('formularios-estudiantes:obtener-url-publica', responderUri),
 
@@ -878,8 +896,32 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke('estudiantes:progreso', id, periodoReferenciaId),
   registrarResultadoAcademicoEstudiante: (id, datos) =>
     ipcRenderer.invoke('estudiantes:registrar-resultado', id, datos),
-  reingresarEstudiante: (id) =>
-    ipcRenderer.invoke('estudiantes:reingresar', id),
+  reingresarEstudiante: (id, datos) =>
+    ipcRenderer.invoke('estudiantes:reingresar', id, datos),
   graduarEstudiante: (id, observacion) =>
     ipcRenderer.invoke('estudiantes:graduar', id, observacion),
+  evaluarGraduacionEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:evaluar-graduacion', id),
+  confirmarGraduacionEstudiante: (id, observacion) =>
+    ipcRenderer.invoke('estudiantes:confirmar-graduacion', id, observacion),
+  obtenerDiagnosticoReingreso: (id) =>
+    ipcRenderer.invoke('estudiantes:reingreso-diagnostico', id),
+  compararPlanesEstudiante: (id, planNuevoId) =>
+    ipcRenderer.invoke('estudiantes:comparar-planes', id, planNuevoId),
+  corregirResultadoAcademicoEstudiante: (id, historialId, datos) =>
+    ipcRenderer.invoke('estudiantes:corregir-resultado', id, historialId, datos),
+  listarCorreccionesHistorialEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes:correcciones-historial', id),
+  listarBandejaRevisionEstudiantes: (filtros) =>
+    ipcRenderer.invoke('estudiantes-revision:bandeja', filtros),
+  obtenerRegistroRevisionEstudiante: (id) =>
+    ipcRenderer.invoke('estudiantes-revision:detalle', id),
+  cargarLoteExcelRevision: (payload) =>
+    ipcRenderer.invoke('estudiantes-revision:lote-excel', payload),
+  aprobarRegistrosRevision: (registroIds) =>
+    ipcRenderer.invoke('estudiantes-revision:aprobar-masivo', registroIds),
+  rechazarRegistrosRevision: (rechazos) =>
+    ipcRenderer.invoke('estudiantes-revision:rechazar-masivo', rechazos),
+  devolverRegistrosRevision: (registroIds, observacion) =>
+    ipcRenderer.invoke('estudiantes-revision:devolver', registroIds, observacion),
 });

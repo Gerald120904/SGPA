@@ -1,702 +1,89 @@
-import {
-  DASHBOARD_MOCK
-} from '../../data/dashboard.mock.js';
+import { escapeHtml } from '../../utils/html.js';
+import { obtenerModuloPorRuta } from '../../config/modules.js';
+import { puedeAcceder } from '../../config/permissions.js';
+import { obtenerRolesEfectivos, obtenerPermisosUsuario } from '../../app/session.js';
+import { listarEstudiantes } from '../../services/estudiantes.service.js';
 
-import {
-  escapeHtml
-} from '../../utils/html.js';
+const ACCIONES = [
+  { title: 'Crear oferta académica', route: '/oferta', icon: 'circle-plus' },
+  { title: 'Registrar estudiante', route: '/estudiantes', icon: 'user-plus' },
+  { title: 'Generar proyección', route: '/proyeccion', icon: 'line-chart' },
+];
 
-import {
-  obtenerModuloPorRuta
-} from '../../config/modules.js';
-
-import {
-  puedeAcceder
-} from '../../config/permissions.js';
-
-import {
-  obtenerRolesUsuario,
-  obtenerPermisosUsuario,
-} from '../../app/session.js';
-
-
-/* =========================================================
-   HOME
-   =========================================================
-   Esta es la página inicial del SGPA.
-
-   Actualmente utiliza datos MOCK / TEMPORALES
-   mientras el Product Owner entrega los datos reales.
-
-   Cuando exista el backend correspondiente,
-   dashboard.mock.js será sustituido por un servicio.
-   ========================================================= */
-
-
-/* =========================================================
-   ESTADO DEL PERIODO
-   ========================================================= */
-
-function obtenerClaseEstado(
-  estado
-) {
-
-  switch (estado) {
-
-    case 'ABIERTA':
-      return 'period-status-open';
-
-    case 'ADMINISTRATIVA':
-      return 'period-status-admin';
-
-    case 'CERRADA':
-      return 'period-status-closed';
-
-    default:
-      return 'period-status-open';
-
-  }
-
+function tarjetaIndicador(icon, label, id) {
+  return `<article class="dashboard-stat-card">
+    <div class="dashboard-stat-icon"><i data-lucide="${icon}" aria-hidden="true"></i></div>
+    <div class="dashboard-stat-data"><strong id="${id}">Sin definir</strong><span>${label}</span>
+      <small id="${id}-detalle">Indicador pendiente de definición</small></div>
+  </article>`;
 }
 
-
-/* =========================================================
-   INDICADORES
-   ========================================================= */
-
-function renderIndicadores() {
-
-  return DASHBOARD_MOCK
-    .indicadores
-    .map(
-      (item) => {
-
-        return `
-          <article class="dashboard-stat-card">
-
-            <div class="dashboard-stat-icon">
-
-              <i
-                data-lucide="${item.icon}"
-                aria-hidden="true"
-              ></i>
-
-            </div>
-
-
-            <div class="dashboard-stat-data">
-
-              <strong>
-                ${escapeHtml(item.value)}
-              </strong>
-
-              <span>
-                ${escapeHtml(item.label)}
-              </span>
-
-              <small>
-                ${escapeHtml(item.detail)}
-              </small>
-
-            </div>
-
-          </article>
-        `;
-
-      }
-    )
-    .join('');
-
+function tarjetaPanel(titulo, contenido) {
+  return `<article class="dashboard-card"><header class="dashboard-card-header"><h3>${titulo}</h3></header>
+    <div class="dashboard-card-body">${contenido}</div></article>`;
 }
-
-
-/* =========================================================
-   DEMANDA
-   ========================================================= */
-
-function renderDemanda() {
-
-  const valores =
-    DASHBOARD_MOCK
-      .demandaCarreras
-      .map(
-        (item) =>
-          item.estudiantes
-      );
-
-
-  const maximo =
-    Math.max(
-      ...valores,
-      1
-    );
-
-
-  return DASHBOARD_MOCK
-    .demandaCarreras
-    .map(
-      (item) => {
-
-        const porcentaje =
-          Math.round(
-            (
-              item.estudiantes /
-              maximo
-            ) * 100
-          );
-
-
-        return `
-          <div class="demand-row">
-
-            <span class="demand-name">
-              ${escapeHtml(
-                item.carrera
-              )}
-            </span>
-
-
-            <div class="demand-track">
-
-              <div
-                class="demand-bar"
-                style="--demand-width: ${porcentaje}%"
-              ></div>
-
-            </div>
-
-
-            <span class="demand-value">
-              ${item.estudiantes}
-            </span>
-
-          </div>
-        `;
-
-      }
-    )
-    .join('');
-
-}
-
-
-/* =========================================================
-   ALERTAS
-   ========================================================= */
-
-function renderAlertas() {
-
-  return DASHBOARD_MOCK
-    .alertas
-    .map(
-      (alerta) => {
-
-        return `
-          <div class="academic-alert">
-
-            <i
-              data-lucide="triangle-alert"
-              class="alert-${alerta.type}"
-              aria-hidden="true"
-            ></i>
-
-
-            <span>
-              ${escapeHtml(
-                alerta.text
-              )}
-            </span>
-
-
-            <i
-              data-lucide="chevron-right"
-              class="alert-arrow"
-              aria-hidden="true"
-            ></i>
-
-          </div>
-        `;
-
-      }
-    )
-    .join('');
-
-}
-
-
-/* =========================================================
-   ACTIVIDAD
-   ========================================================= */
-
-function renderActividad() {
-
-  return DASHBOARD_MOCK
-    .actividad
-    .map(
-      (item) => {
-
-        return `
-          <div class="activity-row">
-
-            <div class="activity-icon">
-
-              <i
-                data-lucide="${item.icon}"
-                aria-hidden="true"
-              ></i>
-
-            </div>
-
-
-            <span class="activity-time">
-              ${escapeHtml(
-                item.time
-              )}
-            </span>
-
-
-            <span class="activity-text">
-              ${escapeHtml(
-                item.text
-              )}
-            </span>
-
-          </div>
-        `;
-
-      }
-    )
-    .join('');
-
-}
-
-
-/* =========================================================
-   ACCIONES
-   ========================================================= */
-
-function renderAcciones() {
-
-  const roles =
-    obtenerRolesUsuario();
-
-  const permisos =
-    obtenerPermisosUsuario();
-
-  return DASHBOARD_MOCK
-    .acciones
-    .filter(
-      (action) => {
-
-        const module =
-          obtenerModuloPorRuta(
-            action.route
-          );
-
-
-        return (
-          module &&
-          puedeAcceder(
-            roles,
-            module.id,
-            permisos,
-          )
-        );
-
-      }
-    )
-    .map(
-      (action) => {
-
-        return `
-          <button
-            class="dashboard-action"
-            data-route="${action.route}"
-            type="button"
-          >
-
-            <i
-              data-lucide="${action.icon}"
-              aria-hidden="true"
-            ></i>
-
-
-            <span>
-              ${escapeHtml(
-                action.title
-              )}
-            </span>
-
-
-            <i
-              data-lucide="chevron-right"
-              class="action-arrow"
-              aria-hidden="true"
-            ></i>
-
-          </button>
-        `;
-
-      }
-    )
-    .join('');
-
-}
-
-
-/* =========================================================
-   HOME PAGE
-   ========================================================= */
 
 export function HomePage() {
-
-  const periodo =
-    DASHBOARD_MOCK.periodo;
-
-
-  const estadoClass =
-    obtenerClaseEstado(
-      periodo.estado
-    );
-
-
-  return `
-    <section class="dashboard-page">
-
-      <!-- =================================================
-           DATOS TEMPORALES
-
-           Todos los valores numéricos mostrados actualmente
-           provienen de:
-
-           src/data/dashboard.mock.js
-
-           Se eliminarán cuando existan datos reales.
-           ================================================= -->
-
-
-      <!-- =============================================== -->
-      <!-- ENCABEZADO -->
-      <!-- =============================================== -->
-
-      <div class="dashboard-page-header">
-
-        <div>
-
-          <h2>
-            Dashboard
-          </h2>
-
-          <p>
-            Periodo actual:
-            ${escapeHtml(
-              periodo.nombre
-            )}
-            ·
-            ${escapeHtml(
-              periodo.campus
-            )}
-          </p>
-
-        </div>
-
-
-        <div class="dashboard-updated">
-
-          <i
-            data-lucide="clock"
-            aria-hidden="true"
-          ></i>
-
-          <span>
-            ${escapeHtml(
-              DASHBOARD_MOCK
-                .ultimaActualizacion
-            )}
-          </span>
-
-        </div>
-
-      </div>
-
-
-      <!-- =============================================== -->
-      <!-- INDICADORES -->
-      <!-- =============================================== -->
-
-      <div class="dashboard-kpis">
-
-        ${renderIndicadores()}
-
-      </div>
-
-
-      <!-- =============================================== -->
-      <!-- INFORMACIÓN -->
-      <!-- =============================================== -->
-
-      <div class="dashboard-insights-grid">
-
-
-        <!-- DEMANDA -->
-
-        <article class="dashboard-card">
-
-          <header class="dashboard-card-header">
-
-            <h3>
-              Demanda por carrera
-            </h3>
-
-          </header>
-
-
-          <div class="dashboard-card-body">
-
-            <div class="demand-list">
-
-              ${renderDemanda()}
-
-            </div>
-
-          </div>
-
-        </article>
-
-
-
-        <!-- ESTADO DEL PERIODO -->
-
-        <article class="dashboard-card">
-
-          <header class="dashboard-card-header">
-
-            <h3>
-              Estado del periodo
-            </h3>
-
-          </header>
-
-
-          <div class="dashboard-card-body">
-
-            <div
-              class="period-status ${estadoClass}"
-            >
-
-              <span
-                class="period-status-dot"
-              ></span>
-
-              ${escapeHtml(
-                periodo.estadoTexto
-              )}
-
-            </div>
-
-
-            <div class="period-meta">
-
-              <span>
-
-                <strong>
-                  Inicio:
-                </strong>
-
-                ${escapeHtml(
-                  periodo.fechaInicio
-                )}
-
-              </span>
-
-
-              <span>
-
-                <strong>
-                  Fin:
-                </strong>
-
-                ${escapeHtml(
-                  periodo.fechaFin
-                )}
-
-              </span>
-
-            </div>
-
-          </div>
-
-        </article>
-
-
-
-        <!-- OFERTA ACADÉMICA -->
-
-        <article class="dashboard-card">
-
-          <header class="dashboard-card-header">
-
-            <h3>
-              Oferta académica
-            </h3>
-
-          </header>
-
-
-          <div class="dashboard-card-body">
-
-            <div class="offer-summary">
-
-              <div class="offer-row">
-
-                <strong>
-                  ${
-                    DASHBOARD_MOCK
-                      .oferta
-                      .cursosOfertados
-                  }
-                </strong>
-
-                <span>
-                  cursos ofertados
-                </span>
-
-              </div>
-
-
-              <div class="offer-row">
-
-                <strong>
-                  ${
-                    DASHBOARD_MOCK
-                      .oferta
-                      .gruposAbiertos
-                  }
-                </strong>
-
-                <span>
-                  grupos abiertos
-                </span>
-
-              </div>
-
-
-              <div class="offer-row">
-
-                <strong>
-                  ${
-                    DASHBOARD_MOCK
-                      .oferta
-                      .pendientes
-                  }
-                </strong>
-
-                <span>
-                  pendientes
-                </span>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        </article>
-
-
-
-        <!-- ALERTAS -->
-
-        <article class="dashboard-card">
-
-          <header class="dashboard-card-header">
-
-            <h3>
-              Alertas académicas
-            </h3>
-
-          </header>
-
-
-          <div class="dashboard-card-body">
-
-            <div class="alert-list">
-
-              ${renderAlertas()}
-
-            </div>
-
-          </div>
-
-        </article>
-
-
-      </div>
-
-
-      <!-- =============================================== -->
-      <!-- PARTE INFERIOR -->
-      <!-- =============================================== -->
-
-      <div class="dashboard-bottom-grid">
-
-
-        <!-- ACTIVIDAD -->
-
-        <article class="dashboard-card">
-
-          <header class="dashboard-card-header">
-
-            <h3>
-              Actividad reciente
-            </h3>
-
-          </header>
-
-
-          <div class="dashboard-card-body">
-
-            <div class="activity-list">
-
-              ${renderActividad()}
-
-            </div>
-
-          </div>
-
-        </article>
-
-
-
-        <!-- ACCIONES -->
-
-        <article class="dashboard-card">
-
-          <header class="dashboard-card-header">
-
-            <h3>
-              Accesos rápidos
-            </h3>
-
-          </header>
-
-
-          <div class="dashboard-card-body">
-
-            <div class="dashboard-actions">
-
-              ${renderAcciones()}
-
-            </div>
-
-          </div>
-
-        </article>
-
-
-      </div>
-
-    </section>
-  `;
-
+  const roles = obtenerRolesEfectivos();
+  const permisos = obtenerPermisosUsuario();
+
+  const puedeVerEstudiantes = puedeAcceder(roles, 'estudiantes', permisos);
+  const puedeVerCursos = puedeAcceder(roles, 'cursos', permisos);
+  const puedeVerProfesores = puedeAcceder(roles, 'profesores', permisos);
+  const puedeVerAulas = puedeAcceder(roles, 'aulas', permisos);
+
+  const accesos = ACCIONES.filter(({ route }) => {
+    const modulo = obtenerModuloPorRuta(route);
+    return modulo && puedeAcceder(roles, modulo.id, permisos);
+  });
+
+  const acciones = accesos.length
+    ? accesos.map(({ title, route, icon }) => `<button class="dashboard-action" data-route="${route}" type="button">
+        <i data-lucide="${icon}" aria-hidden="true"></i><span>${escapeHtml(title)}</span>
+        <i data-lucide="chevron-right" class="action-arrow" aria-hidden="true"></i></button>`).join('')
+    : '<p>No hay accesos rápidos disponibles para este usuario.</p>';
+
+  const kpis = [
+    puedeVerEstudiantes ? tarjetaIndicador('users', 'Estudiantes activos en carreras autorizadas', 'dashboard-estudiantes-activos') : '',
+    puedeVerCursos ? tarjetaIndicador('book-open', 'Cursos activos', 'dashboard-cursos') : '',
+    puedeVerProfesores ? tarjetaIndicador('briefcase', 'Profesores asignados', 'dashboard-profesores') : '',
+    puedeVerAulas ? tarjetaIndicador('door-open', 'Aulas disponibles', 'dashboard-aulas') : '',
+  ].filter(Boolean).join('');
+
+  return `<section class="dashboard-page">
+    <div class="dashboard-page-header"><div><h2>Dashboard</h2><p>Resumen académico</p></div>
+      <div class="dashboard-updated"><i data-lucide="clock" aria-hidden="true"></i><span>Datos del sistema</span></div></div>
+    <div class="dashboard-kpis">
+      ${kpis || '<p class="dashboard-no-kpis">No hay indicadores disponibles para el rol activo.</p>'}
+    </div>
+    <div class="dashboard-insights-grid">
+      ${tarjetaPanel('Demanda por carrera', '<p>Indicador pendiente de definición.</p>')}
+      ${tarjetaPanel('Estado del periodo', '<p>Periodo actual pendiente de definición.</p>')}
+      ${tarjetaPanel('Oferta académica', '<p>Indicadores pendientes de definición.</p>')}
+      ${tarjetaPanel('Alertas académicas', '<p>Alertas pendientes de definición.</p>')}
+    </div>
+    <div class="dashboard-bottom-grid">
+      ${tarjetaPanel('Actividad reciente', '<p>Fuente de actividad pendiente de definición.</p>')}
+      ${tarjetaPanel('Accesos rápidos', `<div class="dashboard-actions">${acciones}</div>`)}
+    </div>
+  </section>`;
+}
+
+export async function iniciarHomePage() {
+  const valor = document.getElementById('dashboard-estudiantes-activos');
+  if (!valor) return;
+  const detalle = document.getElementById('dashboard-estudiantes-activos-detalle');
+  valor.textContent = 'Cargando…';
+  if (detalle) detalle.textContent = 'Consultando registros autorizados';
+  try {
+    const estudiantes = await listarEstudiantes({ estado: 'ACTIVO' });
+    if (!Array.isArray(estudiantes)) throw new Error('Respuesta de estudiantes inválida.');
+    if (!valor.isConnected) return;
+    valor.textContent = String(estudiantes.length);
+    if (detalle) detalle.textContent = estudiantes.length ? 'Según los registros autorizados' : 'Sin registros activos';
+  } catch {
+    if (!valor.isConnected) return;
+    valor.textContent = 'No disponible';
+    if (detalle) detalle.textContent = 'No se pudo consultar este indicador';
+  }
 }

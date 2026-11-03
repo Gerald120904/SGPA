@@ -17,6 +17,7 @@ import { EstadoEstudiante } from '../constants/estado-estudiante.constant';
 @Index('UQ_estudiantes_carrera_cedula', ['carreraId', 'cedula'], { unique: true })
 @Index('IDX_estudiantes_carrera', ['carreraId'])
 @Index('IDX_estudiantes_plan', ['planEstudioId'])
+@Index('FK_estudiante_graduador', ['graduadoPorUsuarioId'])
 export class Estudiante {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;

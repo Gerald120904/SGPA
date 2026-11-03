@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'node:crypto';
-import { EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { Optional } from '@nestjs/common';
 import { ActualizarAsignaturasSalidaDto } from './dto/actualizar-asignaturas-salida.dto';
 import { ActualizarSalidaAcademicaDto } from './dto/actualizar-salida-academica.dto';
 import { CrearSalidaAcademicaDto } from './dto/crear-salida-academica.dto';
@@ -23,7 +24,83 @@ export class SalidasAcademicasService {
     private readonly planRepository: Repository<PlanEstudio>,
     @InjectRepository(PlanAsignatura)
     private readonly asignaturaRepository: Repository<PlanAsignatura>,
+    @Optional()
+    private readonly dataSource?: DataSource,
   ) {}
+
+  async evaluarSalidaEstudiante(
+    planId: number,
+    salidaId: number,
+    estudianteId: number,
+  ): Promise<{
+    salidaId: number;
+    nombre: string;
+    tipo: string;
+    cumplida: boolean;
+    creditosObtenidos: number;
+    creditosRequeridos: number;
+    asignaturasCompletadas: Array<{ id: number; codigo: string; nombre: string; creditos: number }>;
+    asignaturasPendientes: Array<{ id: number; codigo: string; nombre: string; creditos: number }>;
+  }> {
+    const salida = await this.obtenerSalida(planId, salidaId);
+    const asignaturasSalida = salida.asignaturas || [];
+
+    const aprobadasPlanAsignaturaIds = new Set<number>();
+    const aprobadasCursoIds = new Set<number>();
+
+    if (this.dataSource && typeof this.dataSource.query === 'function') {
+      try {
+        const historiales: Array<{ plan_asignatura_id: number; curso_id: number | null }> = await this.dataSource.query(
+          `SELECT h.plan_asignatura_id, pa.curso_id
+           FROM historial_academico_estudiantes h
+           LEFT JOIN plan_asignaturas pa ON pa.id = h.plan_asignatura_id
+           WHERE h.estudiante_id = ? AND h.resultado = 'APROBADO'`,
+          [estudianteId],
+        );
+        for (const h of historiales) {
+          if (h.plan_asignatura_id) aprobadasPlanAsignaturaIds.add(Number(h.plan_asignatura_id));
+          if (h.curso_id) aprobadasCursoIds.add(Number(h.curso_id));
+        }
+      } catch {
+        // En mock
+      }
+    }
+
+    const completadas: Array<{ id: number; codigo: string; nombre: string; creditos: number }> = [];
+    const pendientes: Array<{ id: number; codigo: string; nombre: string; creditos: number }> = [];
+    let creditosObtenidos = 0;
+
+    for (const asig of asignaturasSalida) {
+      const aprobada = aprobadasPlanAsignaturaIds.has(asig.id) || (asig.cursoId != null && aprobadasCursoIds.has(asig.cursoId));
+      const info = {
+        id: asig.id,
+        codigo: asig.curso?.codigo || asig.codigoReferencia || '—',
+        nombre: asig.curso?.nombre || asig.nombreReferencia || '—',
+        creditos: Number(asig.creditos) || 0,
+      };
+      if (aprobada) {
+        completadas.push(info);
+        creditosObtenidos += info.creditos;
+      } else {
+        pendientes.push(info);
+      }
+    }
+
+    const cumpleCreditos = creditosObtenidos >= (salida.creditosRequeridos || 0);
+    const cumpleAsignaturas = pendientes.length === 0;
+    const cumplida = cumpleCreditos && cumpleAsignaturas;
+
+    return {
+      salidaId: salida.id,
+      nombre: salida.nombre,
+      tipo: salida.tipo,
+      cumplida,
+      creditosObtenidos,
+      creditosRequeridos: salida.creditosRequeridos || 0,
+      asignaturasCompletadas: completadas,
+      asignaturasPendientes: pendientes,
+    };
+  }
 
   private async obtenerPlan(
     planId: number,

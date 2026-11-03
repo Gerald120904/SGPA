@@ -18,6 +18,7 @@ import { ImportarEstudiantesDto } from '../estudiantes/dto/importar-estudiantes.
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { MotorRequisitosService } from '../planes-estudio/motor-requisitos/motor-requisitos.service';
+import { PoliticaCorrequisito } from '../planes-estudio/motor-requisitos/types/motor-reglas.types';
 import { EstadoRespuestaFormulario } from './constants/estado-respuesta-formulario.constant';
 import { ProveedorFormulario } from './constants/proveedor-formulario.constant';
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
@@ -153,9 +154,10 @@ export class FormulariosEstudiantesProcesamientoService {
       where: {
         id: respuestaId,
       },
-      relations: {
+            relations: {
         formulario: {
           carrera: true,
+          planEstudio: true,
         },
       },
     });
@@ -185,12 +187,67 @@ export class FormulariosEstudiantesProcesamientoService {
       );
     }
 
-    const datos = respuesta.datosNormalizadosJson;
+        const datos = respuesta.datosNormalizadosJson;
 
     if (!datos) {
       const detalle = 'La respuesta no posee datos normalizados.';
       await this.marcarRespuestaNoProcesable(respuesta, EstadoRespuestaFormulario.ERROR, detalle);
       throw new ConflictException(detalle);
+    }
+
+    // Verificación estricta de plan EN TRANSICIÓN en la aprobación definitiva
+    let esPlanEnTransicion = (respuesta.formulario?.planEstudio as any)?.estado === 'EN_TRANSICION';
+    if (!esPlanEnTransicion && this.dataSource && typeof this.dataSource.query === 'function') {
+      try {
+        const rows = await this.dataSource.query(
+          "SELECT estado, activo FROM planes_estudio WHERE id = ?",
+          [respuesta.formulario.planEstudioId],
+        );
+        if (rows && rows[0]?.estado === 'EN_TRANSICION') {
+          esPlanEnTransicion = true;
+        } else if (!rows || !rows[0]?.estado) {
+          const ult = await this.dataSource.query(
+            "SELECT valor_nuevo FROM auditoria_planes_estudio WHERE plan_estudio_id = ? AND tipo_modificacion IN ('CAMBIO_ESTADO', 'CIERRE', 'REAPERTURA') ORDER BY id DESC LIMIT 1",
+            [respuesta.formulario.planEstudioId],
+          );
+          if (ult?.[0]?.valor_nuevo === 'EN_TRANSICION') {
+            esPlanEnTransicion = true;
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    if (esPlanEnTransicion) {
+      const cedula = datos.identificacion?.trim();
+      let estudianteExistente = null;
+      if (cedula && this.dataSource && typeof this.dataSource.query === 'function') {
+        try {
+          const res = await this.dataSource.query(
+            "SELECT id, plan_estudio_id, carrera_id FROM estudiantes WHERE cedula = ? AND carrera_id = ? LIMIT 1",
+            [cedula, respuesta.formulario.carreraId],
+          );
+          estudianteExistente = res?.[0] || null;
+        } catch {
+          // Fallback
+        }
+      }
+
+      const esEstudianteDelPlan =
+        estudianteExistente &&
+        Number(estudianteExistente.plan_estudio_id) === Number(respuesta.formulario.planEstudioId);
+
+      if (!esEstudianteDelPlan) {
+        const detalle =
+          'El plan de estudio asociado se encuentra EN TRANSICIÓN. No se admiten nuevos ingresos ordinarios.';
+        await this.marcarRespuestaNoProcesable(
+          respuesta,
+          EstadoRespuestaFormulario.REQUIERE_REVISION,
+          detalle,
+        );
+        throw new ConflictException(detalle);
+      }
     }
 
     const periodo = await this.periodoRepo.findOne({
@@ -290,7 +347,7 @@ export class FormulariosEstudiantesProcesamientoService {
         (this.motorRequisitosService || esInstantaneaCurricularInterna(respuesta.formulario.mapaPreguntas))) {
       try {
         if (esInstantaneaCurricularInterna(respuesta.formulario.mapaPreguntas)) {
-          validarSeleccionInstantanea(respuesta.formulario.mapaPreguntas, idsAsignaturas);
+          validarSeleccionInstantanea(respuesta.formulario.mapaPreguntas, idsAsignaturas, { politicaCorrequisito: PoliticaCorrequisito.INFORMATIVO });
         } else {
           await this.motorRequisitosService!.validarSeleccionEstricta(
             respuesta.formulario.planEstudioId,
@@ -387,6 +444,10 @@ export class FormulariosEstudiantesProcesamientoService {
         if (cambio.affected !== 1) {
           throw new ConflictException('Esta solicitud ya fue revisada.');
         }
+        await manager.query(
+          `DELETE FROM solicitudes_activas_estudiantes WHERE referencia_id = ?`,
+          [respuestaId],
+        ).catch(() => null);
         return importacion;
       });
     } catch (err: any) {
@@ -426,7 +487,15 @@ export class FormulariosEstudiantesProcesamientoService {
       throw new ConflictException(detalleError);
     }
 
-    respuesta.estado = EstadoRespuestaFormulario.PROCESADO;
+    if (this.dataSource && typeof this.dataSource.query === 'function') {
+      await this.dataSource.query(
+        `UPDATE registros_importacion_estudiantes
+         SET estado = 'APROBADO', revisado_por_usuario_id = ?, revisado_en = NOW()
+         WHERE JSON_UNQUOTE(JSON_EXTRACT(datos_json, '$.formularioRespuestaId')) = ?`,
+        [usuarioId, respuestaId],
+      ).catch(() => null);
+    }
+        respuesta.estado = EstadoRespuestaFormulario.PROCESADO;
     respuesta.revisadoPorUsuarioId = usuarioId;
     respuesta.revisadoAt = new Date();
     respuesta.procesadoAt = respuesta.revisadoAt;
@@ -537,8 +606,22 @@ export class FormulariosEstudiantesProcesamientoService {
       if (updateResult && updateResult.affected === 0) {
         throw new ConflictException('Esta solicitud ya fue revisada.');
       }
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        await this.dataSource.query(
+          `DELETE FROM solicitudes_activas_estudiantes WHERE referencia_id = ?`,
+          [respuestaId],
+        ).catch(() => null);
+      }
 
       // Actualizar objeto en memoria para el retorno
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        await this.dataSource.query(
+          `UPDATE registros_importacion_estudiantes
+           SET estado = 'RECHAZADO', motivo_rechazo = ?, revisado_por_usuario_id = ?, revisado_en = NOW()
+           WHERE JSON_UNQUOTE(JSON_EXTRACT(datos_json, '$.formularioRespuestaId')) = ?`,
+          [motivoLimpio, usuarioId, respuestaId],
+        ).catch(() => null);
+      }
       respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
       respuesta.revisadoPorUsuarioId = usuarioId;
       respuesta.revisadoAt = new Date();

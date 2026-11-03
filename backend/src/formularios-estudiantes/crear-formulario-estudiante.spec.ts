@@ -348,7 +348,7 @@ describe('Validaciones Nuevo Formulario de Estudiantes — PBI-90 (Frontend-Back
         responderUri: 'https://docs.google.com/forms/d/e/123/viewform',
         revisionId: 'rev-1',
       });
-      mockGoogleFormsClient.actualizarFormulario.mockImplementation(async (_usuario, _formId, requests: any[]) => {
+      mockGoogleFormsClient.actualizarFormulario.mockImplementation(async (_usuario: number, _formId: string, requests: any[]) => {
         let qIdx = 0;
         return {
           replies: requests.map((req, idx) => {

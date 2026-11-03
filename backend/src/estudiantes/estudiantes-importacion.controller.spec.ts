@@ -11,9 +11,11 @@ import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { PermisosService } from '../permisos/permisos.service';
 import { EstudiantesImportacionController } from './estudiantes-importacion.controller';
 import { EstudiantesImportacionService } from './estudiantes-importacion.service';
+import { BandejaRevisionEstudiantesService } from './bandeja-revision-estudiantes.service';
 
 describe('EstudiantesImportacionController', () => {
   const jwtSecret = 'estudiantes-importacion-controller-secret';
+  const bandejaService = { cargarLoteExcel: jest.fn() };
   const service = {
     validar: jest.fn(),
     ejecutar: jest.fn(),
@@ -48,6 +50,7 @@ describe('EstudiantesImportacionController', () => {
         AuthGuard,
         PermisosGuard,
         { provide: EstudiantesImportacionService, useValue: service },
+        { provide: BandejaRevisionEstudiantesService, useValue: bandejaService },
         { provide: PermisosService, useValue: permisosService },
         {
           provide: ConfigService,
@@ -89,6 +92,11 @@ describe('EstudiantesImportacionController', () => {
     rolesActuales = ['COORDINADOR'];
     service.validar.mockResolvedValue({ resumen: { total: 1 }, filas: [] });
     service.ejecutar.mockResolvedValue({ creados: 1, actualizados: 0 });
+    bandejaService.cargarLoteExcel.mockResolvedValue({
+      loteId: 10,
+      totalFilas: 1,
+      resumen: { creados: 1, actualizados: 0 },
+    });
   });
 
   afterAll(async () => app.close());
@@ -153,7 +161,7 @@ describe('EstudiantesImportacionController', () => {
       .set('Authorization', `Bearer ${await token()}`)
       .send(validDto)
       .expect(201);
-    expect(service.ejecutar).toHaveBeenCalledWith(3, validDto);
+    expect(bandejaService.cargarLoteExcel).toHaveBeenCalledWith(3, validDto);
   });
 
   it('rechaza DTO inválido cuando estudiantes está vacío o contiene solo espacios', async () => {
@@ -214,6 +222,6 @@ describe('EstudiantesImportacionController', () => {
       .expect(400);
 
     expect(service.validar).not.toHaveBeenCalled();
-    expect(service.ejecutar).not.toHaveBeenCalled();
+    expect(bandejaService.cargarLoteExcel).not.toHaveBeenCalled();
   });
 });

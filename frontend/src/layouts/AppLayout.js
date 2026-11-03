@@ -11,18 +11,20 @@ export function AppLayout({
   usuario,
   roles,
   permisos,
+  isCollapsed = false
 }) {
 
   return `
     <main
       id="appShell"
-      class="app-shell"
+      class="app-shell ${isCollapsed ? 'sidebar-collapsed' : ''}"
     >
 
       ${Sidebar({
         usuario,
         roles,
         permisos,
+        isCollapsed
       })}
 
 

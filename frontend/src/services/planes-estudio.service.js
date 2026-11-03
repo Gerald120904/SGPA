@@ -24,7 +24,7 @@ export async function actualizarPlanEstudio(id, datos) {
   return window.sgpa.actualizarPlanEstudio(id, datos);
 }
 
-export async function cambiarEstadoPlanEstudio(id, activo) {
+export async function cambiarEstadoPlanEstudio(id, activo, motivo) {
   validarApi('cambiarEstadoPlanEstudio');
-  return window.sgpa.cambiarEstadoPlanEstudio(id, activo);
+  return window.sgpa.cambiarEstadoPlanEstudio(id, activo, motivo);
 }

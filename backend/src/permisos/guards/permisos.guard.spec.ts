@@ -109,6 +109,24 @@ describe('PermisosGuard', () => {
     await expect(guard.canActivate(crearContexto(user, 'POST', 'CursosController'))).rejects.toThrow(ForbiddenException);
   });
 
+  it('autoriza controladores nuevos al coordinador con permiso y bloquea escritura del asistente', async () => {
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+    const coordinador = { sub: 3, roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true };
+    const asistente = { sub: 4, roles: [RolSistema.ASISTENTE_ESTUDIANTIL], jerarquiaConfigurada: true };
+    for (const [clase, permiso] of [
+      ['BandejaRevisionEstudiantesController', PermisoSistema.ESTUDIANTES_GESTIONAR],
+      ['TransicionesCurricularesController', PermisoSistema.PLANES_ESTUDIO_GESTIONAR],
+    ] as const) {
+      reflector.getAllAndOverride.mockReturnValue([permiso]);
+      await expect(guard.canActivate(crearContexto(coordinador, 'POST', clase))).resolves.toBe(true);
+      await expect(guard.canActivate(crearContexto(asistente, 'POST', clase))).rejects.toThrow(ForbiddenException);
+    }
+    permisosService.usuarioTienePermisos.mockResolvedValue(false);
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.ESTUDIANTES_GESTIONAR]);
+    await expect(guard.canActivate(crearContexto(coordinador, 'POST', 'BandejaRevisionEstudiantesController'))).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(crearContexto({ sub: 1, roles: [RolSistema.ADMIN_GLOBAL] }, 'POST', 'BandejaRevisionEstudiantesController'))).resolves.toBe(true);
+  });
+
   it('lanza ForbiddenException si el usuario no posee los permisos requeridos', async () => {
     reflector.getAllAndOverride.mockReturnValue([
       PermisoSistema.ATESTADOS_VALIDAR,

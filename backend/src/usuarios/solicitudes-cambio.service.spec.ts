@@ -595,7 +595,7 @@ describe('SolicitudesCambioService', () => {
     expect(cancelada.motivoCancelacion).toBe('Ya no es requerida');
 
     // 2. Reasignar
-    const sol2 = await service.proponerCrearPlan(3, { codigo: 'P-REASIGN', nombre: 'Plan Reasign', grado: 'BACHILLERATO', carreraId: 10 } as any);
+    const sol2: SolicitudCambio = await service.proponerCrearPlan(3, { codigo: 'P-REASIGN', nombre: 'Plan Reasign', grado: 'BACHILLERATO', carreraId: 10 } as any);
     sol2.estado = 'BLOQUEADA_POR_REVOCACION';
     const reasignada = await service.reasignar(999, sol2.id, 2);
     expect(reasignada.coordinadorId).toBe(2);

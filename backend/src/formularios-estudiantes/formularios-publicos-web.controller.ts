@@ -2,13 +2,16 @@ import {
   Controller,
   Get,
   HttpStatus,
+  Optional,
   Param,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { createHash } from 'node:crypto';
 import { RateLimitPublicoGuard } from './guards/rate-limit-publico.guard';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
 import { generarHtmlFormularioPublico } from './web/formulario-web.template';
 
 /**
@@ -19,17 +22,33 @@ import { generarHtmlFormularioPublico } from './web/formulario-web.template';
 @Controller('formularios')
 @UseGuards(RateLimitPublicoGuard)
 export class FormulariosPublicosWebController {
+  constructor(
+    @Optional()
+    private readonly persistenciaInternaService?: FormulariosInternosPersistenciaService,
+  ) {}
+
   @Get('p/:token')
   mostrarFormularioPublico(
     @Param('token') token: string,
     @Res() res: Response,
+    @Query('preview') preview?: string,
+    @Query('preview_token') previewToken?: string,
   ) {
     const esValido = Boolean(
       token &&
         token.length === 64 &&
         /^[0-9a-fA-F]{64}$/.test(token),
     );
-    const html = generarHtmlFormularioPublico(token || '');
+
+    let esVistaPreviaValida = false;
+    if (previewToken && this.persistenciaInternaService) {
+      esVistaPreviaValida = this.persistenciaInternaService.validarTicketVistaPrevia(
+        token || '',
+        previewToken,
+      );
+    }
+
+    const html = generarHtmlFormularioPublico(token || '', esVistaPreviaValida, previewToken);
     const script = html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
     const scriptSrc = script
       ? `'sha256-${createHash('sha256').update(script).digest('base64')}'`

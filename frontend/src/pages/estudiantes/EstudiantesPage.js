@@ -23,7 +23,8 @@ import {
 
 import {
   usuarioTienePermiso,
-  obtenerRolesUsuario
+  obtenerRolesUsuario,
+  obtenerRolActivo
 } from '../../app/session.js';
 import { ROLES } from '../../config/permissions.js';
 import {
@@ -48,7 +49,12 @@ import {
   obtenerProgresoEstudiante,
   registrarResultadoAcademicoEstudiante,
   contarEstudiantesPorCarrera,
-  contarEstudiantesPorPlan
+  contarEstudiantesPorPlan,
+  listarBandejaRevisionEstudiantes,
+  obtenerRegistroRevisionEstudiante,
+  aprobarRegistrosRevision,
+  rechazarRegistrosRevision,
+  devolverRegistrosRevision
 } from '../../services/estudiantes.service.js';
 
 import {
@@ -110,12 +116,18 @@ let catalogoEstudiantes = [];
 
 let solicitudesFormularios = [];
 
+let registrosBandejaRevision = [];
+let seleccionBandejaRevision = new Set();
+
 let intervaloSolicitudes = null;
 
 function esCuentaJerarquica() {
-  const roles = obtenerRolesUsuario();
-  return !roles.includes(ROLES.ADMIN_GLOBAL) &&
-    (roles.includes(ROLES.COORDINADOR) || roles.includes(ROLES.ASISTENTE_ESTUDIANTIL));
+  const rol = obtenerRolActivo();
+  return rol === ROLES.COORDINADOR || rol === ROLES.ASISTENTE_ESTUDIANTIL;
+}
+
+function esAsistenteActivo() {
+  return obtenerRolActivo() === ROLES.ASISTENTE_ESTUDIANTIL;
 }
 
 async function listarCarrerasParaEstudiantes() {
@@ -490,7 +502,7 @@ function renderizarEstudiantes() {
     return;
   }
 
-  const esAsistente = obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+  const esAsistente = esAsistenteActivo();
   const puedeEditar = usuarioTienePermiso(PERMISOS.GESTIONAR);
   const puedeGestionar = !esAsistente && puedeEditar;
 
@@ -1523,7 +1535,7 @@ async function mostrarEstudiantesPlan() {
         puedeGestionar
           ? `
             <div class="sgpa-toolbar-actions">
-              ${obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL) ? '' : `<button
+              ${esAsistenteActivo() ? '' : `<button
                 id="importarEstudiantesExcelButton"
                 type="button"
                 class="sgpa-button sgpa-button-secondary"
@@ -1546,7 +1558,7 @@ async function mostrarEstudiantesPlan() {
                   aria-hidden="true"
                 ></i>
 
-                ${obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                ${esAsistenteActivo()
                   ? 'Solicitar nuevo estudiante' : 'Nuevo estudiante'}
               </button>
             </div>
@@ -1611,6 +1623,39 @@ async function mostrarEstudiantesPlan() {
       <div class="sgpa-state-message">Cargando estudiantes...</div>
     </div>
 
+    <section class="estudiantes-revision sgpa-section-spaced" aria-labelledby="bandejaRevisionTitulo">
+      <div class="sgpa-toolbar">
+        <div>
+          <h2 id="bandejaRevisionTitulo">Bandeja de revisión</h2>
+          <p>Importaciones y respuestas pendientes de aprobación para este plan.</p>
+        </div>
+        <button id="tabNavBandejaRevision" type="button" class="sgpa-button sgpa-button-secondary sgpa-button-sm">
+          <i data-lucide="refresh-cw" aria-hidden="true"></i> Actualizar
+        </button>
+      </div>
+      <div class="sgpa-filters">
+        <label>Fuente
+          <select id="bandejaRevisionFuente" class="sgpa-select">
+            <option value="">Todas</option><option value="EXCEL">Excel</option>
+            <option value="FORMULARIO_INTERNO">Formulario interno</option>
+            <option value="GOOGLE_FORMS">Google Forms</option>
+          </select>
+        </label>
+        <label>Estado
+          <select id="bandejaRevisionEstado" class="sgpa-select">
+            <option value="">Pendientes</option><option value="PENDIENTE">Pendiente</option>
+            <option value="REQUIERE_REVISION">Requiere revisión</option>
+            <option value="DEVUELTO_PARA_CORRECCION">Devuelto</option>
+            <option value="APROBADO">Aprobado</option><option value="RECHAZADO">Rechazado</option>
+          </select>
+        </label>
+        <label>Buscar
+          <input id="bandejaRevisionTexto" type="search" class="sgpa-input" placeholder="Cédula, nombre o correo" maxlength="100">
+        </label>
+      </div>
+      <div id="bandejaRevisionContent" aria-live="polite"><div class="sgpa-state-message">Cargando revisión...</div></div>
+    </section>
+
     <div class="sgpa-toolbar sgpa-section-spaced">
       <div>
         <h2>
@@ -1639,10 +1684,14 @@ async function mostrarEstudiantesPlan() {
 
   vincularEventosVistaEstudiantes();
 
+  configurarBandejaRevision();
+
   await cargarEstudiantes(
     instanciaActual,
     true
   );
+
+  await cargarBandejaRevision(carreraSeleccionada.id, planSeleccionado.id);
 
   await cargarSolicitudesFormularios(
     instanciaActual,
@@ -2165,12 +2214,12 @@ async function abrirEditarEstudiante(
           'editarEstudianteForm',
 
         title:
-          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          esAsistenteActivo()
             ? 'Proponer actualización de estudiante'
             : 'Editar estudiante',
 
         description:
-          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          esAsistenteActivo()
             ? 'El coordinador debe aprobar esta propuesta antes de aplicar los cambios.'
             : 'Actualice la información personal del estudiante.',
 
@@ -2184,7 +2233,7 @@ async function abrirEditarEstudiante(
           'guardarEstudianteButton',
 
         submitText:
-          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          esAsistenteActivo()
             ? 'Enviar propuesta'
             : 'Guardar cambios',
 
@@ -2306,7 +2355,7 @@ async function abrirEditarEstudiante(
 
           try {
             const respuesta =
-              await (obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+              await (esAsistenteActivo()
                 ? proponerActualizarEstudiante
                 : actualizarEstudiante)(
                 estudiante.id,
@@ -2372,11 +2421,11 @@ async function abrirEditarEstudiante(
 
             mostrarExito({
               titulo:
-                obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                esAsistenteActivo()
                   ? 'Propuesta enviada'
                   : 'Estudiante actualizado',
               mensaje:
-                obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+                esAsistenteActivo()
                   ? 'La actualización quedó pendiente de aprobación.'
                   : 'La información se actualizó correctamente.'
             });
@@ -2515,7 +2564,7 @@ async function abrirNuevoEstudiante() {
           'Nuevo estudiante',
 
         description:
-          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          esAsistenteActivo()
             ? 'La propuesta quedará pendiente hasta que la apruebe su coordinador.'
             : 'Registre los datos personales y académicos iniciales.',
 
@@ -2529,7 +2578,7 @@ async function abrirNuevoEstudiante() {
           'crearEstudianteButton',
 
         submitText:
-          obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+          esAsistenteActivo()
             ? 'Enviar solicitud de creación'
             : 'Crear estudiante',
 
@@ -2659,7 +2708,7 @@ async function abrirNuevoEstudiante() {
           button.disabled = true;
 
           try {
-            const esAsistente = obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+            const esAsistente = esAsistenteActivo();
             const datosEstudiante = {
                 cedula:
                   document
@@ -2791,7 +2840,7 @@ async function abrirCambiarEstadoEstudiante(
         'cambiarEstadoEstudianteForm',
 
       title:
-        obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+        esAsistenteActivo()
           ? 'Proponer cambio de estado'
           : 'Cambiar estado',
 
@@ -2807,7 +2856,7 @@ async function abrirCambiarEstadoEstudiante(
         'guardarEstadoEstudiante',
 
       submitText:
-        obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+        esAsistenteActivo()
           ? 'Enviar propuesta'
           : 'Cambiar estado',
 
@@ -2874,7 +2923,7 @@ async function abrirCambiarEstadoEstudiante(
               'Confirmar cambio de estado',
 
             mensaje:
-              `${obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL) ? 'Se solicitará cambiar el estado' : 'El estudiante pasará'} de ${formatearEstado(
+              `${esAsistenteActivo() ? 'Se solicitará cambiar el estado' : 'El estudiante pasará'} de ${formatearEstado(
                 estudiante.estado
               )} a ${formatearEstado(
                 estado
@@ -2891,7 +2940,7 @@ async function abrirCambiarEstadoEstudiante(
 
         try {
           const respuesta =
-            await (obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+            await (esAsistenteActivo()
               ? proponerEstadoEstudiante
               : cambiarEstadoEstudiante)(
               id,
@@ -2909,11 +2958,11 @@ async function abrirCambiarEstadoEstudiante(
 
           mostrarExito({
             titulo:
-              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+              esAsistenteActivo()
                 ? 'Propuesta enviada'
                 : 'Estado actualizado',
             mensaje:
-              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL)
+              esAsistenteActivo()
                 ? 'El cambio de estado quedó pendiente de aprobación.'
                 : 'El estado del estudiante se actualizó correctamente.'
           });
@@ -3129,8 +3178,7 @@ async function abrirCambiarPlanEstudiante(
 
           try {
             const esAsistente =
-              typeof obtenerRolesUsuario === 'function' &&
-              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+              esAsistenteActivo();
             const datosPlan = {
               planNuevoId: Number(
                 document.getElementById('planNuevoEstudiante').value,
@@ -3819,8 +3867,7 @@ async function abrirRegistrarResultadoAcademico(
                 .trim();
 
             const esAsistente =
-              typeof obtenerRolesUsuario === 'function' &&
-              obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+              esAsistenteActivo();
             const datosResultado = {
               planAsignaturaId,
               periodoId,
@@ -4266,8 +4313,7 @@ function renderizarPreviewImportacionEstudiantes(
 
         try {
           const esAsistente =
-            typeof obtenerRolesUsuario === 'function' &&
-            obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+            esAsistenteActivo();
           const resultado = esAsistente
             ? await proponerImportacionEstudiantes({
                 carreraId: contexto.carreraId,
@@ -4299,17 +4345,18 @@ function renderizarPreviewImportacionEstudiantes(
                 'La propuesta de importación masiva de estudiantes fue enviada a su coordinador para revisión y aplicación.',
             });
           } else {
-            const importacion = extraerData(resultado);
-            const resumenFinal = obtenerResumenImportacion(importacion);
+            const totalRegistros = resultado.data?.totalFilas || resultado.totalFilas || (resultado.data?.resumen ? (resultado.data.resumen.creados + resultado.data.resumen.actualizados) : 0);
             mostrarExito({
-              titulo: 'Importación completada',
+              titulo: 'Lote registrado en Bandeja de Revisión',
               mensaje:
-                `${resumenFinal.creados} estudiantes creados, ` +
-                `${resumenFinal.actualizados} actualizados, ` +
-                `${resumenFinal.sinCambios} sin cambios y ` +
-                `${resumenFinal.errores} omitidos por errores.`,
+                `El lote con ${totalRegistros} registro(s) fue registrado en estado PENDIENTE en la bandeja de revisión y staging. Debe ser aprobado por el coordinador antes de impactar el padrón oficial.`,
             });
-            await cargarEstudiantes(instanciaActual, true);
+            const tabBandeja = document.getElementById('tabNavBandejaRevision');
+            if (tabBandeja) {
+              tabBandeja.click();
+            } else {
+              await cargarBandejaRevision(contexto.carreraId, contexto.planEstudioId);
+            }
           }
         } catch (error) {
           mostrarError({
@@ -4700,6 +4747,192 @@ async function abrirImportacionEstudiantes() {
   }
 }
 
+function filtrosBandejaRevision(carreraId, planEstudioId) {
+  return {
+    carreraId,
+    planEstudioId,
+    fuente: document.getElementById('bandejaRevisionFuente')?.value || undefined,
+    estado: document.getElementById('bandejaRevisionEstado')?.value || undefined,
+    texto: document.getElementById('bandejaRevisionTexto')?.value?.trim() || undefined,
+  };
+}
+
+function renderizarBandejaRevision() {
+  const contenedor = document.getElementById('bandejaRevisionContent');
+  if (!contenedor) return;
+  const puedeResolver = obtenerRolActivo() !== ROLES.ASISTENTE_ESTUDIANTIL &&
+    usuarioTienePermiso(PERMISOS.GESTIONAR);
+  const pendientes = new Set(['PENDIENTE', 'REQUIERE_REVISION', 'DEVUELTO_PARA_CORRECCION']);
+  const seleccionables = registrosBandejaRevision.filter((registro) => pendientes.has(registro.estado));
+  const filas = registrosBandejaRevision.map((registro) => `
+    <tr>
+      <td>${puedeResolver && pendientes.has(registro.estado)
+        ? `<input type="checkbox" data-revision-select="${registro.id}" ${seleccionBandejaRevision.has(registro.id) ? 'checked' : ''} aria-label="Seleccionar registro ${registro.id}">`
+        : ''}</td>
+      <td><strong>${escapeHtml(registro.cedula || '—')}</strong><br>${escapeHtml(registro.nombreCompleto || '—')}</td>
+      <td>${escapeHtml(registro.fuente || '—')}</td>
+      <td>${escapeHtml(registro.accion || '—')}</td>
+      <td>${escapeHtml(formatearTextoEnum(registro.estado))}</td>
+      <td><button type="button" class="sgpa-button sgpa-button-secondary sgpa-button-sm" data-revision-detalle="${registro.id}">Ver detalle</button></td>
+    </tr>
+  `).join('');
+  contenedor.innerHTML = `
+    <p class="estudiantes-revision-resumen">${registrosBandejaRevision.length} registro(s) encontrados.</p>
+    ${puedeResolver && seleccionables.length ? `
+      <div class="sgpa-toolbar-actions estudiantes-revision-acciones">
+        <button type="button" class="sgpa-button sgpa-button-secondary sgpa-button-sm" id="revisionSeleccionarTodos">Seleccionar visibles</button>
+        <button type="button" class="sgpa-button sgpa-button-primary sgpa-button-sm" id="revisionAprobar" ${seleccionBandejaRevision.size ? '' : 'disabled'}>Aprobar (${seleccionBandejaRevision.size})</button>
+        <button type="button" class="sgpa-button sgpa-button-secondary sgpa-button-sm" id="revisionRechazar" ${seleccionBandejaRevision.size ? '' : 'disabled'}>Rechazar</button>
+        <button type="button" class="sgpa-button sgpa-button-secondary sgpa-button-sm" id="revisionDevolver" ${seleccionBandejaRevision.size ? '' : 'disabled'}>Devolver para corrección</button>
+      </div>` : ''}
+    ${DataTable({
+      columns: ['', 'Estudiante', 'Fuente', 'Acción', 'Estado', 'Detalle'],
+      rows: filas,
+      emptyMessage: 'No hay registros de revisión para estos filtros.',
+      ariaLabel: 'Bandeja de revisión de estudiantes',
+    })}
+  `;
+  renderizarIconos();
+}
+
+async function cargarBandejaRevision(carreraId, planEstudioId) {
+  const contenedor = document.getElementById('bandejaRevisionContent');
+  if (!contenedor || !carreraId || !planEstudioId) return;
+  contenedor.innerHTML = '<div class="sgpa-state-message">Cargando revisión...</div>';
+  try {
+    const respuesta = await listarBandejaRevisionEstudiantes(filtrosBandejaRevision(carreraId, planEstudioId));
+    if (respuesta?.ok === false) throw new Error(respuesta.message || 'No fue posible consultar la bandeja.');
+    const datos = extraerData(respuesta);
+    registrosBandejaRevision = Array.isArray(datos) ? datos : [];
+    seleccionBandejaRevision = new Set();
+    renderizarBandejaRevision();
+  } catch (error) {
+    contenedor.innerHTML = `<div class="sgpa-state-message sgpa-state-message-error" role="alert">${escapeHtml(error?.message || 'No fue posible consultar la bandeja.')}</div>`;
+  }
+}
+
+function pedirMotivoRevision(titulo) {
+  return new Promise((resolve) => {
+    const dialog = document.getElementById('estudianteDialog');
+    const content = document.getElementById('estudianteDialogContent');
+    if (!dialog || !content) return resolve(null);
+    content.innerHTML = FormDialog({
+      formId: 'revisionMotivoForm', title: titulo,
+      description: 'Indique el motivo que quedará registrado en la revisión.',
+      body: '<label><span>Motivo (mínimo 3 caracteres)</span><textarea id="revisionMotivo" class="sgpa-textarea" rows="4" maxlength="500" required minlength="3"></textarea></label>',
+      cancelButtonId: 'revisionMotivoCancelar', cancelText: 'Cancelar',
+      submitButtonId: 'revisionMotivoConfirmar', submitText: 'Continuar',
+    });
+    const terminar = (valor) => { dialog.close(); resolve(valor); };
+    dialog.addEventListener('close', () => resolve(null), { once: true });
+    content.querySelector('#revisionMotivoCancelar')?.addEventListener('click', () => terminar(null));
+    content.querySelector('#revisionMotivoForm')?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const motivo = content.querySelector('#revisionMotivo')?.value?.trim() || '';
+      if (motivo.length >= 3) terminar(motivo);
+    });
+    renderizarIconos();
+    dialog.showModal();
+    habilitarCierreExterior(dialog);
+  });
+}
+
+async function mostrarDetalleRevision(id) {
+  try {
+    const respuesta = await obtenerRegistroRevisionEstudiante(id);
+    if (respuesta?.ok === false) throw new Error(respuesta.message);
+    const datos = extraerData(respuesta) || {};
+    const registro = datos.registro || {};
+    const items = (valor) => Array.isArray(valor) && valor.length
+      ? valor.map((item) => `<li>${escapeHtml(typeof item === 'string' ? item : JSON.stringify(item))}</li>`).join('')
+      : '<li>Ninguno</li>';
+    const dialog = document.getElementById('estudianteDialog');
+    const content = document.getElementById('estudianteDialogContent');
+    if (!dialog || !content) return;
+    content.innerHTML = FormDialog({
+      formId: 'revisionDetalleForm', title: `Revisión #${id}`,
+      description: `${registro.cedula || ''} · ${registro.estado || ''}`,
+      layout: 'custom', cancelButtonId: 'revisionDetalleCerrar', cancelText: 'Cerrar',
+      body: `<p><strong>Acción:</strong> ${escapeHtml(registro.accion || '—')}</p>
+        <p><strong>Estudiante actual:</strong> ${escapeHtml(datos.estudianteActual ? obtenerNombreCompleto(datos.estudianteActual) : 'Nuevo registro')}</p>
+        <h3>Cambios propuestos</h3><ul>${items(datos.cambiosPropuestos)}</ul>
+        <h3>Asignaturas aprobadas</h3><ul>${items(datos.aprobacionesPropuestas)}</ul>
+        <h3>Errores de validación</h3><ul>${items(datos.erroresValidacion)}</ul>`,
+    });
+    content.querySelector('#revisionDetalleCerrar')?.addEventListener('click', () => dialog.close());
+    dialog.showModal();
+    habilitarCierreExterior(dialog);
+  } catch (error) {
+    mostrarError({ titulo: 'No fue posible abrir el registro', mensaje: error?.message || 'Error de consulta.' });
+  }
+}
+
+function configurarBandejaRevision() {
+  const seccion = document.querySelector('#estudiantesNavegacion .estudiantes-revision');
+  if (!seccion) return;
+  const actualizar = () => cargarBandejaRevision(carreraSeleccionada?.id, planSeleccionado?.id);
+  seccion.querySelector('#tabNavBandejaRevision')?.addEventListener('click', () => {
+    seccion.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    actualizar();
+  });
+  for (const id of ['bandejaRevisionFuente', 'bandejaRevisionEstado']) {
+    seccion.querySelector(`#${id}`)?.addEventListener('change', actualizar);
+  }
+  let temporizador;
+  seccion.querySelector('#bandejaRevisionTexto')?.addEventListener('input', () => {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(actualizar, 300);
+  });
+  seccion.addEventListener('change', (event) => {
+    const id = Number(event.target?.dataset?.revisionSelect);
+    if (!id) return;
+    if (event.target.checked) seleccionBandejaRevision.add(id);
+    else seleccionBandejaRevision.delete(id);
+    renderizarBandejaRevision();
+  });
+  seccion.addEventListener('click', async (event) => {
+    const detalleId = Number(event.target.closest('[data-revision-detalle]')?.dataset.revisionDetalle);
+    if (detalleId) return mostrarDetalleRevision(detalleId);
+    if (event.target.closest('#revisionSeleccionarTodos')) {
+      seleccionBandejaRevision = new Set(registrosBandejaRevision
+        .filter((r) => ['PENDIENTE', 'REQUIERE_REVISION', 'DEVUELTO_PARA_CORRECCION'].includes(r.estado))
+        .map((r) => r.id));
+      renderizarBandejaRevision();
+      return;
+    }
+    const accion = event.target.closest('#revisionAprobar, #revisionRechazar, #revisionDevolver')?.id;
+    if (!accion || !seleccionBandejaRevision.size) return;
+    const ids = [...seleccionBandejaRevision];
+    const confirmado = await confirmarAccion({
+      titulo: 'Confirmar revisión', mensaje: `Se procesarán ${ids.length} registro(s).`,
+      textoConfirmar: 'Continuar', peligro: accion === 'revisionRechazar',
+    });
+    if (!confirmado) return;
+    try {
+      let respuesta;
+      if (accion === 'revisionAprobar') respuesta = await aprobarRegistrosRevision(ids);
+      else {
+        const motivo = await pedirMotivoRevision(accion === 'revisionRechazar' ? 'Motivo de rechazo' : 'Motivo de devolución');
+        if (!motivo) return;
+        respuesta = accion === 'revisionRechazar'
+          ? await rechazarRegistrosRevision(ids.map((id) => ({ id, motivo })))
+          : await devolverRegistrosRevision(ids, motivo);
+      }
+      if (respuesta?.ok === false) throw new Error(respuesta.message);
+      const datos = extraerData(respuesta) || {};
+      const fallidos = datos.fallidos || [];
+      if (fallidos.length) mostrarAdvertencia({
+        titulo: 'Revisión parcial', mensaje: `${fallidos.length} registro(s) no se procesaron: ${fallidos.map((f) => `#${f.id}: ${f.error}`).join('; ')}`,
+      });
+      else mostrarExito({ titulo: 'Revisión guardada', mensaje: 'Los registros seleccionados se procesaron correctamente.' });
+      await actualizar();
+      await cargarEstudiantes(instanciaActual, true);
+    } catch (error) {
+      mostrarError({ titulo: 'No fue posible completar la revisión', mensaje: error?.message || 'Error de conexión.' });
+    }
+  });
+}
+
 export function iniciarEstudiantesPage() {
   instanciaActual += 1;
 
@@ -4867,7 +5100,7 @@ function renderizarSolicitudesFormularios() {
   }
 
   const puedeGestionar =
-    !obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL) && usuarioTienePermiso(
+    !esAsistenteActivo() && usuarioTienePermiso(
       PERMISOS.GESTIONAR
     );
 

@@ -546,7 +546,8 @@ describe('SGPA Fase 4 — Formulario Web Público y Validaciones Dinámicas (30 
   // 15. Correquisitos bloqueados
   it('15. Correquisitos bloqueados: política BLOQUEAR_REVISION impide habilitar correquisito', () => {
     const aprobadas = new Set<number>([1]);
-    expect(esAsignaturaElegibleFrontend(correquisitoAsig, aprobadas)).toBe(false);
+    expect(esAsignaturaElegibleFrontend(correquisitoAsig, aprobadas, { politicaCorrequisito: 'BLOQUEAR_REVISION' })).toBe(false);
+    expect(esAsignaturaElegibleFrontend(correquisitoAsig, aprobadas)).toBe(true);
   });
 
   // 16. Materias inactivas o inconsistentes
