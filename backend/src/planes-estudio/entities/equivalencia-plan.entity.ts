@@ -15,6 +15,11 @@ import { PlanAsignatura } from './plan-asignatura.entity';
 @Entity({ name: 'equivalencias_plan' })
 @Index('IDX_equivalencia_origen', ['planOrigenId', 'asignaturaOrigenId'])
 @Index('IDX_equivalencia_destino', ['planDestinoId', 'asignaturaDestinoId'])
+@Index('FK_eq_carrera_origen', ['carreraOrigenId'])
+@Index('FK_eq_asignatura_origen', ['asignaturaOrigenId'])
+@Index('FK_eq_carrera_destino', ['carreraDestinoId'])
+@Index('FK_eq_asignatura_destino', ['asignaturaDestinoId'])
+@Index('FK_eq_autorizador', ['autorizadoPorUsuarioId'])
 export class EquivalenciaPlan {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;

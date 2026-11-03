@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { GradoAcademico } from '../carreras/constants/grado-academico.constant';
 import { PlanEstudio } from './entities/plan-estudio.entity';
+import { EstadoPlanEstudio } from './constants/estado-plan-estudio.constant';
 import { PlanesEstudioService } from './planes-estudio.service';
 
 describe('PlanesEstudioService', () => {
@@ -33,6 +34,8 @@ describe('PlanesEstudioService', () => {
     nombre: 'Ingeniería en Sistemas',
     descripcion: null,
     activo: true,
+    estado: EstadoPlanEstudio.VIGENTE,
+    motivoUltimoCambio: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   } as Carrera;
@@ -46,6 +49,8 @@ describe('PlanesEstudioService', () => {
     descripcion: 'Plan de estudios',
     activo: true,
     carrera,
+    estado: EstadoPlanEstudio.VIGENTE,
+    motivoUltimoCambio: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...cambios,

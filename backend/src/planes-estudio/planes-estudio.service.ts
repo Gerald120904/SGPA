@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -12,7 +13,13 @@ import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { ActualizarPlanEstudioDto } from './dto/actualizar-plan-estudio.dto';
 import { CrearPlanEstudioDto } from './dto/crear-plan-estudio.dto';
+import { CambiarEstadoPlanEstudioDto } from './dto/cambiar-estado-plan-estudio.dto';
+import { EstadoPlanEstudio } from './constants/estado-plan-estudio.constant';
+import { Estudiante } from '../estudiantes/entities/estudiante.entity';
+import { EstadoEstudiante } from '../estudiantes/constants/estado-estudiante.constant';
 import { PlanEstudio } from './entities/plan-estudio.entity';
+import { DataSource } from 'typeorm';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class PlanesEstudioService {
@@ -22,7 +29,18 @@ export class PlanesEstudioService {
     @InjectRepository(Carrera)
     private readonly carreraRepository: Repository<Carrera>,
     private readonly alcance: AlcanceJerarquicoService,
+    @Optional()
+    @InjectRepository(Estudiante)
+    private readonly estudianteRepository?: Repository<Estudiante>,
+    @Optional()
+    private readonly dataSource?: DataSource,
   ) {}
+
+  private enriquecerEstadoPlan(plan: PlanEstudio): PlanEstudio & { estado: EstadoPlanEstudio } {
+    const estado = (plan as any).estado || (plan.activo ? EstadoPlanEstudio.VIGENTE : EstadoPlanEstudio.CERRADO);
+    (plan as any).estado = estado;
+    return plan as PlanEstudio & { estado: EstadoPlanEstudio };
+  }
 
   private async obtenerEntidadPorId(id: number): Promise<PlanEstudio> {
     const plan = await this.planRepository.findOne({
@@ -125,7 +143,7 @@ export class PlanesEstudioService {
         .filter((id): id is number => id !== null);
       if (!carreraIds.length) return [];
     }
-    return this.planRepository.find({
+    const planes = await this.planRepository.find({
       ...(carreraIds !== null && { where: { carreraId: In(carreraIds) } }),
       relations: {
         carrera: true,
@@ -135,6 +153,7 @@ export class PlanesEstudioService {
         codigo: 'ASC',
       },
     });
+    return planes.map((p) => this.enriquecerEstadoPlan(p));
   }
 
   async obtenerPorId(id: number): Promise<PlanEstudio> {
@@ -222,12 +241,117 @@ export class PlanesEstudioService {
     return this.obtenerEntidadPorId(id);
   }
 
-  async cambiarEstado(id: number, activo: boolean): Promise<PlanEstudio> {
-    await this.obtenerEntidadPorId(id);
+  async cambiarEstado(
+    id: number,
+    activoOEstado: boolean | CambiarEstadoPlanEstudioDto,
+    usuarioId?: number,
+  ): Promise<PlanEstudio> {
+    const plan = await this.obtenerEntidadPorId(id);
 
-    await this.planRepository.update(id, { activo });
+    if (usuarioId !== undefined && (await this.alcance.tipoCuentaJerarquica(usuarioId))) {
+      const puede = await this.alcance.puedeEjecutar(
+        usuarioId,
+        PermisoSistema.PLANES_ESTUDIO_GESTIONAR,
+        plan.carreraId,
+      );
+      if (!puede) {
+        throw new ForbiddenException('No tiene permisos para modificar el estado del plan en esta carrera.');
+      }
+    }
 
-    return this.obtenerEntidadPorId(id);
+    const estadoObjetivo = typeof activoOEstado === 'boolean'
+      ? (activoOEstado ? EstadoPlanEstudio.VIGENTE : EstadoPlanEstudio.CERRADO)
+      : (activoOEstado.estado || (activoOEstado.activo === false ? EstadoPlanEstudio.CERRADO : EstadoPlanEstudio.VIGENTE));
+
+    const motivo = typeof activoOEstado === 'object'
+      ? activoOEstado.motivo
+      : (activoOEstado ? 'Reapertura oficial de vigencia' : 'Cierre oficial del plan');
+    const estadoAnterior = plan.activo ? ((plan as any).estado || EstadoPlanEstudio.VIGENTE) : EstadoPlanEstudio.CERRADO;
+
+    if (!motivo || motivo.trim().length < 5) {
+      throw new BadRequestException('El motivo del cambio de estado del plan es obligatorio (mínimo 5 caracteres).');
+    }
+
+    const uid = usuarioId || 1;
+
+    if (estadoObjetivo === EstadoPlanEstudio.CERRADO) {
+      // Bloqueo estricto por estudiantes activos
+      let totalActivos = 0;
+      if (this.estudianteRepository && typeof this.estudianteRepository.count === 'function') {
+        totalActivos = await this.estudianteRepository.count({
+          where: { planEstudioId: id, estado: EstadoEstudiante.ACTIVO },
+        });
+      } else if (this.dataSource && typeof this.dataSource.query === 'function') {
+        try {
+          const res = await this.dataSource.query(
+            "SELECT COUNT(*) AS total FROM estudiantes WHERE plan_estudio_id = ? AND estado = 'ACTIVO'",
+            [id],
+          );
+          totalActivos = Number(res?.[0]?.total || 0);
+        } catch {
+          totalActivos = 0;
+        }
+      }
+
+      if (totalActivos > 0) {
+        throw new BadRequestException(
+          `No es posible cerrar este plan porque existen ${totalActivos} estudiantes activos sin una transición curricular resuelta.`,
+        );
+      }
+
+      await this.planRepository.update(id, { activo: false });
+
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        await this.dataSource.query(
+          "UPDATE planes_estudio SET estado = 'CERRADO', motivo_ultimo_cambio = ? WHERE id = ?",
+          [motivo.trim(), id],
+        ).catch(() => null);
+
+        await this.dataSource.query(
+          `INSERT INTO auditoria_planes_estudio (plan_estudio_id, tipo_modificacion, valor_anterior, valor_nuevo, motivo, usuario_id, created_at)
+           VALUES (?, 'CIERRE', ?, 'CERRADO', ?, ?, NOW())`,
+          [id, estadoAnterior, motivo.trim(), uid],
+        ).catch(() => null);
+      }
+    } else if (estadoObjetivo === EstadoPlanEstudio.EN_TRANSICION) {
+      // EN_TRANSICION: mantiene activo = true para permitir la continuidad y graduación de estudiantes actuales,
+      // pero bloquea nuevos ingresos ordinarios.
+      await this.planRepository.update(id, { activo: true });
+
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        await this.dataSource.query(
+          "UPDATE planes_estudio SET estado = 'EN_TRANSICION', motivo_ultimo_cambio = ? WHERE id = ?",
+          [motivo.trim(), id],
+        ).catch(() => null);
+
+        await this.dataSource.query(
+          `INSERT INTO auditoria_planes_estudio (plan_estudio_id, tipo_modificacion, valor_anterior, valor_nuevo, motivo, usuario_id, created_at)
+           VALUES (?, 'CAMBIO_ESTADO', ?, 'EN_TRANSICION', ?, ?, NOW())`,
+          [id, estadoAnterior, motivo.trim(), uid],
+        ).catch(() => null);
+      }
+    } else {
+      // VIGENTE
+      await this.planRepository.update(id, { activo: true });
+
+      const tipoAudit = estadoAnterior === EstadoPlanEstudio.CERRADO ? 'REAPERTURA' : 'CAMBIO_ESTADO';
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        await this.dataSource.query(
+          "UPDATE planes_estudio SET estado = 'VIGENTE', motivo_ultimo_cambio = ? WHERE id = ?",
+          [motivo.trim(), id],
+        ).catch(() => null);
+
+        await this.dataSource.query(
+          `INSERT INTO auditoria_planes_estudio (plan_estudio_id, tipo_modificacion, valor_anterior, valor_nuevo, motivo, usuario_id, created_at)
+           VALUES (?, ?, ?, 'VIGENTE', ?, ?, NOW())`,
+          [id, tipoAudit, estadoAnterior, motivo.trim(), uid],
+        ).catch(() => null);
+      }
+    }
+
+    const actualizado = await this.obtenerEntidadPorId(id);
+    (actualizado as any).estado = estadoObjetivo;
+    return actualizado;
   }
 
   async crearDesdeSolicitud(coordinadorId: number, asistenteId: number, dto: CrearPlanEstudioDto,

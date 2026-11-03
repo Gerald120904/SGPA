@@ -11,6 +11,7 @@ import {
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Permisos } from '../permisos/decorators/permisos.decorator';
+import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarPlanAsignaturaDto } from './dto/actualizar-plan-asignatura.dto';
 import { CambiarEstadoPlanAsignaturaDto } from './dto/cambiar-estado-plan-asignatura.dto';

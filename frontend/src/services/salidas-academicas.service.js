@@ -34,3 +34,8 @@ export async function reemplazarAsignaturasSalida(
     asignaturaIds,
   });
 }
+
+export async function evaluarSalidaAcademica(salidaId, estudianteId) {
+  validarApi("evaluarSalidaAcademica");
+  return window.sgpa.evaluarSalidaAcademica(salidaId, estudianteId);
+}

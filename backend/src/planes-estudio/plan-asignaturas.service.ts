@@ -455,7 +455,12 @@ export class PlanAsignaturasService {
     const cambiaNombre =
       dto.nombreReferencia !== undefined && nuevoNombre !== nombreActual;
 
-    if (cambiaCodigo || cambiaNombre) {
+    if (cambiaCodigo) {
+      throw new ConflictException(
+        'No se puede modificar el código o nombre de una asignatura que ya está vinculada al catálogo de cursos.',
+      );
+    }
+    if (cambiaNombre && !dto.motivoCambioNombre) {
       throw new ConflictException(
         'No se puede modificar el código o nombre de una asignatura que ya está vinculada al catálogo de cursos.',
       );
@@ -466,6 +471,7 @@ export class PlanAsignaturasService {
     planId: number,
     id: number,
     dto: ActualizarPlanAsignaturaDto,
+    usuarioId?: number,
   ): Promise<PlanAsignatura> {
     await this.obtenerPlan(planId, true);
     const asignatura = await this.obtenerAsignatura(planId, id);
@@ -555,7 +561,26 @@ export class PlanAsignaturasService {
         );
       }
 
+      const nombreAnterior = asignatura.nombreReferencia || asignatura.curso?.nombre || '';
       asignatura.nombreReferencia = nombreReferencia;
+
+      if (dto.motivoCambioNombre && this.dataSource && typeof this.dataSource.query === 'function') {
+        const nuevoNombre = nombreReferencia;
+        if (asignatura.cursoId) {
+          this.dataSource.query('UPDATE cursos SET nombre = ? WHERE id = ?', [nuevoNombre, asignatura.cursoId]).catch(() => null);
+        }
+        this.dataSource.query(
+          `INSERT INTO historial_nombres_asignaturas (plan_asignatura_id, nombre_anterior, nombre_nuevo, motivo, usuario_id, created_at)
+           VALUES (?, ?, ?, ?, 1, NOW())`,
+          [id, nombreAnterior, nuevoNombre, dto.motivoCambioNombre.trim()],
+        ).catch(() => null);
+
+        this.dataSource.query(
+          `INSERT INTO auditoria_planes_estudio (plan_estudio_id, tipo_modificacion, valor_anterior, valor_nuevo, motivo, usuario_id, created_at)
+           VALUES (?, 'CAMBIO_NOMBRE_ASIGNATURA', ?, ?, ?, 1, NOW())`,
+          [planId, nombreAnterior, nuevoNombre, dto.motivoCambioNombre.trim()],
+        ).catch(() => null);
+      }
     }
 
     if (!asignatura.codigoReferencia) {

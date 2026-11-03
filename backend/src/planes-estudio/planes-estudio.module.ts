@@ -11,6 +11,8 @@ import { PlanRequisito } from './entities/plan-requisito.entity';
 import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
 import { EquivalenciaPlan } from './entities/equivalencia-plan.entity';
+import { AuditoriaPlanEstudio } from './entities/auditoria-plan-estudio.entity';
+import { HistorialNombreAsignatura } from './entities/historial-nombre-asignatura.entity';
 import { PlanAsignaturasController } from './plan-asignaturas.controller';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
 import { PlanImportacionController } from './plan-importacion.controller';
@@ -29,6 +31,8 @@ import { SalidasAcademicasController } from './salidas-academicas.controller';
 import { SalidasAcademicasService } from './salidas-academicas.service';
 import { EquivalenciasController } from './equivalencias.controller';
 import { EquivalenciasService } from './equivalencias.service';
+import { TransicionesCurricularesController } from './transiciones-curriculares.controller';
+import { TransicionesCurricularesService } from './transiciones-curriculares.service';
 import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.service';
 
@@ -41,6 +45,8 @@ import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.serv
       SalidaAcademica,
       ReglaOptativaPlan,
       EquivalenciaPlan,
+      AuditoriaPlanEstudio,
+      HistorialNombreAsignatura,
       Carrera,
       Estudiante,
       HistorialAcademicoEstudiante,
@@ -49,6 +55,7 @@ import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.serv
     PermisosModule,
   ],
   controllers: [
+    EquivalenciasController,
     PlanesEstudioController,
     PlanAsignaturasController,
     PlanRequisitosController,
@@ -57,7 +64,7 @@ import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.serv
     PlanValidacionesController,
     PlanImportacionController,
     PlanReglasOptativasController,
-    EquivalenciasController,
+    TransicionesCurricularesController,
   ],
   providers: [
     PlanesEstudioService,
@@ -69,6 +76,7 @@ import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.serv
     PlanImportacionService,
     PlanReglasOptativasService,
     EquivalenciasService,
+    TransicionesCurricularesService,
     PlanesAlcanceGuard,
     MotorRequisitosService,
   ],
@@ -82,6 +90,7 @@ import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.serv
     PlanImportacionService,
     PlanReglasOptativasService,
     EquivalenciasService,
+    TransicionesCurricularesService,
     MotorRequisitosService,
   ],
 })
