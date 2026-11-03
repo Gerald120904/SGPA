@@ -14,8 +14,10 @@ export type EstadoSolicitudCambio =
   | 'INVALIDADA';
 
 @Entity({ name: 'solicitudes_cambio' })
-@Index('IDX_solicitud_responsable_estado', ['coordinadorId', 'estado'])
+@Index('IDX_solicitud_responsable_estado', ['coordinadorId'])
+@Index('IDX_solicitud_coordinador_estado', ['coordinadorId', 'estado'])
 @Index('IDX_solicitud_solicitante', ['solicitanteId'])
+@Index('UQ_12811adaa586cfd56925a295d21', ['correlacionId'], { unique: true })
 export class SolicitudCambio {
   @PrimaryGeneratedColumn({ type: 'int', unsigned: true })
   id!: number;
@@ -81,7 +83,7 @@ export class SolicitudCambio {
   @Column({ name: 'historial_versiones', type: 'json', nullable: true })
   historialVersiones!: Array<Record<string, unknown>> | null;
 
-  @Column({ name: 'correlacion_id', type: 'char', length: 36, unique: true })
+  @Column({ name: 'correlacion_id', type: 'char', length: 36 })
   correlacionId!: string;
 
   @Column({ name: 'resultado_aplicado', type: 'json', nullable: true })

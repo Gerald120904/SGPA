@@ -10,6 +10,9 @@ export const proponerActualizarEstudiante = (id, datos) => invocar('proponerActu
 export const proponerEstadoEstudiante = (id, estado) => invocar('proponerEstadoEstudiante', id, estado);
 export const proponerCambioPlanEstudiante = (id, datos) => invocar('proponerCambioPlanEstudiante', id, datos);
 export const proponerResultadoEstudiante = (id, datos) => invocar('proponerResultadoEstudiante', id, datos);
+export const proponerReingresoEstudiante = (id, datos) => invocar('proponerReingresoEstudiante', id, datos);
+export const proponerCorreccionResultado = (id, datos) => invocar('proponerCorreccionResultado', id, datos);
+export const proponerRevisionBandejaEstudiantes = (datos) => invocar('proponerRevisionBandejaEstudiantes', datos);
 export const proponerImportacionEstudiantes = (datos) => invocar('proponerImportacionEstudiantes', datos);
 export const proponerCrearCurso = (datos) => invocar('proponerCrearCurso', datos);
 export const proponerActualizarCurso = (id, datos) => invocar('proponerActualizarCurso', id, datos);
@@ -39,4 +42,5 @@ export const proponerEstadoOptativa = (id, activo) => invocar('proponerEstadoOpt
 export const listarMisSolicitudesCambio = () => invocar('listarMisSolicitudesCambio');
 export const listarSolicitudesPendientesCambio = () => invocar('listarSolicitudesPendientesCambio');
 export const aprobarSolicitudCambio = (id) => invocar('aprobarSolicitudCambio', id);
+export const devolverSolicitudCambio = (id, observaciones) => invocar('devolverSolicitudCambio', id, observaciones);
 export const rechazarSolicitudCambio = (id, motivo) => invocar('rechazarSolicitudCambio', id, motivo);

@@ -35,9 +35,13 @@ import { ActualizarAsignaturasSalidaDto } from '../planes-estudio/dto/actualizar
 import { GuardarReglaOptativaPlanDto } from '../planes-estudio/dto/guardar-regla-optativa-plan.dto';
 import { ValidarImportacionPlanDto } from '../planes-estudio/dto/validar-importacion-plan.dto';
 import { CambiarPlanEstudianteDto } from '../estudiantes/dto/cambiar-plan-estudiante.dto';
+import { CorregirResultadoAcademicoDto } from '../estudiantes/dto/corregir-resultado-academico.dto';
 import { RegistrarResultadoAcademicoDto } from '../estudiantes/dto/registrar-resultado-academico.dto';
+import { ReingresarEstudianteDto } from '../estudiantes/dto/reingresar-estudiante.dto';
 import { ImportarEstudiantesDto } from '../estudiantes/dto/importar-estudiantes.dto';
+import { ProponerRevisionBandejaDto } from '../estudiantes/dto/proponer-revision-bandeja.dto';
 import { EstudiantesImportacionService } from '../estudiantes/estudiantes-importacion.service';
+import { BandejaRevisionEstudiantesService } from '../estudiantes/bandeja-revision-estudiantes.service';
 import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { RolSistema } from '../auth/constants/roles.constants';
@@ -67,6 +71,8 @@ export class SolicitudesCambioService {
     private readonly optativas?: OptativasService,
     @Optional()
     private readonly estudiantesImportacion?: EstudiantesImportacionService,
+    @Optional()
+    private readonly bandejaRevision?: BandejaRevisionEstudiantesService,
     @Optional()
     private readonly notificaciones?: NotificacionesService,
   ) {}
@@ -527,6 +533,11 @@ export class SolicitudesCambioService {
   }
 
   async proponerCambiarEstadoEstudiante(solicitanteId: number, estudianteId: number, dto: CambiarEstadoEstudianteDto) {
+    if (dto.estado === EstadoEstudiante.GRADUADO) {
+      throw new BadRequestException(
+        'El asistente estudiantil no puede proponer la graduación oficial como cambio genérico de estado.',
+      );
+    }
     const estudiante = await this.estudiantes.obtenerPorId(solicitanteId, estudianteId);
     const carreraId = estudiante.carreraId;
     const dependencia = await this.dependencias.findOne({ where: { asistenteId: solicitanteId, activo: true } });
@@ -544,6 +555,81 @@ export class SolicitudesCambioService {
         actorUsuarioId: solicitanteId, objetivoUsuarioId: solicitanteId,
         accion: 'ENVIAR_SOLICITUD', detalle: { solicitudId: solicitud.id, carreraId,
           modulo: 'ESTUDIANTES', operacion: 'CAMBIAR_ESTADO', estudianteId },
+      });
+      return solicitud;
+    });
+  }
+
+  async proponerReingresarEstudiante(
+    solicitanteId: number,
+    estudianteId: number,
+    dto: ReingresarEstudianteDto,
+  ) {
+    const estudiante = await this.estudiantes.obtenerPorId(solicitanteId, estudianteId);
+    const carreraId = estudiante.carreraId;
+    const dependencia = await this.dependencias.findOne({ where: { asistenteId: solicitanteId, activo: true } });
+    if (!dependencia || !(await this.alcance.puedeEjecutar(solicitanteId, PermisoSistema.ESTUDIANTES_GESTIONAR, carreraId))) {
+      throw new ForbiddenException('No puede proponer reingreso de estudiantes en esa carrera.');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const solicitud = await manager.getRepository(SolicitudCambio).save({
+        solicitanteId,
+        coordinadorId: dependencia.coordinadorId,
+        carreraId,
+        modulo: 'ESTUDIANTES',
+        operacion: 'REINGRESAR',
+        objetivoId: estudianteId,
+        datosPropuestos: { ...dto, estudianteReferencia: { cedula: estudiante.cedula, nombres: `${estudiante.nombres} ${estudiante.apellido1}` } },
+        huellaOriginal: this.estudiantes.huellaEstudiante(estudiante),
+        estado: 'PENDIENTE',
+        correlacionId: randomUUID(),
+        resultadoAplicado: null,
+      });
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: solicitanteId,
+        objetivoUsuarioId: solicitanteId,
+        accion: 'ENVIAR_SOLICITUD',
+        detalle: { solicitudId: solicitud.id, carreraId, modulo: 'ESTUDIANTES', operacion: 'REINGRESAR', estudianteId },
+      });
+      return solicitud;
+    });
+  }
+
+  async proponerCorregirResultadoEstudiante(
+    solicitanteId: number,
+    estudianteId: number,
+    historialId: number,
+    dto: CorregirResultadoAcademicoDto,
+  ) {
+    const estudiante = await this.estudiantes.obtenerPorId(solicitanteId, estudianteId);
+    const carreraId = estudiante.carreraId;
+    const dependencia = await this.dependencias.findOne({ where: { asistenteId: solicitanteId, activo: true } });
+    if (!dependencia || !(await this.alcance.puedeEjecutar(solicitanteId, PermisoSistema.ESTUDIANTES_GESTIONAR, carreraId))) {
+      throw new ForbiddenException('No puede proponer correcciones académicas en esa carrera.');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const solicitud = await manager.getRepository(SolicitudCambio).save({
+        solicitanteId,
+        coordinadorId: dependencia.coordinadorId,
+        carreraId,
+        modulo: 'ESTUDIANTES',
+        operacion: 'CORREGIR_RESULTADO',
+        objetivoId: estudianteId,
+        datosPropuestos: {
+          ...dto,
+          historialId,
+          estudianteReferencia: { cedula: estudiante.cedula, nombres: `${estudiante.nombres} ${estudiante.apellido1}` },
+        },
+        huellaOriginal: this.estudiantes.huellaEstudiante(estudiante),
+        estado: 'PENDIENTE',
+        correlacionId: randomUUID(),
+        resultadoAplicado: null,
+      });
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: solicitanteId,
+        objetivoUsuarioId: solicitanteId,
+        accion: 'ENVIAR_SOLICITUD',
+        detalle: { solicitudId: solicitud.id, carreraId, modulo: 'ESTUDIANTES', operacion: 'CORREGIR_RESULTADO', estudianteId, historialId },
       });
       return solicitud;
     });
@@ -674,6 +760,79 @@ export class SolicitudesCambioService {
         accion: 'ENVIAR_SOLICITUD',
         detalle: { solicitudId: solicitud.id, carreraId: dto.carreraId, modulo: 'ESTUDIANTES', operacion: 'IMPORTAR_ESTUDIANTES' },
       });
+      return solicitud;
+    });
+  }
+
+  async proponerRevisionBandeja(
+    solicitanteId: number,
+    dto: ProponerRevisionBandejaDto,
+  ) {
+    const dependencia = await this.dependencias.findOne({
+      where: { asistenteId: solicitanteId, activo: true },
+    });
+    if (
+      !dependencia ||
+      !(await this.alcance.puedeEjecutar(
+        solicitanteId,
+        PermisoSistema.ESTUDIANTES_GESTIONAR,
+        dto.carreraId,
+      ))
+    ) {
+      throw new ForbiddenException(
+        'No puede proponer revisión de importación de estudiantes en esa carrera.',
+      );
+    }
+
+    if (!dto.aprobarRegistroIds?.length && !dto.rechazarRegistros?.length) {
+      throw new BadRequestException(
+        'Debe indicar al menos un registro para aprobar o rechazar.',
+      );
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const solicitud = await manager.getRepository(SolicitudCambio).save({
+        solicitanteId,
+        coordinadorId: dependencia.coordinadorId,
+        carreraId: dto.carreraId,
+        modulo: 'ESTUDIANTES',
+        operacion: 'REVISAR_BANDEJA',
+        objetivoId: dto.loteId ?? null,
+        datosPropuestos: { ...dto },
+        huellaOriginal: null,
+        estado: 'PENDIENTE',
+        correlacionId: randomUUID(),
+        resultadoAplicado: null,
+      });
+
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: solicitanteId,
+        objetivoUsuarioId: solicitanteId,
+        accion: 'ENVIAR_SOLICITUD',
+        detalle: {
+          solicitudId: solicitud.id,
+          carreraId: dto.carreraId,
+          modulo: 'ESTUDIANTES',
+          operacion: 'REVISAR_BANDEJA',
+          aprobadosPropuestos: dto.aprobarRegistroIds?.length || 0,
+          rechazadosPropuestos: dto.rechazarRegistros?.length || 0,
+        },
+      });
+
+      if (this.notificaciones) {
+        await this.notificaciones
+          .crear({
+            usuarioId: dependencia.coordinadorId,
+            carreraId: dto.carreraId,
+            titulo: 'Propuesta de revisión de estudiantes',
+            mensaje: `El asistente propuso revisión de ${dto.aprobarRegistroIds?.length || 0} aprobaciones y ${dto.rechazarRegistros?.length || 0} rechazos en la bandeja de importación.`,
+            tipo: 'INFO',
+            enlace: `/estudiantes/bandeja-revision`,
+            metadatos: { solicitudId: solicitud.id },
+          })
+          .catch(() => null);
+      }
+
       return solicitud;
     });
   }
@@ -980,12 +1139,37 @@ export class SolicitudesCambioService {
           if (!Object.values(EstadoEstudiante).includes(estado as EstadoEstudiante)) {
             throw new ForbiddenException('Estado propuesto no admitido.');
           }
+          if (estado === EstadoEstudiante.GRADUADO) {
+            throw new BadRequestException('La graduación oficial no puede registrarse mediante solicitud genérica de cambio de estado.');
+          }
           estudianteId = await this.estudiantes.cambiarEstadoDesdeSolicitud(
             coordinadorId, solicitud.objetivoId, solicitud.carreraId,
             estado as EstadoEstudiante,
             solicitud.huellaOriginal, manager,
           );
           resultado = { estudianteId };
+        } else if (solicitud.operacion === 'REINGRESAR' && solicitud.objetivoId && solicitud.huellaOriginal) {
+          estudianteId = await this.estudiantes.reingresarDesdeSolicitud(
+            coordinadorId,
+            solicitud.objetivoId,
+            solicitud.carreraId,
+            solicitud.datosPropuestos as unknown as ReingresarEstudianteDto,
+            solicitud.huellaOriginal,
+            manager,
+          );
+          resultado = { estudianteId };
+        } else if (solicitud.operacion === 'CORREGIR_RESULTADO' && solicitud.objetivoId && solicitud.huellaOriginal) {
+          const historialId = Number(solicitud.datosPropuestos.historialId);
+          await this.estudiantes.corregirResultadoDesdeSolicitud(
+            coordinadorId,
+            solicitud.objetivoId,
+            solicitud.carreraId,
+            historialId,
+            solicitud.datosPropuestos as unknown as CorregirResultadoAcademicoDto,
+            solicitud.huellaOriginal,
+            manager,
+          );
+          resultado = { estudianteId: solicitud.objetivoId, historialId };
         } else if (solicitud.operacion === 'CAMBIAR_PLAN' && solicitud.objetivoId && solicitud.huellaOriginal) {
           estudianteId = await this.estudiantes.cambiarPlanDesdeSolicitud(
             coordinadorId,
@@ -1014,6 +1198,19 @@ export class SolicitudesCambioService {
             manager,
           );
           resultado = res as Record<string, number>;
+        } else if (solicitud.operacion === 'REVISAR_BANDEJA') {
+          if (!this.bandejaRevision) throw new ForbiddenException('Servicio de bandeja de revisión no disponible.');
+          const res = await this.bandejaRevision.aplicarRevisionDesdeSolicitud(
+            coordinadorId,
+            solicitud.datosPropuestos as unknown as ProponerRevisionBandejaDto,
+            manager,
+          );
+          resultado = {
+            solicitados: res.solicitados,
+            aprobados: res.aprobados,
+            rechazados: res.rechazados,
+            fallidos: res.fallidos.length,
+          };
         } else throw new ForbiddenException('Operación de estudiante no admitida.');
       } else if (solicitud.modulo === 'OPTATIVAS') {
         let optativaId: number;
@@ -1130,6 +1327,15 @@ export class SolicitudesCambioService {
       solicitud.resueltoEn = new Date();
       solicitud.resueltoPorUsuarioId = coordinadorId;
       await repo.save(solicitud);
+
+      if (solicitud.modulo === 'ESTUDIANTES' && solicitud.operacion === 'REVISAR_BANDEJA' && this.bandejaRevision) {
+        await this.bandejaRevision.marcarDevueltosDesdeSolicitud(
+          coordinadorId,
+          solicitud.datosPropuestos as unknown as ProponerRevisionBandejaDto,
+          observaciones,
+          manager,
+        );
+      }
 
       await manager.getRepository(AuditoriaJerarquia).save({
         actorUsuarioId: coordinadorId,

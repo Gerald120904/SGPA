@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsArray, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class CambiarPlanEstudianteDto {
   @IsInt()
@@ -13,4 +13,9 @@ export class CambiarPlanEstudianteDto {
   @IsString()
   @MaxLength(500)
   motivo?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  equivalenciaIds?: number[];
 }

@@ -366,6 +366,20 @@ export class EstudiantesImportacionService {
     const periodosPorCodigo = new Map(
       periodos.map((item) => [this.normalizarCodigo(item.codigo), item]),
     );
+    const plan = await this.planRepository.findOne({ where: { id: dto.planEstudioId } });
+    let esEnTransicion = (plan as any)?.estado === 'EN_TRANSICION';
+    if (!esEnTransicion && this.dataSource && typeof this.dataSource.query === 'function') {
+      try {
+        const ult = await this.dataSource.query(
+          "SELECT valor_nuevo FROM auditoria_planes_estudio WHERE plan_estudio_id = ? AND tipo_modificacion IN ('CAMBIO_ESTADO', 'CIERRE', 'REAPERTURA') ORDER BY id DESC LIMIT 1",
+          [dto.planEstudioId],
+        );
+        if (ult?.[0]?.valor_nuevo === 'EN_TRANSICION') {
+          esEnTransicion = true;
+        }
+      } catch {}
+    }
+
     const porCedula = new Map(estudiantes.map((item) => [item.cedula, item]));
     const porCorreo = new Map(
       estudiantes.map((item) => [item.correoInstitucional.toLowerCase(), item]),
@@ -377,6 +391,9 @@ export class EstudiantesImportacionService {
     return normalizadas.map((fila): FilaValidada => {
       const errores: string[] = [];
       const existente = estudiantes.find((item) => item.cedula === fila.cedula && item.carreraId === dto.carreraId);
+      if (!existente && esEnTransicion) {
+        errores.push('El plan de estudio se encuentra EN TRANSICIÓN. No se admiten nuevos ingresos ordinarios.');
+      }
       const existentePorCorreo = porCorreo.get(fila.datos.correoInstitucional);
       const periodo = periodosPorCodigo.get(fila.periodoIngresoCodigo);
       if ((conteoCedulas.get(fila.cedula) ?? 0) > 1)

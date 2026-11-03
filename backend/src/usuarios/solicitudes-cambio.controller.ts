@@ -8,8 +8,11 @@ import { CrearEstudianteDto } from '../estudiantes/dto/crear-estudiante.dto';
 import { ActualizarEstudianteDto } from '../estudiantes/dto/actualizar-estudiante.dto';
 import { CambiarEstadoEstudianteDto } from '../estudiantes/dto/cambiar-estado-estudiante.dto';
 import { CambiarPlanEstudianteDto } from '../estudiantes/dto/cambiar-plan-estudiante.dto';
+import { CorregirResultadoAcademicoDto } from '../estudiantes/dto/corregir-resultado-academico.dto';
 import { RegistrarResultadoAcademicoDto } from '../estudiantes/dto/registrar-resultado-academico.dto';
+import { ReingresarEstudianteDto } from '../estudiantes/dto/reingresar-estudiante.dto';
 import { ImportarEstudiantesDto } from '../estudiantes/dto/importar-estudiantes.dto';
+import { ProponerRevisionBandejaDto } from '../estudiantes/dto/proponer-revision-bandeja.dto';
 import { CrearCursoDto } from '../cursos/dto/crear-curso.dto';
 import { ActualizarCursoDto } from '../cursos/dto/actualizar-curso.dto';
 import { CambiarEstadoCursoDto } from '../cursos/dto/cambiar-estado-curso.dto';
@@ -93,6 +96,36 @@ export class SolicitudesCambioController {
     return this.solicitudes.proponerImportarEstudiantes(request.user!.sub, dto);
   }
 
+  @Post('estudiantes/revision-bandeja')
+  @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
+  proponerRevisionBandeja(
+    @Req() request: Request,
+    @Body() dto: ProponerRevisionBandejaDto,
+  ) {
+    return this.solicitudes.proponerRevisionBandeja(request.user!.sub, dto);
+  }
+
+  @Post('estudiantes/:id/reingresar')
+  @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
+  proponerReingresoEstudiante(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReingresarEstudianteDto,
+  ) {
+    return this.solicitudes.proponerReingresarEstudiante(request.user!.sub, id, dto);
+  }
+
+  @Post('estudiantes/:id/historial-academico/:historialId/corregir')
+  @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
+  proponerCorreccionResultado(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('historialId', ParseIntPipe) historialId: number,
+    @Body() dto: CorregirResultadoAcademicoDto,
+  ) {
+    return this.solicitudes.proponerCorregirResultadoEstudiante(request.user!.sub, id, historialId, dto);
+  }
+
   @Post('cursos')
   @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
   proponerCurso(@Req() request: Request, @Body() dto: CrearCursoDto) {
@@ -144,7 +177,8 @@ export class SolicitudesCambioController {
   @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
   proponerEstadoPlan(@Req() request: Request, @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoPlanEstudioDto) {
-    return this.solicitudes.proponerCambiarEstadoPlan(request.user!.sub, id, dto.activo);
+    const activo = dto.activo ?? (dto.estado ? dto.estado !== 'CERRADO' : true);
+    return this.solicitudes.proponerCambiarEstadoPlan(request.user!.sub, id, activo);
   }
 
   @Post('planes-estudio/:planId/asignaturas')
