@@ -131,7 +131,7 @@ Fuente verificada: `backend/src/usuarios/solicitudes-cambio.controller.ts`. Toda
 
 - `migrationsRun` permanece desactivado.
 - El ejecutor manual exige `--apply` y confirmación exacta del nombre de la base.
-- `DB_SYNCHRONIZE=true` no está habilitado para las bases persistentes.
+- Para `sgpa`, TypeORM mantiene `synchronize=false` aunque la configuración local solicite `DB_SYNCHRONIZE=true`; el arranque verifica el historial oficial sin aplicar migraciones.
 - La migración no se ha aplicado a `sgpa` ni a `sgpa_test` durante este desarrollo.
 - `down()` rechaza eliminar las tablas si cualquiera contiene datos.
 

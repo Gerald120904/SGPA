@@ -22,8 +22,10 @@ export function crearConfiguracionBaseDatos(
   if (database === TEST_DATABASE && !modoPruebas) {
     throw new Error('La base sgpa_test solo puede utilizarse con SGPA_TEST_MODE=true.');
   }
-  if (synchronizeRequested && !(modoPruebas && database === TEST_DATABASE)) {
-    throw new Error('DB_SYNCHRONIZE=true está prohibido fuera de sgpa_test en modo de pruebas.');
+  if (synchronizeRequested && database !== 'sgpa' && !(modoPruebas && database === TEST_DATABASE)) {
+    throw new Error(
+      'DB_SYNCHRONIZE=true está prohibido fuera de sgpa y sgpa_test en modo de pruebas.',
+    );
   }
 
   return {

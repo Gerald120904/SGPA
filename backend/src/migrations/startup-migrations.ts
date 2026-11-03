@@ -212,3 +212,12 @@ export async function verificarMigracionesAntesDeEscuchar(
 ): Promise<string[]> {
   return executeSafeOfficialMigrations(dataSource, config, 'development-startup');
 }
+
+export async function verificarMigracionesSinAplicar(dataSource: DataSource): Promise<void> {
+  if (!dataSource.isInitialized) throw new Error('La conexión TypeORM no está inicializada.');
+  assertSafeDataSource(dataSource);
+  const pendientes = await pending(dataSource, configuredMigrationNames(dataSource));
+  if (pendientes.length) {
+    throw new Error(`La base sgpa tiene migraciones pendientes: ${pendientes.join(', ')}. No se aplicó ninguna migración.`);
+  }
+}

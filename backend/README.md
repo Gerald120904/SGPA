@@ -67,45 +67,17 @@ npm run clean
 El archivo `package.json` define esos comandos y mantiene los comandos de
 arranque existentes. Esta fase no cambia entidades, migraciones ni el API.
 
-## Sincronización segura del esquema en desarrollo
+## Sincronización de TypeORM
 
-Cada desarrollador configura su propio `backend/.env` a partir de `.env.example`.
-Mantenga `DB_SYNCHRONIZE=false`, `NODE_ENV=development` y
-`SGPA_RUNTIME_ENV=development`. Consulte la identidad del servidor local:
+En la base institucional `sgpa`, TypeORM usa `synchronize=false` aunque la
+configuración local solicite `DB_SYNCHRONIZE=true`. Antes de escuchar, el
+servidor comprueba el historial oficial mediante lecturas y se detiene si hay
+migraciones pendientes. `SGPA_AUTO_MIGRATE_DEV=true` no ejecuta migraciones
+automáticas sobre `sgpa` durante el arranque.
 
-```sql
-SELECT DATABASE(), @@port, @@datadir, @@server_uuid, @@read_only;
-```
-
-Copie los valores de base, host, puerto, directorio y UUID a las variables
-`SGPA_AUTO_MIGRATE_*` del ejemplo. Establezca `SGPA_AUTO_MIGRATE_DEV=true`
-para las migraciones oficiales y `SGPA_AUTO_SCHEMA_SYNC_DEV=true` para los
-cambios aditivos de entidades. Configure `SGPA_SCHEMA_BACKUP_DIR` como un
-directorio privado fuera del repositorio, con espacio para una copia completa
-de la base. `mysqldump` debe estar en `PATH` o indicado con
-`SGPA_MYSQLDUMP_PATH`.
-
-Con esa autorización inicial, `npm run start:dev` resuelve primero las
-migraciones oficiales, comprueba el esquema, crea un respaldo si hay cambios y
-aplica únicamente tablas, columnas, índices y claves foráneas aditivos que
-superan las comprobaciones de datos. El servidor HTTP comienza a escuchar al
-terminar. Si no hay cambios, no crea respaldo ni modifica la base.
-
-Los cambios de tipo, eliminaciones, renombramientos, columnas obligatorias sin
-valor inicial en tablas pobladas y restricciones que incumplen datos existentes
-requieren una migración revisada. Ante un fallo de DDL, el mensaje indica el
-respaldo SQL para restauración manual; MySQL no garantiza rollback de DDL.
-La única ampliación de tipo admitida es `datetime(0)` a `datetime(6)` cuando
-TypeORM confirma que no cambian nulabilidad, valores por defecto ni `ON UPDATE`,
-y el esquema real vuelve a comprobarse antes de escribir. Las fechas existentes
-conservan sus segundos y reciben una fracción de seis ceros.
-
-La prueba de integración `npm run test:integration:schema-sync` utiliza y
-elimina solo una base temporal cuyo nombre comienza con `sgpa_sync_codex_`.
-Requiere MySQL local y `mysqldump`; nunca apunta a `DB_DATABASE`.
-`npm run test:integration:restored-schema` hace un dump de solo lectura de
-`sgpa`, lo restaura en una base temporal `sgpa_sync_codex_copy_*`, comprueba
-registros, FK e índices, ejecuta dos arranques HTTP y elimina la copia.
+La sincronización automática solo se permite en `sgpa_test` con
+`SGPA_TEST_MODE=true`. Las migraciones de `sgpa` requieren una operación
+explícita y las comprobaciones de identidad del ejecutor oficial.
 
 ## Run tests
 

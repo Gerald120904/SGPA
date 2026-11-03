@@ -4,13 +4,10 @@ import { NestFactory } from '@nestjs/core';
 import { config as cargarEntorno } from 'dotenv';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
-import { acquireDevelopmentStartupGuard } from './config/development-startup-guard';
-import { synchronizeDevelopmentSchemaSafely } from './config/development-schema-sync';
-import { verificarMigracionesAntesDeEscuchar } from './migrations/startup-migrations';
+import { verificarMigracionesAntesDeEscuchar, verificarMigracionesSinAplicar } from './migrations/startup-migrations';
 
 async function bootstrap() {
   cargarEntorno({ path: process.env.SGPA_ENV_FILE || '.env', quiet: true });
-  const guard = await acquireDevelopmentStartupGuard(process.env);
   let app;
   try {
     app = await NestFactory.create(AppModule);
@@ -22,12 +19,12 @@ async function bootstrap() {
       }),
     );
 
-    await verificarMigracionesAntesDeEscuchar(
-      app.get(DataSource),
-      app.get(ConfigService),
-    );
-    await synchronizeDevelopmentSchemaSafely(app.get(DataSource), app.get(ConfigService));
-    await guard?.releasePort();
+    const dataSource = app.get(DataSource);
+    if (dataSource.options.database === 'sgpa') {
+      await verificarMigracionesSinAplicar(dataSource);
+    } else if (dataSource.options.synchronize !== true) {
+      await verificarMigracionesAntesDeEscuchar(dataSource, app.get(ConfigService));
+    }
     const port = process.env.PORT ?? 3000;
     await app.listen(port);
     const config = app.get(ConfigService);
@@ -36,8 +33,6 @@ async function bootstrap() {
   } catch (error) {
     if (app) await app.close();
     throw error;
-  } finally {
-    await guard?.close();
   }
 }
 
