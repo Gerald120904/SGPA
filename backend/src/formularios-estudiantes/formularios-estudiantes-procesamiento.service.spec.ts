@@ -153,7 +153,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
         ),
       } as never,
       undefined,
-      mailService,
+      mailService as never,
     );
   });
 
@@ -520,7 +520,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       respuestaRepo.findOne.mockResolvedValue(mockRespuesta);
 
       await expect(
-        service.rechazarRespuesta(respuestaId, usuarioId),
+        service.rechazarRespuesta(respuestaId, usuarioId, 'Motivo de prueba'),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -528,7 +528,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(false);
 
       await expect(
-        service.rechazarRespuesta(respuestaId, usuarioId),
+        service.rechazarRespuesta(respuestaId, usuarioId, 'Motivo de prueba'),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -536,7 +536,7 @@ describe('FormulariosEstudiantesProcesamientoService', () => {
       respuestaRepo.findOne.mockResolvedValue(null);
 
       await expect(
-        service.rechazarRespuesta(respuestaId, usuarioId),
+        service.rechazarRespuesta(respuestaId, usuarioId, 'Motivo de prueba'),
       ).rejects.toThrow(NotFoundException);
     });
   });

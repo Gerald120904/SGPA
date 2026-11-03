@@ -23,4 +23,6 @@ export interface DatosNormalizadosFormulario {
   optativasNoDisciplinarias: string | null;
 
   requiereRevisionOptativas: boolean;
+
+  advertenciasCorrequisitos?: string[];
 }

@@ -5,7 +5,8 @@
  * soporte multidispositivo y reactividad académica de prerrequisitos.
  */
 
-export function generarHtmlFormularioPublico(token: string): string {
+export function generarHtmlFormularioPublico(token: string, esVistaPrevia: boolean = false, previewToken?: string): string {
+  const previewTokenSanitizado = (previewToken || '').replace(/[^a-zA-Z0-9_.-]/g, '');
   // Escapar token para evitar inyección en atributos
   const tokenSanitizado = token.replace(/[^a-fA-F0-9]/g, '');
 
@@ -445,6 +446,12 @@ export function generarHtmlFormularioPublico(token: string): string {
       font-size: 0.95rem;
     }
 
+    .alert-warning {
+      background: var(--color-warning-bg);
+      border: 1px solid #FCD34D;
+      color: var(--color-warning);
+    }
+
     .alert-error {
       background: var(--color-error-bg);
       border: 1px solid #FCA5A5;
@@ -497,6 +504,11 @@ export function generarHtmlFormularioPublico(token: string): string {
   <div class="container" id="app-root">
     <!-- Header Institucional -->
     <header class="header" role="banner">
+      ${esVistaPrevia ? `
+      <div id="banner-vista-previa" style="background: #FEF3C7; border: 1px solid #F59E0B; color: #92400E; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+        <span>⚠️</span> MODO VISTA PREVIA — No se guardarán respuestas ni se alterará ningún expediente.
+      </div>
+      ` : ''}
       <div class="header-logo-row">
         <span class="badge-institucional">Universidad Nacional</span>
         <span style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-muted);">SGPA Oficial</span>
@@ -540,6 +552,7 @@ export function generarHtmlFormularioPublico(token: string): string {
       // 2. Estado reactivo en memoria
       const state = {
         token: token,
+        esVistaPrevia: ${JSON.stringify(esVistaPrevia)},
         cargado: false,
         formulario: null,
         carrera: null,
@@ -625,7 +638,8 @@ export function generarHtmlFormularioPublico(token: string): string {
         }
 
         try {
-          const res = await fetch('/formularios-publicos/' + encodeURIComponent(token));
+          const queryParams = state.previewToken ? '?preview_token=' + encodeURIComponent(state.previewToken) : (state.esVistaPrevia ? '?preview=true' : '');
+          const res = await fetch('/formularios-publicos/' + encodeURIComponent(token) + queryParams);
 
           if (res.status === 404) {
             renderErrorCard('Formulario no encontrado o revocado', 'El formulario solicitado no existe o el enlace ha sido revocado por la administración académica.');
@@ -687,9 +701,7 @@ export function generarHtmlFormularioPublico(token: string): string {
         }
         const reqs = asig.detallesRequisitos || [];
         for (const req of reqs) {
-          if (req.tipo === 'CORREQUISITO') {
-            return false; // Bloqueo preventivo de correquisitos
-          }
+          // Los correquisitos no bloquean la elegibilidad de asignaturas ya aprobadas
           if (req.tipo === 'REQUISITO') {
             if (!state.aprobadasSeleccionadas.has(req.requisitoAsignaturaId)) {
               return false; // Falta prerrequisito -> NO ELEGIBLE
@@ -697,6 +709,30 @@ export function generarHtmlFormularioPublico(token: string): string {
           }
         }
         return true;
+      }
+
+      function obtenerAdvertenciasCorrequisitos() {
+        const advertencias = [];
+        for (const asigId of Array.from(state.aprobadasSeleccionadas)) {
+          const asig = state.asignaturasMap.get(asigId);
+          if (!asig) continue;
+          const reqs = asig.detallesRequisitos || [];
+          for (const req of reqs) {
+            if (req.tipo === 'CORREQUISITO' && !state.aprobadasSeleccionadas.has(req.requisitoAsignaturaId)) {
+              const reqAsig = state.asignaturasMap.get(req.requisitoAsignaturaId);
+              const nomCorreq = reqAsig ? (reqAsig.codigo + ' — ' + reqAsig.nombre) : (req.codigo ? (req.codigo + ' — ' + req.nombre) : ('#' + req.requisitoAsignaturaId));
+              advertencias.push({
+                asignaturaId: asig.asignaturaId,
+                codigo: asig.codigo,
+                nombre: asig.nombre,
+                correquisitoId: req.requisitoAsignaturaId,
+                correquisitoNombre: nomCorreq,
+                mensaje: 'Advertencia: Has seleccionado ' + asig.codigo + ' (' + asig.nombre + '), que tiene como correquisito ' + nomCorreq + '. Si aprobaste ambas, asegúrate de marcar también ' + nomCorreq + '. Si sólo aprobaste una, puedes continuar.'
+              });
+            }
+          }
+        }
+        return advertencias;
       }
 
       function podarSeleccionesInvalidas() {
@@ -1011,6 +1047,18 @@ export function generarHtmlFormularioPublico(token: string): string {
         const periodoObj = state.periodos.find(p => p.id === state.periodoIngresoId);
         const periodoTxt = periodoObj ? (periodoObj.nombre + ' (' + periodoObj.codigo + ')') : 'No indicado';
 
+        // Calcular advertencias de correquisitos no seleccionados
+        const advsResumen = obtenerAdvertenciasCorrequisitos();
+        let advertenciasResumenHtml = '';
+        if (advsResumen.length > 0) {
+          advertenciasResumenHtml = '<div class="summary-section" style="border-left: 4px solid var(--color-warning); background: var(--color-warning-bg); padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">' +
+            '<h3 style="color: var(--color-warning); margin-bottom: 0.5rem;">⚠️ Advertencias sobre Correquisitos</h3>' +
+            '<p style="font-size: 0.875rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">Las siguientes materias tienen correquisitos que no seleccionaste. Puedes continuar y enviar tu declaración si efectivamente cursaste y aprobaste la materia sin su correquisito:</p>' +
+            '<ul style="list-style-type: disc; padding-left: 1.25rem; font-size: 0.875rem; color: var(--color-text-main);">' +
+            advsResumen.map(function(a) { return '<li style="margin-bottom: 0.25rem;">' + escapeHtml(a.mensaje) + '</li>'; }).join('') +
+            '</ul></div>';
+        }
+
         // Construir listado de materias aprobadas
         let materiasHtml = '';
         if (state.aprobadasSeleccionadas.size === 0) {
@@ -1104,6 +1152,12 @@ export function generarHtmlFormularioPublico(token: string): string {
         if (state.enviando) return; // Prevención de doble clic
         state.enviando = true;
 
+        if (state.esVistaPrevia) {
+          state.enviando = false;
+          alert('MODO VISTA PREVIA: Las respuestas no se han enviado ni guardado en el sistema. Esta simulación confirma que la configuración de materias, ciclos y prerrequisitos funciona correctamente.');
+          return;
+        }
+
         const btn = document.getElementById('btn-enviar-formulario');
         const errBox = document.getElementById('submit-error');
         if (errBox) errBox.style.display = 'none';
@@ -1128,7 +1182,8 @@ export function generarHtmlFormularioPublico(token: string): string {
 
         try {
           payload.idempotencyKey = obtenerClaveIntento();
-          const res = await fetch('/formularios-publicos/' + encodeURIComponent(state.token) + '/respuestas', {
+          const urlSubmit = '/formularios-publicos/' + encodeURIComponent(state.token) + '/respuestas' + (state.previewToken ? '?preview_token=' + encodeURIComponent(state.previewToken) : '');
+          const res = await fetch(urlSubmit, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

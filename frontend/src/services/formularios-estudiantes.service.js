@@ -186,3 +186,8 @@ export async function obtenerUrlPublicaFormulario(
       responderUri
     );
 }
+
+export async function obtenerTicketVistaPreviaFormulario(id) {
+  validarApi('obtenerTicketVistaPreviaFormulario');
+  return window.sgpa.obtenerTicketVistaPreviaFormulario(id);
+}

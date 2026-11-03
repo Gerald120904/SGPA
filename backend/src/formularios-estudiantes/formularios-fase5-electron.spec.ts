@@ -322,6 +322,7 @@ describe('SGPA Fase 5 — Integración Administrativa del Motor en Electron (22 
     const dto: CrearFormularioEstudianteDto = {
       titulo: 'Formulario Con Token',
       descripcion: 'Prueba de token',
+      proveedor: ProveedorFormulario.INTERNO,
       carreraId: 1,
       planEstudioId: 10,
     };

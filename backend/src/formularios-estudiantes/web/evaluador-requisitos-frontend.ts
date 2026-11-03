@@ -33,9 +33,24 @@ export interface AsignaturaFrontend {
  * 3. Si no tiene requisitos obligatorios, ES elegible inmediatamente.
  * 4. Si tiene requisitos obligatorios, TODOS y cada uno de ellos deben estar en aprobadasSeleccionadas.
  */
+export interface OpcionesEvaluacionFrontend {
+  politicaCorrequisito?: 'INFORMATIVO' | 'BLOQUEAR_REVISION';
+}
+
+export interface AdvertenciaCorrequisitoFrontend {
+  asignaturaId: number;
+  codigo: string;
+  nombre: string;
+  correquisitoId: number;
+  correquisitoCodigo?: string;
+  correquisitoNombre?: string;
+  mensaje: string;
+}
+
 export function esAsignaturaElegibleFrontend(
   asignatura: AsignaturaFrontend,
   aprobadasSeleccionadas: Set<number>,
+  opciones?: OpcionesEvaluacionFrontend,
 ): boolean {
   if (asignatura.activo === false || asignatura.estado === 'INACTIVA' || asignatura.estado === 'INCONSISTENTE') {
     return false;
@@ -47,9 +62,12 @@ export function esAsignaturaElegibleFrontend(
     return true;
   }
 
+  const politica = opciones?.politicaCorrequisito ?? 'INFORMATIVO';
+
   for (const req of requisitos) {
-    // Correquisitos bloqueados preventivamente
-    if (req.tipo === 'CORREQUISITO') {
+    // Solo bloquea si la política es explícitamente BLOQUEAR_REVISION.
+    // Bajo la política oficial INFORMATIVO de SGPA, los correquisitos no bloquean la declaración retrospectiva de materias ya aprobadas.
+    if (req.tipo === 'CORREQUISITO' && politica === 'BLOQUEAR_REVISION') {
       return false;
     }
 
@@ -62,6 +80,49 @@ export function esAsignaturaElegibleFrontend(
   }
 
   return true;
+}
+
+/**
+ * Detecta advertencias no bloqueantes de correquisitos:
+ * Si una materia marcada como aprobada exige un correquisito que no fue seleccionado,
+ * genera la advertencia correspondiente para orientación del estudiante y decisión del coordinador.
+ */
+export function detectarAdvertenciasCorrequisitosFrontend(
+  asignaturas: AsignaturaFrontend[],
+  aprobadasSeleccionadas: Set<number>,
+): AdvertenciaCorrequisitoFrontend[] {
+  const mapaAsignaturas = new Map<number, AsignaturaFrontend>();
+  for (const asig of asignaturas) {
+    mapaAsignaturas.set(asig.asignaturaId, asig);
+  }
+
+  const advertencias: AdvertenciaCorrequisitoFrontend[] = [];
+
+  for (const asigId of Array.from(aprobadasSeleccionadas)) {
+    const asig = mapaAsignaturas.get(asigId);
+    if (!asig) continue;
+
+    const requisitos = asig.detallesRequisitos || [];
+    for (const req of requisitos) {
+      if (req.tipo === 'CORREQUISITO' && !aprobadasSeleccionadas.has(req.requisitoAsignaturaId)) {
+        const correq = mapaAsignaturas.get(req.requisitoAsignaturaId);
+        const correquisitoCodigo = correq?.codigo || req.codigo || `#${req.requisitoAsignaturaId}`;
+        const correquisitoNombre = correq?.nombre || req.nombre || 'Asignatura correquisito';
+
+        advertencias.push({
+          asignaturaId: asig.asignaturaId,
+          codigo: asig.codigo,
+          nombre: asig.nombre,
+          correquisitoId: req.requisitoAsignaturaId,
+          correquisitoCodigo,
+          correquisitoNombre,
+          mensaje: `Advertencia: Has seleccionado ${asig.codigo} (${asig.nombre}), que tiene como correquisito ${correquisitoCodigo} (${correquisitoNombre}). Si aprobaste ambas, asegúrate de marcar también ${correquisitoCodigo}. Si sólo aprobaste una, puedes continuar.`,
+        });
+      }
+    }
+  }
+
+  return advertencias;
 }
 
 /**

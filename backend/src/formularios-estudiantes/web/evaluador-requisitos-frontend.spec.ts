@@ -3,6 +3,7 @@ import {
   esAsignaturaElegibleFrontend,
   filtrarAsignaturasVisiblesFrontend,
   podarSeleccionesInvalidasFrontend,
+  detectarAdvertenciasCorrequisitosFrontend,
 } from './evaluador-requisitos-frontend';
 
 describe('EvaluadorRequisitosFrontend (Motor Reactivo)', () => {
@@ -171,9 +172,39 @@ describe('EvaluadorRequisitosFrontend (Motor Reactivo)', () => {
       expect(esAsignaturaElegibleFrontend(estructuraDatos, aprobadas)).toBe(true);
     });
 
-    it('debe bloquear preventivamente asignaturas con correquisitos bajo política BLOQUEAR_REVISION', () => {
+    it('no debe bloquear asignaturas con correquisitos bajo política INFORMATIVO (por defecto)', () => {
+      const aprobadas = new Set<number>();
+      expect(esAsignaturaElegibleFrontend(conCorrequisito, aprobadas)).toBe(true);
+    });
+
+    it('debe bloquear preventivamente asignaturas con correquisitos si se especifica BLOQUEAR_REVISION', () => {
       const aprobadas = new Set<number>([101]);
-      expect(esAsignaturaElegibleFrontend(conCorrequisito, aprobadas)).toBe(false);
+      expect(
+        esAsignaturaElegibleFrontend(conCorrequisito, aprobadas, {
+          politicaCorrequisito: 'BLOQUEAR_REVISION',
+        }),
+      ).toBe(false);
+    });
+
+    it('debe generar advertencia no bloqueante cuando se selecciona materia con correquisito faltante', () => {
+      const aprobadas = new Set<number>([107]); // conCorrequisito seleccionado, pero 101 no
+      const advertencias = detectarAdvertenciasCorrequisitosFrontend(
+        todasLasAsignaturas,
+        aprobadas,
+      );
+      expect(advertencias).toHaveLength(1);
+      expect(advertencias[0].asignaturaId).toBe(107);
+      expect(advertencias[0].correquisitoId).toBe(101);
+      expect(advertencias[0].mensaje).toContain('Advertencia: Has seleccionado');
+    });
+
+    it('no genera advertencia si el correquisito también fue seleccionado', () => {
+      const aprobadas = new Set<number>([107, 101]);
+      const advertencias = detectarAdvertenciasCorrequisitosFrontend(
+        todasLasAsignaturas,
+        aprobadas,
+      );
+      expect(advertencias).toHaveLength(0);
     });
 
     it('debe denegar asignaturas inactivas', () => {
@@ -245,14 +276,13 @@ describe('EvaluadorRequisitosFrontend (Motor Reactivo)', () => {
       );
 
       const idsVisibles = visibles.map((a) => a.asignaturaId);
-      // Solo deben aparecer Prog 1 y Mate 1
-      expect(idsVisibles).toEqual([101, 102]);
-      // Prog 2, 3, 4, Estructuras, Correquisito e Inactiva NO DEBEN APARECER
+      // Deben aparecer Prog 1, Mate 1 y conCorrequisito (que es elegible bajo política informativa)
+      expect(idsVisibles).toEqual([101, 102, 107]);
+      // Prog 2, 3, 4, Estructuras (con prerrequisito faltante) e Inactiva NO DEBEN APARECER
       expect(idsVisibles).not.toContain(103);
       expect(idsVisibles).not.toContain(104);
       expect(idsVisibles).not.toContain(105);
       expect(idsVisibles).not.toContain(106);
-      expect(idsVisibles).not.toContain(107);
       expect(idsVisibles).not.toContain(108);
     });
   });

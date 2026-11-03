@@ -135,6 +135,18 @@ export class FormulariosEstudiantesController {
     );
   }
 
+  @Post(':id/ticket-vista-previa')
+  @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER)
+  generarTicketVistaPrevia(
+    @Req() req: Request,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.formulariosInternosPersistenciaService.generarTicketVistaPrevia(
+      id,
+      req.user!.sub,
+    );
+  }
+
   @Get(':id/respuestas')
   @Permisos(PermisoSistema.FORMULARIOS_ESTUDIANTES_VER_RESPUESTAS)
   listarRespuestas(

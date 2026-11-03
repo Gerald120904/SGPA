@@ -3,7 +3,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { BandejaRevisionEstudiantesService } from '../estudiantes/bandeja-revision-estudiantes.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EstructuraAcademicaService } from '../estructura-academica/estructura-academica.service';
@@ -14,6 +16,7 @@ import { esInstantaneaCurricularInterna } from './types/instantanea-curricular-i
 import { FormularioEstudiante } from './entities/formulario-estudiante.entity';
 import { RespuestaFormularioEstudiante } from './entities/respuesta-formulario-estudiante.entity';
 import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta-formulario.service';
+import { FormulariosInternosPersistenciaService } from './formularios-internos-persistencia.service';
 import { ResultadoSincronizacionFormulario } from './types/resultado-sincronizacion-formulario.type';
 
 export type { ResultadoSincronizacionFormulario };
@@ -30,6 +33,10 @@ export class FormulariosEstudiantesSyncService {
     private readonly googleFormsClient: GoogleFormsClientService,
     private readonly normalizador: NormalizadorRespuestaFormularioService,
     private readonly estructuraAcademicaService: EstructuraAcademicaService,
+    @Optional()
+    private readonly bandejaRevision?: BandejaRevisionEstudiantesService,
+    @Optional()
+    private readonly persistenciaInterna?: FormulariosInternosPersistenciaService,
   ) {}
 
   async sincronizar(
@@ -40,6 +47,7 @@ export class FormulariosEstudiantesSyncService {
       where: {
         id: formularioId,
       },
+      relations: { planEstudio: true },
     });
 
     if (!formulario) {
@@ -114,24 +122,88 @@ export class FormulariosEstudiantesSyncService {
 
         const requiereRevision = datos.requiereRevisionOptativas;
 
+        // Comprobar política consistente de duplicados concurrentes con SGPA
+        const cedula = datos.identificacion?.trim();
+        const correo = datos.correoEstudiantil?.trim()?.toLowerCase();
+        let esDuplicadoPendiente = false;
+
+        if ((cedula || correo) && typeof this.respuestaRepo.createQueryBuilder === 'function') {
+          const qb = this.respuestaRepo
+            .createQueryBuilder('r')
+            .innerJoin('r.formulario', 'f')
+            .where('f.carreraId = :carreraId', { carreraId: formulario.carreraId })
+            .andWhere('r.estado IN (:...estadosBloqueantes)', {
+              estadosBloqueantes: [
+                EstadoRespuestaFormulario.PENDIENTE,
+                EstadoRespuestaFormulario.REQUIERE_REVISION,
+              ],
+            });
+
+          if (cedula && correo) {
+            qb.andWhere(
+              '(JSON_UNQUOTE(JSON_EXTRACT(r.datosNormalizadosJson, "$.identificacion")) = :cedula OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(r.datosNormalizadosJson, "$.correoEstudiantil"))) = :correo)',
+              { cedula, correo },
+            );
+          } else if (cedula) {
+            qb.andWhere(
+              'JSON_UNQUOTE(JSON_EXTRACT(r.datosNormalizadosJson, "$.identificacion")) = :cedula',
+              { cedula },
+            );
+          } else {
+            qb.andWhere(
+              'LOWER(JSON_UNQUOTE(JSON_EXTRACT(r.datosNormalizadosJson, "$.correoEstudiantil"))) = :correo',
+              { correo },
+            );
+          }
+
+          const pendienteExistente = await qb.getOne();
+          if (pendienteExistente) {
+            esDuplicadoPendiente = true;
+          }
+        }
+
+        const esPlanEnTransicion = (formulario.planEstudio as any)?.estado === 'EN_TRANSICION';
+
+        const estadoFinal = esDuplicadoPendiente
+          ? EstadoRespuestaFormulario.RECHAZADO
+          : (requiereRevision || esPlanEnTransicion ? EstadoRespuestaFormulario.REQUIERE_REVISION : EstadoRespuestaFormulario.PENDIENTE);
+
+        const detalleErrorDuplicado = esDuplicadoPendiente
+          ? 'Respuesta externa de Google Forms rechazada automáticamente por duplicidad: el estudiante ya posee una solicitud académica activa en trámite en esta carrera.'
+          : (esPlanEnTransicion
+            ? 'El formulario corresponde a un plan de estudio EN TRANSICIÓN. No se admiten nuevos ingresos ordinarios; requiere revisión manual.'
+            : null);
+
         const entidad = this.respuestaRepo.create({
           formularioId: formulario.id,
           googleResponseId: respuesta.responseId,
           payloadJson: respuesta as unknown as Record<string, unknown>,
           datosNormalizadosJson: datos,
-          estado: requiereRevision
-            ? EstadoRespuestaFormulario.REQUIERE_REVISION
-            : EstadoRespuestaFormulario.PENDIENTE,
-          detalleError: null,
+          estado: estadoFinal,
+          detalleError: detalleErrorDuplicado,
           optativasNoDisciplinarias: datos.optativasNoDisciplinarias,
-          procesadoAt: null,
+          procesadoAt: esDuplicadoPendiente ? new Date() : null,
         });
 
-        await this.respuestaRepo.save(entidad);
+        const guardada = await this.respuestaRepo.save(entidad);
+        if (this.bandejaRevision && !esDuplicadoPendiente) {
+          await this.bandejaRevision.registrarRespuestaFormularioEnStaging(formulario, guardada).catch(() => null);
+        }
+
+        if (!esDuplicadoPendiente && this.persistenciaInterna) {
+          await this.persistenciaInterna.registrarSolicitudActiva(
+            formulario.carreraId,
+            cedula,
+            correo,
+            guardada.id,
+          ).catch(() => null);
+        }
 
         nuevas++;
 
-        if (requiereRevision) {
+        if (esDuplicadoPendiente) {
+          // La respuesta externa se conserva para trazabilidad histórica pero no se convierte en una solicitud académica procesable
+        } else if (requiereRevision) {
           requierenRevision++;
         } else {
           pendientes++;
@@ -151,7 +223,10 @@ export class FormulariosEstudiantesSyncService {
           procesadoAt: null,
         });
 
-        await this.respuestaRepo.save(entidad);
+        const guardadaError = await this.respuestaRepo.save(entidad);
+        if (this.bandejaRevision) {
+          await this.bandejaRevision.registrarRespuestaFormularioEnStaging(formulario, guardadaError).catch(() => null);
+        }
 
         nuevas++;
         errores++;
