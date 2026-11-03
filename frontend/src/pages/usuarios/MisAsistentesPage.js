@@ -1,4 +1,4 @@
-import { obtenerRolesUsuario, obtenerUsuario } from '../../app/session.js';
+import { obtenerRolesUsuario, obtenerUsuario, obtenerRolActivo } from '../../app/session.js';
 import { ROLES } from '../../config/permissions.js';
 import {
   listarMisAlcancesJerarquia, listarMisAsistentes, obtenerAsistenteJerarquia,
@@ -7,7 +7,7 @@ import {
 } from '../../services/jerarquia.service.js';
 import {
   listarMisSolicitudesCambio, listarSolicitudesPendientesCambio,
-  aprobarSolicitudCambio, rechazarSolicitudCambio,
+  aprobarSolicitudCambio, rechazarSolicitudCambio, devolverSolicitudCambio,
 } from '../../services/solicitudes-cambio.service.js';
 import { escapeHtml } from '../../utils/html.js';
 import { confirmarAccion } from '../../utils/confirm.js';
@@ -176,6 +176,10 @@ function propuestaVisible(solicitud) {
     ['Resultado propuesto', datos.resultado],
     ['Origen académico', datos.origenAcademico],
     ['Observaciones', datos.observaciones],
+    ['Bandeja - Aprobaciones propuestas', Array.isArray(datos.aprobarRegistroIds) ? `${datos.aprobarRegistroIds.length} registro(s)` : undefined],
+    ['Bandeja - Rechazos propuestos', Array.isArray(datos.rechazarRegistros) ? `${datos.rechazarRegistros.length} registro(s)` : undefined],
+    ['Detalle motivos rechazo', Array.isArray(datos.rechazarRegistros) && datos.rechazarRegistros.length > 0 ? datos.rechazarRegistros.map((r) => `ID #${r.id}: ${r.motivo}`).join('; ') : undefined],
+    ['Observación del asistente', datos.observacion],
   ];
   return `<dl class="mis-asistentes-propuesta">${campos.filter(([, valor]) => valor !== undefined && valor !== null)
     .map(([etiqueta, valor]) => `<div><dt>${escapeHtml(etiqueta)}</dt><dd>${escapeHtml(String(valor))}</dd></div>`).join('')}</dl>`;
@@ -186,7 +190,7 @@ export async function iniciarMisAsistentesPage() {
   if (!pagina) return;
   const instancia = ++instanciaActual;
   const sigueActiva = () => instancia === instanciaActual && document.getElementById('misAsistentesPage') === pagina;
-  const esAsistente = obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+  const esAsistente = (obtenerRolActivo() ? obtenerRolActivo() === ROLES.ASISTENTE_ESTUDIANTIL : obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL));
   const contenido = pagina.querySelector('#misAsistentesContenido');
   const feedback = pagina.querySelector('#misAsistentesFeedback');
   const dialogo = pagina.querySelector('#misAsistentesDialog');
@@ -283,8 +287,10 @@ export async function iniciarMisAsistentesPage() {
                 ${escapeHtml(new Date(s.createdAt).toLocaleString('es-CR'))}</p>
               ${propuestaVisible(s)}
               ${s.motivoRechazo ? `<p class="mis-asistentes-motivo">Motivo: ${escapeHtml(s.motivoRechazo)}</p>` : ''}
+              ${s.observacionesDevolucion ? `<p class="mis-asistentes-motivo" style="color:#d97706; background:#fef3c7; border:1px solid #fde68a; padding:6px 10px; border-radius:4px; margin-top:6px;"><strong>Devolución:</strong> ${escapeHtml(s.observacionesDevolucion)}</p>` : ''}
               ${!esAsistente && s.estado === 'PENDIENTE' ? `<div class="mis-asistentes-actions">
                 <button type="button" data-action="aprobar" data-id="${s.id}" class="mis-asistentes-btn mis-asistentes-btn-primary"><i data-lucide="circle-check" aria-hidden="true"></i><span>Aprobar</span></button>
+                <button type="button" data-action="devolver" data-id="${s.id}" class="mis-asistentes-btn" style="background-color:#d97706; color:#fff; border:none;"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span>Devolver</span></button>
                 <button type="button" data-action="rechazar" data-id="${s.id}" class="mis-asistentes-btn mis-asistentes-btn-secondary"><i data-lucide="circle-x" aria-hidden="true"></i><span>Rechazar</span></button>
               </div>` : ''}
             </article>`).join('')}</div>` : '<p class="mis-asistentes-empty">No hay solicitudes.</p>'}
@@ -505,6 +511,23 @@ export async function iniciarMisAsistentesPage() {
       renderizarIconos();
       dialogo.showModal();
     }
+    if (accion === 'devolver') {
+      dialogoContenido.innerHTML = FormDialog({
+        formId: 'formDevolver',
+        title: 'Devolver solicitud al asistente',
+        description: 'Indique las observaciones para que el asistente pueda realizar las correcciones necesarias.',
+        layout: 'custom',
+        formClass: 'mis-asistentes-form mis-asistentes-devolucion-form',
+        bodyClass: 'mis-asistentes-dialog-body',
+        body: `<button type="button" data-action="cerrar" class="mis-asistentes-dialog-close" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
+          <label class="mis-asistentes-motivo-input">Observaciones de devolución<textarea name="observaciones" required minlength="3" maxlength="500" rows="4"></textarea></label>`,
+        footerHtml: `<button type="button" data-action="cerrar" class="sgpa-form-secondary">Cancelar</button>
+          <button type="submit" class="sgpa-form-primary" style="background-color:#d97706; border-color:#d97706;"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Devolver solicitud</button>`,
+      });
+      dialogoContenido.querySelector('#formDevolver').dataset.id = String(Number(boton.dataset.id));
+      renderizarIconos();
+      dialogo.showModal();
+    }
   });
 
   // Impide caracteres ajenos al campo; muestra errores en el propio formulario.
@@ -562,6 +585,21 @@ export async function iniciarMisAsistentesPage() {
         verificar(await rechazarSolicitudCambio(Number(form.dataset.id), motivo), 'No se pudo rechazar la solicitud.');
         dialogo.close();
         mensaje('Solicitud rechazada.');
+        await cargar();
+      } catch (error) { mensaje(error.message, true); } finally { boton.disabled = false; }
+      return;
+    }
+    if (event.target.id === 'formDevolver') {
+      event.preventDefault();
+      const form = event.target;
+      const observaciones = String(new FormData(form).get('observaciones') || '').trim();
+      if (observaciones.length < 3) { mensaje('Escriba una observación de al menos 3 caracteres.', true); return; }
+      const boton = form.querySelector('[type="submit"]');
+      try {
+        boton.disabled = true;
+        verificar(await devolverSolicitudCambio(Number(form.dataset.id), observaciones), 'No se pudo devolver la solicitud.');
+        dialogo.close();
+        mensaje('Solicitud devuelta al asistente para corrección.');
         await cargar();
       } catch (error) { mensaje(error.message, true); } finally { boton.disabled = false; }
       return;

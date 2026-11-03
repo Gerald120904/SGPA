@@ -42,7 +42,8 @@ export class PermisosGuard implements CanActivate {
       const moduloConAlcance = ['EstudiantesController', 'EstudiantesImportacionController', 'CarrerasController', 'CursosController', 'CursoRequisitosController',
         'PlanesEstudioController', 'PlanAsignaturasController', 'PlanRequisitosController',
         'SalidasAcademicasController', 'PlanResumenController', 'PlanValidacionesController',
-        'PlanImportacionController', 'PlanReglasOptativasController', 'OptativasController']
+        'PlanImportacionController', 'PlanReglasOptativasController', 'OptativasController',
+        'BandejaRevisionEstudiantesController', 'TransicionesCurricularesController']
         .includes(context.getClass()?.name);
       const soloLecturaAsistente = request.method === 'GET' ||
         (context.getClass()?.name === 'EstudiantesImportacionController' && request.url.includes('/validar'));
@@ -93,7 +94,8 @@ export class PermisosGuard implements CanActivate {
       ((['CursosController', 'CursoRequisitosController'].includes(context.getClass()?.name) &&
         requeridos.length === 1 && requeridos[0] === PermisoSistema.CURSOS_VER &&
         await this.permisosService.usuarioTienePermisos(usuario.sub, [PermisoSistema.CURSOS_GESTIONAR], rolActivo)) ||
-       (context.getClass()?.name.startsWith('Plan') || context.getClass()?.name === 'SalidasAcademicasController') &&
+       (context.getClass()?.name.startsWith('Plan') ||
+        ['SalidasAcademicasController', 'TransicionesCurricularesController'].includes(context.getClass()?.name)) &&
         requeridos.length === 1 && requeridos[0] === PermisoSistema.PLANES_ESTUDIO_VER &&
         await this.permisosService.usuarioTienePermisos(usuario.sub, [PermisoSistema.PLANES_ESTUDIO_GESTIONAR], rolActivo))) {
       return true;

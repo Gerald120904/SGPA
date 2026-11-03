@@ -4,7 +4,8 @@ import {
 } from '../pages/login/LoginPage.js';
 
 import {
-  HomePage
+  HomePage,
+  iniciarHomePage
 } from '../pages/home/HomePage.js';
 
 import {
@@ -71,6 +72,10 @@ import {
 } from '../layouts/AppLayout.js';
 
 import {
+  iniciarSidebar
+} from '../components/Sidebar.js';
+
+import {
   obtenerModuloPorRuta
 } from '../config/modules.js';
 
@@ -83,6 +88,7 @@ import {
   cambiarRolActivo,
   obtenerUsuario,
   obtenerRolesUsuario,
+  obtenerRolesEfectivos,
   obtenerPermisosUsuario,
   tieneRolValido,
   limpiarSesion
@@ -277,7 +283,7 @@ function mostrarAplicacion() {
 
 
   const roles =
-    obtenerRolesUsuario(
+    obtenerRolesEfectivos(
       usuario
     );
 
@@ -287,36 +293,27 @@ function mostrarAplicacion() {
     );
 
 
+  const isCollapsed =
+    typeof localStorage !== 'undefined' &&
+    localStorage.getItem('sgpa_sidebar_collapsed') === 'true';
+
   appRoot.innerHTML =
     AppLayout({
       usuario,
       roles,
-      permisos
+      permisos,
+      isCollapsed
     });
 
 
   renderizarIconos();
 
-  const selectorEspacio = document.getElementById('selectEspacioActivo');
-  if (selectorEspacio) {
-    selectorEspacio.addEventListener('change', async (event) => {
-      const nuevoRol = event.target.value;
-      selectorEspacio.disabled = true;
-      try {
-        const ok = await cambiarRolActivo(nuevoRol);
-        if (ok) {
-          reemplazarRuta('/home');
-          mostrarAplicacion();
-        } else {
-          alert('No fue posible cambiar al espacio seleccionado.');
-          mostrarAplicacion();
-        }
-      } catch (err) {
-        alert(err.message || 'Error al cambiar de espacio.');
-        mostrarAplicacion();
-      }
-    });
-  }
+  iniciarSidebar({
+    onCambiarRol: async () => {
+      reemplazarRuta('/home');
+      mostrarAplicacion();
+    }
+  });
 
 
   desmontarRouter();
@@ -352,7 +349,7 @@ function renderizarRuta(
 
 
   const roles =
-    obtenerRolesUsuario(
+    obtenerRolesEfectivos(
       usuario
     );
 
@@ -482,6 +479,10 @@ function renderizarRuta(
   /* =======================================================
      INICIALIZADORES DE PÁGINAS
      ======================================================= */
+
+  if (module.id === 'home') {
+    iniciarHomePage();
+  }
 
   if (
     module.id === 'usuarios'
@@ -687,7 +688,7 @@ function manejarClickGlobal(
 
 
   const roles =
-    obtenerRolesUsuario(
+    obtenerRolesEfectivos(
       usuario
     );
 

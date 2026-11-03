@@ -111,9 +111,9 @@ describe('D-01: Seguridad del Rol Activo y Contexto de Autorización', () => {
 
       permisosService.usuarioTienePermisos.mockResolvedValue(false);
 
-      const context = crearContextoPermisos(user, [PermisoSistema.USUARIOS_GESTIONAR]);
+      const context = crearContextoPermisos(user, [PermisoSistema.ESTUDIANTES_GESTIONAR]);
       await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
-      expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(1, [PermisoSistema.USUARIOS_GESTIONAR], RolSistema.PROFESOR);
+      expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(1, [PermisoSistema.ESTUDIANTES_GESTIONAR], RolSistema.PROFESOR);
     });
 
     it('concede superusuario inmediato cuando el rolActivo es ADMIN_GLOBAL', async () => {
@@ -124,7 +124,7 @@ describe('D-01: Seguridad del Rol Activo y Contexto de Autorización', () => {
         rolActivo: RolSistema.ADMIN_GLOBAL,
       };
 
-      const context = crearContextoPermisos(user, [PermisoSistema.USUARIOS_GESTIONAR]);
+      const context = crearContextoPermisos(user, [PermisoSistema.ESTUDIANTES_GESTIONAR]);
       const res = await guard.canActivate(context);
       expect(res).toBe(true);
       expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();

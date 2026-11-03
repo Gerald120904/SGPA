@@ -98,10 +98,7 @@ function puedeValidarAtestados() {
 }
 
 function esProfesorActual() {
-  return obtenerRolesUsuario()
-    .includes(
-      ROLES.PROFESOR,
-    );
+  return obtenerRolActivo() === ROLES.PROFESOR;
 }
 
 

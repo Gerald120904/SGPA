@@ -1,16 +1,76 @@
 import { app, BrowserWindow, ipcMain, net, shell } from "electron";
 import path from "node:path";
+import fs from "node:fs";
 import started from "electron-squirrel-startup";
 
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
-import { fetchBackendSeguro, verificarIdentidadBackend } from './electron/backend-identity.js';
+import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 
-const API_URL = process.env.SGPA_API_URL || "http://127.0.0.1:3000";
-const EXPECTED_DATABASE = process.env.SGPA_EXPECTED_DATABASE || (app.isPackaged ? 'sgpa' : 'sgpa_isolated_audit');
-const consultarBackend = (route, options) => fetchBackendSeguro(
-  (url, requestOptions) => net.fetch(url, requestOptions), API_URL, EXPECTED_DATABASE, route, options);
+function leerConfigProyecto() {
+  const posiblesRutas = [
+    path.resolve(process.cwd(), '../backend/.env'),
+    path.resolve(process.cwd(), 'backend/.env'),
+    path.resolve(app.getAppPath(), '../backend/.env'),
+    path.resolve(app.getAppPath(), '../../backend/.env'),
+  ];
+  for (const ruta of posiblesRutas) {
+    try {
+      if (fs.existsSync(ruta)) {
+        const contenido = fs.readFileSync(ruta, 'utf8');
+        const matchUrl = contenido.match(/^SGPA_API_URL\s*=\s*(.+)/m);
+        if (matchUrl && matchUrl[1].trim()) {
+          return { url: matchUrl[1].trim() };
+        }
+        const matchPort = contenido.match(/^PORT\s*=\s*(\d+)/m);
+        if (matchPort) {
+          return { port: Number(matchPort[1]) };
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+let apiUrl = normalizarUrlBackend(process.env.SGPA_API_URL || "http://127.0.0.1:3000");
+const EXPECTED_DATABASE = process.env.SGPA_EXPECTED_DATABASE || 'sgpa';
+
+async function asegurarBackendConectado() {
+  try {
+    await verificarIdentidadBackend(
+      (url, requestOptions) => net.fetch(url, requestOptions),
+      apiUrl,
+      EXPECTED_DATABASE,
+    );
+    return apiUrl;
+  } catch {
+    const resuelta = await resolverUrlBackend(
+      (url, requestOptions) => net.fetch(url, requestOptions),
+      {
+        urlActual: apiUrl,
+        expectedDatabase: EXPECTED_DATABASE,
+        leerConfigProyecto,
+      },
+    );
+    apiUrl = resuelta;
+    return apiUrl;
+  }
+}
+
+const consultarBackend = async (route, options) => {
+  await asegurarBackendConectado();
+  return fetchBackendSeguro(
+    (url, requestOptions) => net.fetch(url, requestOptions),
+    apiUrl,
+    EXPECTED_DATABASE,
+    route,
+    options,
+  );
+};
+
+
+
 let accessToken = null;
 
 const HOSTS_OAUTH_GOOGLE_PERMITIDOS = new Set(["accounts.google.com"]);
@@ -47,7 +107,7 @@ function resolverUrlPublicaFormulario(responderUri) {
     return uri;
   }
 
-  const baseUrl = process.env.SGPA_PUBLIC_URL || API_URL;
+  const baseUrl = process.env.SGPA_PUBLIC_URL || apiUrl;
   const pathNormalizado = uri.startsWith('/') ? uri : `/${uri}`;
   return `${baseUrl.replace(/\/+$/, '')}${pathNormalizado}`;
 }
@@ -114,7 +174,7 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
     return {
       ok: false,
       status: 0,
-      message: "No se pudo conectar con el servidor del SGPA.",
+      message: "No se pudo conectar con el sistema. Verifique que el servidor esté disponible.",
     };
   }
 }
@@ -166,7 +226,7 @@ ipcMain.handle("auth:login", async (_event, credenciales) => {
     return {
       ok: false,
       status: 0,
-      message: "No se pudo conectar con el servidor del SGPA.",
+      message: "No se pudo conectar con el sistema. Verifique que el servidor esté disponible.",
     };
   }
 });
@@ -203,8 +263,9 @@ ipcMain.handle("auth:cambiar-rol-activo", async (_event, nuevoRol) => {
 
 ipcMain.handle("app:verificar-identidad", async () => {
   try {
+    await asegurarBackendConectado();
     const data = await verificarIdentidadBackend(
-      (url, requestOptions) => net.fetch(url, requestOptions), API_URL, EXPECTED_DATABASE);
+      (url, requestOptions) => net.fetch(url, requestOptions), apiUrl, EXPECTED_DATABASE);
     return {
       ok: true,
       identidad: data,
@@ -213,8 +274,22 @@ ipcMain.handle("app:verificar-identidad", async () => {
     return {
       ok: false,
       status: 0,
-      message: `No se pudo verificar la identidad del backend en ${API_URL}: ${error.message}`,
+      message: "No se pudo conectar con el sistema. Verifique que el servidor esté disponible.",
     };
+  }
+});
+
+ipcMain.handle('app:backend-config', () => ({ url: apiUrl }));
+ipcMain.handle('app:configurar-backend', async (_event, value) => {
+  if (accessToken) return { ok: false, message: 'Cierre la sesión antes de cambiar el servidor.' };
+  try {
+    const candidate = normalizarUrlBackend(value);
+    const identidad = await verificarIdentidadBackend(
+      (url, requestOptions) => net.fetch(url, requestOptions), candidate, EXPECTED_DATABASE);
+    apiUrl = candidate;
+    return { ok: true, url: candidate, identidad };
+  } catch (error) {
+    return { ok: false, message: `Conexión rechazada: ${error.message}` };
   }
 });
 
@@ -254,7 +329,7 @@ ipcMain.handle("auth:recuperar-password", async (_event, datos) => {
     return {
       ok: false,
       status: 0,
-      message: "No se pudo conectar con el servidor del SGPA.",
+      message: "No se pudo conectar con el sistema. Verifique que el servidor esté disponible.",
     };
   }
 });
@@ -295,7 +370,7 @@ ipcMain.handle("auth:restablecer-password", async (_event, datos) => {
     return {
       ok: false,
       status: 0,
-      message: "No se pudo conectar con el servidor del SGPA.",
+      message: "No se pudo conectar con el sistema. Verifique que el servidor esté disponible.",
     };
   }
 });
@@ -472,6 +547,22 @@ ipcMain.handle('solicitudes:proponer-importacion-estudiantes', async (_event, da
     method: 'POST', body: datos,
   }));
 
+ipcMain.handle('solicitudes:proponer-reingreso-estudiante', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/estudiantes/${id}/reingreso`, {
+    method: 'POST', body: datos,
+  }));
+
+ipcMain.handle('solicitudes:proponer-correccion-resultado', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/estudiantes/${id}/correccion-resultado`, {
+    method: 'POST', body: datos,
+  }));
+
+
+ipcMain.handle('solicitudes:proponer-revision-bandeja-estudiantes', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/solicitudes-cambio/estudiantes/revision-bandeja', {
+    method: 'POST', body: datos,
+  }));
+
 ipcMain.handle('solicitudes:propias', async () =>
   ejecutarPeticionAutenticada('/solicitudes-cambio/mis-solicitudes'));
 
@@ -522,13 +613,27 @@ ipcMain.handle('equivalencias:crear', async (_event, datos) =>
   ejecutarPeticionAutenticada('/planes-estudio/equivalencias', { method: 'POST', body: datos }));
 
 ipcMain.handle('equivalencias:listar-planes', async (_event, planOrigenId, planDestinoId) =>
-  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/planes?planOrigenId=${planOrigenId}&planDestinoId=${planDestinoId}`));
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias?planOrigenId=${planOrigenId}&planDestinoId=${planDestinoId}`));
 
 ipcMain.handle('equivalencias:sugerir', async (_event, estudianteId, nuevoPlanId) =>
-  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/sugerencias/estudiante/${estudianteId}?nuevoPlanId=${nuevoPlanId}`));
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/sugerencias/${estudianteId}?planNuevoId=${nuevoPlanId}`));
 
-ipcMain.handle('equivalencias:aplicar', async (_event, estudianteId, datos) =>
-  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/aplicar/estudiante/${estudianteId}`, { method: 'POST', body: datos }));
+ipcMain.handle('equivalencias:aplicar', async (_event, estudianteId, datos) => {
+  if (!Number.isInteger(estudianteId) || estudianteId <= 0 ||
+      !datos || typeof datos !== 'object' || !Array.isArray(datos.equivalenciaIds) ||
+      datos.equivalenciaIds.length === 0 ||
+      !datos.equivalenciaIds.every((id) => Number.isInteger(id) && id > 0)) {
+    return { ok: false, status: 400, message: 'Estudiante y equivalencias válidas son obligatorios.' };
+  }
+
+  return ejecutarPeticionAutenticada('/planes-estudio/equivalencias/aplicar', {
+    method: 'POST',
+    body: { estudianteId, equivalenciaIds: datos.equivalenciaIds },
+  });
+});
+
+ipcMain.handle('equivalencias:eliminar', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/equivalencias/${id}`, { method: 'DELETE' }));
 
 ipcMain.handle('perfiles-academicos:copiar-cursos', async (_event, perfilId, perfilOrigenId) =>
   ejecutarPeticionAutenticada(`/perfiles-academicos/${perfilId}/copiar-cursos/${perfilOrigenId}`, { method: 'POST' }));
@@ -1040,10 +1145,11 @@ ipcMain.handle("planes-estudio:actualizar", async (_event, id, datos) => {
   });
 });
 
-ipcMain.handle("planes-estudio:cambiar-estado", async (_event, id, activo) => {
+ipcMain.handle("planes-estudio:cambiar-estado", async (_event, id, activo, motivo) => {
+  const body = typeof activo === "object" && activo !== null ? activo : { activo, motivo };
   return ejecutarPeticionAutenticada(`/planes-estudio/${id}/estado`, {
     method: "PATCH",
-    body: { activo },
+    body,
   });
 });
 
@@ -1310,6 +1416,47 @@ ipcMain.handle(
     );
   },
 );
+
+ipcMain.handle(
+  "salidas-academicas:evaluar",
+  async (_event, salidaId, estudianteId) => {
+    return ejecutarPeticionAutenticada(
+      `/planes-estudio/salidas-academicas/${salidaId}/evaluar/${estudianteId}`,
+    );
+  },
+);
+
+/* =========================================================
+   TRANSICIONES CURRICULARES
+   ========================================================= */
+
+ipcMain.handle("transiciones-curriculares:poblacion", async (_event, planOrigenId, carreraId) => {
+  const query = carreraId ? `?planOrigenId=${planOrigenId}&carreraId=${carreraId}` : `?planOrigenId=${planOrigenId}`;
+  return ejecutarPeticionAutenticada(`/planes-estudio/transiciones/poblacion${query}`);
+});
+
+ipcMain.handle("transiciones-curriculares:simular", async (_event, datos) => {
+  return ejecutarPeticionAutenticada("/planes-estudio/transiciones/simular", {
+    method: "POST",
+    body: datos,
+  });
+});
+
+ipcMain.handle("transiciones-curriculares:ejecutar", async (_event, datos) => {
+  return ejecutarPeticionAutenticada("/planes-estudio/transiciones/ejecutar", {
+    method: "POST",
+    body: datos,
+  });
+});
+
+ipcMain.handle("transiciones-curriculares:lotes", async (_event, carreraId, planOrigenId, planDestinoId) => {
+  const params = [];
+  if (carreraId) params.push(`carreraId=${carreraId}`);
+  if (planOrigenId) params.push(`planOrigenId=${planOrigenId}`);
+  if (planDestinoId) params.push(`planDestinoId=${planDestinoId}`);
+  const query = params.length ? `?${params.join("&")}` : "";
+  return ejecutarPeticionAutenticada(`/planes-estudio/transiciones/lotes${query}`);
+});
 
 ipcMain.handle("plan-resumen:obtener", async (_event, planId) => {
   const resultado = await ejecutarPeticionAutenticada(
@@ -2513,6 +2660,16 @@ ipcMain.handle('formularios-estudiantes:respuestas', async (_event, id) => {
 });
 
 ipcMain.handle(
+  'formularios-estudiantes:ticket-vista-previa',
+  async (_event, id) => {
+    return ejecutarPeticionAutenticada(
+      `/formularios-estudiantes/${id}/ticket-vista-previa`,
+      { method: 'POST' },
+    );
+  },
+);
+
+ipcMain.handle(
   'formularios-estudiantes:obtener-url-publica',
   async (_event, responderUri) => {
     try {
@@ -2531,7 +2688,7 @@ ipcMain.handle(
       const urlResuelta = resolverUrlPublicaFormulario(url);
       const urlValidada = validarUrlExternaFormulario(
         urlResuelta,
-        process.env.SGPA_PUBLIC_URL || API_URL,
+        process.env.SGPA_PUBLIC_URL || apiUrl,
         process.env.NODE_ENV === 'production',
       );
       await shell.openExternal(urlValidada);
@@ -2651,14 +2808,92 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle('estudiantes:reingresar', async (_event, id) => {
-  return ejecutarPeticionAutenticada(`/estudiantes/${id}/reingresar`, { method: 'POST' });
+ipcMain.handle('estudiantes:evaluar-graduacion', async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/evaluacion-graduacion`);
+});
+
+ipcMain.handle('estudiantes:confirmar-graduacion', async (_event, id, observacion) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/confirmar-graduacion`, {
+    method: 'POST',
+    body: { observacion },
+  });
 });
 
 ipcMain.handle('estudiantes:graduar', async (_event, id, observacion) => {
-  return ejecutarPeticionAutenticada(`/estudiantes/${id}/graduar`, {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/confirmar-graduacion`, {
     method: 'POST',
     body: { observacion },
+  });
+});
+
+ipcMain.handle('estudiantes:reingreso-diagnostico', async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/reingreso/diagnostico`);
+});
+
+ipcMain.handle('estudiantes:reingresar', async (_event, id, datos) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/reingresar`, {
+    method: 'POST',
+    body: datos || {},
+  });
+});
+
+ipcMain.handle('estudiantes:comparar-planes', async (_event, id, planNuevoId) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/comparar-planes?planNuevoId=${planNuevoId}`);
+});
+
+ipcMain.handle('estudiantes:corregir-resultado', async (_event, id, historialId, datos) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/historial-academico/${historialId}/corregir`, {
+    method: 'PATCH',
+    body: datos,
+  });
+});
+
+ipcMain.handle('estudiantes:correcciones-historial', async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/${id}/historial-academico/correcciones`);
+});
+
+ipcMain.handle('estudiantes-revision:bandeja', async (_event, filtros = {}) => {
+  const query = new URLSearchParams();
+  for (const nombre of ['carreraId', 'planEstudioId', 'fuente', 'estado', 'texto']) {
+    if (filtros[nombre] !== undefined && filtros[nombre] !== null && String(filtros[nombre]).trim() !== '') {
+      query.append(nombre, String(filtros[nombre]).trim());
+    }
+  }
+  const qStr = query.toString();
+  return ejecutarPeticionAutenticada(`/estudiantes/bandeja-revision${qStr ? `?${qStr}` : ''}`);
+});
+
+ipcMain.handle('estudiantes-revision:detalle', async (_event, id) => {
+  return ejecutarPeticionAutenticada(`/estudiantes/bandeja-revision/${id}`);
+});
+
+ipcMain.handle('estudiantes-revision:lote-excel', async (_event, payload) => {
+  return ejecutarPeticionAutenticada('/estudiantes/bandeja-revision/lote-excel', {
+    method: 'POST',
+    body: payload,
+  });
+});
+
+ipcMain.handle('estudiantes-revision:aprobar-masivo', async (_event, registroIds) => {
+  const payload = Array.isArray(registroIds) ? { registroIds } : (registroIds?.registroIds ? registroIds : { registroIds });
+  return ejecutarPeticionAutenticada('/estudiantes/bandeja-revision/aprobar-masivo', {
+    method: 'POST',
+    body: payload,
+  });
+});
+
+ipcMain.handle('estudiantes-revision:rechazar-masivo', async (_event, rechazos) => {
+  const payload = Array.isArray(rechazos) ? { rechazos } : (rechazos?.rechazos ? rechazos : { rechazos });
+  return ejecutarPeticionAutenticada('/estudiantes/bandeja-revision/rechazar-masivo', {
+    method: 'POST',
+    body: payload,
+  });
+});
+
+ipcMain.handle('estudiantes-revision:devolver', async (_event, registroIds, observacion) => {
+  return ejecutarPeticionAutenticada('/estudiantes/bandeja-revision/devolver', {
+    method: 'POST',
+    body: { registroIds, observacion },
   });
 });
 

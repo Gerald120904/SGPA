@@ -209,22 +209,41 @@ export function obtenerRolActivo(
   usuario = obtenerUsuario()
 ) {
 
-  if (sesionActual?.rolActivo) {
+  const activo =
+    sesionActual?.rolActivo ||
+    usuario?.rolActivo ||
+    null;
+
+  if (activo) {
 
     const roles =
       obtenerRolesUsuario(
         usuario
       );
 
-    if (roles.includes(sesionActual.rolActivo)) {
+    if (roles.includes(activo)) {
 
-      return sesionActual.rolActivo;
+      return activo;
 
     }
 
   }
 
   return null;
+
+}
+
+
+export function obtenerRolesEfectivos(
+  usuario = obtenerUsuario()
+) {
+
+  const rolActivo =
+    obtenerRolActivo(
+      usuario
+    );
+
+  return rolActivo ? [rolActivo] : [];
 
 }
 

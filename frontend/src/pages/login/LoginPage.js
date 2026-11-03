@@ -1120,7 +1120,9 @@ export function iniciarLoginPage({
         if (!resultado?.ok) {
 
           mostrarError(
-            resultado?.message ||
+            resultado?.status === 0
+              ? 'No se pudo conectar con el sistema. Verifique que el servidor esté disponible.'
+              : resultado?.message ||
             'Credenciales incorrectas.'
           );
 
@@ -1171,7 +1173,7 @@ export function iniciarLoginPage({
 
 
         mostrarError(
-          'No fue posible conectar con el servidor.'
+          'No se pudo conectar con el sistema. Verifique que el servidor esté disponible.'
         );
 
 
@@ -1254,7 +1256,9 @@ export function iniciarLoginPage({
 
           mostrarErrorRecuperacion(
             recoveryRequestError,
-            resultado?.message ||
+            resultado?.status === 0
+              ? 'No se pudo conectar con el sistema. Verifique que el servidor esté disponible.'
+              : resultado?.message ||
             'No fue posible solicitar el código.'
           );
 
@@ -1291,7 +1295,7 @@ export function iniciarLoginPage({
 
         mostrarErrorRecuperacion(
           recoveryRequestError,
-          'No fue posible conectar con el servidor.'
+          'No se pudo conectar con el sistema. Verifique que el servidor esté disponible.'
         );
 
       } finally {
@@ -1396,7 +1400,9 @@ export function iniciarLoginPage({
 
           mostrarErrorRecuperacion(
             resetPasswordError,
-            resultado?.message ||
+            resultado?.status === 0
+              ? 'No se pudo conectar con el sistema. Verifique que el servidor esté disponible.'
+              : resultado?.message ||
             'No fue posible cambiar la contraseña.'
           );
 
@@ -1431,7 +1437,7 @@ export function iniciarLoginPage({
 
         mostrarErrorRecuperacion(
           resetPasswordError,
-          'No fue posible conectar con el servidor.'
+          'No se pudo conectar con el sistema. Verifique que el servidor esté disponible.'
         );
 
       } finally {
