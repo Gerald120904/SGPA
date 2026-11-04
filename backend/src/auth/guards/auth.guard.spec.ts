@@ -52,6 +52,22 @@ describe('AuthGuard', () => {
     expect(context.switchToHttp().getRequest().user.jerarquiaConfigurada).toBe(true);
   });
 
+  it('permite a un asistente activo sin dependencia vigente entrar sin alcance y rechaza su token anterior', async () => {
+    jwtService.verifyAsync.mockResolvedValue({ sub: 3, correo: 'asistente@una.cr',
+      rolActivo: 'ASISTENTE_ESTUDIANTIL', carreraActiva: null, av: 2 });
+    usuarioRepository.findOne.mockResolvedValue({ id: 3, activo: true, versionAutenticacion: 2,
+      usuarioRoles: [{ rol: { nombre: 'ASISTENTE_ESTUDIANTIL', activo: true } }] });
+    dependenciaRepository.findOne.mockResolvedValue(null);
+    const contexto = crearContexto('Bearer token-vigente');
+    await expect(guard.canActivate(contexto)).resolves.toBe(true);
+    expect(contexto.switchToHttp().getRequest().user.jerarquiaConfigurada).toBe(true);
+    expect(contexto.switchToHttp().getRequest().user.accesoJerarquicoVigente).toBe(false);
+    jwtService.verifyAsync.mockResolvedValue({ sub: 3, correo: 'asistente@una.cr',
+      rolActivo: 'ASISTENTE_ESTUDIANTIL', carreraActiva: null, av: 1 });
+    await expect(guard.canActivate(crearContexto('Bearer token-anterior')))
+      .rejects.toThrow(UnauthorizedException);
+  });
+
   function crearContexto(authHeader?: string): ExecutionContext {
     const request: { headers: Record<string, string | undefined>; user?: any } = {
       headers: {

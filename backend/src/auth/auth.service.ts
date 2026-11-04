@@ -84,9 +84,8 @@ export class AuthService {
       throw new UnauthorizedException('Combinación de roles jerárquicos no permitida.');
     }
 
-    if (roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL) &&
-      (!this.alcanceJerarquico || !(await this.alcanceJerarquico.tieneCoordinadorResponsableActivo(usuario.id)))) {
-      throw new UnauthorizedException('La cuenta asistente no tiene coordinador responsable activo.');
+    if (roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL) && !this.alcanceJerarquico) {
+      throw new UnauthorizedException('No se pudo verificar el alcance del asistente.');
     }
 
     const rolActivo = [RolSistema.PROFESOR, RolSistema.ASISTENTE_ESTUDIANTIL,
@@ -99,6 +98,9 @@ export class AuthService {
       roles,
       rolActivo,
     );
+    const opcionesCarrera = rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL
+      ? await this.alcanceJerarquico!.obtenerOpcionesCarrera(usuario.id) : [];
+    const carreraActiva = opcionesCarrera.length === 1 ? opcionesCarrera[0].id : null;
 
     const versionAutenticacion = await this.usuariosService.rotarVersionAutenticacion(
       usuario.id, usuario.versionAutenticacion,
@@ -108,6 +110,7 @@ export class AuthService {
       correo: usuario.correo,
       roles,
       rolActivo,
+      carreraActiva,
       av: versionAutenticacion,
     };
 
@@ -126,7 +129,10 @@ export class AuthService {
         correo: usuario.correo,
         roles,
         rolActivo,
-        permisos,
+        permisos: rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL
+          ? (opcionesCarrera.find((c) => c.id === carreraActiva)?.permisos ?? []) : permisos,
+        carreraActiva,
+        carrerasDisponibles: opcionesCarrera,
       },
     };
   }
@@ -232,14 +238,8 @@ export class AuthService {
       );
     }
 
-    if (
-      dto.rol === RolSistema.ASISTENTE_ESTUDIANTIL &&
-      (!this.alcanceJerarquico ||
-        !(await this.alcanceJerarquico.tieneCoordinadorResponsableActivo(usuario.id)))
-    ) {
-      throw new UnauthorizedException(
-        'La cuenta asistente no tiene coordinador responsable activo.',
-      );
+    if (dto.rol === RolSistema.ASISTENTE_ESTUDIANTIL && !this.alcanceJerarquico) {
+      throw new UnauthorizedException('No se pudo verificar el alcance del asistente.');
     }
 
     const permisos = await this.permisosService.obtenerPermisosEfectivos(
@@ -247,6 +247,9 @@ export class AuthService {
       rolesVigentes,
       dto.rol,
     );
+    const opcionesCarrera = dto.rol === RolSistema.ASISTENTE_ESTUDIANTIL
+      ? await this.alcanceJerarquico!.obtenerOpcionesCarrera(usuario.id) : [];
+    const carreraActiva = opcionesCarrera.length === 1 ? opcionesCarrera[0].id : null;
 
     const versionAutenticacion = await this.usuariosService.rotarVersionAutenticacion(
       usuario.id, versionActual,
@@ -256,6 +259,7 @@ export class AuthService {
       correo: usuario.correo,
       roles: rolesVigentes,
       rolActivo: dto.rol,
+      carreraActiva,
       av: versionAutenticacion,
     };
 
@@ -272,7 +276,10 @@ export class AuthService {
         correo: usuario.correo,
         roles: rolesVigentes,
         rolActivo: dto.rol,
-        permisos,
+        permisos: dto.rol === RolSistema.ASISTENTE_ESTUDIANTIL
+          ? (opcionesCarrera.find((c) => c.id === carreraActiva)?.permisos ?? []) : permisos,
+        carreraActiva,
+        carrerasDisponibles: opcionesCarrera,
       },
     };
   }
@@ -295,7 +302,26 @@ export class AuthService {
     };
   }
 
-  async perfil(usuarioId: number, rolActivo?: RolSistema | string) {
+  async cambiarCarreraActiva(usuarioId: number, versionActual: number, carreraId: number) {
+    const usuario = await this.usuariosService.buscarPorId(usuarioId);
+    if (!usuario?.activo || !this.alcanceJerarquico) throw new UnauthorizedException('Usuario no válido.');
+    const roles = this.obtenerRolesValidos(usuario.usuarioRoles ?? []);
+    if (!roles.includes(RolSistema.ASISTENTE_ESTUDIANTIL)) throw new UnauthorizedException('Rol de asistente no vigente.');
+    if (usuario.versionAutenticacion !== versionActual) throw new UnauthorizedException('Sesión reemplazada.');
+    const carrerasDisponibles = await this.alcanceJerarquico.obtenerOpcionesCarrera(usuarioId);
+    const seleccionada = carrerasDisponibles.find((c) => c.id === carreraId && c.permisos.length > 0);
+    if (!seleccionada) throw new BadRequestException('Carrera no autorizada o sin permisos.');
+    const accessToken = await this.jwtService.signAsync({ sub: usuario.id, correo: usuario.correo,
+      roles, rolActivo: RolSistema.ASISTENTE_ESTUDIANTIL, av: versionActual, carreraActiva: carreraId });
+    return { accessToken, usuario: {
+      id: usuario.id, cedula: usuario.cedula, nombres: usuario.nombres, apellido1: usuario.apellido1,
+      apellido2: usuario.apellido2, correo: usuario.correo, roles,
+      rolActivo: RolSistema.ASISTENTE_ESTUDIANTIL, permisos: seleccionada.permisos,
+      carreraActiva: carreraId, carrerasDisponibles,
+    } };
+  }
+
+  async perfil(usuarioId: number, rolActivo?: RolSistema | string, carreraActiva?: number | null) {
     const usuario = await this.usuariosService.buscarPorId(usuarioId);
 
     if (!usuario || !usuario.activo) {
@@ -319,6 +345,9 @@ export class AuthService {
       roles,
       rolActivo as RolSistema,
     );
+    const carrerasDisponibles = rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL
+      ? await this.alcanceJerarquico!.obtenerOpcionesCarrera(usuario.id) : [];
+    const activa = carrerasDisponibles.find((c) => c.id === carreraActiva);
 
     return {
       id: usuario.id,
@@ -329,7 +358,9 @@ export class AuthService {
       correo: usuario.correo,
       roles,
       rolActivo,
-      permisos,
+      permisos: rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL ? (activa?.permisos ?? []) : permisos,
+      carreraActiva: activa?.id ?? null,
+      carrerasDisponibles,
     };
   }
 }

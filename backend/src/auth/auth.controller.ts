@@ -19,6 +19,13 @@ import { SolicitarRecuperacionDto } from './dto/solicitar-recuperacion.dto';
 import { RestablecerPasswordDto } from './dto/restablecer-password.dto';
 import { AceptarInvitacionDto } from './dto/aceptar-invitacion.dto';
 import { CambiarRolActivoDto } from './dto/cambiar-rol-activo.dto';
+import { IsInt, Min } from 'class-validator';
+
+class CambiarCarreraActivaDto {
+  @IsInt()
+  @Min(1)
+  carreraId!: number;
+}
 
 @Controller('auth')
 export class AuthController {
@@ -110,12 +117,21 @@ form.addEventListener('submit', async (event) => {
   }
 
   @UseGuards(AuthGuard)
+  @Post('cambiar-carrera-activa')
+  @HttpCode(HttpStatus.OK)
+  cambiarCarreraActiva(@Req() request: Request, @Body() dto: CambiarCarreraActivaDto) {
+    const user = request.user;
+    if (!user || user.rolActivo !== 'ASISTENTE_ESTUDIANTIL') throw new UnauthorizedException('Rol no autorizado.');
+    return this.authService.cambiarCarreraActiva(user.sub, user.av, dto.carreraId);
+  }
+
+  @UseGuards(AuthGuard)
   @Get('perfil')
   perfil(@Req() request: Request) {
     const user = request.user;
     if (!user) {
       throw new UnauthorizedException('Usuario no autenticado');
     }
-    return this.authService.perfil(user.sub, user.rolActivo);
+    return this.authService.perfil(user.sub, user.rolActivo, user.carreraActiva);
   }
 }
