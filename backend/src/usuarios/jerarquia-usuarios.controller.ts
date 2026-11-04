@@ -19,7 +19,13 @@ export class JerarquiaUsuariosController {
   @Get('mis-carreras')
   @Roles(RolSistema.ADMIN_GLOBAL, RolSistema.COORDINADOR, RolSistema.ASISTENTE_ESTUDIANTIL)
   async misCarreras(@Req() request: Request) {
-    return this.alcance.obtenerCarrerasAutorizadas(request.user!.sub);
+    return this.alcance.obtenerCarrerasAsignadas(request.user!.sub);
+  }
+
+  @Get('mis-carreras-detalle')
+  @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
+  misCarrerasDetalle(@Req() request: Request) {
+    return this.alcance.obtenerOpcionesCarrera(request.user!.sub);
   }
 
   @Get('mis-alcances')
@@ -53,7 +59,14 @@ export class JerarquiaUsuariosController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ConfigurarJerarquiaDto,
   ) {
-    return this.jerarquia.configurarCoordinador(request.user!.sub, id, dto.carreras);
+    return this.jerarquia.configurarCoordinador(request.user!.sub, id, dto.carreras, dto.firmaImpacto);
+  }
+
+  @Post('coordinadores/:id/impacto')
+  @Roles(RolSistema.ADMIN_GLOBAL)
+  impactoCoordinador(@Req() request: Request, @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfigurarJerarquiaDto) {
+    return this.jerarquia.previsualizarCoordinador(request.user!.sub, id, dto.carreras);
   }
 
   @Get('coordinadores/:id')
@@ -66,6 +79,26 @@ export class JerarquiaUsuariosController {
   @Roles(RolSistema.COORDINADOR)
   listarMisAsistentes(@Req() request: Request) {
     return this.jerarquia.listarMisAsistentes(request.user!.sub);
+  }
+
+  @Post('admin/asistentes/:id/impacto')
+  @Roles(RolSistema.ADMIN_GLOBAL)
+  impactoAsistente(@Req() request: Request, @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfigurarJerarquiaDto) {
+    return this.jerarquia.previsualizarAsistente(request.user!.sub, id, dto.carreras);
+  }
+
+  @Get('admin/asistentes/:id')
+  @Roles(RolSistema.ADMIN_GLOBAL)
+  obtenerAsistentePorAdmin(@Req() request: Request, @Param('id', ParseIntPipe) id: number) {
+    return this.jerarquia.obtenerAsistentePorAdmin(request.user!.sub, id);
+  }
+
+  @Put('admin/asistentes/:id')
+  @Roles(RolSistema.ADMIN_GLOBAL)
+  configurarAsistentePorAdmin(@Req() request: Request, @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ConfigurarJerarquiaDto) {
+    return this.jerarquia.configurarAsistentePorAdmin(request.user!.sub, id, dto.carreras, dto.firmaImpacto);
   }
 
   @Get('asistentes-configuracion')

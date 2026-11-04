@@ -99,8 +99,15 @@ export class UsuariosController {
     rolId: number,
     @Req()
     request: Request,
+    @Body() dto: { firmaImpacto?: string },
   ) {
-    return this.usuariosService.revocarRol(id, rolId, request.user!.sub);
+    return this.usuariosService.revocarRol(id, rolId, request.user!.sub, dto?.firmaImpacto);
+  }
+
+  @Get(':id/roles/:rolId/impacto')
+  impactoRevocacionRol(@Param('id', ParseIntPipe) id: number,
+    @Param('rolId', ParseIntPipe) rolId: number) {
+    return this.usuariosService.previsualizarRevocacionRol(id, rolId);
   }
 
   @Get(':id/impacto-desactivacion')

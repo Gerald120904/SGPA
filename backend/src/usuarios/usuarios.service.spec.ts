@@ -104,6 +104,7 @@ describe('UsuariosService', () => {
     create: jest.Mock;
     save: jest.Mock;
     findOne: jest.Mock;
+    update: jest.Mock;
   };
   let txUsuarioRolRepository: {
     create: jest.Mock;
@@ -162,6 +163,7 @@ describe('UsuariosService', () => {
       create: jest.fn((datos) => datos),
       save: jest.fn(),
       findOne: jest.fn().mockResolvedValue({ id: 1 }),
+      update: jest.fn(),
     };
     txUsuarioRolRepository = {
       create: jest.fn((datos) => datos),
@@ -772,7 +774,7 @@ describe('UsuariosService', () => {
 
     const resultado = await service.asignarRol(2, RolSistema.PROFESOR);
 
-    expect(usuarioRolRepository.save).toHaveBeenCalledWith({
+    expect(txUsuarioRolRepository.save).toHaveBeenCalledWith({
       usuarioId: 2,
       rolId: 3,
     });

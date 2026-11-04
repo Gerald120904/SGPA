@@ -14,6 +14,7 @@ import { Carrera } from '../carreras/entities/carrera.entity';
 import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
 import { SolicitudCambio } from './entities/solicitud-cambio.entity';
 import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
+import { PermisoCarrera } from '../permisos/entities/permiso-carrera.entity';
 
 describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)', () => {
   let usuariosService: UsuariosService;
@@ -111,6 +112,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
                   }));
                 return { ...u, usuarioRoles: roles };
               },
+              update: async () => ({ affected: 1 }),
             };
           }
           if (entity === UsuarioRol) {
@@ -148,6 +150,12 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
                     ...ur,
                     rol: rolesDb.get(ur.rolId),
                   }));
+              },
+              findOne: async ({ where }: any) => {
+                const item = usuarioRolesDb.find(
+                  (ur) => ur.usuarioId === where?.usuarioId && ur.rolId === where?.rolId,
+                );
+                return item ? { ...item, rol: rolesDb.get(item.rolId) } : null;
               },
             };
           }
@@ -229,7 +237,10 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
             return { find: async () => [], save: async (items: any) => items };
           }
           if (entity === SolicitudCambio) {
-            return { update: async () => ({ affected: 0 }) };
+            return { find: async () => [], update: async () => ({ affected: 0 }) };
+          }
+          if (entity === PermisoCarrera) {
+            return { find: async () => [], update: async () => ({ affected: 0 }), delete: async () => ({ affected: 0 }) };
           }
           if (entity === AuditoriaJerarquia) {
             return { save: async (item: any) => item };
@@ -241,6 +252,7 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
     };
 
     dataSource = {
+      manager: createTxManager(),
       transaction: jest.fn(async (cb: (m: any) => Promise<any>) => {
         const mgr = createTxManager();
         return cb(mgr);
@@ -371,7 +383,8 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
     );
 
     // Revocar rol COORDINADOR (id: 2)
-    await usuariosService.revocarRol(10, 2, 999);
+    const impacto = await usuariosService.previsualizarRevocacionRol(10, 2);
+    await usuariosService.revocarRol(10, 2, 999, impacto.firma);
 
     // En usuario_roles ya no está COORDINADOR
     expect(usuarioRolesDb.find((ur) => ur.usuarioId === 10 && ur.rolId === 2)).toBeUndefined();
@@ -460,7 +473,8 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
     expect(permisosTrasAsignar).not.toContain(PermisoSistema.PERIODOS_VER);
 
     // Ahora revocar COORDINADOR
-    await usuariosService.revocarRol(30, 2, 999);
+    const impacto = await usuariosService.previsualizarRevocacionRol(30, 2);
+    await usuariosService.revocarRol(30, 2, 999, impacto.firma);
 
     const permisosTrasRevocar = usuarioPermisosDb
       .filter((up) => up.usuarioId === 30)
@@ -513,7 +527,8 @@ describe('UsuariosService - Doble Escritura Transaccional y Reversión (QA-003)'
     usuarioRolesDb.push({ usuarioId: 50, rolId: 3 }); // PROFESOR
 
     // Operación bajo Opción B: Revocar COORDINADOR
-    await usuariosService.revocarRol(50, 2, 999);
+    const impacto = await usuariosService.previsualizarRevocacionRol(50, 2);
+    await usuariosService.revocarRol(50, 2, 999, impacto.firma);
 
     // Comprobar que usuario_permisos fue sincronizado
     const permisosEnLegacy = usuarioPermisosDb

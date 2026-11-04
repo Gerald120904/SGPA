@@ -31,6 +31,10 @@ import { InvitacionOutboxService } from './invitacion-outbox.service';
 import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
 import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
 import { SolicitudCambio } from './entities/solicitud-cambio.entity';
+import { PermisoCarrera } from '../permisos/entities/permiso-carrera.entity';
+import { AsignacionAcademica } from '../estructura-academica/entities/asignacion-academica.entity';
+import { TipoAsignacionAcademica } from '../estructura-academica/constants/tipo-asignacion-academica.constant';
+import { ESTADOS_ABIERTOS_SOLICITUD, firmaImpacto } from './revocacion-impacto';
 
 @Injectable()
 export class UsuariosService {
@@ -635,7 +639,7 @@ export class UsuariosService {
     }
 
     try {
-      if (this.permisosService?.esPoliticaOpcionBActiva()) {
+      {
         await this.dataSource.transaction(async (manager) => {
           const usuarioRolRepo = manager.getRepository(UsuarioRol);
           await usuarioRolRepo.save(
@@ -645,18 +649,12 @@ export class UsuariosService {
             }),
           );
 
-          await this.permisosService?.sincronizarPermisosUsuarioEnTransaccion(
-            manager,
-            id,
-          );
+          if (this.permisosService?.esPoliticaOpcionBActiva()) {
+            await this.permisosService.sincronizarPermisosUsuarioEnTransaccion(manager, id);
+          }
+          await manager.getRepository(Usuario).update(id,
+            { versionAutenticacion: () => 'version_autenticacion + 1' });
         });
-      } else {
-        await this.usuarioRolRepository.save(
-          this.usuarioRolRepository.create({
-            usuarioId: id,
-            rolId: rol.id,
-          }),
-        );
       }
     } catch (error) {
       this.relanzarErrorPersistencia(error);
@@ -665,7 +663,84 @@ export class UsuariosService {
     return this.obtenerPorId(id);
   }
 
-  async revocarRol(id: number, rolId: number, usuarioActualId: number) {
+  async previsualizarRevocacionRol(id: number, rolId: number,
+    manager: EntityManager = this.dataSource.manager) {
+    const usuario = await this.obtenerEntidadPorId(id);
+    const relacion = await manager.getRepository(UsuarioRol).findOne({
+      where: { usuarioId: id, rolId }, relations: { rol: true },
+    });
+    if (!relacion) throw new NotFoundException('El usuario no posee este rol.');
+    const jerarquico = [RolSistema.COORDINADOR, RolSistema.ASISTENTE_ESTUDIANTIL]
+      .includes(relacion.rol.nombre as RolSistema);
+    const permisosRevocados = jerarquico
+      ? (await manager.getRepository(PermisoCarrera).find({ where: { usuarioId: id, activo: true } }))
+        .map((p) => ({ carreraId: p.carreraId, permiso: p.permiso }))
+        .sort((a, b) => a.carreraId - b.carreraId || a.permiso.localeCompare(b.permiso)) : [];
+    const carrerasAfectadas = [...new Set(permisosRevocados.map((p) => p.carreraId))].sort((a, b) => a - b);
+    const relaciones = relacion.rol.nombre === RolSistema.COORDINADOR
+      ? await manager.getRepository(DependenciaUsuario).find({
+        where: { coordinadorId: id, activo: true }, order: { id: 'ASC' },
+        ...(manager !== this.dataSource.manager ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+      }) : [];
+    const idsAsistentes = relaciones.map((d) => d.asistenteId);
+    const cuentas = idsAsistentes.length ? await manager.getRepository(Usuario).find({
+      where: { id: In(idsAsistentes) },
+      relations: { usuarioRoles: { rol: true } },
+      ...(manager !== this.dataSource.manager ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    }) : [];
+    const permisosAsistentes = idsAsistentes.length ? await manager.getRepository(PermisoCarrera).find({
+      where: { usuarioId: In(idsAsistentes), activo: true },
+    }) : [];
+    const asignaciones = idsAsistentes.length ? await manager.getRepository(AsignacionAcademica).find({
+      where: { usuarioId: In(idsAsistentes), tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA, activo: true },
+    }) : [];
+    const asignacionesPadre = idsAsistentes.length ? await manager.getRepository(AsignacionAcademica).find({
+      where: { usuarioId: id, tipo: TipoAsignacionAcademica.COORDINADOR_CARRERA, activo: true },
+    }) : [];
+    const hoyPartes = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Costa_Rica',
+      year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const hoy = ['year', 'month', 'day'].map((tipo) => hoyPartes.find((p) => p.type === tipo)?.value).join('-');
+    const carrerasPadre = new Set(asignacionesPadre.filter((a) =>
+      a.carreraId !== null && a.fechaInicio <= hoy && (!a.fechaFin || a.fechaFin >= hoy))
+      .map((a) => a.carreraId));
+    const permisosPadre = new Set(permisosRevocados.filter((p) => carrerasPadre.has(p.carreraId))
+      .map((p) => `${p.carreraId}:${p.permiso}`));
+    const asistentesAfectados = relaciones.map((d) => {
+      const cuenta = cuentas.find((u) => u.id === d.asistenteId);
+      const rolAsistenteVigente = cuenta?.usuarioRoles?.some((ur) =>
+        ur.rol?.activo && ur.rol.nombre === RolSistema.ASISTENTE_ESTUDIANTIL) === true;
+      const carrerasVigentes = new Set(asignaciones.filter((a) => a.usuarioId === d.asistenteId &&
+        a.carreraId !== null && a.fechaInicio <= hoy && (!a.fechaFin || a.fechaFin >= hoy))
+        .map((a) => a.carreraId));
+      const delegaciones = permisosAsistentes.filter((p) => p.usuarioId === d.asistenteId &&
+        carrerasVigentes.has(p.carreraId) && permisosPadre.has(`${p.carreraId}:${p.permiso}`))
+        .map((p) => ({ carreraId: p.carreraId, permiso: p.permiso }))
+        .sort((a, b) => a.carreraId - b.carreraId || a.permiso.localeCompare(b.permiso));
+      return { id: d.asistenteId,
+        nombre: cuenta ? `${cuenta.nombres} ${cuenta.apellido1}` : `#${d.asistenteId}`,
+        cuentaActiva: cuenta?.activo === true, delegaciones: rolAsistenteVigente ? delegaciones : [],
+        sesionesInvalidadas: cuenta?.activo === true && rolAsistenteVigente && delegaciones.length > 0 };
+    });
+    const sesionesInvalidadas = asistentesAfectados.filter((a) => a.sesionesInvalidadas).map((a) => a.id);
+    const where = ESTADOS_ABIERTOS_SOLICITUD.map((estado) => relacion.rol.nombre === RolSistema.COORDINADOR
+      ? { coordinadorId: id, estado } : { solicitanteId: id, estado });
+    const solicitudes = jerarquico ? await manager.getRepository(SolicitudCambio).find({
+      where, order: { id: 'ASC' },
+      ...(manager !== this.dataSource.manager ? { lock: { mode: 'pessimistic_write' as const } } : {}),
+    }) : [];
+    const resumen = solicitudes.map((s) => ({ id: s.id, modulo: s.modulo, carreraId: s.carreraId,
+      estado: s.estado }));
+    return { usuarioId: id, usuario: `${usuario.nombres} ${usuario.apellido1}`,
+      rol: relacion.rol.nombre, permisosRevocados, carrerasAfectadas,
+      asistentesAfectados, totalAsistentes: asistentesAfectados.length,
+      totalAsistentesActivos: asistentesAfectados.filter((a) => a.cuentaActiva).length,
+      sesionesInvalidadas,
+      solicitudesAfectadas: resumen, totalSolicitudes: resumen.length,
+      firma: firmaImpacto({ id, rolId, rol: relacion.rol.nombre, permisosRevocados,
+        asistentesAfectados, sesionesInvalidadas, solicitudes: resumen }) };
+  }
+
+  async revocarRol(id: number, rolId: number, usuarioActualId: number, firma?: string) {
     await this.obtenerEntidadPorId(id);
 
     const relacion = await this.usuarioRolRepository.findOne({
@@ -693,6 +768,12 @@ export class UsuariosService {
 
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      const jerarquico = relacion.rol.nombre === RolSistema.COORDINADOR ||
+        relacion.rol.nombre === RolSistema.ASISTENTE_ESTUDIANTIL;
+      const impacto = jerarquico ? await this.previsualizarRevocacionRol(id, rolId, manager) : null;
+      if (jerarquico && (!firma || firma !== impacto?.firma)) {
+        throw new ConflictException('El impacto de la revocación cambió. Revíselo antes de continuar.');
+      }
       const relaciones = manager.getRepository(UsuarioRol);
       const profesorCarreras = manager.getRepository(ProfesorCarrera);
 
@@ -700,6 +781,12 @@ export class UsuariosService {
         usuarioId: id,
         rolId,
       });
+
+      if (jerarquico) {
+        await manager.getRepository(PermisoCarrera).update(
+          { usuarioId: id, activo: true }, { activo: false },
+        );
+      }
 
       if (relacion.rol.nombre === RolSistema.PROFESOR) {
         await profesorCarreras.delete({
@@ -710,9 +797,7 @@ export class UsuariosService {
       if (relacion.rol.nombre === RolSistema.COORDINADOR) {
         const dependencias = manager.getRepository(DependenciaUsuario);
         const relacionadas = await dependencias.find({ where: { coordinadorId: id, activo: true } });
-        const asistentes = relacionadas.map((rel) => rel.asistenteId);
-        if (asistentes.length) {
-          await manager.getRepository(Usuario).update({ id: In(asistentes) }, { activo: false });
+        if (relacionadas.length) {
           for (const rel of relacionadas) {
             rel.activo = false;
             rel.desactivadoEn = new Date();
@@ -720,15 +805,20 @@ export class UsuariosService {
           }
           await dependencias.save(relacionadas);
         }
-        await manager.getRepository(SolicitudCambio).update(
-          { coordinadorId: id, estado: 'PENDIENTE' },
-          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
-        );
+        for (const solicitud of impacto?.solicitudesAfectadas ?? []) {
+          await manager.getRepository(SolicitudCambio).update(solicitud.id, {
+            estado: 'RECHAZADA', motivoRechazo: 'Rol de coordinador revocado por el administrador global.',
+            resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId,
+          });
+        }
         await manager.getRepository(AuditoriaJerarquia).save({
           actorUsuarioId: usuarioActualId,
           objetivoUsuarioId: id,
           accion: 'REVOCAR_COORDINADOR',
-          detalle: { asistentesDesactivados: asistentes },
+          detalle: { asistentesDesvinculados: impacto?.asistentesAfectados ?? [],
+            permisosAnteriores: impacto?.permisosRevocados ?? [], permisosNuevos: [],
+            solicitudesRechazadas: impacto?.solicitudesAfectadas.map((s) => s.id) ?? [],
+            motivo: 'Rol de coordinador revocado por el administrador global.' },
         });
       }
 
@@ -737,13 +827,18 @@ export class UsuariosService {
           { asistenteId: id, activo: true },
           { activo: false, desactivadoEn: new Date(), motivoDesactivacion: 'Revocación del rol de asistente' },
         );
-        await manager.getRepository(SolicitudCambio).update(
-          { solicitanteId: id, estado: 'PENDIENTE' },
-          { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
-        );
+        for (const solicitud of impacto?.solicitudesAfectadas ?? []) {
+          await manager.getRepository(SolicitudCambio).update(solicitud.id, {
+            estado: 'RECHAZADA', motivoRechazo: 'Rol de asistente revocado por el administrador global.',
+            resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId,
+          });
+        }
         await manager.getRepository(AuditoriaJerarquia).save({
           actorUsuarioId: usuarioActualId, objetivoUsuarioId: id,
-          accion: 'REVOCAR_ASISTENTE', detalle: { asistenteId: id },
+          accion: 'REVOCAR_ASISTENTE', detalle: { asistenteId: id,
+            permisosAnteriores: impacto?.permisosRevocados ?? [], permisosNuevos: [],
+            solicitudesRechazadas: impacto?.solicitudesAfectadas.map((s) => s.id) ?? [],
+            motivo: 'Rol de asistente revocado por el administrador global.' },
         });
       }
 
@@ -753,6 +848,9 @@ export class UsuariosService {
           id,
         );
       }
+      const ids = [id, ...(impacto?.sesionesInvalidadas ?? [])];
+      await manager.getRepository(Usuario).update({ id: In(ids) },
+        { versionAutenticacion: () => 'version_autenticacion + 1' });
     });
 
     return this.obtenerPorId(id);
