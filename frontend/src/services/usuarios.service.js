@@ -39,9 +39,14 @@ export async function asignarRolUsuario(usuarioId, rol) {
   return window.sgpa.asignarRolUsuario(usuarioId, rol);
 }
 
-export async function revocarRolUsuario(usuarioId, rolId) {
+export async function previsualizarRevocacionRol(usuarioId, rolId) {
+  validarApi('previsualizarRevocacionRol');
+  return window.sgpa.previsualizarRevocacionRol(usuarioId, rolId);
+}
+
+export async function revocarRolUsuario(usuarioId, rolId, firmaImpacto) {
   validarApi('revocarRolUsuario');
-  return window.sgpa.revocarRolUsuario(usuarioId, rolId);
+  return window.sgpa.revocarRolUsuario(usuarioId, rolId, firmaImpacto);
 }
 
 export async function listarRoles() {

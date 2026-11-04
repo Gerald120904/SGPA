@@ -179,10 +179,11 @@ test('cada método requerido por los servicios existe en preload', async () => {
 test('cada canal invocado por preload tiene un manejador IPC registrado', () => {
   const registered = new Set(registeredHandlers);
   const missing = [...preloadMethods.entries()]
-    .filter(([, channel]) => !channel || !registered.has(channel))
+    .filter(([method, channel]) => method !== 'onSesionInvalidada' && (!channel || !registered.has(channel)))
     .map(([method, channel]) => ({ method, channel }));
 
   assert.deepEqual(missing, []);
+  assert.match(preloadSource, /ipcRenderer\.on\('auth:invalidada', listener\)/);
 });
 
 test('no existen manejadores IPC duplicados', () => {

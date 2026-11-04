@@ -121,9 +121,10 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
     };
   }
 
+  const tokenUsado = accessToken;
   const { method = "GET", body } = opciones;
   const headers = {
-    Authorization: `Bearer ${accessToken}`,
+    Authorization: `Bearer ${tokenUsado}`,
   };
 
   if (body !== undefined) {
@@ -150,7 +151,11 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
 
     if (!response.ok) {
       if (response.status === 401) {
-        accessToken = null;
+        if (accessToken === tokenUsado) {
+          accessToken = null;
+          BrowserWindow.getAllWindows().forEach((ventana) =>
+            ventana.webContents.send('auth:invalidada'));
+        }
       }
 
       const mensaje = Array.isArray(data?.message)
@@ -259,6 +264,15 @@ ipcMain.handle("auth:cambiar-rol-activo", async (_event, nuevoRol) => {
       message: "No se pudo cambiar el rol activo.",
     };
   }
+});
+
+ipcMain.handle('auth:cambiar-carrera-activa', async (_event, carreraId) => {
+  const resultado = await ejecutarPeticionAutenticada('/auth/cambiar-carrera-activa', {
+    method: 'POST', body: { carreraId },
+  });
+  if (!resultado.ok) return resultado;
+  accessToken = resultado.data.accessToken;
+  return { ok: true, usuario: resultado.data.usuario };
 });
 
 ipcMain.handle("app:verificar-identidad", async () => {
@@ -384,17 +398,22 @@ ipcMain.handle("auth:perfil", async () => {
   }
 
   try {
+    const tokenUsado = accessToken;
     const response = await consultarBackend('/auth/perfil', {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${tokenUsado}`,
       },
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      accessToken = null;
+      if (response.status === 401 && accessToken === tokenUsado) {
+        accessToken = null;
+        BrowserWindow.getAllWindows().forEach((ventana) =>
+          ventana.webContents.send('auth:invalidada'));
+      }
       return {
         ok: false,
         status: response.status,
@@ -467,9 +486,12 @@ ipcMain.handle("usuarios:asignar-rol", async (_event, id, rol) => {
   });
 });
 
-ipcMain.handle("usuarios:revocar-rol", async (_event, usuarioId, rolId) => {
+ipcMain.handle('usuarios:impacto-revocacion-rol', async (_event, usuarioId, rolId) =>
+  ejecutarPeticionAutenticada(`/usuarios/${usuarioId}/roles/${rolId}/impacto`));
+ipcMain.handle("usuarios:revocar-rol", async (_event, usuarioId, rolId, firmaImpacto) => {
   return ejecutarPeticionAutenticada(`/usuarios/${usuarioId}/roles/${rolId}`, {
     method: "DELETE",
+    body: { firmaImpacto },
   });
 });
 
@@ -488,9 +510,24 @@ ipcMain.handle('jerarquia:catalogo-estudiantes', async () =>
 ipcMain.handle('jerarquia:coordinador', async (_event, id) =>
   ejecutarPeticionAutenticada(`/jerarquia-usuarios/coordinadores/${id}`));
 
-ipcMain.handle('jerarquia:configurar-coordinador', async (_event, id, carreras) =>
+ipcMain.handle('jerarquia:admin-asistente', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/admin/asistentes/${id}`));
+ipcMain.handle('jerarquia:impacto-admin-asistente', async (_event, id, carreras) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/admin/asistentes/${id}/impacto`, {
+    method: 'POST', body: { carreras },
+  }));
+ipcMain.handle('jerarquia:configurar-admin-asistente', async (_event, id, carreras, firmaImpacto) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/admin/asistentes/${id}`, {
+    method: 'PUT', body: { carreras, firmaImpacto },
+  }));
+
+ipcMain.handle('jerarquia:impacto-coordinador', async (_event, id, carreras) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/coordinadores/${id}/impacto`, {
+    method: 'POST', body: { carreras },
+  }));
+ipcMain.handle('jerarquia:configurar-coordinador', async (_event, id, carreras, firmaImpacto) =>
   ejecutarPeticionAutenticada(`/jerarquia-usuarios/coordinadores/${id}`, {
-    method: 'PUT', body: { carreras },
+    method: 'PUT', body: { carreras, firmaImpacto },
   }));
 
 ipcMain.handle('jerarquia:asistentes', async () =>
