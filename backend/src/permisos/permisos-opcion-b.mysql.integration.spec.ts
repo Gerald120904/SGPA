@@ -94,6 +94,7 @@ describeMysql('QA-003 persistencia MySQL aislada', () => {
 
   async function limpiarDatosFicticios(): Promise<void> {
     await verificarDestinoSeguro();
+
     await dataSource.query('DELETE FROM usuario_permiso_excepciones');
     await dataSource.query('DELETE FROM usuario_permisos');
     await dataSource.query('DELETE FROM usuario_roles');
@@ -132,6 +133,10 @@ describeMysql('QA-003 persistencia MySQL aislada', () => {
     await dataSource.initialize();
     await verificarDestinoSeguro();
 
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 0');
+    await dataSource.query('DROP TABLE IF EXISTS auditoria_jerarquia, solicitudes_cambio, cursos, permisos_carrera, dependencias_usuario, usuario_permiso_excepciones, usuario_permisos, usuario_roles, profesor_carreras, roles, usuarios, carreras');
+    await dataSource.query('SET FOREIGN_KEY_CHECKS = 1');
+
     await dataSource.query(`
       CREATE TABLE carreras (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -158,6 +163,7 @@ describeMysql('QA-003 persistencia MySQL aislada', () => {
         password_reset_token_hash VARCHAR(64) NULL,
         password_reset_expires_at DATETIME NULL,
         activo TINYINT NOT NULL DEFAULT 1,
+        version_autenticacion INT UNSIGNED NOT NULL DEFAULT 0,
         ultimo_acceso DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -259,7 +265,12 @@ describeMysql('QA-003 persistencia MySQL aislada', () => {
   });
 
   afterAll(async () => {
-    if (dataSource?.isInitialized) await dataSource.destroy();
+    if (dataSource?.isInitialized) {
+      await dataSource.query('SET FOREIGN_KEY_CHECKS = 0').catch(() => undefined);
+      await dataSource.query('DROP TABLE IF EXISTS auditoria_jerarquia, solicitudes_cambio, cursos, permisos_carrera, dependencias_usuario, usuario_permiso_excepciones, usuario_permisos, usuario_roles, profesor_carreras, roles, usuarios, carreras').catch(() => undefined);
+      await dataSource.query('SET FOREIGN_KEY_CHECKS = 1').catch(() => undefined);
+      await dataSource.destroy();
+    }
   });
 
   it('persiste la restricción UNIQUE (usuario_id, permiso) en MySQL', async () => {
@@ -438,7 +449,7 @@ describeMysql('QA-003 persistencia MySQL aislada', () => {
       } as unknown as Reflector;
       const guard = new PermisosGuard(reflector, permisosService);
       const request = {
-        user: { sub: usuario.id, roles: [RolSistema.COORDINADOR] },
+        user: { sub: usuario.id, roles: [RolSistema.COORDINADOR], rolActivo: RolSistema.COORDINADOR },
       };
       const context = {
         getHandler: () => ({}),

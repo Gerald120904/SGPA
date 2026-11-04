@@ -9,6 +9,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { AlcanceJerarquicoService } from './alcance-jerarquico.service';
 import { PermisoSistema } from './constants/permisos.constant';
 import { PermisoCarrera } from './entities/permiso-carrera.entity';
+import { establecerRolActivo, iniciarContextoRolActivo } from '../auth/active-role-context';
 
 describe('AlcanceJerarquicoService', () => {
   const usuarios = new Map<number, { activo: boolean; roles: RolSistema[] }>([
@@ -91,5 +92,25 @@ describe('AlcanceJerarquicoService', () => {
       .rejects.toThrow(ForbiddenException);
     await expect(service.validarDelegacion(1, 3, 10, [PermisoSistema.PLANES_ESTUDIO_GESTIONAR]))
       .rejects.toThrow(ForbiddenException);
+  });
+
+  it('aísla permisos de dos carreras según la carrera activa del token', async () => {
+    asignaciones.push({ usuarioId: 3, carreraId: 20,
+      tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA, activo: true, fechaInicio: '2020-01-01' });
+    permisos.push(
+      { usuarioId: 1, carreraId: 20, permiso: PermisoSistema.PLANES_ESTUDIO_GESTIONAR, activo: true },
+      { usuarioId: 3, carreraId: 20, permiso: PermisoSistema.PLANES_ESTUDIO_GESTIONAR, activo: true },
+    );
+    const enCarrera = <T>(carreraId: number, operacion: () => Promise<T>): Promise<T> =>
+      new Promise((resolve, reject) => iniciarContextoRolActivo({} as any, {} as any, () => {
+        establecerRolActivo(3, RolSistema.ASISTENTE_ESTUDIANTIL, carreraId);
+        operacion().then(resolve, reject);
+      }));
+    expect(await enCarrera(10, () => service.obtenerCarrerasAutorizadas(3))).toEqual([10]);
+    expect(await enCarrera(10, () => service.puedeEjecutar(3, PermisoSistema.ESTUDIANTES_GESTIONAR, 10))).toBe(true);
+    expect(await enCarrera(10, () => service.puedeEjecutar(3, PermisoSistema.PLANES_ESTUDIO_GESTIONAR, 20))).toBe(false);
+    expect(await enCarrera(20, () => service.puedeEjecutar(3, PermisoSistema.PLANES_ESTUDIO_GESTIONAR, 20))).toBe(true);
+    expect(await enCarrera(20, () => service.puedeEjecutar(3, PermisoSistema.ESTUDIANTES_GESTIONAR, 10))).toBe(false);
+    expect(await enCarrera(99, () => service.obtenerCarrerasAutorizadas(3))).toEqual([]);
   });
 });

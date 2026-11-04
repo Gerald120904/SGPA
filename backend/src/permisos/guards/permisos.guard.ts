@@ -34,6 +34,9 @@ export class PermisosGuard implements CanActivate {
     if (usuario && !rolActivo) {
       throw new ForbiddenException('Falta un rol activo autorizado.');
     }
+    if (rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL && usuario?.accesoJerarquicoVigente === false) {
+      throw new ForbiddenException('El asistente no tiene un coordinador responsable vigente.');
+    }
 
     // Los módulos restantes todavía no verifican carrera y propiedad en cada recurso.
     // Hasta integrarlos, se bloquean para cuentas jerárquicas.
