@@ -3,6 +3,7 @@ import { RolSistema } from '../auth/constants/roles.constants';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { AsignacionAcademica } from '../estructura-academica/entities/asignacion-academica.entity';
+import { TipoAsignacionAcademica } from '../estructura-academica/constants/tipo-asignacion-academica.constant';
 import { PermisoCarrera } from '../permisos/entities/permiso-carrera.entity';
 import { UsuarioPermisoExcepcion } from '../permisos/entities/usuario-permiso-excepcion.entity';
 import { UsuarioPermiso } from '../permisos/entities/usuario-permiso.entity';
@@ -148,7 +149,8 @@ describe('JerarquiaUsuariosService', () => {
     const excepciones = { delete: jest.fn(), create: jest.fn((value) => value), save: jest.fn() };
     const legacy = { delete: jest.fn(), create: jest.fn((value) => value), save: jest.fn() };
     const manager = { getRepository: jest.fn((entity) => {
-      if (entity === Usuario) return { findOne: jest.fn(async () => cuenta(2, RolSistema.COORDINADOR)) };
+       if (entity === Usuario) return { findOne: jest.fn(async () => cuenta(2, RolSistema.COORDINADOR)),
+         update: jest.fn() };
       if (entity === Carrera) return vacio;
       if (entity === AsignacionAcademica) return asignaciones;
       if (entity === PermisoCarrera) return permisos;
@@ -159,10 +161,50 @@ describe('JerarquiaUsuariosService', () => {
       throw new Error('Repositorio inesperado');
     }) };
     tx.mockImplementation((callback) => callback(manager));
-    const resultado = await service.configurarCoordinador(1, 2, []);
+     const impacto = await (service as any).impactoEn(manager, 2, TipoAsignacionAcademica.COORDINADOR_CARRERA, []);
+     const resultado = await service.configurarCoordinador(1, 2, [], impacto.firma);
     expect(resultado.carreras).toEqual([]);
     expect(asignacion.activo).toBe(false);
     expect(permisoCarrera.activo).toBe(false);
     expect(auditoria.save).toHaveBeenCalled();
+  });
+
+  it('distingue el impacto selectivo y conserva solicitudes cuando revoca el coordinador', async () => {
+    const asignacion = { usuarioId: 4, carreraId: 2,
+      tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA, activo: true };
+    const permisosActuales = [
+      { usuarioId: 4, carreraId: 2, permiso: PermisoSistema.ESTUDIANTES_GESTIONAR, activo: true },
+      { usuarioId: 4, carreraId: 2, permiso: PermisoSistema.PLANES_ESTUDIO_GESTIONAR, activo: true },
+    ];
+    const solicitudes = [
+      { id: 1, solicitanteId: 4, estado: 'PENDIENTE', modulo: 'ESTUDIANTES', carreraId: 2, datosPropuestos: {} },
+      { id: 2, solicitanteId: 4, estado: 'PENDIENTE', modulo: 'PLANES_ESTUDIO', carreraId: 2, datosPropuestos: {} },
+    ];
+    const asignacionesRepo = { find: jest.fn().mockResolvedValue([asignacion]), save: jest.fn(), create: (v: any) => v };
+    const permisosRepo = { find: jest.fn(async ({ where }: any) => permisosActuales.filter((p) =>
+      p.usuarioId === where.usuarioId && (where.activo === undefined || p.activo === where.activo))),
+      save: jest.fn(async (p: any) => p), create: (v: any) => v };
+    const solicitudesRepo = { find: jest.fn().mockResolvedValue(solicitudes), save: jest.fn() };
+    const usuarioRepo = { update: jest.fn() };
+    const auditoriaRepo = { save: jest.fn() };
+    const manager = { getRepository: (entity: any): any => {
+      if (entity === AsignacionAcademica) return asignacionesRepo;
+      if (entity === PermisoCarrera) return permisosRepo;
+      if (entity === SolicitudCambio) return solicitudesRepo;
+      if (entity === Usuario) return usuarioRepo;
+      if (entity === AuditoriaJerarquia) return auditoriaRepo;
+      throw new Error('Repositorio inesperado');
+    } };
+    const nuevas = [{ carreraId: 2, permisos: [PermisoSistema.ESTUDIANTES_GESTIONAR] }];
+    const impacto = await (service as any).impactoEn(manager, 4,
+      TipoAsignacionAcademica.ASISTENTE_CARRERA, nuevas);
+    expect(impacto.solicitudesAfectadas.map((s: any) => s.id)).toEqual([2]);
+    expect(impacto.revocados).toEqual([`2:${PermisoSistema.PLANES_ESTUDIO_GESTIONAR}`]);
+    jest.spyOn(service as any, 'sincronizarLegacy').mockResolvedValue(undefined);
+    await (service as any).configurarAsistenteEnTransaccion(manager, 2, 4, nuevas);
+    expect(permisosActuales[1].activo).toBe(false);
+    expect(solicitudes.map((s) => s.estado)).toEqual(['PENDIENTE', 'PENDIENTE']);
+    expect(solicitudesRepo.save).not.toHaveBeenCalled();
+    expect(usuarioRepo.update).toHaveBeenCalledTimes(1);
   });
 });

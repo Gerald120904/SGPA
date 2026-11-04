@@ -10,7 +10,11 @@ export const listarMisAlcancesJerarquia = () => invocar('listarMisAlcancesJerarq
 export const obtenerConfiguracionAsistentesJerarquia = () => invocar('obtenerConfiguracionAsistentesJerarquia');
 export const obtenerCatalogoEstudiantesJerarquia = () => invocar('obtenerCatalogoEstudiantesJerarquia');
 export const obtenerCoordinadorJerarquia = (id) => invocar('obtenerCoordinadorJerarquia', id);
-export const configurarCoordinadorJerarquia = (id, carreras) => invocar('configurarCoordinadorJerarquia', id, carreras);
+export const obtenerAsistenteAdminJerarquia = (id) => invocar('obtenerAsistenteAdminJerarquia', id);
+export const previsualizarAsistenteAdminJerarquia = (id, carreras) => invocar('previsualizarAsistenteAdminJerarquia', id, carreras);
+export const configurarAsistenteAdminJerarquia = (id, carreras, firmaImpacto) => invocar('configurarAsistenteAdminJerarquia', id, carreras, firmaImpacto);
+export const previsualizarCoordinadorJerarquia = (id, carreras) => invocar('previsualizarCoordinadorJerarquia', id, carreras);
+export const configurarCoordinadorJerarquia = (id, carreras, firmaImpacto) => invocar('configurarCoordinadorJerarquia', id, carreras, firmaImpacto);
 export const listarMisAsistentes = () => invocar('listarMisAsistentes');
 export const obtenerAsistenteJerarquia = (id) => invocar('obtenerAsistenteJerarquia', id);
 export const crearAsistenteJerarquia = (datos) => invocar('crearAsistenteJerarquia', datos);

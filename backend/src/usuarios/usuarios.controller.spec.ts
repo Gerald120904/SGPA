@@ -314,6 +314,6 @@ describe('UsuariosController', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200, { id: 2 });
 
-    expect(usuariosService.revocarRol).toHaveBeenCalledWith(2, 3, 1);
+    expect(usuariosService.revocarRol).toHaveBeenCalledWith(2, 3, 1, undefined);
   });
 });

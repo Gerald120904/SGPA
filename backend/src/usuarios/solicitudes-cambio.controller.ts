@@ -307,7 +307,7 @@ export class SolicitudesCambioController {
   @Get('mis-solicitudes')
   @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
   listarPropias(@Req() request: Request) {
-    return this.solicitudes.listarPropias(request.user!.sub);
+    return this.solicitudes.listarPropias(request.user!.sub, request.user!.carreraActiva ?? null);
   }
 
   @Get('pendientes')

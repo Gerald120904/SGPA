@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { RolSistema } from '../auth/constants/roles.constants';
-import { rolActivoDePeticion } from '../auth/active-role-context';
+import { carreraActivaDePeticion, rolActivoDePeticion } from '../auth/active-role-context';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { TipoAsignacionAcademica } from '../estructura-academica/constants/tipo-asignacion-academica.constant';
 import { AsignacionAcademica } from '../estructura-academica/entities/asignacion-academica.entity';
@@ -67,7 +67,7 @@ export class AlcanceJerarquicoService {
     return carreras.map((c) => c.id);
   }
 
-  async obtenerCarrerasAutorizadas(usuarioId: number): Promise<number[]> {
+  async obtenerCarrerasAsignadas(usuarioId: number): Promise<number[]> {
     const usuario = await this.usuarioVigente(usuarioId);
     if (!usuario) return [];
     if (usuario.roles.has(RolSistema.ADMIN_GLOBAL)) {
@@ -84,6 +84,30 @@ export class AlcanceJerarquicoService {
       return this.carrerasDirectas(usuarioId, TipoAsignacionAcademica.COORDINADOR_CARRERA);
     }
     return [];
+  }
+
+  async obtenerCarrerasAutorizadas(usuarioId: number): Promise<number[]> {
+    const asignadas = await this.obtenerCarrerasAsignadas(usuarioId);
+    const activa = carreraActivaDePeticion(usuarioId);
+    return activa === undefined ? asignadas : activa === null ? [] : asignadas.filter((id) => id === activa);
+  }
+
+  async obtenerOpcionesCarrera(usuarioId: number) {
+    const ids = await this.obtenerCarrerasAsignadas(usuarioId);
+    if (!ids.length) return [];
+    const usuario = await this.usuarioVigente(usuarioId);
+    if (!usuario?.roles.has(RolSistema.ASISTENTE_ESTUDIANTIL)) return [];
+    const dependencia = await this.dependencias.findOne({ where: { asistenteId: usuarioId, activo: true } });
+    if (!dependencia) return [];
+    const [carreras, propias, padre] = await Promise.all([
+      this.carreras.find({ where: { id: In(ids), activo: true }, order: { nombre: 'ASC' } }),
+      this.permisos.find({ where: { usuarioId, activo: true } }),
+      this.permisos.find({ where: { usuarioId: dependencia.coordinadorId, activo: true } }),
+    ]);
+    const padreSet = new Set(padre.map((p) => `${p.carreraId}:${p.permiso}`));
+    return carreras.map((c) => ({ id: c.id, codigo: c.codigo, nombre: c.nombre,
+      permisos: propias.filter((p) => p.carreraId === c.id && padreSet.has(`${c.id}:${p.permiso}`))
+        .map((p) => p.permiso) }));
   }
 
   async puedeEjecutar(usuarioId: number, permiso: PermisoSistema, carreraId: number): Promise<boolean> {

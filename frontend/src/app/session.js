@@ -39,6 +39,18 @@ export function guardarSesion(
 
 }
 
+export async function cambiarCarreraActiva(carreraId) {
+  if (!Number.isInteger(Number(carreraId)) || Number(carreraId) <= 0) {
+    throw new Error('Seleccione una carrera válida.');
+  }
+  const respuesta = await window.sgpa.cambiarCarreraActiva(Number(carreraId));
+  if (!respuesta?.ok || !respuesta.usuario) {
+    throw new Error(respuesta?.message || 'No fue posible cambiar de carrera.');
+  }
+  guardarSesion({ usuario: respuesta.usuario });
+  return respuesta.usuario;
+}
+
 
 /* =========================================================
    USUARIO

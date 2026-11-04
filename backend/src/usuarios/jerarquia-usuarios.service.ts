@@ -1,6 +1,6 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, In, Repository } from 'typeorm';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
@@ -21,6 +21,7 @@ import { SolicitudCambio } from './entities/solicitud-cambio.entity';
 import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuariosService } from './usuarios.service';
+import { carrerasDeSolicitud, ESTADOS_ABIERTOS_SOLICITUD, firmaImpacto, solicitudAfectada } from './revocacion-impacto';
 
 @Injectable()
 export class JerarquiaUsuariosService {
@@ -160,13 +161,124 @@ export class JerarquiaUsuariosService {
     return this.configuracion(asistenteId, TipoAsignacionAcademica.ASISTENTE_CARRERA);
   }
 
+  async obtenerAsistentePorAdmin(actorId: number, asistenteId: number) {
+    const actor = await this.usuarioConRoles(actorId);
+    if (!actor.activo || !this.tieneRol(actor, RolSistema.ADMIN_GLOBAL)) throw new ForbiddenException();
+    const dependencia = await this.dependencias.findOne({ where: { asistenteId, activo: true } });
+    if (!dependencia) throw new ForbiddenException('Asistente sin coordinador responsable activo.');
+    return { ...(await this.configuracion(asistenteId, TipoAsignacionAcademica.ASISTENTE_CARRERA)),
+      delegables: await this.misAlcances(dependencia.coordinadorId),
+      coordinadorId: dependencia.coordinadorId };
+  }
+
   async listarAuditoria(actorId: number, objetivoId: number) {
     const actor = await this.usuarioConRoles(actorId);
     if (!this.tieneRol(actor, RolSistema.ADMIN_GLOBAL)) throw new ForbiddenException();
     return this.auditorias.find({ where: { objetivoUsuarioId: objetivoId }, order: { createdAt: 'DESC' }, take: 100 });
   }
 
-  async configurarCoordinador(actorId: number, coordinadorId: number, carreras: AlcanceCarreraDto[]) {
+  private pares(carreras: AlcanceCarreraDto[]): string[] {
+    return carreras.flatMap((c) => c.permisos.map((p) => `${c.carreraId}:${p}`)).sort();
+  }
+
+  private async invalidarSesionesEn(manager: EntityManager, ids: number[]): Promise<void> {
+    if (!ids.length) return;
+    await manager.getRepository(Usuario).update({ id: In([...new Set(ids)]) },
+      { versionAutenticacion: () => 'version_autenticacion + 1' });
+  }
+
+  private async configuracionEn(manager: EntityManager, usuarioId: number,
+    tipo: TipoAsignacionAcademica): Promise<AlcanceCarreraDto[]> {
+    const asignaciones = await manager.getRepository(AsignacionAcademica).find({ where: { usuarioId, tipo, activo: true } });
+    const permisos = await manager.getRepository(PermisoCarrera).find({ where: { usuarioId, activo: true } });
+    return asignaciones.filter((a) => a.carreraId !== null).map((a) => ({
+      carreraId: a.carreraId!, permisos: permisos.filter((p) => p.carreraId === a.carreraId).map((p) => p.permiso),
+    }));
+  }
+
+  private async impactoEn(manager: EntityManager, usuarioId: number, tipo: TipoAsignacionAcademica,
+    carreras: AlcanceCarreraDto[], bloquearSolicitudes = false) {
+    const anteriores = await this.configuracionEn(manager, usuarioId, tipo);
+    const previos = this.pares(anteriores);
+    const nuevos = this.pares(carreras);
+    const revocados = new Set(previos.filter((p) => !nuevos.includes(p)));
+    const repo = manager.getRepository(SolicitudCambio);
+    const where: FindOptionsWhere<SolicitudCambio>[] = ESTADOS_ABIERTOS_SOLICITUD.map((estado): FindOptionsWhere<SolicitudCambio> =>
+      tipo === TipoAsignacionAcademica.COORDINADOR_CARRERA
+        ? { coordinadorId: usuarioId, estado }
+        : { solicitanteId: usuarioId, estado });
+    const abiertas = await repo.find({ where, order: { id: 'ASC' },
+      ...(bloquearSolicitudes ? { lock: { mode: 'pessimistic_write' as const } } : {}) });
+    const afectadas = abiertas.filter((s) => solicitudAfectada(s, revocados));
+    const firma = firmaImpacto({ usuarioId, tipo, previos, nuevos,
+      abiertas: abiertas.map((s) => [s.id, s.estado, s.modulo, s.operacion, s.carreraId, s.datosPropuestos]) });
+    return { usuarioId, anteriores, nuevos: carreras, revocados: [...revocados],
+      solicitudesAfectadas: afectadas.map((s) => ({ id: s.id, modulo: s.modulo,
+        carreraIds: carrerasDeSolicitud(s), estado: s.estado })), totalSolicitudes: afectadas.length,
+      firma, afectadas };
+  }
+
+  async previsualizarCoordinador(actorId: number, coordinadorId: number, carreras: AlcanceCarreraDto[]) {
+    this.validarCarreras(carreras);
+    const actor = await this.usuarioConRoles(actorId);
+    if (!actor.activo || !this.tieneRol(actor, RolSistema.ADMIN_GLOBAL)) throw new ForbiddenException();
+    const usuario = await this.usuarioConRoles(coordinadorId);
+    if (!this.tieneRol(usuario, RolSistema.COORDINADOR)) throw new ForbiddenException();
+    const { afectadas, ...impacto } = await this.impactoEn(this.dataSource.manager, coordinadorId,
+      TipoAsignacionAcademica.COORDINADOR_CARRERA, carreras);
+    return impacto;
+  }
+
+  async previsualizarAsistente(actorId: number, asistenteId: number, carreras: AlcanceCarreraDto[]) {
+    this.validarCarreras(carreras);
+    const actor = await this.usuarioConRoles(actorId);
+    if (!actor.activo || !this.tieneRol(actor, RolSistema.ADMIN_GLOBAL)) throw new ForbiddenException();
+    const dependencia = await this.dependencias.findOne({ where: { asistenteId, activo: true } });
+    if (!dependencia) throw new ForbiddenException('Asistente sin coordinador responsable activo.');
+    await this.validarDelegacion(dependencia.coordinadorId, carreras);
+    const { afectadas, ...impacto } = await this.impactoEn(this.dataSource.manager, asistenteId,
+      TipoAsignacionAcademica.ASISTENTE_CARRERA, carreras);
+    return impacto;
+  }
+
+  async configurarAsistentePorAdmin(actorId: number, asistenteId: number,
+    carreras: AlcanceCarreraDto[], firma?: string) {
+    this.validarCarreras(carreras);
+    const actor = await this.usuarioConRoles(actorId);
+    if (!actor.activo || !this.tieneRol(actor, RolSistema.ADMIN_GLOBAL)) throw new ForbiddenException();
+    return this.dataSource.transaction(async (manager) => {
+      const dependencia = await manager.getRepository(DependenciaUsuario).findOne({
+        where: { asistenteId, activo: true },
+      });
+      if (!dependencia) throw new ForbiddenException('Asistente sin coordinador responsable activo.');
+      await this.validarDelegacionEnTransaccion(manager, dependencia.coordinadorId, carreras);
+      const usuario = await manager.getRepository(Usuario).findOne({
+        where: { id: asistenteId, activo: true }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!usuario) throw new ForbiddenException('Cuenta asistente inactiva.');
+      const impacto = await this.impactoEn(manager, asistenteId,
+        TipoAsignacionAcademica.ASISTENTE_CARRERA, carreras, true);
+      if (!firma || firma !== impacto.firma) throw new ConflictException('El impacto cambió. Revise la advertencia.');
+      await this.configurarAsistenteEnTransaccion(manager, dependencia.coordinadorId, asistenteId, carreras, actorId);
+      for (const solicitud of impacto.afectadas) {
+        solicitud.estado = 'RECHAZADA';
+        solicitud.motivoRechazo = 'Permiso revocado por el administrador global.';
+        solicitud.resueltoEn = new Date();
+        solicitud.resueltoPorUsuarioId = actorId;
+        await manager.getRepository(SolicitudCambio).save(solicitud);
+      }
+      await manager.getRepository(AuditoriaJerarquia).save({
+        actorUsuarioId: actorId, objetivoUsuarioId: asistenteId,
+        accion: 'REVOCACION_ADMINISTRATIVA',
+        detalle: { anteriores: impacto.anteriores, nuevos: carreras,
+          revocados: impacto.revocados, solicitudesRechazadas: impacto.afectadas.map((s) => s.id),
+          motivo: 'Permiso revocado por el administrador global.' },
+      });
+      return { asistenteId, carreras, solicitudesRechazadas: impacto.afectadas.map((s) => s.id) };
+    });
+  }
+
+  async configurarCoordinador(actorId: number, coordinadorId: number, carreras: AlcanceCarreraDto[], firma?: string) {
     this.validarCarreras(carreras);
     const actor = await this.usuarioConRoles(actorId);
     if (!actor.activo || !this.tieneRol(actor, RolSistema.ADMIN_GLOBAL)) throw new ForbiddenException();
@@ -186,6 +298,9 @@ export class JerarquiaUsuariosService {
         this.tieneRol(rolesActuales, RolSistema.ADMIN_GLOBAL)) {
         throw new ForbiddenException('La cuenta ya no tiene el rol o estado de coordinador.');
       }
+      const impacto = await this.impactoEn(manager, coordinadorId,
+        TipoAsignacionAcademica.COORDINADOR_CARRERA, carreras, true);
+      if (!firma || firma !== impacto.firma) throw new ConflictException('El impacto cambió. Revise la advertencia antes de continuar.');
       const validas = await manager.getRepository(Carrera).find({ where: { id: In(carreras.map((c) => c.carreraId)), activo: true } });
       if (validas.length !== carreras.length) throw new BadRequestException('Carrera inexistente o inactiva.');
       await this.reemplazarAsignaciones(manager, coordinadorId, TipoAsignacionAcademica.COORDINADOR_CARRERA, carreras);
@@ -193,6 +308,12 @@ export class JerarquiaUsuariosService {
       const dependientes = await manager.getRepository(DependenciaUsuario).find({ where: { coordinadorId, activo: true } });
       const permitidos = new Set(carreras.flatMap((c) => c.permisos.map((p) => `${c.carreraId}:${p}`)));
       const ids = dependientes.map((d) => d.asistenteId);
+      const previasAsignaciones = ids.length ? await manager.getRepository(AsignacionAcademica).find({
+        where: { usuarioId: In(ids), tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA, activo: true },
+      }) : [];
+      const previosDelegados = ids.length ? await manager.getRepository(PermisoCarrera).find({
+        where: { usuarioId: In(ids), activo: true },
+      }) : [];
       if (ids.length) {
         const asignaciones = await manager.getRepository(AsignacionAcademica).find({ where: {
           usuarioId: In(ids), tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA, activo: true,
@@ -209,24 +330,42 @@ export class JerarquiaUsuariosService {
           await this.sincronizarLegacy(manager, p.usuarioId);
         }
       }
-      const pendientes = await manager.getRepository(SolicitudCambio).find({ where: [{ coordinadorId, estado: 'PENDIENTE' }, { coordinadorId, estado: 'CORREGIDA' }, { coordinadorId, estado: 'DEVUELTA_PARA_CORRECCION' }] });
-      for (const solicitud of pendientes) {
-        const requerido = solicitud.modulo === 'ESTUDIANTES' ? PermisoSistema.ESTUDIANTES_GESTIONAR :
-          solicitud.modulo === 'CURSOS' ? PermisoSistema.CURSOS_GESTIONAR :
-          solicitud.modulo === 'PLANES_ESTUDIO' ? PermisoSistema.PLANES_ESTUDIO_GESTIONAR : null;
-        const carrerasSolicitud = solicitud.modulo === 'CURSOS' && Array.isArray(solicitud.datosPropuestos.carrerasAfectadas) ?
-          solicitud.datosPropuestos.carrerasAfectadas as number[] : [solicitud.carreraId];
-        if (!requerido || carrerasSolicitud.some((id) => !permitidos.has(`${id}:${requerido}`))) {
-          solicitud.estado = 'BLOQUEADA_POR_REVOCACION';
-          solicitud.resueltoEn = new Date();
-          solicitud.resueltoPorUsuarioId = actorId;
-          await manager.getRepository(SolicitudCambio).save(solicitud);
+      const afectados = new Set<number>();
+      const previosPadre = new Set(this.pares(impacto.anteriores));
+      if (JSON.stringify(this.pares(impacto.anteriores)) !== JSON.stringify(this.pares(carreras))) {
+        afectados.add(coordinadorId);
+      }
+      if (ids.length) {
+        const actualesDelegados = await manager.getRepository(PermisoCarrera).find({
+          where: { usuarioId: In(ids), activo: true },
+        });
+        const actualesAsignaciones = await manager.getRepository(AsignacionAcademica).find({
+          where: { usuarioId: In(ids), tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA, activo: true },
+        });
+        for (const id of ids) {
+          const previasCarreras = new Set(previasAsignaciones.filter((a) => a.usuarioId === id).map((a) => a.carreraId));
+          const actualesCarreras = new Set(actualesAsignaciones.filter((a) => a.usuarioId === id).map((a) => a.carreraId));
+          const antes = previosDelegados.filter((p) => p.usuarioId === id && previasCarreras.has(p.carreraId) &&
+            previosPadre.has(`${p.carreraId}:${p.permiso}`)).map((p) => `${p.carreraId}:${p.permiso}`).sort();
+          const despues = actualesDelegados.filter((p) => p.usuarioId === id && actualesCarreras.has(p.carreraId) &&
+            permitidos.has(`${p.carreraId}:${p.permiso}`)).map((p) => `${p.carreraId}:${p.permiso}`).sort();
+          if (JSON.stringify(antes) !== JSON.stringify(despues)) afectados.add(id);
         }
+      }
+      await this.invalidarSesionesEn(manager, [...afectados]);
+      for (const solicitud of impacto.afectadas) {
+        solicitud.estado = 'RECHAZADA';
+        solicitud.motivoRechazo = 'Permiso revocado por el administrador global.';
+        solicitud.resueltoEn = new Date();
+        solicitud.resueltoPorUsuarioId = actorId;
+        await manager.getRepository(SolicitudCambio).save(solicitud);
       }
       await this.sincronizarLegacy(manager, coordinadorId);
       await manager.getRepository(AuditoriaJerarquia).save({
         actorUsuarioId: actorId, objetivoUsuarioId: coordinadorId, accion: 'CONFIGURAR_COORDINADOR',
-        detalle: { carreras: carreras.map((c) => ({ carreraId: c.carreraId, permisos: c.permisos })) },
+        detalle: { anteriores: impacto.anteriores, nuevos: carreras, revocados: impacto.revocados,
+          solicitudesRechazadas: impacto.afectadas.map((s) => s.id),
+          motivo: 'Permiso revocado por el administrador global.' },
       });
       return { coordinadorId, carreras };
     });
@@ -318,27 +457,19 @@ export class JerarquiaUsuariosService {
     }
   }
 
-  private async configurarAsistenteEnTransaccion(manager: EntityManager, coordinadorId: number, asistenteId: number, carreras: AlcanceCarreraDto[]) {
+  private async configurarAsistenteEnTransaccion(manager: EntityManager, coordinadorId: number, asistenteId: number,
+    carreras: AlcanceCarreraDto[], actorId = coordinadorId) {
+    const anteriores = await this.configuracionEn(manager, asistenteId, TipoAsignacionAcademica.ASISTENTE_CARRERA);
     await this.reemplazarAsignaciones(manager, asistenteId, TipoAsignacionAcademica.ASISTENTE_CARRERA, carreras);
     await this.reemplazarPermisos(manager, asistenteId, carreras);
     await this.sincronizarLegacy(manager, asistenteId);
-    const permitidos = new Set(carreras.flatMap((c) => c.permisos.map((p) => `${c.carreraId}:${p}`)));
-    const pendientes = await manager.getRepository(SolicitudCambio).find({ where: { solicitanteId: asistenteId, estado: 'PENDIENTE' } });
-    for (const solicitud of pendientes) {
-      const requerido = solicitud.modulo === 'ESTUDIANTES' ? PermisoSistema.ESTUDIANTES_GESTIONAR :
-        solicitud.modulo === 'CURSOS' ? PermisoSistema.CURSOS_GESTIONAR :
-        solicitud.modulo === 'PLANES_ESTUDIO' ? PermisoSistema.PLANES_ESTUDIO_GESTIONAR : null;
-      const carrerasSolicitud = solicitud.modulo === 'CURSOS' && Array.isArray(solicitud.datosPropuestos.carrerasAfectadas) ?
-        solicitud.datosPropuestos.carrerasAfectadas as number[] : [solicitud.carreraId];
-      if (requerido && carrerasSolicitud.every((id) => permitidos.has(`${id}:${requerido}`))) continue;
-      solicitud.estado = 'INVALIDADA';
-      solicitud.resueltoEn = new Date();
-      solicitud.resueltoPorUsuarioId = coordinadorId;
-      await manager.getRepository(SolicitudCambio).save(solicitud);
+    if (JSON.stringify(this.pares(anteriores)) !== JSON.stringify(this.pares(carreras))) {
+      await this.invalidarSesionesEn(manager, [asistenteId]);
     }
+    // Las propuestas ya enviadas conservan su estado aunque cambie la delegación.
     await manager.getRepository(AuditoriaJerarquia).save({
-      actorUsuarioId: coordinadorId, objetivoUsuarioId: asistenteId, accion: 'CONFIGURAR_ASISTENTE',
-      detalle: { carreras: carreras.map((c) => ({ carreraId: c.carreraId, permisos: c.permisos })) },
+      actorUsuarioId: actorId, objetivoUsuarioId: asistenteId, accion: 'CONFIGURAR_ASISTENTE',
+      detalle: { anteriores, nuevos: carreras },
     });
   }
 

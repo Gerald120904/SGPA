@@ -409,7 +409,7 @@ describe('SGPA-QA-003: Implementación y Pruebas Automatizadas de la Opción B',
       ).rejects.toThrow('Fallo simulado de MySQL en tabla excepciones');
 
       // Se comprueba que el error aborta la transacción y no llega a consultar el estado final
-      expect(txRepoPermiso.find).not.toHaveBeenCalled();
+      expect(txRepoPermiso.find).toHaveBeenCalledTimes(1);
     });
 
     it('ejecuta rollback total si falla la escritura en la tabla legacy usuario_permisos', async () => {
@@ -421,7 +421,7 @@ describe('SGPA-QA-003: Implementación y Pruebas Automatizadas de la Opción B',
         service.reemplazarPermisos(usuarioId, [PermisoSistema.AULAS_VER]),
       ).rejects.toThrow('Fallo simulado de MySQL en tabla legacy');
 
-      expect(txRepoPermiso.find).not.toHaveBeenCalled();
+      expect(txRepoPermiso.find).toHaveBeenCalledTimes(1);
     });
   });
 

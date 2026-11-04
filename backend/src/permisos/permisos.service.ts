@@ -375,6 +375,9 @@ export class PermisosService {
 
     return this.dataSource.transaction(async (manager) => {
       const repoLegacy = manager.getRepository(UsuarioPermiso);
+      const anteriores = (await repoLegacy.find({ where: { usuarioId, activo: true } }))
+        .map((p) => p.permiso).sort();
+      const nuevos = [...new Set(permisos)].sort();
 
       // 1. Si la tabla de excepciones existe o se opera con el modelo nuevo, calcular excepciones
       const repoExcepciones = manager.getRepository(UsuarioPermisoExcepcion);
@@ -439,6 +442,11 @@ export class PermisosService {
           }),
         );
         await repoLegacy.save(entidades);
+      }
+
+      if (JSON.stringify(anteriores) !== JSON.stringify(nuevos)) {
+        await manager.getRepository(Usuario).update(usuarioId,
+          { versionAutenticacion: () => 'version_autenticacion + 1' });
       }
 
       return repoLegacy.find({

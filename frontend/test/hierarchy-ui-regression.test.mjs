@@ -25,7 +25,8 @@ test('el selector general conserva el contrato de guardado por carrera', () => {
   assert.match(dialogo, /name="jerarquia-todos-permisos"/);
   assert.match(usuarios, /carreraId: Number\(campo\.dataset\.carreraId\)/);
   assert.match(usuarios, /\[name="jerarquia-permiso"\]:checked/);
-  assert.match(usuarios, /configurarCoordinadorJerarquia\(Number\(formulario\.dataset\.userId\), carreras\)/);
+  assert.match(usuarios, /previsualizarCoordinadorJerarquia\(usuarioId, carreras\)/);
+  assert.match(usuarios, /configurarCoordinadorJerarquia\(usuarioId, carreras, impacto\.firma\)/);
 });
 
 test('los formularios de estudiantes jerárquicos usan el catálogo de períodos autorizado', () => {

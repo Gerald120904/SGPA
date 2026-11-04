@@ -7,8 +7,14 @@ contextBridge.exposeInMainWorld("sgpa", {
   restablecerPassword: (datos) =>
     ipcRenderer.invoke("auth:restablecer-password", datos),
   obtenerPerfil: () => ipcRenderer.invoke("auth:perfil"),
+  onSesionInvalidada: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('auth:invalidada', listener);
+    return () => ipcRenderer.removeListener('auth:invalidada', listener);
+  },
   logout: () => ipcRenderer.invoke("auth:logout"),
   cambiarRolActivo: (rol) => ipcRenderer.invoke("auth:cambiar-rol-activo", rol),
+  cambiarCarreraActiva: (carreraId) => ipcRenderer.invoke('auth:cambiar-carrera-activa', carreraId),
   verificarIdentidadBackend: () => ipcRenderer.invoke("app:verificar-identidad"),
   obtenerBackendConfig: () => ipcRenderer.invoke('app:backend-config'),
   configurarBackend: (url) => ipcRenderer.invoke('app:configurar-backend', url),
@@ -21,15 +27,21 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("usuarios:cambiar-estado", id, activo),
   asignarRolUsuario: (id, rol) =>
     ipcRenderer.invoke("usuarios:asignar-rol", id, rol),
-  revocarRolUsuario: (usuarioId, rolId) =>
-    ipcRenderer.invoke("usuarios:revocar-rol", usuarioId, rolId),
+  previsualizarRevocacionRol: (usuarioId, rolId) =>
+    ipcRenderer.invoke('usuarios:impacto-revocacion-rol', usuarioId, rolId),
+  revocarRolUsuario: (usuarioId, rolId, firmaImpacto) =>
+    ipcRenderer.invoke("usuarios:revocar-rol", usuarioId, rolId, firmaImpacto),
   listarRoles: () => ipcRenderer.invoke("roles:listar"),
   listarMisCarrerasJerarquia: () => ipcRenderer.invoke('jerarquia:mis-carreras'),
   listarMisAlcancesJerarquia: () => ipcRenderer.invoke('jerarquia:mis-alcances'),
   obtenerConfiguracionAsistentesJerarquia: () => ipcRenderer.invoke('jerarquia:asistentes-configuracion'),
   obtenerCatalogoEstudiantesJerarquia: () => ipcRenderer.invoke('jerarquia:catalogo-estudiantes'),
   obtenerCoordinadorJerarquia: (id) => ipcRenderer.invoke('jerarquia:coordinador', id),
-  configurarCoordinadorJerarquia: (id, carreras) => ipcRenderer.invoke('jerarquia:configurar-coordinador', id, carreras),
+  obtenerAsistenteAdminJerarquia: (id) => ipcRenderer.invoke('jerarquia:admin-asistente', id),
+  previsualizarAsistenteAdminJerarquia: (id, carreras) => ipcRenderer.invoke('jerarquia:impacto-admin-asistente', id, carreras),
+  configurarAsistenteAdminJerarquia: (id, carreras, firmaImpacto) => ipcRenderer.invoke('jerarquia:configurar-admin-asistente', id, carreras, firmaImpacto),
+  previsualizarCoordinadorJerarquia: (id, carreras) => ipcRenderer.invoke('jerarquia:impacto-coordinador', id, carreras),
+  configurarCoordinadorJerarquia: (id, carreras, firmaImpacto) => ipcRenderer.invoke('jerarquia:configurar-coordinador', id, carreras, firmaImpacto),
   listarMisAsistentes: () => ipcRenderer.invoke('jerarquia:asistentes'),
   obtenerAsistenteJerarquia: (id) => ipcRenderer.invoke('jerarquia:asistente', id),
   crearAsistenteJerarquia: (datos) => ipcRenderer.invoke('jerarquia:crear-asistente', datos),

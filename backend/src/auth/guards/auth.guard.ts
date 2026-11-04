@@ -24,9 +24,11 @@ declare global {
         roles: string[];
         rolActivo?: string;
         av: number;
+        carreraActiva?: number | null;
         iat?: number;
         exp?: number;
         jerarquiaConfigurada?: boolean;
+        accesoJerarquicoVigente?: boolean;
       };
     }
   }
@@ -60,6 +62,7 @@ export class AuthGuard implements CanActivate {
       exp?: number;
       rolActivo?: RolSistema;
       av?: number;
+      carreraActiva?: number | null;
     };
 
     try {
@@ -132,8 +135,14 @@ export class AuthGuard implements CanActivate {
     }
 
     const rolActivo = rolActivoPayload;
+    const carreraActiva = rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL
+      ? payload.carreraActiva ?? null : null;
+    if (carreraActiva !== null && (!Number.isSafeInteger(carreraActiva) || carreraActiva <= 0)) {
+      throw new UnauthorizedException('Carrera activa inválida.');
+    }
 
     let jerarquiaConfigurada = false;
+    let accesoJerarquicoVigente = true;
     if (rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL) {
       if (rolesVigentes.includes(RolSistema.COORDINADOR) || rolesVigentes.includes(RolSistema.ADMIN_GLOBAL)) {
         throw new UnauthorizedException('Combinación de roles jerárquicos no permitida');
@@ -143,14 +152,17 @@ export class AuthGuard implements CanActivate {
       }
       if (this.dependenciaRepository) {
         const dependencia = await this.dependenciaRepository.findOne({ where: { asistenteId: sub, activo: true } });
-        if (!dependencia) throw new UnauthorizedException('Asistente sin coordinador responsable activo');
-        const responsable = await this.usuarioRepository.findOne({
-          where: { id: dependencia.coordinadorId, activo: true },
-          relations: { usuarioRoles: { rol: true } },
-        });
-        if (!responsable?.usuarioRoles?.some((ur) => ur.rol?.activo && ur.rol.nombre === RolSistema.COORDINADOR)) {
-          throw new UnauthorizedException('Coordinador responsable inactivo');
+        accesoJerarquicoVigente = false;
+        if (dependencia) {
+          const responsable = await this.usuarioRepository.findOne({
+            where: { id: dependencia.coordinadorId, activo: true },
+            relations: { usuarioRoles: { rol: true } },
+          });
+          accesoJerarquicoVigente = !!responsable?.usuarioRoles?.some((ur) =>
+            ur.rol?.activo && ur.rol.nombre === RolSistema.COORDINADOR);
         }
+        // Sin responsable vigente el asistente puede entrar, pero sin alcance funcional.
+        // El guardia de permisos debe seguir tratando la cuenta como jerárquica.
         jerarquiaConfigurada = true;
       }
     }
@@ -168,10 +180,12 @@ export class AuthGuard implements CanActivate {
       sub,
       roles: Array.from(new Set(rolesVigentes)),
       rolActivo,
+      carreraActiva,
       jerarquiaConfigurada,
+      accesoJerarquicoVigente,
     } as Express.Request['user'];
 
-    establecerRolActivo(sub, rolActivo);
+    establecerRolActivo(sub, rolActivo, carreraActiva);
 
     return true;
   }

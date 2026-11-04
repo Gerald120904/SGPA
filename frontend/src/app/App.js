@@ -80,11 +80,12 @@ import {
 } from '../config/modules.js';
 
 import {
-  puedeAcceder
+  puedeAcceder, ROLES
 } from '../config/permissions.js';
 
 import {
   guardarSesion,
+  cambiarCarreraActiva,
   cambiarRolActivo,
   obtenerUsuario,
   obtenerRolesUsuario,
@@ -108,11 +109,62 @@ import {
 import {
   logout
 } from '../services/auth.service.js';
+import { escapeHtml } from '../utils/html.js';
 
 
 let appRoot = null;
 
 let detenerObservadorRutas = null;
+let intervaloSesion = null;
+let comprobandoSesion = false;
+
+function detenerVigilanciaSesion() {
+  if (intervaloSesion) clearInterval(intervaloSesion);
+  intervaloSesion = null;
+}
+
+function sesionInvalidada() {
+  if (!obtenerUsuario()) return;
+  detenerVigilanciaSesion();
+  desmontarRouter();
+  limpiarSesion();
+  mostrarLogin();
+  appRoot.insertAdjacentHTML('afterbegin',
+    '<p role="alert" class="session-expired">Tu sesión cambió. Ingresá nuevamente.</p>');
+}
+
+function vigilarSesion() {
+  detenerVigilanciaSesion();
+  intervaloSesion = setInterval(async () => {
+    if (comprobandoSesion || !obtenerUsuario()) return;
+    comprobandoSesion = true;
+    try {
+      const respuesta = await window.sgpa.obtenerPerfil();
+      if (respuesta?.status === 401) sesionInvalidada();
+    } finally {
+      comprobandoSesion = false;
+    }
+  }, 30000);
+}
+
+function mostrarSeleccionCarrera(usuario, carreras) {
+  desmontarRouter();
+  appRoot.innerHTML = `<main class="content-area"><h1>Seleccioná una carrera</h1>
+    <p>Elegí la carrera con la que vas a trabajar.</p>
+    ${carreras.map((c) => `<button type="button" data-seleccionar-carrera="${Number(c.id)}">${escapeHtml(c.nombre)}</button>`).join(' ')}
+    <button type="button" id="logoutButton">Cerrar sesión</button></main>`;
+}
+
+export function pantallaSinPermisos() {
+  return `<main class="content-area"><h1>Acceso pendiente</h1>
+    <p>No tenés permisos asignados. Contactá a tu coordinador para solicitar acceso.</p>
+    <button type="button" id="logoutButton">Cerrar sesión</button></main>`;
+}
+
+function mostrarSinPermisos() {
+  desmontarRouter();
+  appRoot.innerHTML = pantallaSinPermisos();
+}
 
 
 /* =========================================================
@@ -188,6 +240,7 @@ export function iniciarAplicacion() {
     'click',
     manejarClickGlobal
   );
+  window.sgpa?.onSesionInvalidada?.(sesionInvalidada);
 
 
   mostrarLogin();
@@ -225,6 +278,7 @@ function mostrarLogin() {
         guardarSesion(
           resultado
         );
+        vigilarSesion();
 
 
         reemplazarRuta(
@@ -281,6 +335,17 @@ function mostrarAplicacion() {
 
   }
 
+  if (usuario.rolActivo === ROLES.ASISTENTE_ESTUDIANTIL) {
+    const carreras = (usuario.carrerasDisponibles || []).filter((c) => c.permisos?.length);
+    if (!carreras.length) { mostrarSinPermisos(); return; }
+    if (!usuario.carreraActiva) {
+      if (carreras.length > 1) { mostrarSeleccionCarrera(usuario, carreras); return; }
+      cambiarCarreraActiva(carreras[0].id).then(() => mostrarAplicacion())
+        .catch(() => mostrarSinPermisos());
+      return;
+    }
+  }
+
 
   const roles =
     obtenerRolesEfectivos(
@@ -304,6 +369,20 @@ function mostrarAplicacion() {
       permisos,
       isCollapsed
     });
+
+  appRoot.querySelector('#carreraActivaSelector')?.addEventListener('change', async (event) => {
+    const selector = event.target;
+    selector.disabled = true;
+    try {
+      await cambiarCarreraActiva(Number(selector.value));
+      reemplazarRuta('/home');
+      mostrarAplicacion();
+    } catch (error) {
+      selector.disabled = false;
+      selector.value = String(usuario.carreraActiva);
+      alert(error.message);
+    }
+  });
 
 
   renderizarIconos();
@@ -628,6 +707,14 @@ function actualizarNavegacion(
 function manejarClickGlobal(
   event
 ) {
+  const carrera = event.target.closest('[data-seleccionar-carrera]');
+  if (carrera) {
+    carrera.disabled = true;
+    cambiarCarreraActiva(Number(carrera.dataset.seleccionarCarrera))
+      .then(() => { reemplazarRuta('/home'); mostrarAplicacion(); })
+      .catch((error) => { carrera.disabled = false; alert(error.message); });
+    return;
+  }
 
   /* =======================================================
      CERRAR SESIÓN
@@ -723,6 +810,7 @@ function manejarClickGlobal(
    ========================================================= */
 
 async function cerrarSesion() {
+  detenerVigilanciaSesion();
 
   desmontarRouter();
 

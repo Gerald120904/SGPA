@@ -5,6 +5,7 @@ import {
   actualizarUsuario,
   cambiarEstadoUsuario,
   asignarRolUsuario,
+  previsualizarRevocacionRol,
   revocarRolUsuario,
   listarRoles,
 } from '../../services/usuarios.service.js';
@@ -18,7 +19,10 @@ import {
   listarCarreras,
 } from '../../services/carreras.service.js';
 import { ROLES } from '../../config/permissions.js';
-import { obtenerCoordinadorJerarquia, configurarCoordinadorJerarquia, listarAuditoriaJerarquia } from '../../services/jerarquia.service.js';
+import { obtenerCoordinadorJerarquia, obtenerAsistenteAdminJerarquia,
+  previsualizarCoordinadorJerarquia, previsualizarAsistenteAdminJerarquia,
+  configurarCoordinadorJerarquia, configurarAsistenteAdminJerarquia,
+  listarAuditoriaJerarquia } from '../../services/jerarquia.service.js';
 
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
@@ -29,6 +33,26 @@ import { StatCard } from '../../components/StatCard.js';
 import { StatusBadge } from '../../components/StatusBadge.js';
 
 let instanciaActual = 0;
+
+export function construirMensajeRevocacionRol(impacto, carreras = []) {
+  const nombreCarrera = (id) => carreras.find((c) => Number(c.id) === Number(id))?.nombre || `#${id}`;
+  const permisos = impacto.permisosRevocados.map((p) =>
+    `${nombreCarrera(p.carreraId)}: ${p.permiso}`).join(', ') || 'ninguno';
+  const asistentes = impacto.rol === ROLES.COORDINADOR
+    ? `${impacto.totalAsistentes || 0} dependencia(s) vigente(s), de las cuales ` +
+      `${impacto.totalAsistentesActivos || 0} corresponden a cuentas activas, perderán su coordinador: ` +
+      `${(impacto.asistentesAfectados || []).map((a) =>
+        `${a.nombre} (#${a.id}; ${a.cuentaActiva ? 'cuenta activa' : 'cuenta inactiva'}; ${a.delegaciones.map((p) =>
+          `${nombreCarrera(p.carreraId)}: ${p.permiso}`).join(', ') || 'sin permisos efectivos'})`)
+        .join('; ') || 'ninguno'}. ` +
+      'Las cuentas activas seguirán activas y podrán ingresar sin permisos. ' +
+      `Se invalidarán las sesiones del coordinador y de ${impacto.sesionesInvalidadas?.length || 0} asistente(s) con acceso efectivo. `
+    : '';
+  return `Se revocará el rol ${impacto.rol} de ${impacto.usuario}. ` +
+    `Permisos y carreras afectados: ${permisos}. ${asistentes}` +
+    `${impacto.totalSolicitudes} solicitud(es) afectada(s) quedarán RECHAZADAS con motivo y auditoría. ` +
+    '¿Desea continuar?';
+}
 
 export function UsuariosPage() {
   return `
@@ -681,6 +705,14 @@ export async function iniciarUsuariosPage() {
                   <i data-lucide="shield-check" aria-hidden="true"></i>
                 </button>
               ` : ''}
+              ${roles.some((rol) => rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL) ? `
+                <button class="usuarios-icon-button" type="button"
+                  data-action="configurar-asistente-admin" data-user-id="${usuario.id}"
+                  aria-label="Configurar carreras y permisos de ${escapeHtml(nombre)}"
+                  title="Carreras y permisos del asistente">
+                  <i data-lucide="shield-check" aria-hidden="true"></i>
+                </button>
+              ` : ''}
               <button
                 class="usuarios-icon-button ${usuario.activo ? 'is-danger' : 'is-success'}"
                 type="button" data-action="estado" data-user-id="${usuario.id}"
@@ -1212,13 +1244,17 @@ export async function iniciarUsuariosPage() {
     });
   }
 
-  function renderizarDialogoJerarquia(usuario, configuracion, auditoria = []) {
+  function renderizarDialogoJerarquia(usuario, configuracion, auditoria = [], esAsistente = false) {
     const asignadas = new Map((configuracion.carreras || []).map((c) => [Number(c.carreraId), new Set(c.permisos || [])]));
+    const delegables = esAsistente
+      ? new Map((configuracion.delegables || []).map((c) => [Number(c.id), new Set(c.permisos || [])])) : null;
     mostrarFormularioUsuario({
       formId: 'jerarquiaForm',
       userId: usuario.id,
       title: `Carreras y permisos de ${obtenerNombreCompleto(usuario)}`,
-      description: 'Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.',
+      description: esAsistente
+        ? 'Seleccione únicamente carreras y permisos autorizados a su coordinador responsable.'
+        : 'Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.',
       body: `
         <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
         <div class="usuario-section-heading">
@@ -1226,7 +1262,7 @@ export async function iniciarUsuariosPage() {
           <div><h4>Alcance académico por carrera</h4><p>Marque las carreras y los permisos que corresponden.</p></div>
         </div>
         <div class="usuarios-alcances">
-          ${estado.carreras.map((carrera) => {
+          ${estado.carreras.filter((c) => !esAsistente || delegables.has(Number(c.id))).map((carrera) => {
             const permisos = asignadas.get(Number(carrera.id)) || new Set();
             return `<fieldset class="usuarios-alcance" data-carrera-id="${carrera.id}">
               <legend>
@@ -1249,7 +1285,7 @@ export async function iniciarUsuariosPage() {
                     'PLANES_ESTUDIO_GESTIONAR',
                     'OPTATIVAS_VER',
                     'OPTATIVAS_GESTIONAR',
-                  ].includes(permiso)).map((permiso) => `
+                  ].includes(permiso) && (!esAsistente || delegables.get(Number(carrera.id))?.has(permiso))).map((permiso) => `
                   <label><input type="checkbox" name="jerarquia-permiso" value="${escapeHtml(permiso)}"
                     ${permisos.has(permiso) ? 'checked' : ''}>
                     ${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</label>
@@ -1277,6 +1313,7 @@ export async function iniciarUsuariosPage() {
     });
     dialogoContenido.querySelectorAll('.usuarios-alcance')
       .forEach(actualizarSeleccionTodosPermisosCarrera);
+    dialogoContenido.querySelector('#jerarquiaForm').dataset.adminAsistente = esAsistente ? 'true' : 'false';
   }
 
   function actualizarSeleccionTodosPermisosCarrera(campo) {
@@ -1820,8 +1857,30 @@ export async function iniciarUsuariosPage() {
       }));
     try {
       boton.disabled = true;
+      const usuarioId = Number(formulario.dataset.userId);
+      const esAsistente = formulario.dataset.adminAsistente === 'true';
+      const impacto = mensajeResultado(await (esAsistente
+        ? previsualizarAsistenteAdminJerarquia(usuarioId, carreras)
+        : previsualizarCoordinadorJerarquia(usuarioId, carreras)),
+        'No fue posible calcular el impacto de la revocación.').data;
+      const usuario = estado.usuarios.find((item) => Number(item.id) === usuarioId);
+      const nombreObjetivo = usuario?.nombres || (esAsistente ? 'este asistente' : 'este coordinador');
+      const resumen = impacto.revocados.length
+        ? `Se revocarán a ${nombreObjetivo}: ${impacto.revocados.map((item) => {
+            const [carreraId, permiso] = item.split(':');
+            const nombreCarrera = estado.carreras.find((c) => Number(c.id) === Number(carreraId))?.nombre || `#${carreraId}`;
+            return `${nombreCarrera}: ${permiso}`;
+          }).join(', ')}. ` +
+          `${impacto.totalSolicitudes} solicitud(es) afectada(s) quedarán RECHAZADAS con motivo y auditoría. ` +
+          'Las demás solicitudes permanecerán pendientes. ¿Desea continuar?'
+        : `Se actualizarán las carreras y permisos de ${nombreObjetivo}. ¿Desea continuar?`;
+      const confirmado = await confirmarAccion({ titulo: 'Impacto del cambio de permisos',
+        mensaje: resumen, textoConfirmar: 'Continuar', peligro: impacto.revocados.length > 0 });
+      if (!confirmado) return;
       mensajeResultado(
-        await configurarCoordinadorJerarquia(Number(formulario.dataset.userId), carreras),
+        await (esAsistente
+          ? configurarAsistenteAdminJerarquia(usuarioId, carreras, impacto.firma)
+          : configurarCoordinadorJerarquia(usuarioId, carreras, impacto.firma)),
         'No fue posible guardar el alcance del coordinador.',
       );
       dialogo.close();
@@ -1888,6 +1947,24 @@ export async function iniciarUsuariosPage() {
       return;
     }
 
+    if (accion === 'configurar-asistente-admin') {
+      try {
+        boton.disabled = true;
+        const [configuracion, auditoria] = await Promise.all([
+          obtenerAsistenteAdminJerarquia(id), listarAuditoriaJerarquia(id),
+        ]);
+        const datos = mensajeResultado(configuracion, 'No fue posible consultar el alcance del asistente.');
+        if (!sigueActiva()) return;
+        const usuario = estado.usuarios.find((item) => Number(item.id) === id);
+        renderizarDialogoJerarquia(usuario, datos.data, auditoria.ok ? auditoria.data : [], true);
+      } catch (error) {
+        mostrarFeedback(error.message, 'error');
+      } finally {
+        boton.disabled = false;
+      }
+      return;
+    }
+
     if (accion === 'estado') {
       const activo = boton.dataset.active === 'true';
       const verbo = activo ? 'desactivar' : 'activar';
@@ -1939,9 +2016,18 @@ export async function iniciarUsuariosPage() {
       const rolId = Number(boton.dataset.roleId);
       if (!rolId) return;
 
+      let impacto;
+      try {
+        impacto = mensajeResultado(await previsualizarRevocacionRol(id, rolId),
+          'No fue posible calcular el impacto de la revocación.').data;
+      } catch (error) {
+        mostrarFeedback(error.message, 'error');
+        return;
+      }
+
       const confirmado = await confirmarAccion({
         titulo: 'Revocar rol',
-        mensaje: '¿Desea revocar este rol del usuario?',
+        mensaje: construirMensajeRevocacionRol(impacto, estado.carreras),
         textoConfirmar: 'Revocar',
         peligro: true,
       });
@@ -1951,7 +2037,7 @@ export async function iniciarUsuariosPage() {
       try {
         boton.disabled = true;
         mensajeResultado(
-          await revocarRolUsuario(id, rolId),
+          await revocarRolUsuario(id, rolId, impacto.firma),
           'No fue posible revocar el rol.',
         );
         await actualizarVistaYDialogo(id);

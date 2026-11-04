@@ -19,6 +19,9 @@ export function Topbar({
       .toUpperCase() ||
     'A';
 
+  const carreras = usuario?.rolActivo === 'ASISTENTE_ESTUDIANTIL'
+    ? (usuario.carrerasDisponibles || []).filter((c) => c.permisos?.length) : [];
+
 
   return `
     <header class="topbar">
@@ -45,6 +48,10 @@ export function Topbar({
       <!-- =============================================== -->
 
       <div class="topbar-user">
+        ${carreras.length > 1 ? `<label>Carrera activa
+          <select id="carreraActivaSelector" aria-label="Carrera activa">
+            ${carreras.map((c) => `<option value="${Number(c.id)}" ${Number(c.id) === Number(usuario.carreraActiva) ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('')}
+          </select></label>` : ''}
 
         <div class="topbar-user-text">
 

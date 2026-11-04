@@ -5,6 +5,7 @@ import { CursosService } from '../cursos/cursos.service';
 import { CursoRequisitosService } from '../cursos/curso-requisitos.service';
 import { PlanesEstudioService } from '../planes-estudio/planes-estudio.service';
 import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
+import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
 import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
 import { SolicitudCambio } from './entities/solicitud-cambio.entity';
@@ -253,6 +254,17 @@ describe('SolicitudesCambioService', () => {
     expect(solicitud.estado).toBe('PENDIENTE');
     expect(solicitud.coordinadorId).toBe(1);
     expect(estudiantes.crearDesdeSolicitud).not.toHaveBeenCalled();
+  });
+
+  it('aprueba una propuesta anterior aunque el asistente haya perdido el permiso después del envío', async () => {
+    const solicitud = await service.proponerCrearEstudiante(3, propuesta);
+    alcance.puedeEjecutar.mockClear();
+    alcance.puedeEjecutar.mockImplementation(async (usuarioId: number) => usuarioId === 1);
+    const aprobada = await service.aprobar(1, solicitud.id);
+    expect(aprobada.estado).toBe('APROBADA');
+    expect(estudiantes.crearDesdeSolicitud).toHaveBeenCalledTimes(1);
+    expect(alcance.puedeEjecutar).toHaveBeenCalledWith(1, PermisoSistema.ESTUDIANTES_GESTIONAR, 10);
+    expect(alcance.puedeEjecutar).not.toHaveBeenCalledWith(3, PermisoSistema.ESTUDIANTES_GESTIONAR, 10);
   });
 
   it('solo el responsable aprueba y la segunda aprobación no duplica la escritura', async () => {

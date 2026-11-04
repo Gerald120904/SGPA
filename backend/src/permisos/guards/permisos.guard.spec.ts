@@ -38,6 +38,15 @@ describe('PermisosGuard', () => {
     expect(result).toBe(true);
   });
 
+  it('bloquea permisos legacy de un asistente sin responsable vigente', async () => {
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.CURSOS_VER]);
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+    const contexto = crearContexto({ sub: 20, roles: [RolSistema.ASISTENTE_ESTUDIANTIL],
+      jerarquiaConfigurada: true, accesoJerarquicoVigente: false }, 'GET', 'CursosController');
+    await expect(guard.canActivate(contexto)).rejects.toThrow(ForbiddenException);
+    expect(permisosService.usuarioTienePermisos).not.toHaveBeenCalled();
+  });
+
   it('cierra rutas sin decorador de permiso a cuentas jerarquicas', async () => {
     reflector.getAllAndOverride.mockReturnValue(undefined);
     const context = crearContexto({

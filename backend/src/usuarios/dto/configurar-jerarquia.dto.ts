@@ -31,6 +31,11 @@ export class ConfigurarJerarquiaDto {
   @ValidateNested({ each: true })
   @Type(() => AlcanceCarreraDto)
   carreras!: AlcanceCarreraDto[];
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  firmaImpacto?: string;
 }
 
 export class CrearAsistenteJerarquicoDto extends ConfigurarJerarquiaDto {
