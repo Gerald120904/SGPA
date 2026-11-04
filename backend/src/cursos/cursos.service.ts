@@ -435,7 +435,7 @@ export class CursosService {
 
   async crearDesdeSolicitud(coordinadorId: number, asistenteId: number, carreraId: number,
     dto: CrearCursoDto, manager: EntityManager): Promise<number> {
-    await this.validarDelegacionCompleta(coordinadorId, asistenteId, [carreraId]);
+    await this.validarGestion(coordinadorId, [carreraId]);
     const curso = await this.crear(dto, coordinadorId, manager, carreraId);
     return curso.id;
   }
@@ -501,7 +501,7 @@ export class CursosService {
     if (!ids.includes(carreraId) || this.huellaCurso(curso) !== huellaOriginal) {
       throw new ConflictException('El curso cambió desde que se envió la solicitud.');
     }
-    await this.validarDelegacionCompleta(coordinadorId, asistenteId, ids);
+    await this.validarGestion(coordinadorId, ids);
     if (dto.descripcion !== undefined) curso.descripcion = dto.descripcion?.trim() || null;
     await manager.getRepository(Curso).save(curso);
     return id;
@@ -515,7 +515,7 @@ export class CursosService {
     if (!ids.includes(carreraId) || this.huellaCurso(curso) !== huellaOriginal) {
       throw new ConflictException('El curso cambió desde que se envió la solicitud.');
     }
-    await this.validarDelegacionCompleta(coordinadorId, asistenteId, ids);
+    await this.validarGestion(coordinadorId, ids);
     if (!activo) await this.validarPuedeDesactivarse(id, manager);
     curso.activo = activo;
     await manager.getRepository(Curso).save(curso);

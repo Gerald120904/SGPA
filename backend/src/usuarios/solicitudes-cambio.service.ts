@@ -943,8 +943,10 @@ export class SolicitudesCambioService {
     return this.solicitudes.find({ where: { coordinadorId }, order: { createdAt: 'DESC' }, take: 100 });
   }
 
-  async listarPropias(solicitanteId: number) {
-    return this.solicitudes.find({ where: { solicitanteId }, order: { createdAt: 'DESC' }, take: 100 });
+  async listarPropias(solicitanteId: number, carreraId?: number | null) {
+    if (carreraId === null) return [];
+    return this.solicitudes.find({ where: { solicitanteId, ...(carreraId ? { carreraId } : {}) },
+      order: { createdAt: 'DESC' }, take: 100 });
   }
 
   async aprobar(coordinadorId: number, solicitudId: number) {
@@ -954,6 +956,7 @@ export class SolicitudesCambioService {
       const solicitud = await repo.findOne({ where: { id: solicitudId }, lock: { mode: 'pessimistic_write' } });
       if (!solicitud) throw new NotFoundException('Solicitud no encontrada.');
       if (solicitud.coordinadorId !== coordinadorId) throw new ForbiddenException('Solicitud de otro coordinador.');
+      if (solicitud.solicitanteId === coordinadorId) throw new ForbiddenException('No puede aprobar su propia solicitud.');
       if (solicitud.estado !== 'PENDIENTE' && solicitud.estado !== 'CORREGIDA') throw new ConflictException('La solicitud ya fue resuelta o no está lista para aprobación.');
       const permiso = solicitud.modulo === 'ESTUDIANTES' ? PermisoSistema.ESTUDIANTES_GESTIONAR :
         solicitud.modulo === 'CURSOS' ? PermisoSistema.CURSOS_GESTIONAR :
@@ -972,10 +975,8 @@ export class SolicitudesCambioService {
           : [solicitud.carreraId];
       const vigente = !!permiso && (await this.alcance.puedeAdministrarAsistente(coordinadorId, solicitud.solicitanteId)) &&
         carrerasAfectadas.length > 0 &&
-        (await Promise.all(carrerasAfectadas.flatMap((carreraId) => [
-          this.alcance.puedeEjecutar(solicitud.solicitanteId, permiso, carreraId),
-          this.alcance.puedeEjecutar(coordinadorId, permiso, carreraId),
-        ]))).every(Boolean);
+        (await Promise.all(carrerasAfectadas.map((carreraId) =>
+          this.alcance.puedeEjecutar(coordinadorId, permiso, carreraId)))).every(Boolean);
       if (!vigente) {
         solicitud.estado = 'INVALIDADA';
         solicitud.resueltoEn = new Date();

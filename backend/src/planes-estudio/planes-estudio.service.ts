@@ -76,6 +76,12 @@ export class PlanesEstudioService {
     if (!coordinador || !asistente) throw new ConflictException('Ya no existe permiso vigente sobre la carrera del plan.');
   }
 
+  private async validarGestionJerarquica(coordinadorId: number, carreraId: number): Promise<void> {
+    if (!(await this.alcance.puedeEjecutar(coordinadorId, PermisoSistema.PLANES_ESTUDIO_GESTIONAR, carreraId))) {
+      throw new ConflictException('El coordinador ya no tiene permiso sobre la carrera del plan.');
+    }
+  }
+
   private async obtenerCarreraActiva(carreraId: number): Promise<Carrera> {
     const carrera = await this.carreraRepository.findOne({
       where: { id: carreraId },
@@ -356,7 +362,7 @@ export class PlanesEstudioService {
 
   async crearDesdeSolicitud(coordinadorId: number, asistenteId: number, dto: CrearPlanEstudioDto,
     manager: EntityManager): Promise<number> {
-    await this.validarDelegacionCompleta(coordinadorId, asistenteId, dto.carreraId);
+    await this.validarGestionJerarquica(coordinadorId, dto.carreraId);
     const carrera = await manager.getRepository(Carrera).findOne({ where: { id: dto.carreraId },
       lock: { mode: 'pessimistic_read' } });
     if (!carrera || !carrera.activo) throw new BadRequestException('La carrera seleccionada no estÃ¡ activa.');
@@ -381,7 +387,7 @@ export class PlanesEstudioService {
     dto: ActualizarPlanEstudioDto, huella: string, manager: EntityManager): Promise<number> {
     const plan = await this.planBloqueado(manager, id);
     if (this.huellaPlan(plan) !== huella) throw new ConflictException('El plan cambiÃ³ desde que se enviÃ³ la solicitud.');
-    await this.validarDelegacionCompleta(coordinadorId, asistenteId, plan.carreraId);
+    await this.validarGestionJerarquica(coordinadorId, plan.carreraId);
     if (dto.grado !== undefined) plan.grado = dto.grado;
     if (dto.codigo !== undefined) plan.codigo = dto.codigo.trim().toUpperCase();
     if (dto.nombre !== undefined) plan.nombre = dto.nombre.trim();
@@ -394,7 +400,7 @@ export class PlanesEstudioService {
     activo: boolean, huella: string, manager: EntityManager): Promise<number> {
     const plan = await this.planBloqueado(manager, id);
     if (this.huellaPlan(plan) !== huella) throw new ConflictException('El plan cambiÃ³ desde que se enviÃ³ la solicitud.');
-    await this.validarDelegacionCompleta(coordinadorId, asistenteId, plan.carreraId);
+    await this.validarGestionJerarquica(coordinadorId, plan.carreraId);
     plan.activo = activo;
     await manager.getRepository(PlanEstudio).save(plan);
     return id;

@@ -239,7 +239,7 @@ export class CursoRequisitosService {
     dto: CrearCursoRequisitoDto, manager: EntityManager): Promise<number> {
     await this.bloquearGrafo(manager);
     const relacion = await this.crearConRepos(cursoId, dto, coordinadorId,
-      manager.getRepository(Curso), manager.getRepository(CursoRequisito), true, asistenteId);
+      manager.getRepository(Curso), manager.getRepository(CursoRequisito), true);
     return relacion.id;
   }
 
@@ -295,7 +295,7 @@ export class CursoRequisitosService {
     id: number, esperado: { requisitoCursoId: number; tipo: TipoRequisito }, manager: EntityManager): Promise<number> {
     await this.bloquearGrafo(manager);
     await this.eliminarConRepos(cursoId, id, coordinadorId, manager.getRepository(Curso),
-      manager.getRepository(CursoRequisito), true, asistenteId, esperado);
+      manager.getRepository(CursoRequisito), true, undefined, esperado);
     return id;
   }
 }

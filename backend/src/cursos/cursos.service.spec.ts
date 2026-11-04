@@ -655,12 +655,12 @@ describe('CursosService', () => {
       expect(managerCursoRepository.save).not.toHaveBeenCalled();
     });
 
-    it('la aprobación de curso compartido revalida todas las carreras del asistente', async () => {
+    it('la aprobación de curso compartido revalida todas las carreras del coordinador', async () => {
       const actual = crearCurso({ carreras: [carrera, carrera2] });
       managerCursoRepository.findOne.mockResolvedValue(actual);
       alcance.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
-      alcance.puedeEjecutar.mockImplementation(async (usuarioId, _permiso, carreraId) =>
-        usuarioId === 99 || carreraId === 1);
+      alcance.puedeEjecutar.mockImplementation(async (_usuarioId, _permiso, carreraId) =>
+        carreraId === 1);
       const manager = { getRepository: () => managerCursoRepository } as any;
       await expect(service.actualizarDesdeSolicitud(99, 3, 5, 1,
         { descripcion: 'Nueva' }, service.huellaCurso(actual), manager)).rejects.toThrow(ForbiddenException);
