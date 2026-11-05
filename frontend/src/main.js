@@ -929,6 +929,21 @@ ipcMain.handle("cursos:listar", async () => {
   };
 });
 
+ipcMain.handle('optativas:listar', async () => {
+  const resultado = await ejecutarPeticionAutenticada('/optativas');
+  return resultado.ok ? { ok: true, optativas: resultado.data } : resultado;
+});
+ipcMain.handle('optativas:carreras-elegibles', async () => {
+  const resultado = await ejecutarPeticionAutenticada('/optativas/carreras-elegibles');
+  return resultado.ok ? { ok: true, carreras: resultado.data } : resultado;
+});
+ipcMain.handle('optativas:crear', async (_event, datos) =>
+  ejecutarPeticionAutenticada('/optativas', { method: 'POST', body: datos }));
+ipcMain.handle('optativas:actualizar', async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/optativas/${id}`, { method: 'PATCH', body: datos }));
+ipcMain.handle('optativas:cambiar-estado', async (_event, id, activo) =>
+  ejecutarPeticionAutenticada(`/optativas/${id}/estado`, { method: 'PATCH', body: { activo } }));
+
 ipcMain.handle(
   "cursos:asignaturas-disponibles",
   async (_event, filtros = {}) => {

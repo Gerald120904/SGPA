@@ -316,6 +316,15 @@ export class OptativasService {
     });
   }
 
+  async listarCarrerasElegibles(usuarioId: number): Promise<Carrera[]> {
+    const ids = await this.carrerasPermitidas(usuarioId, PermisoSistema.OPTATIVAS_GESTIONAR);
+    if (ids !== null && !ids.length) return [];
+    return this.carreraRepository.find({
+      where: ids === null ? { activo: true } : { id: In(ids), activo: true },
+      order: { nombre: 'ASC' },
+    });
+  }
+
   async obtenerPorId(id: number, usuarioId?: number): Promise<CursoOptativo> {
     const optativa = await this.optativaRepository.findOne({
       where: {
@@ -355,6 +364,7 @@ export class OptativasService {
 
     if (usuarioId) {
       await this.validarGestion(usuarioId, optativa.carreraOrigenId, optativa.tipo);
+      await this.validarGestion(usuarioId, carreraResultante ?? null, tipoResultante);
       if (
         dto.carreraOrigenId !== undefined &&
         dto.carreraOrigenId !== null &&

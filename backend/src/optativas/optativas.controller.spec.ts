@@ -20,6 +20,7 @@ describe('OptativasController', () => {
 
   const optativasService = {
     listar: jest.fn(),
+    listarCarrerasElegibles: jest.fn(),
     obtenerPorId: jest.fn(),
     crear: jest.fn(),
     actualizar: jest.fn(),
@@ -124,6 +125,17 @@ describe('OptativasController', () => {
 
     expect(response.body).toEqual([]);
     expect(optativasService.listar).toHaveBeenCalled();
+  });
+
+  it('GET /optativas/carreras-elegibles usa la ruta estática protegida', async () => {
+    optativasService.listarCarrerasElegibles.mockResolvedValue([{ id: 3, nombre: 'Informática' }]);
+    const response = await request(app.getHttpServer())
+      .get('/optativas/carreras-elegibles')
+      .set('Authorization', `Bearer ${generarToken()}`)
+      .expect(200);
+    expect(response.body).toEqual([{ id: 3, nombre: 'Informática' }]);
+    expect(optativasService.listarCarrerasElegibles).toHaveBeenCalledWith(1);
+    expect(optativasService.obtenerPorId).not.toHaveBeenCalled();
   });
 
   it('GET /optativas/:id - obtiene una optativa', async () => {

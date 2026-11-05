@@ -29,6 +29,12 @@ export class OptativasController {
     return this.service.listar(usuarioId);
   }
 
+  @Get('carreras-elegibles')
+  @Permisos(PermisoSistema.OPTATIVAS_GESTIONAR)
+  listarCarrerasElegibles(@UsuarioActualId() usuarioId: number) {
+    return this.service.listarCarrerasElegibles(usuarioId);
+  }
+
   @Get(':id')
   @Permisos(PermisoSistema.OPTATIVAS_VER)
   obtenerPorId(

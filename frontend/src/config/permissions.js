@@ -135,6 +135,9 @@ const PERMISO_MODULO = {
   cursos:
     PERMISOS.CURSOS_VER,
 
+  optativas:
+    PERMISOS.OPTATIVAS_VER,
+
   profesores:
     PERMISOS.PROFESORES_VER,
 

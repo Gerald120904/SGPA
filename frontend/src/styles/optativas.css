@@ -1,0 +1,21 @@
+.optativas-page { padding: 24px; color: #253044; }
+.optativas-header { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.optativas-header h2 { margin: 0 0 6px; }
+.optativas-header p { margin: 0; color: #647084; }
+.optativas-header button, .optativas-actions button[type="submit"] { padding: 10px 16px; border-radius: 8px; background: #b5121b; color: white; cursor: pointer; }
+.optativas-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.optativas-filters input, .optativas-filters select, .optativas-page dialog input, .optativas-page dialog select, .optativas-page dialog textarea { padding: 9px 11px; border: 1px solid #cbd2dc; border-radius: 8px; background: white; color: #253044; }
+.optativas-filters input { min-width: 230px; flex: 1; }
+.optativas-table-wrap { overflow-x: auto; border: 1px solid #e1e5eb; border-radius: 10px; background: white; }
+.optativas-table-wrap table { width: 100%; border-collapse: collapse; text-align: left; }
+.optativas-table-wrap th, .optativas-table-wrap td { padding: 12px; border-bottom: 1px solid #edf0f4; }
+.optativas-table-wrap th { color: #871018; background: #fff6f6; }
+.optativas-table-wrap td button { padding: 6px 9px; border: 1px solid #b5121b; border-radius: 6px; background: white; color: #951019; cursor: pointer; }
+.optativas-page dialog { width: min(520px, calc(100vw - 32px)); border: 1px solid #dce1e8; border-radius: 12px; padding: 24px; box-shadow: 0 24px 70px #18223544; }
+.optativas-page dialog::backdrop { background: #18223588; }
+.optativas-page form { display: grid; gap: 12px; }
+.optativas-page form h3 { margin: 0; }
+.optativas-page form label { display: grid; gap: 5px; }
+.optativas-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.optativas-actions button { padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+@media (max-width: 640px) { .optativas-header { flex-direction: column; } .optativas-filters > * { width: 100%; } }
