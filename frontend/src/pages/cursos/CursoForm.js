@@ -4,7 +4,7 @@ import {
   listarAsignaturasDisponiblesCurso,
 } from "../../services/cursos.service.js";
 import { proponerCrearCurso, proponerActualizarCurso } from '../../services/solicitudes-cambio.service.js';
-import { usuarioTienePermiso, obtenerRolesUsuario } from "../../app/session.js";
+import { usuarioTienePermiso, obtenerRolActivo } from "../../app/session.js";
 import { PERMISOS, ROLES } from "../../config/permissions.js";
 import { escapeHtml } from "../../utils/html.js";
 import { renderizarIconos } from "../../utils/icons.js";
@@ -21,7 +21,7 @@ import {
    FORMULARIO DE CURSO
    ========================================================= */
 
-const esAsistente = () => obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
+const esAsistente = () => obtenerRolActivo() === ROLES.ASISTENTE_ESTUDIANTIL;
 
 export async function abrirFormularioCurso({
   curso = null,

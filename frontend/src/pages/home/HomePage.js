@@ -76,8 +76,11 @@ export async function iniciarHomePage() {
   valor.textContent = 'Cargando…';
   if (detalle) detalle.textContent = 'Consultando registros autorizados';
   try {
-    const estudiantes = await listarEstudiantes({ estado: 'ACTIVO' });
-    if (!Array.isArray(estudiantes)) throw new Error('Respuesta de estudiantes inválida.');
+    const resultado = await listarEstudiantes({ estado: 'ACTIVO' });
+    if (!resultado?.ok || !Array.isArray(resultado.estudiantes)) {
+      throw new Error(resultado?.message || 'Respuesta de estudiantes inválida.');
+    }
+    const estudiantes = resultado.estudiantes;
     if (!valor.isConnected) return;
     valor.textContent = String(estudiantes.length);
     if (detalle) detalle.textContent = estudiantes.length ? 'Según los registros autorizados' : 'Sin registros activos';
