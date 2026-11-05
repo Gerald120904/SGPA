@@ -18,6 +18,7 @@ import { OrigenAcademico } from '../estudiantes/constants/origen-academico.const
 import { ResultadoAcademico } from '../estudiantes/constants/resultado-academico.constant';
 import { Estudiante } from '../estudiantes/entities/estudiante.entity';
 import { HistorialAcademicoEstudiante } from '../estudiantes/entities/historial-academico-estudiante.entity';
+import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { HistorialPlanEstudiante } from '../estudiantes/entities/historial-plan-estudiante.entity';
 import { EquivalenciaPlan } from './entities/equivalencia-plan.entity';
 import { PlanAsignatura } from './entities/plan-asignatura.entity';
@@ -229,9 +230,12 @@ export class TransicionesCurricularesService {
         relations: { planAsignatura: { curso: true } },
       });
 
-      const aprobadasOrigenIds = new Set(historiales.map((h) => h.planAsignaturaId));
+      const historialesValidos = historiales.filter((h) =>
+        h.planAsignatura?.tipo !== TipoPlanAsignatura.OPTATIVA ||
+        h.cursoOptativoId == null || h.reconocimientoOptativo === 'RECONOCIDO');
+      const aprobadasOrigenIds = new Set(historialesValidos.map((h) => h.planAsignaturaId));
       const aprobadasCursosIds = new Set(
-        historiales.filter((h) => h.planAsignatura?.cursoId).map((h) => h.planAsignatura.cursoId!),
+        historialesValidos.filter((h) => h.planAsignatura?.cursoId).map((h) => h.planAsignatura.cursoId!),
       );
 
       const reconocidasMap = new Map<number, {
@@ -449,6 +453,15 @@ export class TransicionesCurricularesService {
               estudiante.carreraId !== dto.carreraId ||
               [EstadoEstudiante.RETIRADO, EstadoEstudiante.GRADUADO].includes(estudiante.estado)) {
             throw new BadRequestException('El estudiante no se encuentra en el plan de origen esperado.');
+          }
+
+          if (sim.asignaturasReconocidas.length) {
+            const destinos = await manager.getRepository(PlanAsignatura).find({
+              where: { id: In(sim.asignaturasReconocidas.map((rec) => rec.asignaturaDestinoId)) },
+            });
+            if (destinos.some((destino) => destino.tipo === TipoPlanAsignatura.OPTATIVA)) {
+              throw new BadRequestException('La transición hacia espacios optativos requiere una decisión explícita sobre la asignatura real y su reconocimiento en el nuevo plan.');
+            }
           }
 
           // 1. Actualizar plan del estudiante

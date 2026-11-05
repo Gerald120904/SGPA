@@ -79,16 +79,12 @@ export class PlanAsignaturasService {
       return null;
     }
 
-    if (
-      !tipoOptativa ||
-      !Object.values(TipoOptativa).includes(tipoOptativa)
-    ) {
+    if (tipoOptativa && !Object.values(TipoOptativa).includes(tipoOptativa)) {
       throw new BadRequestException(
-        'Debe indicar si la optativa es DISCIPLINARIA, ABIERTA o SEDE.',
+        'La categoría optativa indicada no es válida.',
       );
     }
-
-    return tipoOptativa;
+    return tipoOptativa ?? null;
   }
 
   private async obtenerReglaOptativas(
@@ -158,12 +154,6 @@ export class PlanAsignaturasService {
       return;
     }
 
-    if (!tipoOptativa) {
-      throw new BadRequestException(
-        'Debe indicar si la optativa es DISCIPLINARIA, ABIERTA o SEDE.',
-      );
-    }
-
     const regla = await this.obtenerReglaOptativas(planId);
 
     if (!regla) {
@@ -172,16 +162,15 @@ export class PlanAsignaturasService {
       );
     }
 
-    const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa);
-    const actuales = await this.contarOptativasActivasPorTipo(
-      planId,
-      tipoOptativa,
-      opciones.excluirId,
-    );
+    const limite = Number(regla.cantidadDisciplinarias || 0) + Number(regla.cantidadAbiertas || 0) + Number(regla.cantidadSede || 0);
+    const actuales = await this.asignaturaRepository.count({
+      where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, activo: true,
+        ...(opciones.excluirId !== undefined ? { id: Not(opciones.excluirId) } : {}) },
+    });
     const adicionales = opciones.adicionales ?? 1;
 
     if (actuales + adicionales > limite) {
-      const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa);
+      const nombreTipo = tipoOptativa ? this.obtenerNombreTipoOptativa(tipoOptativa) : 'genérica';
       throw new ConflictException(
         `El plan ya alcanzó el límite de ${limite} optativa${
           limite === 1 ? '' : 's'
@@ -211,29 +200,33 @@ export class PlanAsignaturasService {
       );
     }
 
-    for (const tipoOptativa of Object.values(TipoOptativa)) {
-      const nuevas = optativas.filter(
-        (asignatura) => asignatura.tipoOptativa === tipoOptativa,
-      ).length;
+    const total = await this.asignaturaRepository.count({
+      where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, activo: true },
+    });
+    const limiteTotal = Number(regla.cantidadDisciplinarias || 0) + Number(regla.cantidadAbiertas || 0) + Number(regla.cantidadSede || 0);
+    if (total + optativas.length > limiteTotal) {
+      throw new ConflictException(`La carga supera los ${limiteTotal} espacios optativos del plan.`);
+    }
 
-      if (!nuevas) {
-        continue;
-      }
 
-      const actuales = await this.contarOptativasActivasPorTipo(
-        planId,
-        tipoOptativa,
-      );
-      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa);
+  }
 
-      if (actuales + nuevas > limite) {
-        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa);
-        throw new ConflictException(
-          `La carga supera el límite de ${limite} optativa${
-            limite === 1 ? '' : 's'
-          } ${nombreTipo} permitido por la Regla de optativas.`,
-        );
-      }
+  private async validarCupoOptativaTransaccional(
+    asignaturas: Repository<PlanAsignatura>,
+    reglas: Repository<ReglaOptativaPlan>,
+    planId: number,
+    adicionales = 1,
+    excluirId?: number,
+  ): Promise<void> {
+    const regla = await reglas.findOne({ where: { planEstudioId: planId } });
+    if (!regla) throw new ConflictException('Configure la regla de optativas antes de agregar espacios.');
+    const limite = Number(regla.cantidadDisciplinarias || 0) + Number(regla.cantidadAbiertas || 0) + Number(regla.cantidadSede || 0);
+    const actuales = await asignaturas.count({ where: {
+      planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, activo: true,
+      ...(excluirId !== undefined ? { id: Not(excluirId) } : {}),
+    } });
+    if (actuales + adicionales > limite) {
+      throw new ConflictException(`El plan ya alcanzó los ${limite} espacios optativos configurados.`);
     }
   }
 
@@ -694,18 +687,7 @@ export class PlanAsignaturasService {
     const tipoOptativa = this.normalizarTipoOptativa(dto.tipo, dto.tipoOptativa);
 
     if (dto.tipo === TipoPlanAsignatura.OPTATIVA) {
-      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
-      if (!regla) {
-        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
-      }
-      const actuales = await asignaturaRepo.count({
-        where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tipoOptativa!, activo: true },
-      });
-      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa!);
-      if (actuales >= limite) {
-        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa!);
-        throw new ConflictException(`Se alcanzó el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
-      }
+      await this.validarCupoOptativaTransaccional(asignaturaRepo, reglaRepo, planId);
     }
 
     const [ultima] = await asignaturaRepo.find({
@@ -802,18 +784,7 @@ export class PlanAsignaturasService {
     }
 
     if (tipoResultante === TipoPlanAsignatura.OPTATIVA && asignatura.activo) {
-      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
-      if (!regla) {
-        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
-      }
-      const actuales = await asignaturaRepo.count({
-        where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tipoOptativaResultante!, activo: true, id: Not(id) },
-      });
-      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativaResultante!);
-      if (actuales >= limite) {
-        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativaResultante!);
-        throw new ConflictException(`Se alcanzó el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
-      }
+      await this.validarCupoOptativaTransaccional(asignaturaRepo, reglaRepo, planId, 1, id);
     }
 
     if (dto.nivel !== undefined) asignatura.nivel = dto.nivel;
@@ -874,19 +845,7 @@ export class PlanAsignaturasService {
     }
 
     if (activo && asignatura.tipo === TipoPlanAsignatura.OPTATIVA) {
-      const tipoOptativa = this.normalizarTipoOptativa(asignatura.tipo, asignatura.tipoOptativa);
-      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
-      if (!regla) {
-        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
-      }
-      const actuales = await asignaturaRepo.count({
-        where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tipoOptativa!, activo: true, id: Not(id) },
-      });
-      const limite = this.obtenerLimiteTipoOptativa(regla, tipoOptativa!);
-      if (actuales >= limite) {
-        const nombreTipo = this.obtenerNombreTipoOptativa(tipoOptativa!);
-        throw new ConflictException(`Se alcanzó el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
-      }
+      await this.validarCupoOptativaTransaccional(asignaturaRepo, reglaRepo, planId, 1, id);
     }
 
     asignatura.activo = activo;
@@ -966,23 +925,8 @@ export class PlanAsignaturasService {
     }
 
     const optativas = preparadas.filter((asig) => asig.tipo === TipoPlanAsignatura.OPTATIVA);
-    if (optativas.length > 0) {
-      const regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });
-      if (!regla) {
-        throw new ConflictException('Antes de cargar asignaturas optativas debe configurar la Regla de optativas del plan.');
-      }
-      for (const tOpt of Object.values(TipoOptativa)) {
-        const nuevas = optativas.filter((asig) => asig.tipoOptativa === tOpt).length;
-        if (!nuevas) continue;
-        const actuales = await asignaturaRepo.count({
-          where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: tOpt, activo: true },
-        });
-        const limite = this.obtenerLimiteTipoOptativa(regla, tOpt);
-        if (actuales + nuevas > limite) {
-          const nombreTipo = this.obtenerNombreTipoOptativa(tOpt);
-          throw new ConflictException(`La carga supera el límite de ${limite} optativa${limite === 1 ? '' : 's'} ${nombreTipo} permitido por la Regla de optativas.`);
-        }
-      }
+    if (optativas.length) {
+      await this.validarCupoOptativaTransaccional(asignaturaRepo, reglaRepo, planId, optativas.length);
     }
 
     await asignaturaRepo.save(preparadas);

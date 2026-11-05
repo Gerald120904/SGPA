@@ -12,6 +12,7 @@ import { AddNotificationIdempotency2026103002000 } from './2026103002000-AddNoti
 import { AddEstudiantesRevisionYAuditoria2026103100000 } from './2026103100000-AddEstudiantesRevisionYAuditoria';
 import { AddSolicitudesActivasEstudiantes2026110100000 } from './2026110100000-AddSolicitudesActivasEstudiantes';
 import { AddPlanesEstudioTransicionesYAuditoria2026110101000 } from './2026110101000-AddPlanesEstudioTransicionesYAuditoria';
+import { AddOptativaRealHistorialEstudiante2026110400000 } from './2026110400000-AddOptativaRealHistorialEstudiante';
 
 export const OFFICIAL_MIGRATIONS = [
   InitializeOrAdoptSchema2026101400000,
@@ -28,6 +29,7 @@ export const OFFICIAL_MIGRATIONS = [
   AddEstudiantesRevisionYAuditoria2026103100000,
   AddSolicitudesActivasEstudiantes2026110100000,
   AddPlanesEstudioTransicionesYAuditoria2026110101000,
+  AddOptativaRealHistorialEstudiante2026110400000,
 ] as const;
 
 export const OFFICIAL_MIGRATION_NAMES = OFFICIAL_MIGRATIONS.map(

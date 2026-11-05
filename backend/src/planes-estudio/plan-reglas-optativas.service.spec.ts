@@ -94,7 +94,7 @@ describe('PlanReglasOptativasService', () => {
     expect(resultado).toEqual(regla);
   });
 
-  it('rechaza configurar regla si hay optativas sin clasificar', async () => {
+  it('permite espacios genéricos cuando el total cabe en la regla', async () => {
     planRepository.findOne.mockResolvedValue(planActivo);
     asignaturaRepository.count
       .mockResolvedValueOnce(0)
@@ -108,9 +108,9 @@ describe('PlanReglasOptativasService', () => {
         cantidadAbiertas: 1,
         cantidadSede: 1,
       }),
-    ).rejects.toThrow(BadRequestException);
+    ).resolves.toBeUndefined();
 
-    expect(reglaRepository.save).not.toHaveBeenCalled();
+    expect(reglaRepository.save).toHaveBeenCalled();
   });
 
   it('rechaza si la suma configurada supera 200 espacios', async () => {

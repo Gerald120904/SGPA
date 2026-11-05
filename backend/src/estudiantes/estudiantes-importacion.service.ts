@@ -22,6 +22,7 @@ import {
 } from './dto/importar-estudiantes.dto';
 import { Estudiante } from './entities/estudiante.entity';
 import { HistorialAcademicoEstudiante } from './entities/historial-academico-estudiante.entity';
+import { TipoPlanAsignatura } from '../planes-estudio/constants/tipo-plan-asignatura.constant';
 import { crearDatosResultadoImportado } from './resultado-importado.factory';
 
 export type AccionImportacionEstudiante =
@@ -431,6 +432,8 @@ export class EstudiantesImportacionService {
           errores.push(`La asignatura ${codigo} no pertenece al plan.`);
         } else if (coincidencias.length > 1) {
           errores.push(`La asignatura ${codigo} es ambigua dentro del plan.`);
+        } else if (coincidencias[0].tipo === TipoPlanAsignatura.OPTATIVA) {
+          errores.push(`El espacio ${codigo} requiere identificar la optativa real y su reconocimiento individual.`);
         } else {
           candidatas.push({ codigo, planAsignaturaId: coincidencias[0].id });
         }

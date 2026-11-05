@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { PeriodoAcademico } from '../../periodos-academicos/entities/periodo-academico.entity';
+import { TipoOptativa } from '../../optativas/constants/tipo-optativa.constant';
 import { PlanAsignatura } from '../../planes-estudio/entities/plan-asignatura.entity';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { FuenteRegistroAcademico } from '../constants/fuente-registro-academico.constant';
@@ -29,6 +30,36 @@ export class HistorialAcademicoEstudiante {
 
   @Column({ name: 'plan_asignatura_id', type: 'int', unsigned: true })
   planAsignaturaId!: number;
+
+  @Column({ name: 'curso_optativo_id', type: 'int', unsigned: true, nullable: true })
+  cursoOptativoId!: number | null;
+
+  @Column({ name: 'plan_estudio_contexto_id', type: 'int', unsigned: true, nullable: true })
+  planEstudioContextoId!: number | null;
+
+  @Column({ name: 'codigo_optativa_real', type: 'varchar', length: 30, nullable: true })
+  codigoOptativaReal!: string | null;
+
+  @Column({ name: 'nombre_optativa_real', type: 'varchar', length: 150, nullable: true })
+  nombreOptativaReal!: string | null;
+
+  @Column({ name: 'tipo_optativa_real', type: 'varchar', length: 30, nullable: true })
+  tipoOptativaReal!: TipoOptativa | null;
+
+  @Column({ name: 'creditos_optativa_real', type: 'smallint', unsigned: true, nullable: true })
+  creditosOptativaReal!: number | null;
+
+  @Column({ name: 'reconocimiento_optativo', type: 'varchar', length: 20, nullable: true })
+  reconocimientoOptativo!: 'RECONOCIDO' | 'NO_RECONOCIDO' | null;
+
+  @Column({ name: 'creditos_reconocidos', type: 'smallint', unsigned: true, nullable: true })
+  creditosReconocidos!: number | null;
+
+  @Column({ name: 'reconocido_por_usuario_id', type: 'int', unsigned: true, nullable: true })
+  reconocidoPorUsuarioId!: number | null;
+
+  @Column({ name: 'fecha_reconocimiento', type: 'datetime', nullable: true })
+  fechaReconocimiento!: Date | null;
 
   @Column({ name: 'periodo_id', type: 'int', unsigned: true, nullable: true })
   periodoId!: number | null;

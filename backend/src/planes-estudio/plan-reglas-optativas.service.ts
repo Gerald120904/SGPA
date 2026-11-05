@@ -143,28 +143,8 @@ export class PlanReglasOptativasService {
 
     const conteo = await this.obtenerConteoActual(planId);
 
-    if (conteo.sinClasificar > 0) {
-      throw new BadRequestException(
-        'Existen asignaturas optativas sin clasificar. Clasifíquelas antes de modificar la regla.',
-      );
-    }
-
-    if (conteo.disciplinarias > dto.cantidadDisciplinarias) {
-      throw new BadRequestException(
-        `El plan ya tiene ${conteo.disciplinarias} optativas disciplinarias activas. No puede fijar un límite de ${dto.cantidadDisciplinarias}.`,
-      );
-    }
-
-    if (conteo.abiertas > dto.cantidadAbiertas) {
-      throw new BadRequestException(
-        `El plan ya tiene ${conteo.abiertas} optativas abiertas activas. No puede fijar un límite de ${dto.cantidadAbiertas}.`,
-      );
-    }
-
-    if (conteo.sede > dto.cantidadSede) {
-      throw new BadRequestException(
-        `El plan ya tiene ${conteo.sede} optativas de sede activas. No puede fijar un límite de ${dto.cantidadSede}.`,
-      );
+    if (conteo.total > totalConfigurado) {
+      throw new BadRequestException('La nueva regla tiene menos cupos que espacios optativos activos.');
     }
 
     let regla = await this.reglaRepository.findOne({
@@ -260,24 +240,9 @@ export class PlanReglasOptativasService {
       throw new BadRequestException('La suma de espacios optativos no puede superar 200.');
     }
 
-    const [disciplinarias, abiertas, sede, sinClasificar] = await Promise.all([
-      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: TipoOptativa.DISCIPLINARIA, activo: true } }),
-      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: TipoOptativa.ABIERTA, activo: true } }),
-      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: TipoOptativa.SEDE, activo: true } }),
-      asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: IsNull(), activo: true } }),
-    ]);
-
-    if (sinClasificar > 0) {
-      throw new BadRequestException('Existen asignaturas optativas sin clasificar. Clasifíquelas antes de modificar la regla.');
-    }
-    if (disciplinarias > dto.cantidadDisciplinarias) {
-      throw new BadRequestException(`El plan ya tiene ${disciplinarias} optativas disciplinarias activas. No puede fijar un límite de ${dto.cantidadDisciplinarias}.`);
-    }
-    if (abiertas > dto.cantidadAbiertas) {
-      throw new BadRequestException(`El plan ya tiene ${abiertas} optativas abiertas activas. No puede fijar un límite de ${dto.cantidadAbiertas}.`);
-    }
-    if (sede > dto.cantidadSede) {
-      throw new BadRequestException(`El plan ya tiene ${sede} optativas de sede activas. No puede fijar un límite de ${dto.cantidadSede}.`);
+    const espaciosActivos = await asigRepo.count({ where: { planEstudioId: planId, tipo: TipoPlanAsignatura.OPTATIVA, activo: true } });
+    if (espaciosActivos > totalConfigurado) {
+      throw new BadRequestException('La nueva regla tiene menos cupos que espacios optativos activos.');
     }
 
     let regla = await reglaRepo.findOne({ where: { planEstudioId: planId } });

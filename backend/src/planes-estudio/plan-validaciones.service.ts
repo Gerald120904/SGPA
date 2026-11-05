@@ -142,21 +142,6 @@ export class PlanValidacionesService {
       (asignatura) => asignatura.tipo === TipoPlanAsignatura.OPTATIVA,
     );
 
-    const optativasSinClasificar = optativasActivas.filter(
-      (asignatura) => !asignatura.tipoOptativa,
-    );
-
-    for (const optativa of optativasSinClasificar) {
-      errores.push({
-        codigo: 'OPTATIVA_SIN_CLASIFICAR',
-        nivel: 'ERROR',
-        asignaturaId: optativa.id,
-        mensaje: `${this.nombre(
-          optativa,
-        )} debe indicar si es una optativa DISCIPLINARIA, ABIERTA o SEDE.`,
-      });
-    }
-
     if (optativasActivas.length > 0 && !reglaOptativas) {
       errores.push({
         codigo: 'REGLA_OPTATIVAS_NO_CONFIGURADA',
@@ -167,54 +152,13 @@ export class PlanValidacionesService {
     }
 
     if (reglaOptativas) {
-      const cantidadDisciplinarias = optativasActivas.filter(
-        (asignatura) =>
-          asignatura.tipoOptativa === TipoOptativa.DISCIPLINARIA,
-      ).length;
-      const cantidadAbiertas = optativasActivas.filter(
-        (asignatura) => asignatura.tipoOptativa === TipoOptativa.ABIERTA,
-      ).length;
-      const cantidadSede = optativasActivas.filter(
-        (asignatura) => asignatura.tipoOptativa === TipoOptativa.SEDE,
-      ).length;
-
-      const validarCantidad = (
-        codigo: string,
-        etiqueta: string,
-        actual: number,
-        esperada: number,
-      ) => {
-        if (actual !== esperada) {
-          errores.push({
-            codigo,
-            nivel: 'ERROR',
-            mensaje: `La regla del plan define ${esperada} optativa${
-              esperada === 1 ? '' : 's'
-            } ${etiqueta}, pero actualmente hay ${actual}.`,
-          });
-        }
-      };
-
-      validarCantidad(
-        'CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA',
-        'disciplinaria(s) / de carrera',
-        cantidadDisciplinarias,
-        Number(reglaOptativas.cantidadDisciplinarias || 0),
-      );
-      validarCantidad(
-        'CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA',
-        'abierta(s)',
-        cantidadAbiertas,
-        Number(reglaOptativas.cantidadAbiertas || 0),
-      );
-      validarCantidad(
-        'CANTIDAD_OPTATIVAS_SEDE_NO_CUMPLIDA',
-        'de sede',
-        cantidadSede,
-        Number(reglaOptativas.cantidadSede || 0),
-      );
+      const esperadas = Number(reglaOptativas.cantidadDisciplinarias || 0) +
+        Number(reglaOptativas.cantidadAbiertas || 0) + Number(reglaOptativas.cantidadSede || 0);
+      if (optativasActivas.length !== esperadas) {
+        errores.push({ codigo: 'CANTIDAD_ESPACIOS_OPTATIVOS_NO_CUMPLIDA', nivel: 'ERROR',
+          mensaje: `La regla del plan exige ${esperadas} espacios optativos y hay ${optativasActivas.length}.` });
+      }
     }
-
     const codigosUsados = new Set<string>();
     for (const a of activas) {
       const codigo = this.codigo(a);

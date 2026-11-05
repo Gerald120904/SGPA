@@ -308,7 +308,7 @@ describe('PlanAsignaturasService', () => {
   });
 
 
-  it('rechaza crear una tercera optativa de otras áreas cuando el máximo es 2', async () => {
+  it('rechaza agregar un espacio si ya se completó el total del plan', async () => {
     planRepository.findOne.mockResolvedValue(plan);
     reglaOptativaRepository.findOne.mockResolvedValue({
       id: 1,
@@ -319,7 +319,7 @@ describe('PlanAsignaturasService', () => {
       minimoDisciplinariasPropias: 2,
       maximoOtrasAreas: 2,
     });
-    asignaturaRepository.count.mockResolvedValue(2);
+    asignaturaRepository.count.mockResolvedValue(4);
 
     await expect(
       service.crear(1, {
@@ -366,7 +366,6 @@ describe('PlanAsignaturasService', () => {
       where: {
         planEstudioId: 1,
         tipo: TipoPlanAsignatura.OPTATIVA,
-        tipoOptativa: TipoOptativa.DISCIPLINARIA,
         activo: true,
       },
     });

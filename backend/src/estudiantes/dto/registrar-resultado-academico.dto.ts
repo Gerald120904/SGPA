@@ -14,6 +14,11 @@ export class RegistrarResultadoAcademicoDto {
   @Min(1)
   planAsignaturaId!: number;
 
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  cursoOptativoId?: number;
+
   @IsInt()
   @Min(1)
   periodoId!: number;

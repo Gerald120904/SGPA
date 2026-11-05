@@ -166,6 +166,8 @@ export class EvaluacionGraduacionService {
     const historialValidoPorAsignatura = new Map<number, HistorialAcademicoEstudiante>();
 
     for (const h of historiales) {
+      if (h.planAsignatura?.tipo === TipoPlanAsignatura.OPTATIVA &&
+          h.cursoOptativoId != null && h.reconocimientoOptativo !== 'RECONOCIDO') continue;
       if (h.origenAcademico === OrigenAcademico.EQUIVALENCIA) {
         equivalenciasReconocidas.push({
           id: h.planAsignaturaId,
@@ -189,6 +191,7 @@ export class EvaluacionGraduacionService {
 
     const estaAprobada = (asig: PlanAsignatura): boolean => {
       if (aprobadasPlanAsignaturaIds.has(asig.id)) return true;
+      if (asig.tipo === TipoPlanAsignatura.OPTATIVA) return false;
       if (asig.cursoId && aprobadasCursoIds.has(asig.cursoId)) return true;
       return false;
     };
@@ -254,18 +257,21 @@ export class EvaluacionGraduacionService {
 
     const clasificarOptativas = (tipo: TipoOptativa): AsignaturaEvaluadaResumen[] => {
       return optativasAprobadasTodas
-        .filter((a) => a.tipoOptativa === tipo)
+        .filter((a) => {
+          const h = historialValidoPorAsignatura.get(a.id);
+          return h?.cursoOptativoId != null ? h.tipoOptativaReal === tipo : a.tipoOptativa === tipo;
+        })
         .map((asig) => {
           const h = historialValidoPorAsignatura.get(asig.id);
           return {
             id: asig.id,
-            codigo: asig.curso?.codigo || asig.codigoReferencia || '—',
-            nombre: asig.curso?.nombre || asig.nombreReferencia || '—',
+            codigo: h?.codigoOptativaReal || asig.curso?.codigo || asig.codigoReferencia || '—',
+            nombre: h?.nombreOptativaReal || asig.curso?.nombre || asig.nombreReferencia || '—',
             nivel: asig.nivel,
             ciclo: asig.ciclo,
-            creditos: Number(asig.creditos) || 0,
+            creditos: h?.cursoOptativoId != null ? Number(h.creditosReconocidos) || 0 : Number(asig.creditos) || 0,
             tipo: asig.tipo,
-            tipoOptativa: asig.tipoOptativa,
+            tipoOptativa: h?.tipoOptativaReal || asig.tipoOptativa,
             aprobada: true,
             origen: h?.origenAcademico,
             periodoNombre: h?.periodo ? `${h.periodo.anio}-${h.periodo.ciclo}` : undefined,
@@ -337,18 +343,10 @@ export class EvaluacionGraduacionService {
       0,
     );
 
-    // Créditos requeridos por optativas según la regla
-    let creditosOptativosRequeridos = 0;
-    if (reglaOptativas) {
-      const promedioCreditosOptativa = optativasPlan.length
-        ? Math.round(
-            optativasPlan.reduce((sum, a) => sum + (Number(a.creditos) || 0), 0) /
-              optativasPlan.length,
-          ) || 3
-        : 3;
-      creditosOptativosRequeridos =
-        (reqDisciplinarias + reqAbiertas + reqSede) * promedioCreditosOptativa;
-    }
+    // La exigencia de créditos procede de los espacios oficiales, sin promedios supuestos.
+    const creditosOptativosRequeridos = optativasPlan.reduce(
+      (sum, a) => sum + (Number(a.creditos) || 0), 0,
+    );
 
     const creditosRequeridosTotal =
       creditosObligatoriosRequeridos + creditosOptativosRequeridos;
@@ -362,9 +360,9 @@ export class EvaluacionGraduacionService {
     // Contamos solo las optativas aprobadas hasta el límite requerido por categoría
     // para no inflar créditos con asignaturas extra
     const optativasReconocidas = [
-      ...optDisciplinariasAprobadas.slice(0, reqDisciplinarias || optDisciplinariasAprobadas.length),
-      ...optAbiertasAprobadas.slice(0, reqAbiertas || optAbiertasAprobadas.length),
-      ...optSedeAprobadas.slice(0, reqSede || optSedeAprobadas.length),
+      ...optDisciplinariasAprobadas.slice(0, reqDisciplinarias),
+      ...optAbiertasAprobadas.slice(0, reqAbiertas),
+      ...optSedeAprobadas.slice(0, reqSede),
     ];
     const creditosOptativosAprobados = optativasReconocidas.reduce(
       (sum, a) => sum + a.creditos,

@@ -36,6 +36,7 @@ import {
   proponerImportacionEstudiantes,
 } from '../../services/solicitudes-cambio.service.js';
 import { obtenerCatalogoEstudiantesJerarquia } from '../../services/jerarquia.service.js';
+import { listarOptativas } from '../../services/optativas.service.js';
 
 import {
   listarEstudiantes,
@@ -47,6 +48,7 @@ import {
   obtenerHistorialAcademicoEstudiante,
   obtenerHistorialPlanesEstudiante,
   obtenerProgresoEstudiante,
+  evaluarGraduacionEstudiante,
   registrarResultadoAcademicoEstudiante,
   contarEstudiantesPorCarrera,
   contarEstudiantesPorPlan,
@@ -341,6 +343,10 @@ function formatearEstado(
 }
 
 function obtenerTextoAsignatura(item) {
+  if (item?.codigoOptativaReal && item?.nombreOptativaReal) {
+    const espacio = item.planAsignatura?.nombreReferencia || item.planAsignatura?.codigoReferencia || `Espacio #${item.planAsignaturaId}`;
+    return `${item.codigoOptativaReal} - ${item.nombreOptativaReal} (${espacio})`;
+  }
   const asignatura =
     item?.planAsignatura ??
     item?.asignatura ??
@@ -353,11 +359,13 @@ function obtenerTextoAsignatura(item) {
   const codigo =
     curso.codigo ??
     asignatura.codigo ??
+    asignatura.codigoReferencia ??
     '';
 
   const nombre =
     curso.nombre ??
     asignatura.nombre ??
+    asignatura.nombreReferencia ??
     '';
 
   if (codigo && nombre) {
@@ -3419,6 +3427,14 @@ async function abrirExpedienteEstudiante(
             </div>
           </div>
 
+          <div class="sgpa-form-wide">
+            <h3>Evaluación de graduación</h3>
+            <button id="evaluarGraduacionEstudianteButton" type="button" class="sgpa-form-primary">
+              Evaluar cumplimiento
+            </button>
+            <div id="expedienteEvaluacionGraduacion" role="status" aria-live="polite"></div>
+          </div>
+
 
           ${
             usuarioTienePermiso(
@@ -3507,6 +3523,41 @@ async function abrirExpedienteEstudiante(
         }
       );
 
+    document.getElementById('evaluarGraduacionEstudianteButton')
+      ?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        const contenedor = document.getElementById('expedienteEvaluacionGraduacion');
+        button.disabled = true;
+        contenedor.textContent = 'Evaluando cumplimiento...';
+        try {
+          const respuesta = await evaluarGraduacionEstudiante(estudiante.id);
+          if (!respuesta?.ok) throw new Error(respuesta?.message || 'No fue posible evaluar la graduación.');
+          const evaluacion = respuesta.data ?? respuesta.evaluacion;
+          if (!evaluacion?.dictamen || !evaluacion.creditos || !evaluacion.optativas) {
+            throw new Error('La evaluación devolvió una respuesta incompleta.');
+          }
+          const categorias = [
+            ['Disciplinarias', evaluacion.optativas.disciplinarias],
+            ['Abiertas', evaluacion.optativas.abiertas],
+            ['De sede', evaluacion.optativas.sede],
+          ];
+          contenedor.innerHTML = `
+            <p><strong>Dictamen:</strong> ${escapeHtml(evaluacion.dictamen)}</p>
+            <p><strong>Créditos aprobados:</strong> ${Number(evaluacion.creditos.aprobadosTotal || 0)} de ${Number(evaluacion.creditos.requeridosTotal || 0)}</p>
+            <p><strong>Optativas reconocidas:</strong> ${categorias.map(([nombre, datos]) =>
+              `${nombre} ${Number(datos?.aprobadas || 0)}/${Number(datos?.requeridas || 0)}`
+            ).join(' · ')}</p>
+            ${(evaluacion.motivosBloqueo || []).length
+              ? `<ul>${evaluacion.motivosBloqueo.map((motivo) => `<li>${escapeHtml(motivo)}</li>`).join('')}</ul>`
+              : '<p>Sin requisitos pendientes en la evaluación.</p>'}
+          `;
+        } catch (error) {
+          contenedor.textContent = error?.message || 'No fue posible evaluar la graduación.';
+        } finally {
+          button.disabled = false;
+        }
+      });
+
     document
       .getElementById(
         'expedientePeriodoReferencia'
@@ -3561,14 +3612,16 @@ async function abrirRegistrarResultadoAcademico(
   try {
     const [
       resultadoAsignaturas,
-      resultadoPeriodos
+      resultadoPeriodos,
+      resultadoOptativas
     ] =
       await Promise.all([
         listarPlanAsignaturas(
           estudiante.planEstudioId
         ),
 
-        listarPeriodosParaEstudiantes()
+        listarPeriodosParaEstudiantes(),
+        listarOptativas()
       ]);
 
     if (!resultadoAsignaturas?.ok) {
@@ -3593,7 +3646,7 @@ async function abrirRegistrarResultadoAcademico(
             .filter(
               (item) =>
                 item.activo !== false &&
-                (
+                (item.tipo === 'OPTATIVA' ||
                   item.cursoId != null ||
                   item.curso?.id != null
                 )
@@ -3606,6 +3659,11 @@ async function abrirRegistrarResultadoAcademico(
         : []
     ).filter((periodo) =>
       esPeriodoIgualOPosterior(periodo, estudiante.periodoIngreso)
+    );
+
+    const optativasDisponibles = (resultadoOptativas?.optativas || []).filter((item) =>
+      item.activo && item.curso?.activo &&
+      (item.tipo !== 'DISCIPLINARIA' || item.carreraOrigenId === estudiante.carreraId)
     );
 
     content.innerHTML =
@@ -3669,6 +3727,16 @@ async function abrirRegistrarResultadoAcademico(
                   `
                 )
                 .join('')}
+            </select>
+          </label>
+
+          <label class="sgpa-form-wide" id="resultadoOptativaRealLabel" hidden>
+            <span>Asignatura optativa cursada</span>
+            <select id="resultadoOptativaReal">
+              <option value="">Seleccione una optativa del catálogo...</option>
+              ${optativasDisponibles.map((item) => `
+                <option value="${item.id}">${escapeHtml(item.curso.codigo)} · ${escapeHtml(item.curso.nombre)} (${escapeHtml(item.tipo)})</option>
+              `).join('')}
             </select>
           </label>
 
@@ -3788,6 +3856,20 @@ async function abrirRegistrarResultadoAcademico(
         `
       });
 
+    const selectorEspacio = document.getElementById('resultadoPlanAsignatura');
+    const selectorOptativa = document.getElementById('resultadoOptativaReal');
+    const etiquetaOptativa = document.getElementById('resultadoOptativaRealLabel');
+    const actualizarOptativa = () => {
+      const esOptativa = asignaturas.find((item) => item.id === Number(selectorEspacio?.value))?.tipo === 'OPTATIVA';
+      if (etiquetaOptativa) etiquetaOptativa.hidden = !esOptativa;
+      if (selectorOptativa) {
+        selectorOptativa.required = esOptativa;
+        if (!esOptativa) selectorOptativa.value = '';
+      }
+    };
+    selectorEspacio?.addEventListener('change', actualizarOptativa);
+    actualizarOptativa();
+
     renderizarIconos();
 
     configurarTamanoDialog(dialog, 'md');
@@ -3870,6 +3952,9 @@ async function abrirRegistrarResultadoAcademico(
               esAsistenteActivo();
             const datosResultado = {
               planAsignaturaId,
+              ...(document.getElementById('resultadoOptativaReal')?.value
+                ? { cursoOptativoId: Number(document.getElementById('resultadoOptativaReal').value) }
+                : {}),
               periodoId,
               resultado,
               origenAcademico,

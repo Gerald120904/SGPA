@@ -241,7 +241,7 @@ describe('PlanValidacionesService', () => {
     expect(r.valido).toBe(true);
   });
 
-  it('detecta una optativa activa sin clasificación', async () => {
+  it('acepta un espacio optativo genérico con regla de distribución', async () => {
     planes.findOne.mockResolvedValue({ id: 1 });
     asignaturas.find.mockResolvedValue([
       {
@@ -260,18 +260,14 @@ describe('PlanValidacionesService', () => {
     ]);
     requisitos.find.mockResolvedValue([]);
     salidas.find.mockResolvedValue([]);
+    reglasOptativas.findOne.mockResolvedValue({
+      planEstudioId: 1, cantidadDisciplinarias: 1, cantidadAbiertas: 0, cantidadSede: 0,
+    });
 
     const r = await service.validar(1);
 
-    expect(r.errores).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          codigo: 'OPTATIVA_SIN_CLASIFICAR',
-          asignaturaId: 20,
-        }),
-      ]),
-    );
-    expect(r.valido).toBe(false);
+    expect(r.errores).not.toEqual(expect.arrayContaining([expect.objectContaining({ codigo: 'OPTATIVA_SIN_CLASIFICAR' })]));
+    expect(r.valido).toBe(true);
   });
 
   it('detecta que no se cumple la cantidad exacta de optativas disciplinarias', async () => {
@@ -318,7 +314,7 @@ describe('PlanValidacionesService', () => {
     expect(r.errores).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          codigo: 'CANTIDAD_OPTATIVAS_DISCIPLINARIAS_NO_CUMPLIDA',
+          codigo: 'CANTIDAD_ESPACIOS_OPTATIVOS_NO_CUMPLIDA',
         }),
       ]),
     );
@@ -382,7 +378,7 @@ describe('PlanValidacionesService', () => {
     expect(r.errores).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          codigo: 'CANTIDAD_OPTATIVAS_ABIERTAS_NO_CUMPLIDA',
+          codigo: 'CANTIDAD_ESPACIOS_OPTATIVOS_NO_CUMPLIDA',
         }),
       ]),
     );
