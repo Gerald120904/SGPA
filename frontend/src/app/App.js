@@ -37,6 +37,7 @@ import {
   CursosPage,
   iniciarCursosPage
 } from '../pages/cursos/CursosPage.js';
+import { OptativasPage, iniciarOptativasPage } from '../pages/optativas/OptativasPage.js';
 
 import {
   PeriodosPage,
@@ -196,6 +197,9 @@ const PAGE_RENDERERS = {
 
   cursos:
     CursosPage,
+
+  optativas:
+    OptativasPage,
 
   periodos:
     PeriodosPage,
@@ -610,6 +614,10 @@ function renderizarRuta(
 
     iniciarCursosPage();
 
+  }
+
+  if (module.id === 'optativas') {
+    iniciarOptativasPage();
   }
 
 

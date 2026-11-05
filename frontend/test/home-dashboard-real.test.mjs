@@ -19,7 +19,7 @@ test('Inicio consulta solo estudiantes activos y muestra el conteo real', async 
   let filtros;
   globalThis.window = { sgpa: { listarEstudiantes: async (parametros) => {
     filtros = parametros;
-    return [{ id: 1 }, { id: 2 }];
+    return { ok: true, estudiantes: [{ id: 1 }, { id: 2 }] };
   } } };
   await iniciarHomePage();
   assert.deepEqual(filtros, { estado: 'ACTIVO' });
@@ -30,11 +30,11 @@ test('Inicio consulta solo estudiantes activos y muestra el conteo real', async 
 
 test('Inicio distingue ausencia de datos y error de consulta', async () => {
   const { valor, detalle } = preparar();
-  globalThis.window = { sgpa: { listarEstudiantes: async () => [] } };
+  globalThis.window = { sgpa: { listarEstudiantes: async () => ({ ok: true, estudiantes: [] }) } };
   await iniciarHomePage();
   assert.equal(valor.textContent, '0');
   assert.equal(detalle.textContent, 'Sin registros activos');
-  globalThis.window.sgpa.listarEstudiantes = async () => { throw new Error('red caída'); };
+  globalThis.window.sgpa.listarEstudiantes = async () => ({ ok: false, message: 'Sin acceso' });
   await iniciarHomePage();
   assert.equal(valor.textContent, 'No disponible');
   limpiarSesion();

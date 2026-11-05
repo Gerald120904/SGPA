@@ -70,7 +70,7 @@ import {
 } from '../../utils/icons.js';
 
 import {
-  obtenerRolesUsuario,
+  obtenerRolActivo,
   usuarioTienePermiso,
 } from '../../app/session.js';
 

@@ -23,6 +23,7 @@ import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { TipoOptativa } from '../optativas/constants/tipo-optativa.constant';
+import { CursoOptativo } from '../optativas/entities/curso-optativo.entity';
 import { TipoPlanAsignatura } from '../planes-estudio/constants/tipo-plan-asignatura.constant';
 import { TipoRequisito } from '../planes-estudio/constants/tipo-requisito.constant';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
@@ -402,6 +403,20 @@ export class EstudiantesService {
       estudiante.periodoIngreso,
       'El período del resultado académico',
     );
+    if (asignatura.tipo === TipoPlanAsignatura.OPTATIVA) {
+      return this.dataSource.transaction(async (manager) => {
+        const bloqueado = await manager.getRepository(Estudiante).findOne({
+          where: { id: estudianteId }, lock: { mode: 'pessimistic_write' },
+        });
+        if (!bloqueado || bloqueado.planEstudioId !== estudiante.planEstudioId || bloqueado.estado !== estudiante.estado) {
+          throw new ConflictException('El expediente cambió durante el registro del resultado.');
+        }
+        return this.guardarResultadoOptativo(manager, bloqueado, asignatura, dto, usuarioId);
+      });
+    }
+    if (dto.cursoOptativoId != null) {
+      throw new BadRequestException('Solo un espacio optativo admite una asignatura del catálogo.');
+    }
     return this.historialAcademicoRepository.save(
       this.historialAcademicoRepository.create({
         estudianteId,
@@ -463,6 +478,13 @@ export class EstudiantesService {
       estudiante.periodoIngreso,
       'El período del resultado académico',
     );
+    if (asignatura.tipo === TipoPlanAsignatura.OPTATIVA) {
+      const guardado = await this.guardarResultadoOptativo(manager, estudiante, asignatura, dto, coordinadorId);
+      return guardado.id;
+    }
+    if (dto.cursoOptativoId != null) {
+      throw new BadRequestException('Solo un espacio optativo admite una asignatura del catálogo.');
+    }
     const historialRepo = manager.getRepository(HistorialAcademicoEstudiante);
     const guardado = await historialRepo.save(
       historialRepo.create({
@@ -477,6 +499,120 @@ export class EstudiantesService {
       }),
     );
     return guardado.id;
+  }
+
+  private async guardarResultadoOptativo(
+    manager: EntityManager,
+    estudiante: Estudiante,
+    espacio: PlanAsignatura,
+    dto: RegistrarResultadoAcademicoDto,
+    usuarioId: number,
+  ): Promise<HistorialAcademicoEstudiante> {
+    if (!dto.cursoOptativoId) {
+      throw new BadRequestException('Seleccione la asignatura real del catálogo para el espacio optativo.');
+    }
+    const optativa = await manager.getRepository(CursoOptativo).findOne({
+      where: { id: dto.cursoOptativoId, activo: true }, relations: { curso: true },
+    });
+    if (!optativa || !optativa.curso?.activo) {
+      throw new BadRequestException('La asignatura optativa no existe o está inactiva en el catálogo.');
+    }
+    if (optativa.tipo === TipoOptativa.DISCIPLINARIA && optativa.carreraOrigenId !== estudiante.carreraId) {
+      throw new BadRequestException('La optativa disciplinaria no corresponde a la carrera del estudiante.');
+    }
+    const repo = manager.getRepository(HistorialAcademicoEstudiante);
+    const anteriores = await repo.find({
+      where: { estudianteId: estudiante.id },
+    });
+    const aprobada = dto.resultado === ResultadoAcademico.APROBADO;
+    const reconocidas = anteriores.filter((h) =>
+      h.resultado === ResultadoAcademico.APROBADO && h.reconocimientoOptativo === 'RECONOCIDO',
+    );
+    const reconocidasPlan = reconocidas.filter((h) => h.planEstudioContextoId === estudiante.planEstudioId);
+    const yaReconocida = reconocidas.some((h) => h.cursoOptativoId === optativa.id);
+    const espacioOcupado = reconocidasPlan.some((h) => h.planAsignaturaId === espacio.id);
+    if (aprobada && espacioOcupado && !yaReconocida) {
+      throw new ConflictException('Este espacio optativo ya tiene una asignatura reconocida.');
+    }
+    const regla = await manager.getRepository(ReglaOptativaPlan).findOne({
+      where: { planEstudioId: estudiante.planEstudioId },
+    });
+    if (aprobada && !yaReconocida) {
+      if (!regla) throw new BadRequestException('El plan no tiene una regla de distribución de optativas.');
+      const limite = optativa.tipo === TipoOptativa.DISCIPLINARIA
+        ? regla.cantidadDisciplinarias
+        : optativa.tipo === TipoOptativa.ABIERTA ? regla.cantidadAbiertas : regla.cantidadSede;
+      if (reconocidasPlan.filter((h) => h.tipoOptativaReal === optativa.tipo).length >= limite) {
+        throw new ConflictException('La categoría optativa ya completó la cantidad exigida por el plan.');
+      }
+    }
+    const reconocer = aprobada && !yaReconocida;
+    return repo.save(repo.create({
+      estudianteId: estudiante.id,
+      planAsignaturaId: espacio.id,
+      planEstudioContextoId: estudiante.planEstudioId,
+      cursoOptativoId: optativa.id,
+      codigoOptativaReal: optativa.curso.codigo,
+      nombreOptativaReal: optativa.curso.nombre,
+      tipoOptativaReal: optativa.tipo,
+      creditosOptativaReal: null,
+      reconocimientoOptativo: reconocer ? 'RECONOCIDO' : 'NO_RECONOCIDO',
+      creditosReconocidos: reconocer ? espacio.creditos : 0,
+      reconocidoPorUsuarioId: reconocer ? usuarioId : null,
+      fechaReconocimiento: reconocer ? new Date() : null,
+      periodoId: dto.periodoId,
+      resultado: dto.resultado,
+      origenAcademico: dto.origenAcademico,
+      fuenteRegistro: FuenteRegistroAcademico.MANUAL,
+      observaciones: dto.observaciones?.trim() || null,
+      registradoPorUsuarioId: usuarioId,
+    }));
+  }
+
+  private async ajustarReconocimientoOptativo(
+    manager: EntityManager,
+    estudiante: Estudiante,
+    registro: HistorialAcademicoEstudiante,
+    usuarioId: number,
+  ): Promise<void> {
+    if (registro.cursoOptativoId == null) return;
+    if (registro.resultado !== ResultadoAcademico.APROBADO) {
+      registro.reconocimientoOptativo = 'NO_RECONOCIDO';
+      registro.creditosReconocidos = 0;
+      registro.reconocidoPorUsuarioId = null;
+      registro.fechaReconocimiento = null;
+      return;
+    }
+    const anteriores = await manager.getRepository(HistorialAcademicoEstudiante).find({
+      where: { estudianteId: estudiante.id },
+    });
+    const reconocidas = anteriores.filter((h) => h.id !== registro.id &&
+      h.resultado === ResultadoAcademico.APROBADO && h.reconocimientoOptativo === 'RECONOCIDO');
+    const reconocidasPlan = reconocidas.filter((h) => h.planEstudioContextoId === registro.planEstudioContextoId);
+    if (reconocidas.some((h) => h.cursoOptativoId === registro.cursoOptativoId)) {
+      registro.reconocimientoOptativo = 'NO_RECONOCIDO';
+      registro.creditosReconocidos = 0;
+      registro.reconocidoPorUsuarioId = null;
+      registro.fechaReconocimiento = null;
+      return;
+    }
+    if (reconocidasPlan.some((h) => h.planAsignaturaId === registro.planAsignaturaId)) {
+      throw new ConflictException('Este espacio optativo ya tiene una asignatura reconocida.');
+    }
+    const regla = await manager.getRepository(ReglaOptativaPlan).findOne({
+      where: { planEstudioId: registro.planEstudioContextoId! },
+    });
+    if (!regla) throw new BadRequestException('El plan no tiene una regla de distribución de optativas.');
+    const limite = registro.tipoOptativaReal === TipoOptativa.DISCIPLINARIA
+      ? regla.cantidadDisciplinarias
+      : registro.tipoOptativaReal === TipoOptativa.ABIERTA ? regla.cantidadAbiertas : regla.cantidadSede;
+    if (reconocidasPlan.filter((h) => h.tipoOptativaReal === registro.tipoOptativaReal).length >= limite) {
+      throw new ConflictException('La categoría optativa ya completó la cantidad exigida por el plan.');
+    }
+    registro.reconocimientoOptativo = 'RECONOCIDO';
+    registro.creditosReconocidos = registro.planAsignatura?.creditos ?? 0;
+    registro.reconocidoPorUsuarioId = usuarioId;
+    registro.fechaReconocimiento = new Date();
   }
 
   async listarHistorialPlanes(usuarioId: number, estudianteId: number) {
@@ -828,7 +964,9 @@ export class EstudiantesService {
     });
     const aprobadasIds = new Set(
       historialHastaReferencia
-        .filter((item) => item.resultado === ResultadoAcademico.APROBADO)
+        .filter((item) => item.resultado === ResultadoAcademico.APROBADO &&
+          (item.planAsignatura?.tipo !== TipoPlanAsignatura.OPTATIVA ||
+            item.reconocimientoOptativo === 'RECONOCIDO' || item.cursoOptativoId == null))
         .map((item) => item.planAsignaturaId),
     );
     const cursosAprobadosIds = new Set(
@@ -856,11 +994,11 @@ export class EstudiantesService {
     );
     const estaAprobada = (item: PlanAsignatura) =>
       aprobadasIds.has(item.id) ||
-      (item.cursoId !== null && cursosAprobadosIds.has(item.cursoId));
+      (item.tipo !== TipoPlanAsignatura.OPTATIVA && item.cursoId !== null && cursosAprobadosIds.has(item.cursoId));
     const estaReprobada = (item: PlanAsignatura) =>
       !estaAprobada(item) &&
       (reprobadasIds.has(item.id) ||
-        (item.cursoId !== null && cursosReprobadosIds.has(item.cursoId)));
+        (item.tipo !== TipoPlanAsignatura.OPTATIVA && item.cursoId !== null && cursosReprobadosIds.has(item.cursoId)));
     const aprobadas = asignaturas.filter(estaAprobada);
     const reprobadas = asignaturas.filter(estaReprobada);
     const pendientes = asignaturas.filter((item) => !estaAprobada(item));
@@ -909,6 +1047,20 @@ export class EstudiantesService {
         (item.nivel - 1) * ciclosPorAnio + (item.ciclo - 1) <
         posicionReferencia,
     );
+    const resumirPersonalizada = (asignatura: PlanAsignatura) => {
+      const resumen = this.resumirAsignatura(asignatura);
+      if (asignatura.tipo !== TipoPlanAsignatura.OPTATIVA) return resumen;
+      const reconocimiento = historialHastaReferencia.find((item) =>
+        item.planAsignaturaId === asignatura.id && item.reconocimientoOptativo === 'RECONOCIDO');
+      const intento = reconocimiento || [...historialHastaReferencia].reverse().find((item) =>
+        item.planAsignaturaId === asignatura.id && item.cursoOptativoId != null);
+      return intento?.cursoOptativoId != null
+        ? { ...resumen, codigo: intento.codigoOptativaReal, nombre: intento.nombreOptativaReal,
+            espacioCodigo: resumen.codigo, espacioNombre: resumen.nombre,
+            tipoOptativa: intento.tipoOptativaReal,
+            creditos: reconocimiento ? reconocimiento.creditosReconocidos : 0 }
+        : resumen;
+    };
     return {
       estudiante,
       periodoReferencia,
@@ -919,8 +1071,8 @@ export class EstudiantesService {
         pendientes: pendientes.length,
         rezagadas: rezagadas.length,
       },
-      aprobadas: aprobadas.map((item) => this.resumirAsignatura(item)),
-      reprobadas: reprobadas.map((item) => this.resumirAsignatura(item)),
+      aprobadas: aprobadas.map(resumirPersonalizada),
+      reprobadas: reprobadas.map(resumirPersonalizada),
       pendientes: pendientes.map((item) => this.resumirAsignatura(item)),
       habilitadas,
       rezagadas: rezagadas.map((item) => this.resumirAsignatura(item)),
@@ -932,6 +1084,16 @@ export class EstudiantesService {
       id: item.id,
       estudianteId: item.estudianteId,
       planAsignaturaId: item.planAsignaturaId,
+      cursoOptativoId: item.cursoOptativoId,
+      planEstudioContextoId: item.planEstudioContextoId,
+      codigoOptativaReal: item.codigoOptativaReal,
+      nombreOptativaReal: item.nombreOptativaReal,
+      tipoOptativaReal: item.tipoOptativaReal,
+      creditosOptativaReal: item.creditosOptativaReal,
+      reconocimientoOptativo: item.reconocimientoOptativo,
+      creditosReconocidos: item.creditosReconocidos,
+      reconocidoPorUsuarioId: item.reconocidoPorUsuarioId,
+      fechaReconocimiento: item.fechaReconocimiento,
       periodoId: item.periodoId,
       resultado: item.resultado,
       origenAcademico: item.origenAcademico,
@@ -1499,6 +1661,7 @@ export class EstudiantesService {
     }
 
     return this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Estudiante).findOne({ where: { id: estudianteId }, lock: { mode: 'pessimistic_write' } });
       const auditoriaRepo = manager.getRepository(AuditoriaHistorialAcademico);
       const histRepo = manager.getRepository(HistorialAcademicoEstudiante);
 
@@ -1522,6 +1685,7 @@ export class EstudiantesService {
       registroActual.resultado = dto.resultado;
       if (dto.origenAcademico) registroActual.origenAcademico = dto.origenAcademico;
       if (dto.observaciones !== undefined) registroActual.observaciones = dto.observaciones?.trim() || null;
+      await this.ajustarReconocimientoOptativo(manager, estudiante, registroActual, usuarioId);
 
       await histRepo.save(registroActual);
 
@@ -1582,6 +1746,7 @@ export class EstudiantesService {
     registroActual.resultado = dto.resultado;
     if (dto.origenAcademico) registroActual.origenAcademico = dto.origenAcademico;
     if (dto.observaciones !== undefined) registroActual.observaciones = dto.observaciones?.trim() || null;
+    await this.ajustarReconocimientoOptativo(manager, estudiante, registroActual, coordinadorId);
 
     await histRepo.save(registroActual);
     return historialId;
@@ -1663,11 +1828,13 @@ export class EstudiantesService {
         estudianteId: estudiante.id,
         resultado: ResultadoAcademico.APROBADO,
       },
-      select: { planAsignaturaId: true, resultado: true },
+      relations: { planAsignatura: true },
     });
 
     const ids: number[] = aprobadas
-      .filter((a) => a.resultado === ResultadoAcademico.APROBADO)
+      .filter((a) => a.resultado === ResultadoAcademico.APROBADO &&
+        (a.planAsignatura?.tipo !== TipoPlanAsignatura.OPTATIVA ||
+          a.cursoOptativoId == null || a.reconocimientoOptativo === 'RECONOCIDO'))
       .map((a) => a.planAsignaturaId);
     return [...new Set(ids)];
   }

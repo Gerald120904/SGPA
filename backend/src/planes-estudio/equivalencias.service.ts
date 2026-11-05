@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Estudiante } from '../estudiantes/entities/estudiante.entity';
 import { HistorialAcademicoEstudiante } from '../estudiantes/entities/historial-academico-estudiante.entity';
+import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { ResultadoAcademico } from '../estudiantes/constants/resultado-academico.constant';
 import { OrigenAcademico } from '../estudiantes/constants/origen-academico.constant';
 import { FuenteRegistroAcademico } from '../estudiantes/constants/fuente-registro-academico.constant';
@@ -256,9 +257,12 @@ export class EquivalenciasService {
       where: { estudianteId, resultado: ResultadoAcademico.APROBADO },
       relations: { planAsignatura: { curso: true } },
     });
-    const aprobadasOrigenIds = new Set(historiales.map((h) => h.planAsignaturaId));
+    const historialesValidos = historiales.filter((h) =>
+      h.planAsignatura?.tipo !== TipoPlanAsignatura.OPTATIVA ||
+      h.cursoOptativoId == null || h.reconocimientoOptativo === 'RECONOCIDO');
+    const aprobadasOrigenIds = new Set(historialesValidos.map((h) => h.planAsignaturaId));
     const cursosAprobadosIds = new Set(
-      historiales.filter((h) => h.planAsignatura?.cursoId).map((h) => h.planAsignatura.cursoId!),
+      historialesValidos.filter((h) => h.planAsignatura?.cursoId).map((h) => h.planAsignatura.cursoId!),
     );
 
     // 2. Equivalencias activas del plan actual al nuevo plan
@@ -336,6 +340,18 @@ export class EquivalenciasService {
       let aplicadas = 0;
 
       for (const eq of equivalencias) {
+        if (eq.asignaturaDestino?.tipo === TipoPlanAsignatura.OPTATIVA) {
+          throw new BadRequestException('La equivalencia hacia un espacio optativo requiere vincular una asignatura real y una decisión curricular explícita.');
+        }
+        if (eq.asignaturaOrigen?.tipo === TipoPlanAsignatura.OPTATIVA) {
+          const origenReconocido = await historialRepo.findOne({ where: {
+            estudianteId: dto.estudianteId,
+            planAsignaturaId: eq.asignaturaOrigenId,
+            resultado: ResultadoAcademico.APROBADO,
+            reconocimientoOptativo: 'RECONOCIDO',
+          } });
+          if (!origenReconocido) throw new BadRequestException('La optativa de origen no tiene un reconocimiento curricular válido.');
+        }
         // Verificar si ya está aprobada la de destino para no duplicar créditos
         const yaAprobada = await historialRepo.findOne({
           where: {

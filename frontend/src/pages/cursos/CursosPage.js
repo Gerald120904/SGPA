@@ -11,7 +11,7 @@ import { listarPlanAsignaturas } from "../../services/plan-asignaturas.service.j
 import { listarPlanRequisitos } from "../../services/plan-requisitos.service.js";
 import { obtenerCatalogoCursosJerarquia } from '../../services/jerarquia.service.js';
 import { proponerEstadoCurso, proponerRequisitoCurso, proponerEliminarRequisitoCurso } from '../../services/solicitudes-cambio.service.js';
-import { usuarioTienePermiso, obtenerRolesUsuario } from "../../app/session.js";
+import { usuarioTienePermiso, obtenerRolActivo } from "../../app/session.js";
 import { PERMISOS, ROLES } from "../../config/permissions.js";
 import { confirmarAccion } from "../../utils/confirm.js";
 import { escapeHtml } from "../../utils/html.js";
@@ -54,8 +54,8 @@ function puedeGestionarCursos() {
   );
 }
 
-const esAsistente = () => obtenerRolesUsuario().includes(ROLES.ASISTENTE_ESTUDIANTIL);
-const esCuentaJerarquica = () => esAsistente() || obtenerRolesUsuario().includes(ROLES.COORDINADOR);
+const esAsistente = () => obtenerRolActivo() === ROLES.ASISTENTE_ESTUDIANTIL;
+const esCuentaJerarquica = () => esAsistente() || obtenerRolActivo() === ROLES.COORDINADOR;
 
 /* =========================================================
    PAGE

@@ -10,7 +10,7 @@
     "test": "node --test",
     "test:contracts": "node --test test/ipc-contract.test.mjs",
     "test:pbi": "node --test test/pbi-ordering.test.mjs",
-    "package": "electron-forge package",
+    "package": "node scripts/package-verified.cjs",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "echo \"No linting configured\""

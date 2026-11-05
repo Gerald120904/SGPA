@@ -175,6 +175,11 @@ contextBridge.exposeInMainWorld("sgpa", {
       cursoId,
     ),
   listarCursos: () => ipcRenderer.invoke("cursos:listar"),
+  listarOptativas: () => ipcRenderer.invoke('optativas:listar'),
+  listarCarrerasElegiblesOptativa: () => ipcRenderer.invoke('optativas:carreras-elegibles'),
+  crearOptativa: (datos) => ipcRenderer.invoke('optativas:crear', datos),
+  actualizarOptativa: (id, datos) => ipcRenderer.invoke('optativas:actualizar', id, datos),
+  cambiarEstadoOptativa: (id, activo) => ipcRenderer.invoke('optativas:cambiar-estado', id, activo),
   listarAsignaturasDisponiblesCurso: (filtros) =>
     ipcRenderer.invoke("cursos:asignaturas-disponibles", filtros),
   obtenerCurso: (id) => ipcRenderer.invoke("cursos:obtener", id),

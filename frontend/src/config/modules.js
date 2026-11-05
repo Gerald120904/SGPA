@@ -93,6 +93,15 @@ export const MODULES = [
   },
 
   {
+    id: 'optativas',
+    title: 'Catálogo de Optativas',
+    route: '/optativas',
+    icon: 'library-big',
+    section: 'Gestión académica',
+    description: 'Asignaturas optativas disciplinarias, abiertas y de sede'
+  },
+
+  {
     id: 'profesores',
     title: 'Profesores',
     route: '/profesores',

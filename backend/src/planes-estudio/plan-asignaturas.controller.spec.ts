@@ -339,7 +339,7 @@ describe('PlanAsignaturasController', () => {
   });
 
 
-  it('rechaza crear una OPTATIVA sin clasificación', async () => {
+  it('crea un espacio de optativa genérico sin categoría fija', async () => {
     await request(app.getHttpServer())
       .post('/planes-estudio/1/asignaturas')
       .set('Authorization', `Bearer ${await token('COORDINADOR')}`)
@@ -352,9 +352,12 @@ describe('PlanAsignaturasController', () => {
         codigoReferencia: 'OPT-1',
         nombreReferencia: 'Optativa',
       })
-      .expect(400);
+      .expect(201, { id: 10 });
 
-    expect(service.crear).not.toHaveBeenCalled();
+    expect(service.crear).toHaveBeenCalledWith(1, expect.objectContaining({
+      tipo: TipoPlanAsignatura.OPTATIVA,
+      codigoReferencia: 'OPT-1',
+    }));
   });
 
   it('rechaza valores curriculares fuera de rango', async () => {
