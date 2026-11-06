@@ -38,6 +38,31 @@ export class EquivalenciasService {
     private readonly dataSource: DataSource,
   ) {}
 
+  private guardarSinDuplicados(planDestinoId: number, entidades: EquivalenciaPlan[]): Promise<EquivalenciaPlan> {
+    return this.dataSource.transaction(async (manager) => {
+      // El bloqueo del plan serializa las altas concurrentes del mismo destino.
+      // La comprobación de duplicados debe ocurrir dentro de esta transacción.
+      const planes = await manager.query('SELECT id FROM planes_estudio WHERE id = ? FOR UPDATE', [planDestinoId]);
+      if (!planes.length) throw new BadRequestException('El plan de destino no existe.');
+      const repo = manager.getRepository(EquivalenciaPlan);
+      const creadas: EquivalenciaPlan[] = [];
+      for (const entidad of entidades) {
+        const existente = await repo.findOne({ where: {
+          planOrigenId: entidad.planOrigenId,
+          asignaturaOrigenId: entidad.asignaturaOrigenId,
+          planDestinoId: entidad.planDestinoId,
+          asignaturaDestinoId: entidad.asignaturaDestinoId,
+          activo: true,
+        } });
+        if (existente) {
+          throw new ConflictException('Ya existe una equivalencia activa registrada para estas asignaturas.');
+        }
+        creadas.push(await repo.save(entidad));
+      }
+      return creadas[0];
+    });
+  }
+
   async crear(usuarioId: number, dto: CrearEquivalenciaPlanDto): Promise<EquivalenciaPlan> {
     const puede = await this.alcance.puedeEjecutar(
       usuarioId,
@@ -65,21 +90,16 @@ export class EquivalenciasService {
       }
 
       const groupId = `COMP_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const creadas: EquivalenciaPlan[] = [];
-
-      for (let i = 0; i < origenIds.length; i++) {
-        const origId = origenIds[i];
-        const asigOrigen = await this.planAsignaturaRepo.findOne({
-          where: { id: origId, planEstudioId: dto.planOrigenId },
-        });
-        if (!asigOrigen) {
-          throw new BadRequestException(`La asignatura de origen #${origId} no pertenece al plan de origen.`);
-        }
-
+      const origenes = await Promise.all(origenIds.map((id) =>
+        this.planAsignaturaRepo.findOne({ where: { id, planEstudioId: dto.planOrigenId } })));
+      const origenInvalido = origenes.findIndex((asignatura) => !asignatura);
+      if (origenInvalido >= 0) {
+        throw new BadRequestException(`La asignatura de origen #${origenIds[origenInvalido]} no pertenece al plan de origen.`);
+      }
+      const entidades = origenIds.map((origId, i) => {
         const tag = `[COMPUESTA_N1:${groupId}:${i + 1}:${origenIds.length}:${JSON.stringify(origenIds)}]`;
         const justif = dto.justificacion?.trim() ? `${tag} ${dto.justificacion.trim()}` : tag;
-
-        const entidad = this.equivalenciaRepo.create({
+        return this.equivalenciaRepo.create({
           carreraOrigenId: dto.carreraOrigenId,
           planOrigenId: dto.planOrigenId,
           asignaturaOrigenId: origId,
@@ -90,9 +110,8 @@ export class EquivalenciasService {
           autorizadoPorUsuarioId: usuarioId,
           activo: true,
         });
-        creadas.push(await this.equivalenciaRepo.save(entidad));
-      }
-      return creadas[0];
+      });
+      return this.guardarSinDuplicados(dto.planDestinoId, entidades);
     }
 
     // Support 1:N composite equivalence
@@ -112,21 +131,16 @@ export class EquivalenciasService {
       }
 
       const groupId = `COMP1N_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const creadas: EquivalenciaPlan[] = [];
-
-      for (let i = 0; i < destIds.length; i++) {
-        const dId = destIds[i];
-        const asigDestino = await this.planAsignaturaRepo.findOne({
-          where: { id: dId, planEstudioId: dto.planDestinoId },
-        });
-        if (!asigDestino) {
-          throw new BadRequestException(`La asignatura de destino #${dId} no pertenece al plan de destino.`);
-        }
-
+      const destinos = await Promise.all(destIds.map((id) =>
+        this.planAsignaturaRepo.findOne({ where: { id, planEstudioId: dto.planDestinoId } })));
+      const destinoInvalido = destinos.findIndex((asignatura) => !asignatura);
+      if (destinoInvalido >= 0) {
+        throw new BadRequestException(`La asignatura de destino #${destIds[destinoInvalido]} no pertenece al plan de destino.`);
+      }
+      const entidades = destIds.map((dId, i) => {
         const tag = `[COMPUESTA_1N:${groupId}:${i + 1}:${destIds.length}:${JSON.stringify(destIds)}]`;
         const justif = dto.justificacion?.trim() ? `${tag} ${dto.justificacion.trim()}` : tag;
-
-        const entidad = this.equivalenciaRepo.create({
+        return this.equivalenciaRepo.create({
           carreraOrigenId: dto.carreraOrigenId,
           planOrigenId: dto.planOrigenId,
           asignaturaOrigenId: dto.asignaturaOrigenId,
@@ -137,9 +151,8 @@ export class EquivalenciasService {
           autorizadoPorUsuarioId: usuarioId,
           activo: true,
         });
-        creadas.push(await this.equivalenciaRepo.save(entidad));
-      }
-      return creadas[0];
+      });
+      return this.guardarSinDuplicados(dto.planDestinoId, entidades);
     }
 
     // Standard 1:1
@@ -159,26 +172,13 @@ export class EquivalenciasService {
       throw new BadRequestException('La asignatura de destino no pertenece al plan de destino.');
     }
 
-    const existente = await this.equivalenciaRepo.findOne({
-      where: {
-        planOrigenId: dto.planOrigenId,
-        asignaturaOrigenId: dto.asignaturaOrigenId,
-        planDestinoId: dto.planDestinoId,
-        asignaturaDestinoId: dto.asignaturaDestinoId,
-        activo: true,
-      },
-    });
-    if (existente) {
-      throw new ConflictException('Ya existe una equivalencia activa registrada para estas asignaturas.');
-    }
-
     const entidad = this.equivalenciaRepo.create({
       ...dto,
       justificacion: dto.justificacion?.trim() || null,
       autorizadoPorUsuarioId: usuarioId,
       activo: true,
     });
-    return this.equivalenciaRepo.save(entidad);
+    return this.guardarSinDuplicados(dto.planDestinoId, [entidad]);
   }
 
   async listarPorPlanes(planOrigenId: number, planDestinoId: number): Promise<EquivalenciaPlan[]> {
@@ -218,10 +218,10 @@ export class EquivalenciasService {
         where: { planOrigenId: eq.planOrigenId, planDestinoId: eq.planDestinoId, activo: true },
       });
       const relacionadas = grupo.filter((e) => e.justificacion && e.justificacion.includes(`:${groupId}:`));
-      for (const rel of relacionadas) {
-        rel.activo = false;
-        await this.equivalenciaRepo.save(rel);
-      }
+      await this.dataSource.transaction(async (manager) => {
+        const repo = manager.getRepository(EquivalenciaPlan);
+        for (const rel of relacionadas) await repo.save({ ...rel, activo: false });
+      });
       eliminadas = relacionadas.length || 1;
     } else {
       eq.activo = false;
@@ -334,8 +334,15 @@ export class EquivalenciasService {
     if (!equivalencias.length) {
       throw new BadRequestException('No se encontraron equivalencias activas válidas para aplicar.');
     }
+    if (new Set(equivalencias.map((eq) => eq.id)).size !== new Set(dto.equivalenciaIds).size) {
+      throw new BadRequestException('Una o más equivalencias solicitadas no están activas.');
+    }
 
     return this.dataSource.transaction(async (manager) => {
+      const estudiantesBloqueados = await manager.query(
+        'SELECT id FROM estudiantes WHERE id = ? FOR UPDATE', [dto.estudianteId],
+      );
+      if (!estudiantesBloqueados.length) throw new NotFoundException('Estudiante no encontrado.');
       const historialRepo = manager.getRepository(HistorialAcademicoEstudiante);
       let aplicadas = 0;
 
@@ -343,14 +350,52 @@ export class EquivalenciasService {
         if (eq.asignaturaDestino?.tipo === TipoPlanAsignatura.OPTATIVA) {
           throw new BadRequestException('La equivalencia hacia un espacio optativo requiere vincular una asignatura real y una decisión curricular explícita.');
         }
-        if (eq.asignaturaOrigen?.tipo === TipoPlanAsignatura.OPTATIVA) {
-          const origenReconocido = await historialRepo.findOne({ where: {
-            estudianteId: dto.estudianteId,
-            planAsignaturaId: eq.asignaturaOrigenId,
-            resultado: ResultadoAcademico.APROBADO,
-            reconocimientoOptativo: 'RECONOCIDO',
+        const origenAprobado = await historialRepo.findOne({ where: {
+          estudianteId: dto.estudianteId,
+          planAsignaturaId: eq.asignaturaOrigenId,
+          resultado: ResultadoAcademico.APROBADO,
+        } });
+        if (!origenAprobado) {
+          throw new BadRequestException('La asignatura de origen no tiene una aprobación válida en el historial del estudiante.');
+        }
+        if (eq.asignaturaOrigen?.tipo === TipoPlanAsignatura.OPTATIVA &&
+            origenAprobado.reconocimientoOptativo !== 'RECONOCIDO') {
+          throw new BadRequestException('La optativa de origen no tiene un reconocimiento curricular válido.');
+        }
+        const grupoN1 = eq.justificacion?.match(/\[COMPUESTA_N1:([^:]+):\d+:\d+:(\[[^\]]+\])\]/);
+        if (grupoN1) {
+          let idsRequeridos: number[];
+          try {
+            idsRequeridos = JSON.parse(grupoN1[2]);
+          } catch {
+            throw new BadRequestException('La equivalencia compuesta tiene una definición inválida.');
+          }
+          if (!Array.isArray(idsRequeridos) || idsRequeridos.length < 2 ||
+              idsRequeridos.some((id) => !Number.isInteger(id))) {
+            throw new BadRequestException('La equivalencia compuesta tiene asignaturas requeridas inválidas.');
+          }
+          const ramas = await this.equivalenciaRepo.find({ where: {
+            planOrigenId: eq.planOrigenId,
+            planDestinoId: eq.planDestinoId,
+            activo: true,
           } });
-          if (!origenReconocido) throw new BadRequestException('La optativa de origen no tiene un reconocimiento curricular válido.');
+          const grupo = ramas.filter((rama) =>
+            rama.asignaturaDestinoId === eq.asignaturaDestinoId &&
+            rama.justificacion?.includes(`[COMPUESTA_N1:${grupoN1[1]}:`));
+          if (new Set(grupo.map((rama) => rama.asignaturaOrigenId)).size !== idsRequeridos.length ||
+              idsRequeridos.some((id) => !grupo.some((rama) => rama.asignaturaOrigenId === id))) {
+            throw new BadRequestException('La equivalencia compuesta N a 1 no tiene todas sus ramas activas.');
+          }
+          for (const origenId of idsRequeridos) {
+            const aprobado = await historialRepo.findOne({ where: {
+              estudianteId: dto.estudianteId,
+              planAsignaturaId: origenId,
+              resultado: ResultadoAcademico.APROBADO,
+            } });
+            if (!aprobado) {
+              throw new BadRequestException('Faltan asignaturas de origen aprobadas para la equivalencia compuesta N a 1.');
+            }
+          }
         }
         // Verificar si ya está aprobada la de destino para no duplicar créditos
         const yaAprobada = await historialRepo.findOne({
