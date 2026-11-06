@@ -6882,6 +6882,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
   const dialog = document.getElementById("comparadorPlanesDialog");
   const content = document.getElementById("comparadorPlanesDialogContent");
   if (!dialog || !content) return;
+  if (dialog.open) return;
 
   let carreraId = carreraIdInicial || (carrerasDisponibles.length > 0 ? carrerasDisponibles[0].id : null);
   let planOrigenId = planOrigenIdInicial || null;
@@ -6891,6 +6892,14 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
   let equivalencias = [];
   let seleccionadasOrigen = new Set();
   let seleccionadasDestino = new Set();
+  let solicitudActual = 0;
+  let vigente = true;
+  let cargando = false;
+  let errorCarga = "";
+  dialog.addEventListener("close", () => {
+    vigente = false;
+    solicitudActual += 1;
+  }, { once: true });
 
   function normalizarPlanes() {
     const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
@@ -6905,13 +6914,25 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
 
   async function refrescarDatosPlanes() {
     normalizarPlanes();
+    const solicitud = ++solicitudActual;
+    asignaturasOrigen = [];
+    asignaturasDestino = [];
+    equivalencias = [];
+    seleccionadasOrigen.clear();
+    seleccionadasDestino.clear();
+    errorCarga = "";
     if (planOrigenId && planDestinoId && Number(planOrigenId) !== Number(planDestinoId)) {
+      const origenConsultado = planOrigenId;
+      const destinoConsultado = planDestinoId;
+      cargando = true;
+      renderVistaComparador();
       try {
         const [resOrigen, resDestino, resEq] = await Promise.all([
-          listarPlanAsignaturas(planOrigenId),
-          listarPlanAsignaturas(planDestinoId),
-          listarEquivalenciasPlanes(planOrigenId, planDestinoId),
+          listarPlanAsignaturas(origenConsultado),
+          listarPlanAsignaturas(destinoConsultado),
+          listarEquivalenciasPlanes(origenConsultado, destinoConsultado),
         ]);
+        if (!vigente || solicitud !== solicitudActual) return;
         if (resOrigen?.ok === false || resDestino?.ok === false || resEq?.ok === false) {
           throw new Error(resOrigen?.message || resDestino?.message || resEq?.message || "No fue posible consultar las asignaturas y equivalencias.");
         }
@@ -6919,21 +6940,17 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
         asignaturasDestino = Array.isArray(resDestino?.asignaturas) ? resDestino.asignaturas : [];
         equivalencias = Array.isArray(resEq?.data) ? resEq.data : (Array.isArray(resEq) ? resEq : []);
       } catch (error) {
-        asignaturasOrigen = [];
-        asignaturasDestino = [];
-        equivalencias = [];
-        mostrarFeedback(error?.message || "No fue posible consultar el comparador de planes.", "error");
+        if (!vigente || solicitud !== solicitudActual) return;
+        errorCarga = error?.message || "No fue posible consultar el comparador de planes.";
       }
     } else {
-      asignaturasOrigen = [];
-      asignaturasDestino = [];
-      equivalencias = [];
+      cargando = false;
       if (planOrigenId && planDestinoId && Number(planOrigenId) === Number(planDestinoId)) {
         mostrarFeedback("El plan de origen y destino deben ser diferentes.", "error");
       }
     }
-    seleccionadasOrigen.clear();
-    seleccionadasDestino.clear();
+    if (!vigente || solicitud !== solicitudActual) return;
+    cargando = false;
     renderVistaComparador();
   }
 
@@ -6968,7 +6985,9 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
           </label>
         </div>
 
-        ${planOrigenId && planDestinoId && planOrigenId !== planDestinoId ? `
+        ${errorCarga ? `<div class="planes-message planes-error" role="alert">${escapeHtml(errorCarga)}</div>` : ''}
+        ${cargando ? '<div class="planes-message" role="status">Consultando asignaturas y equivalencias...</div>' : ''}
+        ${!cargando && planOrigenId && planDestinoId && Number(planOrigenId) !== Number(planDestinoId) ? `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
             <!-- Columna Izquierda: Plan Origen -->
             <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #ffffff;">
@@ -7061,7 +7080,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
               </table>
             </div>
           </div>
-        ` : `
+        ` : cargando ? '' : `
           <div style="text-align: center; padding: 32px; background: #f8fafc; border-radius: 8px; color: #64748b;">
             ${planOrigenId && planDestinoId && Number(planOrigenId) === Number(planDestinoId)
               ? '<span style="color: #b45309; font-weight: 600;">El plan de origen y de destino no pueden ser el mismo. Seleccione dos planes distintos para realizar la comparación.</span>'

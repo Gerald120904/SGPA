@@ -19,7 +19,7 @@ class NodoPrueba extends EventTarget {
   }
   get innerHTML() { return this._html; }
   showModal() { this.open = true; }
-  close() { this.open = false; }
+  close() { this.open = false; this.dispatchEvent(new Event('close')); }
   click() { this.dispatchEvent(new Event('click')); }
   change(value) { this.value = value; this.dispatchEvent(new Event('change')); }
   querySelectorAll() { return []; }
@@ -136,6 +136,95 @@ test('los clics reales abren y cierran comparador y transición sin duplicar lis
     await tick();
     assert.match(documento.getElementById('transicionCurricularDialogContent').innerHTML, /Se necesitan al menos dos planes/);
     assert.equal(consultas.escrituras, 0);
+  } finally {
+    limpiarSesion();
+    globalThis.document = documentoAnterior;
+    globalThis.window = ventanaAnterior;
+  }
+});
+
+test('una respuesta tardía no reemplaza los planes seleccionados después', async () => {
+  const documentoAnterior = globalThis.document;
+  const ventanaAnterior = globalThis.window;
+  const documento = crearDocumento();
+  globalThis.document = documento;
+  let resolverPlanLento;
+  const planLento = new Promise((resolve) => { resolverPlanLento = resolve; });
+  globalThis.window = { sgpa: {
+    listarPlanesEstudio: async () => ({ ok: true, planes: [1, 2, 3].map((id) => ({ id, carreraId: 10, codigo: `P${id}`, nombre: `Plan ${id}`, activo: true })) }),
+    listarCarreras: async () => ({ ok: true, carreras: [{ id: 10, codigo: 'C', nombre: 'Carrera' }] }),
+    listarPlanAsignaturas: async (id) => id === 3 ? planLento : { ok: true, asignaturas: [{ id: id * 10, creditos: 3, curso: { codigo: `C${id}`, nombre: `Curso ${id}` } }] },
+    listarEquivalenciasPlanes: async () => ({ ok: true, data: [] }),
+  } };
+  guardarSesion({ usuario: { rol: 'ADMIN_GLOBAL', rolActivo: 'ADMIN_GLOBAL' } });
+  try {
+    iniciarPlanesEstudioPage();
+    await tick();
+    documento.getElementById('comparadorPlanesButton').click();
+    await tick();
+    documento.getElementById('compPlanDestinoSelect').change('3');
+    documento.getElementById('compPlanDestinoSelect').change('2');
+    await tick();
+    resolverPlanLento({ ok: true, asignaturas: [{ id: 30, creditos: 3, curso: { codigo: 'C3', nombre: 'Curso 3' } }] });
+    await tick();
+    const html = documento.getElementById('comparadorPlanesDialogContent').innerHTML;
+    assert.match(html, /Curso 2/);
+    assert.doesNotMatch(html, /Curso 3/);
+  } finally {
+    limpiarSesion();
+    globalThis.document = documentoAnterior;
+    globalThis.window = ventanaAnterior;
+  }
+});
+
+test('el comparador ignora la respuesta tras cerrar y limpia datos ante un fallo de red', async () => {
+  const documentoAnterior = globalThis.document;
+  const ventanaAnterior = globalThis.window;
+  const documento = crearDocumento();
+  globalThis.document = documento;
+  let resolverPendiente;
+  let modo = 'pendiente';
+  let consultas = 0;
+  const pendiente = new Promise((resolve) => { resolverPendiente = resolve; });
+  globalThis.window = { sgpa: {
+    listarPlanesEstudio: async () => ({ ok: true, planes: [1, 2, 3].map((id) => ({ id, carreraId: 10, codigo: `P${id}`, nombre: `Plan ${id}`, activo: true })) }),
+    listarCarreras: async () => ({ ok: true, carreras: [{ id: 10, codigo: 'C', nombre: 'Carrera' }] }),
+    listarPlanAsignaturas: async (id) => {
+      consultas += 1;
+      if (id === 3 && modo === 'pendiente') return pendiente;
+      if (id === 3 && modo === 'fallo') throw new Error('Fallo de red QA');
+      return { ok: true, asignaturas: [{ id: id * 10, creditos: 3, curso: { codigo: `C${id}`, nombre: `Curso ${id}` } }] };
+    },
+    listarEquivalenciasPlanes: async () => ({ ok: true, data: [] }),
+  } };
+  guardarSesion({ usuario: { rol: 'ADMIN_GLOBAL', rolActivo: 'ADMIN_GLOBAL' } });
+  try {
+    iniciarPlanesEstudioPage();
+    await tick();
+    documento.getElementById('comparadorPlanesButton').click();
+    await tick();
+    assert.equal(consultas, 2);
+    documento.getElementById('comparadorPlanesButton').click();
+    await tick();
+    assert.equal(consultas, 2, 'otro clic con el diálogo abierto no inicia consultas duplicadas');
+
+    documento.getElementById('compPlanDestinoSelect').change('3');
+    assert.match(documento.getElementById('comparadorPlanesDialogContent').innerHTML, /Consultando asignaturas/);
+    assert.doesNotMatch(documento.getElementById('comparadorPlanesDialogContent').innerHTML, /Curso 2/);
+    documento.getElementById('cerrarComparadorBtn').click();
+    assert.equal(documento.getElementById('comparadorPlanesDialog').open, false);
+    resolverPendiente({ ok: true, asignaturas: [{ id: 30, creditos: 3, curso: { codigo: 'C3', nombre: 'Curso 3' } }] });
+    await tick();
+    assert.doesNotMatch(documento.getElementById('comparadorPlanesDialogContent').innerHTML, /Curso 3/);
+
+    modo = 'fallo';
+    documento.getElementById('comparadorPlanesButton').click();
+    await tick();
+    documento.getElementById('compPlanDestinoSelect').change('3');
+    await tick();
+    const html = documento.getElementById('comparadorPlanesDialogContent').innerHTML;
+    assert.match(html, /Fallo de red QA/);
+    assert.doesNotMatch(html, /Curso 2|Curso 3/);
   } finally {
     limpiarSesion();
     globalThis.document = documentoAnterior;
