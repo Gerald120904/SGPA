@@ -249,6 +249,13 @@ export class TransicionesCurricularesService {
       const conflictos: string[] = [];
       const observacionesAcademicas: string[] = [];
 
+      // Aún no existe una autorización de reconocimiento entre planes para la
+      // optativa real. La simulación no debe presentar este caso como migrable.
+      if (historiales.some((h) =>
+        h.planAsignatura?.tipo === TipoPlanAsignatura.OPTATIVA && h.cursoOptativoId != null)) {
+        conflictos.push('Las optativas reales aprobadas requieren una decisión de reconocimiento en el plan de destino.');
+      }
+
       // Validar conflictos reales que impiden procesar la transición (regla institucional PO):
       // 1. Pertenencia incorrecta al plan de origen
       if (est.planEstudioId !== dto.planOrigenId) {

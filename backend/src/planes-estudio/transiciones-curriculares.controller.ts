@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ConflictException,
   Get,
   Post,
   Query,
@@ -51,10 +52,10 @@ export class TransicionesCurricularesController {
   @Post('ejecutar')
   @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
   ejecutar(
-    @Req() request: Request,
-    @Body() dto: EjecutarTransicionDto,
+    @Req() _request: Request,
+    @Body() _dto: EjecutarTransicionDto,
   ) {
-    return this.transicionesService.ejecutarTransicion(request.user!.sub, dto);
+    throw new ConflictException('La ejecución de transiciones curriculares está suspendida hasta aprobar las reglas de equivalencias y reconocimiento de optativas entre planes.');
   }
 
   @Get('lotes')

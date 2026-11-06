@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { TransicionesCurricularesService } from './transiciones-curriculares.service';
 import { EstadoEstudiante } from '../estudiantes/constants/estado-estudiante.constant';
 import { ResultadoAcademico } from '../estudiantes/constants/resultado-academico.constant';
+import { TipoPlanAsignatura } from './constants/tipo-plan-asignatura.constant';
 import { iniciarContextoRolActivo, establecerRolActivo } from '../auth/active-role-context';
 import { RolSistema } from '../auth/constants/roles.constants';
 
@@ -143,6 +144,29 @@ describe('TransicionesCurricularesService', () => {
   });
 
   describe('simularTransicion', () => {
+    it('marca pendiente la optativa real aprobada sin decidir su reconocimiento en el destino', async () => {
+      mockQueryBuilder.getMany.mockResolvedValueOnce([{
+        id: 101, cedula: 'QA', nombres: 'Prueba', apellido1: 'Optativa',
+        estado: EstadoEstudiante.ACTIVO, planEstudioId: 1, carreraId: 10,
+      }]);
+      historialRepo.find.mockResolvedValueOnce([{
+        estudianteId: 101, planAsignaturaId: 111, cursoOptativoId: 77,
+        resultado: ResultadoAcademico.APROBADO, reconocimientoOptativo: 'RECONOCIDO',
+        planAsignatura: { id: 111, tipo: TipoPlanAsignatura.OPTATIVA, creditos: 3 },
+      }]);
+
+      const resultado = await service.simularTransicion(1, {
+        carreraId: 10, planOrigenId: 1, planDestinoId: 2,
+      });
+
+      expect(resultado.estudiantes[0].puedeMigrar).toBe(false);
+      expect(resultado.estudiantes[0].conflictos).toContain(
+        'Las optativas reales aprobadas requieren una decisión de reconocimiento en el plan de destino.',
+      );
+      expect(resultado.estudiantes[0].asignaturasReconocidas).toHaveLength(0);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
     it('restringe estudiantes seleccionados a la carrera y plan de origen', async () => {
       estudianteRepo.find.mockResolvedValue([]);
 
