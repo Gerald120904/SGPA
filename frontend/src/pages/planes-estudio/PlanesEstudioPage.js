@@ -11,7 +11,6 @@ import {
 } from "../../services/equivalencias.service.js";
 import {
   simularTransicionCurricular,
-  ejecutarTransicionCurricular,
 } from "../../services/transiciones-curriculares.service.js";
 import {
   actualizarPlanAsignatura,
@@ -316,6 +315,7 @@ let frameDibujoMalla = null;
 let mallaAsignaturaSeleccionadaId = null;
 let nivelPaginaPlan = 1;
 let detalleEventosController = null;
+let paginaEventosController = null;
 
 function mostrarDialogHerramienta() {
   const dialog = document.getElementById("asignaturaDialog");
@@ -6892,20 +6892,45 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
   let seleccionadasOrigen = new Set();
   let seleccionadasDestino = new Set();
 
+  function normalizarPlanes() {
+    const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
+    if (!planesCarrera.some((p) => Number(p.id) === Number(planOrigenId))) {
+      planOrigenId = planesCarrera[0]?.id || null;
+    }
+    if (planDestinoId === null && planesCarrera.length > 1) {
+      planDestinoId = planesCarrera.find((p) => Number(p.id) !== Number(planOrigenId))?.id || null;
+    }
+    return planesCarrera;
+  }
+
   async function refrescarDatosPlanes() {
-    if (planOrigenId && planDestinoId && planOrigenId !== planDestinoId) {
-      const [resOrigen, resDestino, resEq] = await Promise.all([
-        listarPlanAsignaturas(planOrigenId),
-        listarPlanAsignaturas(planDestinoId),
-        listarEquivalenciasPlanes(planOrigenId, planDestinoId),
-      ]);
-      asignaturasOrigen = resOrigen?.ok && Array.isArray(resOrigen.asignaturas) ? resOrigen.asignaturas : [];
-      asignaturasDestino = resDestino?.ok && Array.isArray(resDestino.asignaturas) ? resDestino.asignaturas : [];
-      equivalencias = resEq?.ok && Array.isArray(resEq.data) ? resEq.data : (Array.isArray(resEq) ? resEq : []);
+    normalizarPlanes();
+    if (planOrigenId && planDestinoId && Number(planOrigenId) !== Number(planDestinoId)) {
+      try {
+        const [resOrigen, resDestino, resEq] = await Promise.all([
+          listarPlanAsignaturas(planOrigenId),
+          listarPlanAsignaturas(planDestinoId),
+          listarEquivalenciasPlanes(planOrigenId, planDestinoId),
+        ]);
+        if (resOrigen?.ok === false || resDestino?.ok === false || resEq?.ok === false) {
+          throw new Error(resOrigen?.message || resDestino?.message || resEq?.message || "No fue posible consultar las asignaturas y equivalencias.");
+        }
+        asignaturasOrigen = Array.isArray(resOrigen?.asignaturas) ? resOrigen.asignaturas : [];
+        asignaturasDestino = Array.isArray(resDestino?.asignaturas) ? resDestino.asignaturas : [];
+        equivalencias = Array.isArray(resEq?.data) ? resEq.data : (Array.isArray(resEq) ? resEq : []);
+      } catch (error) {
+        asignaturasOrigen = [];
+        asignaturasDestino = [];
+        equivalencias = [];
+        mostrarFeedback(error?.message || "No fue posible consultar el comparador de planes.", "error");
+      }
     } else {
       asignaturasOrigen = [];
       asignaturasDestino = [];
       equivalencias = [];
+      if (planOrigenId && planDestinoId && Number(planOrigenId) === Number(planDestinoId)) {
+        mostrarFeedback("El plan de origen y destino deben ser diferentes.", "error");
+      }
     }
     seleccionadasOrigen.clear();
     seleccionadasDestino.clear();
@@ -6913,11 +6938,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
   }
 
   function renderVistaComparador() {
-    const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
-    if (!planOrigenId && planesCarrera.length > 0) planOrigenId = planesCarrera[0].id;
-    if (!planDestinoId && planesCarrera.length > 1) {
-      planDestinoId = planesCarrera.find((p) => Number(p.id) !== Number(planOrigenId))?.id || planesCarrera[1].id;
-    }
+    const planesCarrera = normalizarPlanes();
 
     const eqOrigenIds = new Set(equivalencias.map((e) => e.asignaturaOrigenId));
     const eqDestinoIds = new Set(equivalencias.map((e) => e.asignaturaDestinoId));
@@ -6956,7 +6977,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
                 <span style="font-size: 12px; color: #64748b;">Seleccionadas: <strong id="countSelOrigen">${seleccionadasOrigen.size}</strong></span>
               </div>
               <div style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
-                ${asignaturasOrigen.map((a) => {
+                ${asignaturasOrigen.length === 0 ? '<p>No hay asignaturas en el plan de origen.</p>' : asignaturasOrigen.map((a) => {
                   const tieneEq = eqOrigenIds.has(a.id);
                   const isChecked = seleccionadasOrigen.has(a.id);
                   return `
@@ -6980,7 +7001,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
                 <span style="font-size: 12px; color: #64748b;">Seleccionadas: <strong id="countSelDestino">${seleccionadasDestino.size}</strong></span>
               </div>
               <div style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
-                ${asignaturasDestino.map((a) => {
+                ${asignaturasDestino.length === 0 ? '<p>No hay asignaturas en el plan de destino.</p>' : asignaturasDestino.map((a) => {
                   const tieneEq = eqDestinoIds.has(a.id);
                   const isChecked = seleccionadasDestino.has(a.id);
                   return `
@@ -6999,6 +7020,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
           </div>
 
           <!-- Barra de Creación de Equivalencia -->
+          ${puedeGestionarPlanes() ? `
           <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 250px;">
               <input type="text" id="compEqJustificacion" placeholder="Justificación o resolución institucional (opcional)..." class="planes-input" style="width: 100%; min-height: 38px; padding: 0 12px; border-radius: 6px; border: 1px solid #cbd5e1;">
@@ -7007,6 +7029,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
               <i data-lucide="link" aria-hidden="true"></i> Vincular Equivalencia (${seleccionadasOrigen.size} a ${seleccionadasDestino.size})
             </button>
           </div>
+          ` : ''}
 
           <!-- Tabla de Equivalencias Registradas -->
           <div style="margin-top: 8px;">
@@ -7028,9 +7051,9 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
                       <td style="padding: 8px;"><strong>${escapeHtml(eq.asignaturaDestino?.curso?.codigo || eq.asignaturaDestino?.codigoReferencia || '#' + eq.asignaturaDestinoId)}</strong> — ${escapeHtml(eq.asignaturaDestino?.curso?.nombre || eq.asignaturaDestino?.nombreReferencia || '')}</td>
                       <td style="padding: 8px; font-size: 12px; color: #475569;">${escapeHtml(eq.justificacion || 'Equivalencia 1:1')}</td>
                       <td style="padding: 8px; text-align: center;">
-                        <button type="button" data-del-eq="${eq.id}" class="planes-icon-button planes-danger-button" title="Eliminar equivalencia" style="padding: 4px 6px;">
+                        ${puedeGestionarPlanes() ? `<button type="button" data-del-eq="${eq.id}" class="planes-icon-button planes-danger-button" title="Eliminar equivalencia" style="padding: 4px 6px;">
                           <i data-lucide="trash-2" aria-hidden="true"></i>
-                        </button>
+                        </button>` : ''}
                       </td>
                     </tr>
                   `).join('')}
@@ -7040,7 +7063,9 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
           </div>
         ` : `
           <div style="text-align: center; padding: 32px; background: #f8fafc; border-radius: 8px; color: #64748b;">
-            Seleccione un plan de origen y un plan de destino distintos para comparar sus mallas y gestionar equivalencias.
+            ${planOrigenId && planDestinoId && Number(planOrigenId) === Number(planDestinoId)
+              ? '<span style="color: #b45309; font-weight: 600;">El plan de origen y de destino no pueden ser el mismo. Seleccione dos planes distintos para realizar la comparación.</span>'
+              : (planesCarrera.length === 0 ? 'No hay planes de estudio disponibles para esta carrera.' : 'Se necesitan al menos dos planes de estudio distintos para comparar sus asignaturas.')}
           </div>
         `}
       </div>
@@ -7072,6 +7097,10 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
 
     document.getElementById("compPlanOrigenSelect")?.addEventListener("change", (e) => {
       planOrigenId = e.target.value ? Number(e.target.value) : null;
+      if (planOrigenId && planDestinoId && Number(planOrigenId) === Number(planDestinoId)) {
+        const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
+        planDestinoId = planesCarrera.find((p) => Number(p.id) !== Number(planOrigenId))?.id || null;
+      }
       refrescarDatosPlanes();
     });
 
@@ -7108,6 +7137,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
 
     content.querySelectorAll("[data-del-eq]").forEach((btn) => {
       btn.addEventListener("click", async () => {
+        if (!puedeGestionarPlanes()) return;
         const id = Number(btn.dataset.delEq);
         const conf = await confirmarAccion({
           titulo: "Eliminar equivalencia",
@@ -7128,6 +7158,7 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
     });
 
     document.getElementById("compBtnCrearEq")?.addEventListener("click", async () => {
+      if (!puedeGestionarPlanes()) return;
       if (seleccionadasOrigen.size === 0 || seleccionadasDestino.size === 0) {
         mostrarFeedback("Debe seleccionar al menos una materia de origen y una de destino.", "error");
         return;
@@ -7185,12 +7216,11 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
   const content = document.getElementById("transicionCurricularDialogContent");
   if (!dialog || !content) return;
 
-  let carreraId = carrerasDisponibles.length > 0 ? carrerasDisponibles[0].id : null;
+  let carreraId = planes.find((plan) => Number(plan.id) === Number(planOrigenIdInicial))?.carreraId
+    || carrerasDisponibles[0]?.id || null;
   let planOrigenId = planOrigenIdInicial || null;
   let planDestinoId = null;
   let simulacion = null;
-  let estudiantesSeleccionados = new Set();
-  let ejecutando = false;
 
   async function ejecutarSimulacion() {
     if (!carreraId || !planOrigenId || !planDestinoId) {
@@ -7210,9 +7240,9 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
       });
       if (res?.ok === false) throw new Error(res.message);
       simulacion = res.data || res;
-      estudiantesSeleccionados = new Set(
-        simulacion.estudiantes.filter((e) => e.puedeMigrar).map((e) => e.estudianteId),
-      );
+      if (!Array.isArray(simulacion?.estudiantes)) {
+        throw new Error("La simulación no devolvió una lista de estudiantes válida.");
+      }
       renderVistaTransicion();
     } catch (err) {
       mostrarFeedback(err?.message || "Error al simular la transición curricular.", "error");
@@ -7256,6 +7286,7 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
           </div>
         </div>
 
+        ${planesCarrera.length < 2 ? `<div class="planes-message">${planesCarrera.length === 0 ? 'No hay planes de estudio disponibles para esta carrera.' : 'Se necesitan al menos dos planes de estudio para simular una transición.'}</div>` : ''}
         ${simulacion ? `
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
             <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; border-left: 4px solid #64748b;">
@@ -7263,7 +7294,7 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
               <div style="font-size: 22px; font-weight: 700; color: #1e293b;">${simulacion.totalAnalizados}</div>
             </div>
             <div style="background: #f0fdf4; padding: 12px; border-radius: 8px; border-left: 4px solid #22c55e;">
-              <small style="color: #16a34a; font-weight: 600;">LISTOS PARA MIGRAR</small>
+              <small style="color: #16a34a; font-weight: 600;">SIN CONFLICTOS EN LA SIMULACIÓN</small>
               <div style="font-size: 22px; font-weight: 700; color: #15803d;">${simulacion.totalMigrables}</div>
             </div>
             <div style="background: ${simulacion.totalConflictos > 0 ? '#fef2f2' : '#f8fafc'}; padding: 12px; border-radius: 8px; border-left: 4px solid ${simulacion.totalConflictos > 0 ? '#ef4444' : '#cbd5e1'};">
@@ -7275,16 +7306,11 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
           <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
             <div style="background: #f8fafc; padding: 10px 12px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
               <span><strong>Estudiantes candidatos</strong> (${simulacion.estudiantes.length})</span>
-              <div style="display: flex; gap: 8px;">
-                <button type="button" id="tcSelMigrables" style="background: none; border: none; color: #0284c7; cursor: pointer; font-size: 12px; text-decoration: underline;">Seleccionar sólo migrables</button>
-                <button type="button" id="tcSelNinguno" style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 12px; text-decoration: underline;">Limpiar selección</button>
-              </div>
             </div>
             <div style="max-height: 260px; overflow-y: auto;">
               <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                 <thead style="background: #ffffff; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0;">
                   <tr>
-                    <th style="padding: 8px; width: 36px; text-align: center;">Sel</th>
                     <th style="padding: 8px; text-align: left;">Estudiante</th>
                     <th style="padding: 8px; text-align: left;">Reconocidas en Destino</th>
                     <th style="padding: 8px; text-align: left;">Sin Equivalencia (Historial)</th>
@@ -7292,13 +7318,8 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
                   </tr>
                 </thead>
                 <tbody>
-                  ${simulacion.estudiantes.map((est) => {
-                    const isSelected = estudiantesSeleccionados.has(est.estudianteId);
-                    return `
+                  ${simulacion.estudiantes.length === 0 ? '<tr><td colspan="4" style="padding: 16px; text-align: center;">No hay estudiantes en el plan de origen para esta simulación.</td></tr>' : simulacion.estudiantes.map((est) => `
                       <tr style="border-bottom: 1px solid #f1f5f9; background: ${est.puedeMigrar ? '#ffffff' : '#fff5f5'};">
-                        <td style="padding: 8px; text-align: center;">
-                          <input type="checkbox" data-est-id="${est.estudianteId}" ${isSelected ? 'checked' : ''} ${!est.puedeMigrar ? 'disabled title="Presenta conflictos curriculares"' : ''} style="cursor: pointer;">
-                        </td>
                         <td style="padding: 8px;">
                           <strong>${escapeHtml(est.nombreCompleto)}</strong>
                           <div style="font-size: 11px; color: #64748b;">${escapeHtml(est.cedula)}</div>
@@ -7314,27 +7335,17 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
                           </div>
                         </td>
                         <td style="padding: 8px;">
-                          ${est.puedeMigrar ? `<span style="font-size: 12px; color: #16a34a; font-weight: 600;">✓ Apta para transición</span>` : `<div style="font-size: 11px; color: #dc2626;">${est.conflictos.map((c) => escapeHtml(c)).join('<br>')}</div>`}
+                          ${est.puedeMigrar ? `<span style="font-size: 12px; color: #16a34a; font-weight: 600;">✓ Sin conflictos en la simulación</span>` : `<div style="font-size: 11px; color: #dc2626;">${est.conflictos.map((c) => escapeHtml(c)).join('<br>')}</div>`}
                         </td>
                       </tr>
-                    `;
-                  }).join('')}
+                    `).join('')}
                 </tbody>
               </table>
             </div>
           </div>
 
           <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px;">
-            <label>
-              <span style="font-weight: 600; font-size: 13px;" class="required">Motivo oficial de la transición curricular (mínimo 5 caracteres)</span>
-              <textarea id="tcMotivoEjecucion" rows="2" class="sgpa-textarea" placeholder="Resolución de asamblea de escuela o justificación académica de la transición en lote..." required minlength="5" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px;"></textarea>
-            </label>
-            <div id="tcErrorFeedback" class="sgpa-form-error hidden"></div>
-            <div style="display: flex; justify-content: flex-end; gap: 8px;">
-              <button id="tcBtnEjecutar" type="button" class="planes-primary-button" style="min-height: 40px; display: inline-flex; align-items: center; gap: 6px;" ${estudiantesSeleccionados.size === 0 || ejecutando ? 'disabled' : ''}>
-                <i data-lucide="circle-check" aria-hidden="true"></i> Ejecutar Transición Atómica (${estudiantesSeleccionados.size} estudiantes)
-              </button>
-            </div>
+            <p>La ejecución de cambios de plan permanece pendiente de validar las equivalencias y el reconocimiento de optativas entre planes. Esta vista solo simula; no modifica expedientes.</p>
           </div>
         ` : ''}
       </div>
@@ -7343,7 +7354,7 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
     content.innerHTML = FormDialog({
       formId: "transicionCurricularForm",
       title: "Transición Curricular Institucional",
-      description: "Ejecute simulaciones y migraciones en lote controladas hacia un nuevo plan de estudio, aplicando equivalencias oficiales y preservando el historial de materias aprobadas.",
+      description: "Simule el impacto de una transición entre planes. La simulación es de solo lectura y no modifica expedientes.",
       body,
       cancelButtonId: "cerrarTransicionBtn",
       cancelText: "Cerrar",
@@ -7379,83 +7390,7 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
 
     document.getElementById("tcBtnSimular")?.addEventListener("click", ejecutarSimulacion);
 
-    content.querySelectorAll("[data-est-id]").forEach((chk) => {
-      chk.addEventListener("change", (e) => {
-        const id = Number(e.target.dataset.estId);
-        if (e.target.checked) estudiantesSeleccionados.add(id);
-        else estudiantesSeleccionados.delete(id);
-        const btn = document.getElementById("tcBtnEjecutar");
-        if (btn) {
-          btn.disabled = estudiantesSeleccionados.size === 0;
-          btn.innerHTML = `<i data-lucide="circle-check" aria-hidden="true"></i> Ejecutar Transición Atómica (${estudiantesSeleccionados.size} estudiantes)`;
-          renderizarIconos();
-        }
-      });
-    });
 
-    document.getElementById("tcSelMigrables")?.addEventListener("click", () => {
-      if (!simulacion) return;
-      estudiantesSeleccionados = new Set(simulacion.estudiantes.filter((e) => e.puedeMigrar).map((e) => e.estudianteId));
-      renderVistaTransicion();
-    });
-
-    document.getElementById("tcSelNinguno")?.addEventListener("click", () => {
-      estudiantesSeleccionados.clear();
-      renderVistaTransicion();
-    });
-
-    document.getElementById("tcBtnEjecutar")?.addEventListener("click", async () => {
-      const motivo = document.getElementById("tcMotivoEjecucion")?.value?.trim() || "";
-      const errBox = document.getElementById("tcErrorFeedback");
-      if (motivo.length < 5) {
-        if (errBox) {
-          errBox.textContent = "Debe indicar un motivo de al menos 5 caracteres.";
-          errBox.classList.remove("hidden");
-        }
-        return;
-      }
-      if (estudiantesSeleccionados.size === 0) {
-        if (errBox) {
-          errBox.textContent = "Seleccione al menos un estudiante apto para migrar.";
-          errBox.classList.remove("hidden");
-        }
-        return;
-      }
-
-      const conf = await confirmarAccion({
-        titulo: "Confirmar Transición Curricular",
-        mensaje: `¿Desea ejecutar la transición curricular de ${estudiantesSeleccionados.size} estudiantes hacia el nuevo plan de estudios? Cada expediente se actualizará de forma atómica.`,
-        peligro: false,
-        textoConfirmar: "Ejecutar Transición",
-      });
-      if (!conf) return;
-
-      try {
-        ejecutando = true;
-        const res = await ejecutarTransicionCurricular({
-          carreraId,
-          planOrigenId,
-          planDestinoId,
-          estudianteIds: Array.from(estudiantesSeleccionados),
-          motivo,
-        });
-        ejecutando = false;
-        if (res?.ok === false) throw new Error(res.message);
-        const data = res.data || res;
-        await mostrarExito({
-          titulo: "Transición Curricular Exitosa",
-          mensaje: `Se migraron ${data.migrados} de ${data.solicitados} estudiantes exitosamente al nuevo plan de estudios.`,
-        });
-        dialog.close();
-        await cargarDatos(instanciaActual);
-      } catch (err) {
-        ejecutando = false;
-        if (errBox) {
-          errBox.textContent = err?.message || "Error al ejecutar la transición curricular.";
-          errBox.classList.remove("hidden");
-        }
-      }
-    });
   }
 
   renderVistaTransicion();
@@ -7473,20 +7408,31 @@ export function iniciarPlanesEstudioPage() {
 
   detalleEventosController?.abort();
   detalleEventosController = null;
+  paginaEventosController?.abort();
+  paginaEventosController = new AbortController();
+  const { signal } = paginaEventosController;
 
   document.getElementById("nuevoPlanButton")?.addEventListener("click", () => {
     abrirFormulario();
-  });
+  }, { signal });
+
+  document.getElementById("comparadorPlanesButton")?.addEventListener("click", () => {
+    void abrirComparadorPlanes();
+  }, { signal });
+
+  document.getElementById("transicionCurricularButton")?.addEventListener("click", () => {
+    void abrirTransicionCurricular();
+  }, { signal });
 
   document
     .getElementById("planesBuscar")
-    ?.addEventListener("input", renderizarPlanes);
+    ?.addEventListener("input", renderizarPlanes, { signal });
   document
     .getElementById("planesEstado")
-    ?.addEventListener("change", renderizarPlanes);
+    ?.addEventListener("change", renderizarPlanes, { signal });
   document
     .getElementById("planesCarrera")
-    ?.addEventListener("change", renderizarPlanes);
+    ?.addEventListener("change", renderizarPlanes, { signal });
 
   document
     .getElementById("planesContent")
@@ -7518,7 +7464,7 @@ export function iniciarPlanesEstudioPage() {
       if (button.dataset.action === "estado") {
         await alternarEstado(plan);
       }
-    });
+    }, { signal });
 
   void cargarDatos(instancia);
 }
