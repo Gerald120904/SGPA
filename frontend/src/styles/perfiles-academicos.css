@@ -67,3 +67,61 @@
 }
 
 .perfil-structure-lock p { margin: 0; }
+
+/* =========================================================
+   AJUSTE FINAL PPS: NUEVO PERFIL COMO BOTONES DE CURSOS/CARRERAS
+   ========================================================= */
+.perfiles-academicos-page .sgpa-toolbar h2 {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.perfiles-academicos-page .sgpa-toolbar p {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.perfiles-academicos-page #nuevoPerfilButton {
+  flex: 0 0 auto;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: #b5121b;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: normal;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.perfiles-academicos-page #nuevoPerfilButton:hover {
+  background: #951019;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(181, 18, 27, 0.14);
+}
+.perfiles-academicos-page #nuevoPerfilButton svg { width: 18px; height: 18px; }
+
+
+/* =========================================================
+   ÚLTIMOS AJUSTES PPS - TIPOGRAFÍA DE BOTONES EN PERFILES
+   Tamaños coherentes con los botones institucionales de Cursos.
+   ========================================================= */
+.perfiles-academicos-page .sgpa-button {
+  font-family: inherit;
+  font-size: 14px;
+}
+.perfiles-academicos-page #nuevoPerfilButton {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+.perfiles-academicos-page .sgpa-form-footer button {
+  font-size: 14px;
+}

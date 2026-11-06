@@ -1,3 +1,7 @@
+import { DataTable } from '../../components/DataTable.js';
+import { StatusBadge } from '../../components/StatusBadge.js';
+import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
+import { renderizarIconos } from '../../utils/icons.js';
 import { listarOptativas, listarCarrerasElegiblesOptativa, crearOptativa, actualizarOptativa, cambiarEstadoOptativa } from '../../services/optativas.service.js';
 import { obtenerRolActivo, usuarioTienePermiso } from '../../app/session.js';
 import { PERMISOS, ROLES } from '../../config/permissions.js';
@@ -12,26 +16,83 @@ const esAsistente = () => obtenerRolActivo() === ROLES.ASISTENTE_ESTUDIANTIL;
 const puedeGestionar = () => usuarioTienePermiso(PERMISOS.OPTATIVAS_GESTIONAR);
 
 export function OptativasPage() {
-  return `<section id="optativasPage" class="module-view optativas-page">
-    <header class="optativas-header"><div><h2>Catálogo de Optativas</h2>
-    <p>Asignaturas reales disponibles para los planes de estudio.</p></div>
-    ${puedeGestionar() ? '<button id="nuevaOptativa" type="button">Nueva optativa</button>' : ''}</header>
-    <div class="optativas-filters">
-      <input id="buscarOptativa" type="search" placeholder="Buscar por código o nombre" aria-label="Buscar optativas">
-      <select id="tipoOptativaFiltro" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option><option value="DISCIPLINARIA">Disciplinaria</option><option value="ABIERTA">Abierta</option><option value="SEDE">Sede</option></select>
-      <select id="estadoOptativaFiltro" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="ACTIVA">Activas</option><option value="INACTIVA">Inactivas</option></select>
-    </div>
-    <div id="optativasResultado" role="status">Cargando optativas...</div>
-    <dialog id="optativaDialog"><form id="optativaForm">
-      <h3 id="optativaDialogTitulo">Optativa</h3>
-      <label>Código<input name="codigo" maxlength="30" required></label>
-      <label>Nombre<input name="nombre" maxlength="150" required></label>
-      <label>Categoría<select name="tipo" required><option value="DISCIPLINARIA">Disciplinaria</option><option value="ABIERTA">Abierta</option><option value="SEDE">Sede</option></select></label>
-      <label>Carrera de origen<select name="carreraOrigenId"><option value="">Sin carrera de origen</option></select></label>
-      <label>Descripción<textarea name="descripcion" maxlength="500"></textarea></label>
-      <div class="optativas-actions"><button type="button" id="cancelarOptativa">Cancelar</button><button type="submit">Guardar</button></div>
-    </form></dialog>
-  </section>`;
+  const campos = `
+    <label>
+      <span>Código *</span>
+      <input name="codigo" maxlength="30" required autocomplete="off" placeholder="Ej. OPT-001">
+    </label>
+    <label>
+      <span>Nombre *</span>
+      <input name="nombre" maxlength="150" required autocomplete="off" placeholder="Nombre de la asignatura">
+    </label>
+    <label>
+      <span>Categoría *</span>
+      <select name="tipo" required>
+        <option value="DISCIPLINARIA">Disciplinaria</option>
+        <option value="ABIERTA">Abierta</option>
+        <option value="SEDE">Sede</option>
+      </select>
+    </label>
+    <label>
+      <span>Carrera de origen</span>
+      <select name="carreraOrigenId"><option value="">Sin carrera de origen</option></select>
+    </label>
+    <label class="sgpa-form-wide">
+      <span>Descripción</span>
+      <textarea name="descripcion" maxlength="500" rows="3" placeholder="Descripción opcional"></textarea>
+    </label>
+  `;
+
+  return `
+    <section id="optativasPage" class="module-view optativas-page">
+      <div class="optativas-toolbar">
+        <div>
+          <h2>Catálogo de optativas</h2>
+          <p>Asignaturas reales disponibles para los planes de estudio.</p>
+        </div>
+        ${puedeGestionar() ? `
+          <button id="nuevaOptativa" class="sgpa-button sgpa-button-primary optativas-primary-button" type="button">
+            <i data-lucide="plus" aria-hidden="true"></i>
+            Nueva optativa
+          </button>` : ''}
+      </div>
+
+      <div class="optativas-filters">
+        <label class="sgpa-search" for="buscarOptativa">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <input id="buscarOptativa" type="search" placeholder="Buscar por código o nombre..." autocomplete="off" aria-label="Buscar optativas">
+        </label>
+        <select id="tipoOptativaFiltro" class="sgpa-select" aria-label="Filtrar por categoría">
+          <option value="">Todas las categorías</option>
+          <option value="DISCIPLINARIA">Disciplinaria</option>
+          <option value="ABIERTA">Abierta</option>
+          <option value="SEDE">Sede</option>
+        </select>
+        <select id="estadoOptativaFiltro" class="sgpa-select" aria-label="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          <option value="ACTIVA">Activas</option>
+          <option value="INACTIVA">Inactivas</option>
+        </select>
+      </div>
+
+      <div id="optativasResultado" aria-live="polite">
+        <div class="sgpa-state-message">Cargando optativas...</div>
+      </div>
+
+      <dialog id="optativaDialog" class="sgpa-form-dialog sgpa-form-dialog-md">
+        ${FormDialog({
+          formId: 'optativaForm',
+          title: 'Nueva optativa',
+          description: 'Complete los datos de la asignatura optativa.',
+          body: campos,
+          errorId: 'optativaFormError',
+          cancelButtonId: 'cancelarOptativa',
+          submitButtonId: 'guardarOptativa',
+          submitText: 'Guardar optativa',
+        })}
+      </dialog>
+    </section>
+  `;
 }
 
 function mostrarMensaje(mensaje) {
@@ -42,18 +103,60 @@ function mostrarMensaje(mensaje) {
 function renderizar() {
   const nodo = document.getElementById('optativasResultado');
   if (!nodo) return;
-  const termino = document.getElementById('buscarOptativa').value.trim().toLocaleLowerCase();
-  const tipo = document.getElementById('tipoOptativaFiltro').value;
-  const estado = document.getElementById('estadoOptativaFiltro').value;
+
+  const termino = document.getElementById('buscarOptativa')?.value.trim().toLocaleLowerCase() || '';
+  const tipo = document.getElementById('tipoOptativaFiltro')?.value || '';
+  const estado = document.getElementById('estadoOptativaFiltro')?.value || '';
   const visibles = optativas.filter((o) => {
     const coincide = `${o.curso?.codigo ?? ''} ${o.curso?.nombre ?? ''}`.toLocaleLowerCase().includes(termino);
     return coincide && (!tipo || o.tipo === tipo) && (!estado || Boolean(o.activo) === (estado === 'ACTIVA'));
   });
-  if (!visibles.length) { nodo.textContent = 'No hay optativas para estos filtros.'; return; }
-  nodo.innerHTML = `<div class="optativas-table-wrap"><table><thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Carrera de origen</th><th>Estado</th>${puedeGestionar() ? '<th>Acciones</th>' : ''}</tr></thead><tbody>${visibles.map((o) => `<tr>
-    <td>${escapeHtml(o.curso?.codigo ?? '')}</td><td>${escapeHtml(o.curso?.nombre ?? '')}</td><td>${escapeHtml(o.tipo)}</td>
-    <td>${escapeHtml(o.carreraOrigen?.nombre ?? 'Institucional')}</td><td>${o.activo ? 'Activa' : 'Inactiva'}</td>
-    ${puedeGestionar() ? `<td>${obtenerRolActivo() === ROLES.ADMIN_GLOBAL || o.tipo === 'DISCIPLINARIA' ? `<button type="button" data-editar-optativa="${Number(o.id)}">Editar</button> <button type="button" data-estado-optativa="${Number(o.id)}">${o.activo ? 'Desactivar' : 'Activar'}</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+
+  const gestionar = puedeGestionar();
+  const filas = visibles.map((o) => `
+    <tr>
+      <td><strong class="optativas-codigo">${escapeHtml(o.curso?.codigo ?? '—')}</strong></td>
+      <td><strong>${escapeHtml(o.curso?.nombre ?? '—')}</strong></td>
+      <td>${escapeHtml(({ DISCIPLINARIA: 'Disciplinaria', ABIERTA: 'Abierta', SEDE: 'Sede' })[o.tipo] || o.tipo || '—')}</td>
+      <td>${escapeHtml(o.carreraOrigen?.nombre ?? 'Institucional')}</td>
+      <td>${StatusBadge({ label: o.activo ? 'Activa' : 'Inactiva', tone: o.activo ? 'success' : 'neutral' })}</td>
+      ${gestionar ? `
+        <td class="sgpa-table-actions-cell">
+          <div class="sgpa-table-actions">
+            ${obtenerRolActivo() === ROLES.ADMIN_GLOBAL || o.tipo === 'DISCIPLINARIA' ? `
+              <button type="button"
+                class="cursos-icon-button optativas-icon-button"
+                data-editar-optativa="${Number(o.id)}"
+                title="Editar optativa"
+                aria-label="Editar ${escapeHtml(o.curso?.nombre ?? 'optativa')}">
+                <i data-lucide="pencil" aria-hidden="true"></i>
+              </button>
+              <button type="button"
+                class="cursos-icon-button optativas-icon-button ${o.activo ? 'optativas-icon-button--danger' : ''}"
+                data-estado-optativa="${Number(o.id)}"
+                title="${o.activo ? 'Desactivar' : 'Activar'} optativa"
+                aria-label="${o.activo ? 'Desactivar' : 'Activar'} ${escapeHtml(o.curso?.nombre ?? 'optativa')}">
+                <i data-lucide="${o.activo ? 'circle-pause' : 'circle-check'}" aria-hidden="true"></i>
+              </button>` : ''}
+          </div>
+        </td>` : ''}
+    </tr>
+  `).join('');
+
+  nodo.innerHTML = DataTable({
+    columns: [
+      'Código',
+      'Nombre',
+      'Categoría',
+      'Carrera de origen',
+      'Estado',
+      ...(gestionar ? [{ label: 'Acciones', className: 'sgpa-table-actions-cell' }] : []),
+    ],
+    rows: filas,
+    emptyMessage: 'No hay optativas que coincidan con los filtros.',
+    ariaLabel: 'Catálogo de optativas',
+  });
+  renderizarIconos();
 }
 
 function abrirFormulario(optativa = null) {
@@ -61,7 +164,8 @@ function abrirFormulario(optativa = null) {
   const formulario = document.getElementById('optativaForm');
   formulario.reset();
   formulario.dataset.id = optativa?.id ?? '';
-  document.getElementById('optativaDialogTitulo').textContent = optativa ? 'Editar optativa' : 'Nueva optativa';
+  const titulo = dialogo.querySelector('.sgpa-form-heading h3');
+  if (titulo) titulo.textContent = optativa ? 'Editar optativa' : 'Nueva optativa';
   formulario.elements.codigo.value = optativa?.curso?.codigo ?? '';
   formulario.elements.nombre.value = optativa?.curso?.nombre ?? '';
   formulario.elements.tipo.value = optativa?.tipo ?? 'DISCIPLINARIA';
@@ -74,6 +178,7 @@ function abrirFormulario(optativa = null) {
   formulario.elements.codigo.disabled = Boolean(optativa);
   formulario.elements.nombre.disabled = Boolean(optativa);
   dialogo.showModal();
+  habilitarCierreExterior(dialogo);
 }
 
 async function cargar(actual) {
@@ -98,8 +203,8 @@ export function iniciarOptativasPage() {
     if (evento.target.matches('#tipoOptativaFiltro, #estadoOptativaFiltro')) renderizar();
   });
   pagina.addEventListener('click', async (evento) => {
-    if (evento.target.id === 'nuevaOptativa') abrirFormulario();
-    if (evento.target.id === 'cancelarOptativa') document.getElementById('optativaDialog').close();
+    if (evento.target.closest('#nuevaOptativa')) abrirFormulario();
+    if (evento.target.closest('#cancelarOptativa')) document.getElementById('optativaDialog').close();
     const editar = evento.target.closest('[data-editar-optativa]');
     if (editar) abrirFormulario(optativas.find((o) => o.id === Number(editar.dataset.editarOptativa)));
     const estado = evento.target.closest('[data-estado-optativa]');

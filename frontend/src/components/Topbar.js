@@ -1,3 +1,4 @@
+import { SelectorRolActivo } from './Sidebar.js';
 import {
   escapeHtml
 } from '../utils/html.js';
@@ -53,22 +54,13 @@ export function Topbar({
             ${carreras.map((c) => `<option value="${Number(c.id)}" ${Number(c.id) === Number(usuario.carreraActiva) ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('')}
           </select></label>` : ''}
 
-        <div class="topbar-user-text">
-
-          <strong>
-            ${escapeHtml(nombre)}
-          </strong>
-
-          <span>
-            Campus Nicoya
-          </span>
-
+        <!-- Rol real de sesión; los nombres de usuario siguen en el pie del Sidebar -->
+        <div class="topbar-role-slot">
+          ${SelectorRolActivo({ usuario })}
         </div>
 
-
-        <div class="topbar-avatar">
-          ${escapeHtml(inicial)}
-        </div>
+        <!-- Se retira el avatar superior: el usuario sigue identificado
+             en el pie del Sidebar y el rol activo ocupa el extremo derecho. -->
 
       </div>
 
