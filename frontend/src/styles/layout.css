@@ -1107,3 +1107,72 @@
   font-size: 0.825rem;
   color: #94a3b8;
 }
+
+/* =========================================================
+   AJUSTE FINAL PPS: SELECTOR DE ROL ARRIBA A LA DERECHA.
+   No afecta el menú de navegación ni la ventana Electron.
+   ========================================================= */
+.topbar {
+  position: relative;
+  z-index: 60;
+  overflow: visible;
+}
+.topbar-heading { min-width: 0; }
+.topbar-user { flex: 0 0 auto; }
+.topbar-role-slot { width: 240px; max-width: 40vw; min-width: 0; }
+
+.topbar .sidebar-role-container,
+.app-shell.sidebar-collapsed .topbar .sidebar-role-container {
+  position: relative !important;
+  width: 100% !important;
+  display: block !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.topbar .role-selector-expanded,
+.app-shell.sidebar-collapsed .topbar .role-selector-expanded {
+  display: block !important;
+  visibility: visible !important;
+  position: static !important;
+  width: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  pointer-events: auto !important;
+}
+
+.topbar .role-selector-collapsed,
+.app-shell.sidebar-collapsed .topbar .role-selector-collapsed {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+.topbar .role-selector-header-row { margin-bottom: 3px; }
+.topbar .role-selector-trigger { min-height: 41px; padding: 5px 9px; }
+.topbar .role-dropdown-menu { z-index: 500; text-align: left; }
+.topbar .role-dropdown-menu.dropdown-expanded { left: auto; right: 0; }
+
+/* Contracción de sidebar: el logo conserva el tamaño compacto original.
+   El selector no participa en la geometría del Sidebar. */
+.app-shell.sidebar-collapsed .sidebar-header-brand { overflow: hidden; }
+.app-shell.sidebar-collapsed .sidebar-logo {
+  object-fit: contain;
+  flex-shrink: 0;
+}
+@media (max-width: 800px) {
+  .topbar { gap: 12px; padding-inline: 16px; }
+  .topbar-role-slot { width: 200px; max-width: 46vw; }
+  .topbar-user { gap: 6px; }
+  .topbar-avatar { display: none; }
+  .topbar h1 { font-size: 16px; }
+}
+@media (max-width: 560px) {
+  .topbar-role-slot { width: 165px; max-width: 48vw; }
+  .topbar .role-selector-trigger { padding-inline: 6px; }
+  .topbar .role-trigger-name { font-size: 11px; }
+}

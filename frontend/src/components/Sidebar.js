@@ -37,211 +37,17 @@ export function obtenerIconoRol(rol) {
 }
 
 
-function renderNavItem(module) {
-
-  const label =
-    module.navLabel ||
-    module.title;
-
-
+/* =========================================================
+   SELECTOR DE ROL REUTILIZADO EN EL ENCABEZADO
+   Se conserva su estructura, identificadores y eventos originales.
+   ========================================================= */
+export function SelectorRolActivo({ usuario }) {
+  const rolActivo = obtenerRolActivo(usuario) || usuario?.rolActivo || null;
+  const espacios = obtenerEspaciosDisponibles(usuario);
+  const tieneVariosRoles = espacios.length > 1;
+  const nombreRolFormateado = rolActivo ? formatearRol(rolActivo) : 'Sin rol activo';
+  const iconoRolActivo = obtenerIconoRol(rolActivo);
   return `
-    <button
-      class="nav-item"
-      data-module="${module.id}"
-      data-route="${module.route}"
-      type="button"
-      title="${escapeHtml(label)}"
-    >
-
-      <i
-        data-lucide="${module.icon}"
-        aria-hidden="true"
-      ></i>
-
-      <span class="nav-item-label">
-        ${escapeHtml(label)}
-      </span>
-
-    </button>
-  `;
-}
-
-
-export function Sidebar({
-  usuario,
-  roles,
-  permisos,
-  isCollapsed = false
-}) {
-
-  const nombre =
-    usuario?.nombres ||
-    'Usuario';
-
-
-  const inicial =
-    nombre
-      .trim()
-      .charAt(0)
-      .toUpperCase() ||
-    'A';
-
-
-  const rolActivo =
-    obtenerRolActivo(
-      usuario
-    ) ||
-    usuario?.rolActivo ||
-    null;
-
-  const espacios =
-    obtenerEspaciosDisponibles(
-      usuario
-    );
-
-  const tieneVariosRoles =
-    espacios.length > 1;
-
-  const rolesEfectivos =
-    rolActivo ? [rolActivo] : [];
-
-  const modulosDisponiblesTotal =
-    MODULES.filter(
-      (m) =>
-        m.id !== 'home' &&
-        m.id !== 'dashboard' &&
-        puedeAcceder(
-          rolesEfectivos,
-          m.id,
-          permisos,
-        )
-    );
-
-  const modulosVisibles =
-    MODULES.filter(
-      (module) => {
-        if (
-          module.id === 'dashboard' &&
-          modulosDisponiblesTotal.length === 0
-        ) {
-          return false;
-        }
-
-        return puedeAcceder(
-          rolesEfectivos,
-          module.id,
-          permisos,
-        );
-      }
-    );
-
-
-  const secciones = [
-    ...new Set(
-      modulosVisibles
-        .map(
-          (module) =>
-            module.section
-        )
-        .filter(Boolean)
-    )
-  ];
-
-
-  const navegacion =
-    secciones
-      .map(
-        (section) => {
-
-          const modules =
-            modulosVisibles.filter(
-              (module) =>
-                module.section ===
-                section
-            );
-
-
-          return `
-            <div class="nav-section-title">
-              ${escapeHtml(section)}
-            </div>
-
-            ${modules
-              .map(renderNavItem)
-              .join('')}
-          `;
-
-        }
-      )
-      .join('');
-
-  const nombreRolFormateado =
-    rolActivo ? formatearRol(rolActivo) : 'Sin rol activo';
-
-  const iconoRolActivo =
-    obtenerIconoRol(rolActivo);
-
-
-  return `
-    <aside
-      id="sidebar"
-      class="sidebar ${isCollapsed ? 'collapsed' : ''}"
-    >
-
-      <!-- =============================================== -->
-      <!-- LOGO UNIVERSIDAD NACIONAL Y TOGGLE -->
-      <!-- =============================================== -->
-
-      <div class="sidebar-header">
-
-        <div class="sidebar-header-brand">
-
-          <img
-            src="${logoUnaUrl}"
-            alt="Universidad Nacional de Costa Rica"
-            class="sidebar-logo"
-            draggable="false"
-          />
-
-        </div>
-
-        <button
-          id="sidebarToggle"
-          class="sidebar-toggle"
-          type="button"
-          aria-label="${isCollapsed ? 'Expandir barra lateral' : 'Contraer barra lateral'}"
-          title="${isCollapsed ? 'Expandir barra lateral' : 'Contraer barra lateral'}"
-        >
-          <i
-            data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-left'}"
-            aria-hidden="true"
-          ></i>
-        </button>
-
-      </div>
-
-
-      <!-- =============================================== -->
-      <!-- CONTEXTO DEL SISTEMA -->
-      <!-- =============================================== -->
-
-      <div class="sidebar-context">
-
-        <span class="sidebar-context-label">
-          Sistema
-        </span>
-
-        <strong>
-          SGPA
-        </strong>
-
-        <small>
-          Campus Nicoya
-        </small>
-
-      </div>
-
-
       <!-- =============================================== -->
       <!-- SELECTOR INSTITUCIONAL DE ROL ACTIVO -->
       <!-- =============================================== -->
@@ -408,6 +214,203 @@ export function Sidebar({
       </div>
 
 
+  `;
+}
+
+function renderNavItem(module) {
+
+  const label =
+    module.navLabel ||
+    module.title;
+
+
+  return `
+    <button
+      class="nav-item"
+      data-module="${module.id}"
+      data-route="${module.route}"
+      type="button"
+      title="${escapeHtml(label)}"
+    >
+
+      <i
+        data-lucide="${module.icon}"
+        aria-hidden="true"
+      ></i>
+
+      <span class="nav-item-label">
+        ${escapeHtml(label)}
+      </span>
+
+    </button>
+  `;
+}
+
+
+export function Sidebar({
+  usuario,
+  roles,
+  permisos,
+  isCollapsed = false
+}) {
+
+  const nombre =
+    usuario?.nombres ||
+    'Usuario';
+
+
+  const inicial =
+    nombre
+      .trim()
+      .charAt(0)
+      .toUpperCase() ||
+    'A';
+
+
+  const rolActivo =
+    obtenerRolActivo(
+      usuario
+    ) ||
+    usuario?.rolActivo ||
+    null;
+
+  const espacios =
+    obtenerEspaciosDisponibles(
+      usuario
+    );
+
+  const tieneVariosRoles =
+    espacios.length > 1;
+
+  const rolesEfectivos =
+    rolActivo ? [rolActivo] : [];
+
+  const modulosDisponiblesTotal =
+    MODULES.filter(
+      (m) =>
+        m.id !== 'home' &&
+        m.id !== 'dashboard' &&
+        puedeAcceder(
+          rolesEfectivos,
+          m.id,
+          permisos,
+        )
+    );
+
+  const modulosVisibles =
+    MODULES.filter(
+      (module) => {
+        if (
+          module.id === 'dashboard' &&
+          modulosDisponiblesTotal.length === 0
+        ) {
+          return false;
+        }
+
+        return puedeAcceder(
+          rolesEfectivos,
+          module.id,
+          permisos,
+        );
+      }
+    );
+
+
+  const secciones = [
+    ...new Set(
+      modulosVisibles
+        .map(
+          (module) =>
+            module.section
+        )
+        .filter(Boolean)
+    )
+  ];
+
+
+  const navegacion =
+    secciones
+      .map(
+        (section) => {
+
+          const modules =
+            modulosVisibles.filter(
+              (module) =>
+                module.section ===
+                section
+            );
+
+
+          return `
+            <div class="nav-section-title">
+              ${escapeHtml(section)}
+            </div>
+
+            ${modules
+              .map(renderNavItem)
+              .join('')}
+          `;
+
+        }
+      )
+      .join('');
+
+  const nombreRolFormateado =
+    rolActivo ? formatearRol(rolActivo) : 'Sin rol activo';
+
+  const iconoRolActivo =
+    obtenerIconoRol(rolActivo);
+
+
+  return `
+    <aside
+      id="sidebar"
+      class="sidebar ${isCollapsed ? 'collapsed' : ''}"
+    >
+
+      <!-- =============================================== -->
+      <!-- LOGO UNIVERSIDAD NACIONAL; EXPANSIÓN AUTOMÁTICA AL PASAR EL MOUSE -->
+      <!-- =============================================== -->
+
+      <div class="sidebar-header">
+
+        <div class="sidebar-header-brand">
+
+          <img
+            src="${logoUnaUrl}"
+            alt="Universidad Nacional de Costa Rica"
+            class="sidebar-logo"
+            draggable="false"
+          />
+
+        </div>
+
+
+
+      </div>
+
+
+      <!-- =============================================== -->
+      <!-- CONTEXTO DEL SISTEMA -->
+      <!-- =============================================== -->
+
+      <div class="sidebar-context">
+
+        <span class="sidebar-context-label">
+          Sistema
+        </span>
+
+        <strong>
+          SGPA
+        </strong>
+
+        <small>
+          Campus Nicoya
+        </small>
+
+      </div>
+
+
       <!-- =============================================== -->
       <!-- NAVEGACIÓN -->
       <!-- =============================================== -->
@@ -475,7 +478,6 @@ export function Sidebar({
 export function iniciarSidebar({ onCambiarRol } = {}) {
   const appShell = document.getElementById('appShell');
   const sidebar = document.getElementById('sidebar');
-  const toggleBtn = document.getElementById('sidebarToggle');
   const btnExpanded = document.getElementById('btnRolActivoExpanded');
   const btnCollapsed = document.getElementById('btnRolActivoCollapsed');
   const menu = document.getElementById('menuRolesFlotante');
@@ -484,40 +486,15 @@ export function iniciarSidebar({ onCambiarRol } = {}) {
 
   let ultimoBotonDisparador = null;
 
-  // 1. Toggle contraer / expandir barra lateral
-  if (toggleBtn && appShell && sidebar) {
-    toggleBtn.addEventListener('click', () => {
-      const colapsando = !appShell.classList.contains('sidebar-collapsed');
-      appShell.classList.toggle('sidebar-collapsed', colapsando);
-      sidebar.classList.toggle('collapsed', colapsando);
-
-      try {
-        localStorage.setItem(
-          'sgpa_sidebar_collapsed',
-          colapsando ? 'true' : 'false'
-        );
-      } catch (_) {}
-
-      toggleBtn.setAttribute(
-        'aria-label',
-        colapsando ? 'Expandir barra lateral' : 'Contraer barra lateral'
-      );
-      toggleBtn.setAttribute(
-        'title',
-        colapsando ? 'Expandir barra lateral' : 'Contraer barra lateral'
-      );
-      toggleBtn.innerHTML = `
-        <i
-          data-lucide="${colapsando ? 'chevron-right' : 'chevron-left'}"
-          aria-hidden="true"
-        ></i>
-      `;
-      renderizarIconos();
-
-      if (menu && !menu.hasAttribute('hidden')) {
-        cerrarMenu();
-      }
-    });
+  // La barra se expande automáticamente mediante :hover en dashboard-v2.css.
+  // Retiramos el estado persistido del antiguo botón manual, ya que sus reglas
+  // .collapsed competían con el hover y ocultaban el logo y los textos.
+  if (appShell && sidebar) {
+    appShell.classList.remove('sidebar-collapsed');
+    sidebar.classList.remove('collapsed');
+    try {
+      localStorage.setItem('sgpa_sidebar_collapsed', 'false');
+    } catch (_) {}
   }
 
   // 2. Control del menú flotante de roles
@@ -531,27 +508,16 @@ export function iniciarSidebar({ onCambiarRol } = {}) {
 
   function posicionarMenu() {
     if (!menu) return;
-
-    const colapsado = estaColapsado();
-
-    if (colapsado) {
-      menu.classList.remove('dropdown-expanded');
-      menu.classList.add('dropdown-collapsed');
-
-      const trigger = btnCollapsed || btnExpanded;
-      if (trigger) {
-        const rect = trigger.getBoundingClientRect();
-        menu.style.position = 'fixed';
-        menu.style.top = `${Math.max(8, rect.top)}px`;
-        menu.style.left = `${rect.right + 10}px`;
-      }
-    } else {
-      menu.classList.remove('dropdown-collapsed');
-      menu.classList.add('dropdown-expanded');
-      menu.style.position = 'absolute';
-      menu.style.top = '';
-      menu.style.left = '';
-    }
+    // El selector ahora pertenece al Topbar y no al Sidebar.
+    // Su menú siempre se ancla debajo del rol activo, incluso si
+    // la barra lateral está contraída.
+    menu.classList.remove('dropdown-collapsed');
+    menu.classList.add('dropdown-expanded');
+    menu.style.position = 'absolute';
+    menu.style.top = 'calc(100% + 6px)';
+    menu.style.left = 'auto';
+    menu.style.right = '0';
+    menu.style.width = 'min(280px, calc(100vw - 24px))';
   }
 
   function abrirMenu(disparador) {

@@ -21,6 +21,7 @@ import {
 import {
   mostrarError,
   mostrarExito,
+  mostrarAdvertencia,
 } from "../../components/AlertModal.js";
 
 import {
@@ -516,7 +517,7 @@ function renderizarPeriodos() {
                             data-action="estado"
                             data-id="${periodo.id}"
                             data-estado="${transicion.estado}"
-                            ${disponible ? "" : "disabled"}
+                            aria-disabled="${disponible ? "false" : "true"}"
                             title="${escapeHtml(
                               motivo ||
                                 transicion.titulo,
@@ -527,20 +528,6 @@ function renderizarPeriodos() {
                             )}
                           </button>
 
-                          ${
-                            !disponible &&
-                            motivo
-                              ? `
-                                <small
-                                  class="periodos-transition-reason"
-                                >
-                                  ${escapeHtml(
-                                    motivo,
-                                  )}
-                                </small>
-                              `
-                              : ""
-                          }
                         </div>
                       `;
                     },
@@ -1539,6 +1526,18 @@ export function iniciarPeriodosPage() {
           button.dataset.action ===
           "estado"
         ) {
+          // Botón visualmente inhabilitado, pero accesible al clic para explicar el motivo.
+          // Nunca se envía al backend una transición declarada no disponible.
+          const informacion = Array.isArray(periodo.transicionesEstado)
+            ? periodo.transicionesEstado.find((item) => item.estado === button.dataset.estado)
+            : null;
+          if (informacion?.disponible === false) {
+            mostrarAdvertencia({
+              titulo: "Acción no disponible",
+              mensaje: informacion.motivo || "Esta transición no está disponible para el periodo seleccionado.",
+            });
+            return;
+          }
 
           await cambiarEstado(
             periodo,
