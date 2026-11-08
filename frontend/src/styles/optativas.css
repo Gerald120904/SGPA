@@ -19,3 +19,207 @@
 .optativas-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .optativas-actions button { padding: 10px 16px; border-radius: 8px; cursor: pointer; }
 @media (max-width: 640px) { .optativas-header { flex-direction: column; } .optativas-filters > * { width: 100%; } }
+
+
+/* =========================================================
+   SGPA - ESTANDARIZACIÓN FINAL DEL CATÁLOGO DE OPTATIVAS
+   Reutiliza DataTable, FormDialog, StatusBadge y botones SGPA.
+   ========================================================= */
+.optativas-page { padding: 0; color: #182235; }
+.optativas-page .optativas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.optativas-page .optativas-toolbar h2 {
+  margin: 0;
+  color: #1d2939;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.optativas-page .optativas-toolbar p {
+  margin: 5px 0 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.optativas-page .optativas-primary-button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: #b5121b;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.optativas-page .optativas-primary-button:hover { background: #951019; color: #fff; }
+.optativas-page .optativas-primary-button svg { width: 18px; height: 18px; }
+
+.optativas-page .optativas-filters {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(170px, 210px) minmax(160px, 210px);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.optativas-page .optativas-filters > * { min-width: 0; }
+.optativas-page .optativas-filters .sgpa-search {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid #dde2ea;
+  border-radius: 10px;
+  background: #fff;
+}
+.optativas-page .optativas-filters .sgpa-search input {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+}
+.optativas-page .optativas-filters .sgpa-select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #dde2ea;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  padding: 0 11px;
+}
+.optativas-page .optativas-codigo { color: #1f2937; }
+.optativas-page .sgpa-data-table td { vertical-align: middle; }
+.optativas-page .sgpa-table-actions-cell { text-align: center; }
+.optativas-page .sgpa-table-actions { justify-content: center; }
+
+/* Anulación de estilos antiguos exclusivamente para el FormDialog reutilizable. */
+.optativas-page dialog.sgpa-form-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(680px, calc(100vw - 40px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+.optativas-page form.sgpa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+.optativas-page .sgpa-form-grid > label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.optativas-page .sgpa-form-grid input,
+.optativas-page .sgpa-form-grid select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+}
+.optativas-page .sgpa-form-grid textarea {
+  width: 100%;
+  min-height: 94px;
+  padding: 11px 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+}
+.optativas-page .sgpa-form-footer .sgpa-form-primary {
+  background: #b5121b;
+  color: #fff;
+}
+@media (max-width: 920px) {
+  .optativas-page .optativas-filters { grid-template-columns: 1fr 1fr; }
+  .optativas-page .optativas-filters .sgpa-search { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .optativas-page .optativas-toolbar { align-items: stretch; flex-direction: column; }
+  .optativas-page .optativas-filters { grid-template-columns: 1fr; }
+  .optativas-page .optativas-filters .sgpa-search { grid-column: auto; }
+}
+
+
+/* =========================================================
+   ÚLTIMOS AJUSTES PPS - BOTONES DEL CATÁLOGO Y ACCIONES
+   Usa el mismo patrón de Cursos y DataTable para los iconos.
+   ========================================================= */
+.optativas-page .optativas-primary-button {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+.optativas-page .sgpa-button:not(.optativas-primary-button) {
+  font-family: inherit;
+  font-size: 14px;
+}
+.optativas-page .sgpa-form-footer button { font-size: 14px; }
+.optativas-page .sgpa-data-table .optativas-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: #f3f5f7;
+  color: #475467;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.optativas-page .sgpa-data-table .optativas-icon-button:hover {
+  background: #e8ebef;
+  transform: translateY(-1px);
+}
+.optativas-page .sgpa-data-table .optativas-icon-button svg {
+  width: 18px;
+  height: 18px;
+}
+.optativas-page .sgpa-data-table .optativas-icon-button--danger {
+  color: #c6212b;
+}
+.optativas-page .sgpa-data-table .optativas-icon-button--danger:hover {
+  background: #fce8ea;
+  color: #a3141f;
+}
+.optativas-page .sgpa-data-table .optativas-icon-button:focus-visible {
+  outline: 2px solid #b5121b;
+  outline-offset: 2px;
+}
+.optativas-page .sgpa-table-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}

@@ -2,6 +2,8 @@ import {
   actualizarPlanEstudio,
   cambiarEstadoPlanEstudio,
   crearPlanEstudio,
+  crearVersionPlanEstudio,
+  activarVersionPlanEstudio,
   listarPlanesEstudio,
 } from "../../services/planes-estudio.service.js";
 import {
@@ -10,7 +12,13 @@ import {
   eliminarEquivalenciaPlan,
 } from "../../services/equivalencias.service.js";
 import {
+  consultarPoblacionTransicion,
   simularTransicionCurricular,
+  ejecutarTransicionCurricular,
+  listarConvalidacionesExternas,
+  verificarEvidenciaConvalidacionExterna,
+  decidirConvalidacionExterna,
+  abrirReferenciaEvidenciaConvalidacion,
 } from "../../services/transiciones-curriculares.service.js";
 import {
   actualizarPlanAsignatura,
@@ -325,7 +333,7 @@ function mostrarDialogHerramienta() {
   }
 
   if (!dialog.open) {
-    dialog.showModal();
+    if (!dialog.open) dialog.showModal();
   }
 
   habilitarCierreExterior(dialog);
@@ -339,18 +347,17 @@ export function PlanesEstudioPage() {
       class="module-view planes-estudio-page"
     >
       <div class="planes-toolbar">
-        <div>
+        <div class="planes-toolbar-heading">
           <h2>Planes de estudio</h2>
           <p>Administración de los planes académicos asociados a cada carrera.</p>
         </div>
 
-        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <div class="planes-toolbar-tools">
           <button
             id="comparadorPlanesButton"
             class="planes-secondary-button"
             type="button"
             title="Comparador Visual de Planes"
-            style="min-height: 40px; padding: 0 14px; border-radius: 8px; background: #f2f4f7; color: #344054; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"
           >
             <i data-lucide="split" aria-hidden="true"></i>
             Comparador de planes
@@ -361,27 +368,31 @@ export function PlanesEstudioPage() {
             class="planes-secondary-button"
             type="button"
             title="Transición Curricular Institucional"
-            style="min-height: 40px; padding: 0 14px; border-radius: 8px; background: #f2f4f7; color: #344054; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"
           >
             <i data-lucide="git-branch" aria-hidden="true"></i>
             Transición curricular
           </button>
 
-          ${
-            puedeGestionarPlanes()
-              ? `
-                <button
-                  id="nuevoPlanButton"
-                  class="planes-primary-button"
-                  type="button"
-                >
-                  <i data-lucide="plus" aria-hidden="true"></i>
-                  Nuevo plan
-                </button>
-              `
-              : ""
-          }
+          ${puedeGestionarPlanes() ? `
+            <button id="convalidacionesExternasButton" class="planes-secondary-button" type="button"
+              title="Revisar evidencia y solicitudes de convalidaciÃ³n externa"
+              >
+              <i data-lucide="file-check" aria-hidden="true"></i> Convalidaciones externas
+            </button>
+          ` : ''}
+
         </div>
+
+        ${puedeGestionarPlanes() ? `
+          <button
+            id="nuevoPlanButton"
+            class="planes-primary-button planes-toolbar-create"
+            type="button"
+          >
+            <i data-lucide="plus" aria-hidden="true"></i>
+            Nuevo plan
+          </button>
+        ` : ""}
       </div>
 
       <div
@@ -453,6 +464,10 @@ export function PlanesEstudioPage() {
       >
         <div id="transicionCurricularDialogContent"></div>
       </dialog>
+
+      <dialog id="convalidacionesExternasDialog" class="sgpa-form-dialog planes-convalidaciones-dialog">
+        <div id="convalidacionesExternasDialogContent"></div>
+      </dialog>
     </section>
   `;
 }
@@ -495,11 +510,11 @@ function obtenerPlanesFiltrados() {
     let coincideEstado = true;
 
     if (estado === "ACTIVOS") {
-      coincideEstado = plan.activo === true;
+      coincideEstado = (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE";
     }
 
     if (estado === "INACTIVOS") {
-      coincideEstado = plan.activo === false;
+      coincideEstado = (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) !== "VIGENTE";
     }
 
     return coincideBusqueda && coincideCarrera && coincideEstado;
@@ -552,9 +567,9 @@ function renderizarPlanes() {
 
           <td>
             <span class="plan-status ${
-              plan.activo ? "plan-status-active" : "plan-status-inactive"
+              (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE" ? "plan-status-active" : "plan-status-inactive"
             }">
-              ${plan.activo ? "Activo" : "Inactivo"}
+              ${plan.estado === "BORRADOR" ? `Borrador · v${Number(plan.numeroVersion || 1)}` : plan.estado === "EN_TRANSICION" ? `Histórico · v${Number(plan.numeroVersion || 1)}` : (plan.estado === "CERRADO" || !plan.activo) ? `Cerrado · v${Number(plan.numeroVersion || 1)}` : `Vigente · v${Number(plan.numeroVersion || 1)}`}
             </span>
           </td>
 
@@ -573,6 +588,8 @@ function renderizarPlanes() {
             ${
               puedeGestionarPlanes()
                 ? `
+                  ${!esAsistente() && plan.estado === "VIGENTE" ? `<button class="planes-icon-button" data-action="crear-version" data-id="${plan.id}" type="button" title="Crear nueva versión curricular" aria-label="Crear nueva versión curricular"><i data-lucide="git-branch-plus" aria-hidden="true"></i></button>` : ""}
+                  ${!esAsistente() && plan.estado === "BORRADOR" && plan.versionAnteriorId ? `<button class="planes-icon-button planes-success-button" data-action="activar-version" data-id="${plan.id}" data-parent-id="${plan.versionAnteriorId}" type="button" title="Activar esta versión" aria-label="Activar esta versión"><i data-lucide="circle-check" aria-hidden="true"></i></button>` : ""}
                   <button
                     class="planes-icon-button"
                     data-action="editar"
@@ -585,18 +602,18 @@ function renderizarPlanes() {
 
                   <button
                     class="planes-icon-button ${
-                      plan.activo
+                      (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE"
                         ? "planes-danger-button"
                         : "planes-success-button"
                     }"
                     data-action="estado"
                     data-id="${plan.id}"
                     type="button"
-                    title="${plan.activo ? "Desactivar plan" : "Activar plan"}"
+                    title="${(plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE" ? "Cerrar a nuevos ingresos" : "Reabrir plan"}"
                   >
                     <i
                       data-lucide="${
-                        plan.activo ? "circle-pause" : "circle-check"
+                        (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE" ? "circle-pause" : "circle-check"
                       }"
                       aria-hidden="true"
                     ></i>
@@ -1142,11 +1159,11 @@ async function alternarEstado(plan) {
     return;
   }
 
-  const cerrando = plan.activo;
-  const titulo = cerrando ? "Cierre Oficial de Plan de Estudio" : "Reapertura / Activación de Plan de Estudio";
+  const cerrando = (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE";
+  const titulo = cerrando ? "Cerrar plan a nuevos ingresos" : "Reabrir plan de estudio";
   const descripcion = cerrando
-    ? `El cierre del plan "${plan.nombre}" verifica que no existan estudiantes activos sin transición curricular resuelta.`
-    : `La reapertura del plan "${plan.nombre}" reactivará su oferta académica y quedará asentada en auditoría institucional.`;
+    ? `El plan "${plan.nombre}" dejará de aceptar nuevos estudiantes. Los estudiantes actuales podrán continuar y graduarse con su plan.`
+    : `La reapertura del plan "${plan.nombre}" permitirá nuevos ingresos autorizados y quedará registrada en auditoría.`;
 
   const body = `
     <div class="sgpa-form-grid">
@@ -1212,7 +1229,7 @@ async function alternarEstado(plan) {
       const nuevoEstado = !cerrando;
       const resultado = await (esAsistente()
         ? proponerEstadoPlan
-        : (id, act) => cambiarEstadoPlanEstudio(id, act, motivo))(plan.id, nuevoEstado);
+        : cambiarEstadoPlanEstudio)(plan.id, nuevoEstado, motivo);
 
       if (!resultado?.ok) {
         throw new Error(resultado?.message || "No fue posible cambiar el estado del plan.");
@@ -1223,7 +1240,7 @@ async function alternarEstado(plan) {
         esAsistente()
           ? "La solicitud de cambio de estado quedó pendiente de aprobación."
           : cerrando
-          ? "Plan cerrado correctamente y registrado en auditoría."
+          ? "Plan cerrado a nuevos ingresos. Los estudiantes actuales pueden continuar. Cambio auditado."
           : "Plan reabierto correctamente y registrado en auditoría.",
       );
       await cargarDatos(instanciaActual);
@@ -1234,14 +1251,79 @@ async function alternarEstado(plan) {
         errorCont.classList.remove("hidden");
       }
 
-      if (msg.includes("estudiantes activos sin una transición curricular resuelta")) {
-        dialog.close();
-        await mostrarError({
-          titulo: "Bloqueo Académico Institucional",
-          mensaje: `${msg}\n\nDebe ejecutar la transición curricular de la población estudiantil activa hacia un plan destino antes de poder cerrar este plan.`,
-        });
-        abrirTransicionCurricular(plan.id);
-      }
+    }
+  });
+}
+
+async function crearVersionDesdePlan(plan) {
+  if (!puedeGestionarPlanes() || esAsistente()) return;
+  const dialog = document.getElementById("estadoPlanDialog");
+  const content = document.getElementById("estadoPlanDialogContent");
+  if (!dialog || !content) return;
+  content.innerHTML = FormDialog({
+    formId: "crearVersionPlanForm", title: "Crear versión curricular",
+    description: `Se conservará el plan ${plan.codigo} y sus estudiantes. La nueva versión comenzará como borrador.`,
+    body: `<div class="sgpa-form-grid">
+      <label><span class="required">Código de la nueva versión</span><input id="codigoNuevaVersion" maxlength="40" required></label>
+      <label><span class="required">Nombre</span><input id="nombreNuevaVersion" maxlength="180" required></label>
+      <label class="sgpa-form-wide"><span class="required">Motivo</span><textarea id="motivoNuevaVersion" minlength="5" maxlength="500" required></textarea></label>
+      <div id="versionPlanError" class="sgpa-form-error hidden sgpa-form-wide"></div>
+    </div>`,
+    errorId: "versionPlanError", cancelButtonId: "cancelarVersionPlan",
+    submitButtonId: "confirmarVersionPlan", submitText: "Crear borrador", submitIcon: "git-branch-plus",
+  });
+  renderizarIconos();
+  if (!dialog.open) dialog.showModal();
+  habilitarCierreExterior(dialog);
+  document.getElementById("cancelarVersionPlan")?.addEventListener("click", () => dialog.close());
+  document.getElementById("crearVersionPlanForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const codigo = document.getElementById("codigoNuevaVersion")?.value?.trim();
+    const nombre = document.getElementById("nombreNuevaVersion")?.value?.trim();
+    const motivo = document.getElementById("motivoNuevaVersion")?.value?.trim();
+    const error = document.getElementById("versionPlanError");
+    try {
+      const resultado = await crearVersionPlanEstudio(plan.id, { codigo, nombre, motivo });
+      if (!resultado?.ok) throw new Error(resultado?.message || "No fue posible crear la versión.");
+      dialog.close();
+      mostrarExito({ mensaje: "Se creó el borrador curricular con una copia de la malla y sus relaciones." });
+      await cargarDatos(instanciaActual);
+    } catch (err) {
+      if (error) { error.textContent = err?.message || "No fue posible crear la versión."; error.classList.remove("hidden"); }
+    }
+  });
+}
+
+async function activarVersionDesdePlan(version, origenId) {
+  if (!puedeGestionarPlanes() || esAsistente()) return;
+  const origen = planes.find((item) => Number(item.id) === Number(origenId));
+  if (!origen) { mostrarError({ mensaje: "No se encontró el plan anterior de esta versión." }); return; }
+  const dialog = document.getElementById("estadoPlanDialog");
+  const content = document.getElementById("estadoPlanDialogContent");
+  if (!dialog || !content) return;
+  content.innerHTML = FormDialog({
+    formId: "activarVersionPlanForm", title: "Activar versión curricular",
+    description: `La versión ${version.codigo} recibirá nuevos ingresos. ${origen.codigo} pasará a EN TRANSICIÓN; sus estudiantes continuarán con su historial.`,
+    body: `<div class="sgpa-form-grid"><label class="sgpa-form-wide"><span class="required">Motivo de activación</span><textarea id="motivoActivarVersion" minlength="5" maxlength="500" required></textarea></label><div id="activarVersionError" class="sgpa-form-error hidden sgpa-form-wide"></div></div>`,
+    errorId: "activarVersionError", cancelButtonId: "cancelarActivarVersion",
+    submitButtonId: "confirmarActivarVersion", submitText: "Activar versión", submitIcon: "circle-check",
+  });
+  renderizarIconos();
+  if (!dialog.open) dialog.showModal();
+  habilitarCierreExterior(dialog);
+  document.getElementById("cancelarActivarVersion")?.addEventListener("click", () => dialog.close());
+  document.getElementById("activarVersionPlanForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const motivo = document.getElementById("motivoActivarVersion")?.value?.trim();
+    const error = document.getElementById("activarVersionError");
+    try {
+      const resultado = await activarVersionPlanEstudio(origenId, version.id, motivo);
+      if (!resultado?.ok) throw new Error(resultado?.message || "No fue posible activar la versión.");
+      dialog.close();
+      mostrarExito({ mensaje: "Versión activada; el cambio quedó registrado en auditoría." });
+      await cargarDatos(instanciaActual);
+    } catch (err) {
+      if (error) { error.textContent = err?.message || "No fue posible activar la versión."; error.classList.remove("hidden"); }
     }
   });
 }
@@ -7240,6 +7322,29 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
   let planOrigenId = planOrigenIdInicial || null;
   let planDestinoId = null;
   let simulacion = null;
+  let poblacion = null;
+  let transicionEjecucionEnCurso = false;
+  const estudiantesSeleccionados = new Set();
+
+  async function cargarPoblacion() {
+    if (!carreraId || !planOrigenId) {
+      mostrarFeedback("Seleccione carrera y plan origen.", "error");
+      return;
+    }
+    try {
+      const res = await consultarPoblacionTransicion(planOrigenId, carreraId);
+      if (res?.ok === false) throw new Error(res.message);
+      const candidatos = res.data || res;
+      if (!Array.isArray(candidatos)) throw new Error("La consulta no devolvió una lista válida.");
+      poblacion = candidatos;
+      estudiantesSeleccionados.clear();
+      candidatos.forEach((estudiante) => estudiantesSeleccionados.add(Number(estudiante.id)));
+      simulacion = null;
+      renderVistaTransicion();
+    } catch (err) {
+      mostrarFeedback(err?.message || "No fue posible cargar los estudiantes.", "error");
+    }
+  }
 
   async function ejecutarSimulacion() {
     if (!carreraId || !planOrigenId || !planDestinoId) {
@@ -7251,11 +7356,16 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
       return;
     }
 
+    if (!poblacion || estudiantesSeleccionados.size === 0) {
+      mostrarFeedback("Cargue y seleccione al menos un estudiante antes de simular.", "error");
+      return;
+    }
     try {
       const res = await simularTransicionCurricular({
         carreraId,
         planOrigenId,
         planDestinoId,
+        estudianteIds: Array.from(estudiantesSeleccionados),
       });
       if (res?.ok === false) throw new Error(res.message);
       simulacion = res.data || res;
@@ -7265,6 +7375,57 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
       renderVistaTransicion();
     } catch (err) {
       mostrarFeedback(err?.message || "Error al simular la transición curricular.", "error");
+    }
+  }
+
+  async function confirmarYEjecutarTransicion() {
+    if (transicionEjecucionEnCurso) return;
+    if (!simulacion || !carreraId || !planOrigenId || !planDestinoId) return;
+    const elegibles = simulacion.estudiantes.filter((estudiante) => estudiante.puedeMigrar);
+    const motivo = document.getElementById('tcMotivoEjecucion')?.value?.trim();
+    if (!elegibles.length) { mostrarFeedback('No hay estudiantes sin conflictos listos para trasladar.', 'error'); return; }
+    if (!motivo || motivo.length < 5) { mostrarFeedback('Indique un motivo institucional de al menos cinco caracteres.', 'error'); return; }
+    transicionEjecucionEnCurso = true;
+    const botonEjecutar = document.getElementById('tcBtnEjecutar');
+    if (botonEjecutar) {
+      botonEjecutar.disabled = true;
+      botonEjecutar.textContent = 'Confirmación en curso…';
+    }
+    try {
+      const planOrigen = planes.find((plan) => Number(plan.id) === Number(planOrigenId));
+      const planDestino = planes.find((plan) => Number(plan.id) === Number(planDestinoId));
+      const primeraConfirmacion = await confirmarAccion({
+        titulo: 'Revisar traslado curricular',
+        mensaje: `Estudiantes seleccionados: ${estudiantesSeleccionados.size}. Plan origen: ${planOrigen?.codigo || planOrigen?.nombre || planOrigenId}. Plan destino: ${planDestino?.codigo || planDestino?.nombre || planDestinoId}. Resumen: ${elegibles.length} elegible(s) de ${simulacion.estudiantes.length}; ${simulacion.estudiantes.length - elegibles.length} con conflicto(s). Se procesará cada estudiante elegible de forma independiente. Motivo: ${motivo}`,
+        textoConfirmar: 'Continuar a confirmación final', peligro: false,
+      });
+      if (!primeraConfirmacion) return;
+
+      const confirmacionFinal = await confirmarAccion({
+        titulo: 'Autorizar ejecución definitiva',
+        mensaje: `Esta confirmación autoriza definitivamente el traslado de ${elegibles.length} estudiante(s) elegible(s) al plan ${planDestino?.codigo || planDestino?.nombre || planDestinoId}.`,
+        textoConfirmar: 'Sí, ejecutar traslado', peligro: true,
+      });
+      if (!confirmacionFinal) return;
+
+      const response = await ejecutarTransicionCurricular({ carreraId, planOrigenId, planDestinoId,
+        estudianteIds: elegibles.map((estudiante) => Number(estudiante.estudianteId)), motivo });
+      if (response?.ok === false) throw new Error(response.message || 'No fue posible ejecutar la transición.');
+      const result = response?.data || response;
+      const failures = Array.isArray(result.fallidos) ? result.fallidos : [];
+      const summary = `Traslado procesado: ${result.migrados || 0}/${result.solicitados || elegibles.length} estudiantes; ${failures.length} con error individual.`;
+      simulacion = null;
+      await cargarPoblacion();
+      mostrarFeedback(summary, failures.length ? 'error' : 'success');
+    } catch (error) {
+      mostrarFeedback(error?.message || 'No fue posible ejecutar la transición curricular.', 'error');
+    } finally {
+      transicionEjecucionEnCurso = false;
+      const botonActual = document.getElementById('tcBtnEjecutar');
+      if (botonActual) {
+        botonActual.disabled = !simulacion || !simulacion.estudiantes.some((estudiante) => estudiante.puedeMigrar);
+        botonActual.textContent = `Ejecutar traslado de ${simulacion?.totalMigrables || 0} estudiante(s) elegible(s)`;
+      }
     }
   }
 
@@ -7306,6 +7467,16 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
         </div>
 
         ${planesCarrera.length < 2 ? `<div class="planes-message">${planesCarrera.length === 0 ? 'No hay planes de estudio disponibles para esta carrera.' : 'Se necesitan al menos dos planes de estudio para simular una transición.'}</div>` : ''}
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+          <button id="tcBtnCargarPoblacion" type="button" class="planes-primary-button">Cargar estudiantes del plan origen</button>
+          ${poblacion ? `<div style="margin-top: 12px;">
+            <label><input id="tcSeleccionarTodos" type="checkbox" ${poblacion.length > 0 && estudiantesSeleccionados.size === poblacion.length ? 'checked' : ''}> Seleccionar todos (${poblacion.length})</label>
+            <span style="margin-left: 12px;">Seleccionados: ${estudiantesSeleccionados.size}</span>
+            <div style="max-height: 180px; overflow-y: auto; margin-top: 8px;">
+              ${poblacion.map((estudiante) => `<label style="display: block; padding: 4px;"><input type="checkbox" data-tc-estudiante="${Number(estudiante.id)}" ${estudiantesSeleccionados.has(Number(estudiante.id)) ? 'checked' : ''}> ${escapeHtml(estudiante.nombreCompleto)} (${escapeHtml(estudiante.cedula)})</label>`).join('') || '<p>No hay estudiantes activos en este plan.</p>'}
+            </div>
+          </div>` : '<p>Consulte la población para seleccionar expedientes antes de simular.</p>'}
+        </div>
         ${simulacion ? `
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
             <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; border-left: 4px solid #64748b;">
@@ -7364,7 +7535,13 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
           </div>
 
           <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 8px;">
-            <p>La ejecución de cambios de plan permanece pendiente de validar las equivalencias y el reconocimiento de optativas entre planes. Esta vista solo simula; no modifica expedientes.</p>
+            <p>Se trasladarán únicamente los estudiantes elegibles. Los demás quedarán identificados como fallidos sin cancelar a los estudiantes confirmados.</p>
+            <label>Motivo institucional
+              <textarea id="tcMotivoEjecucion" class="planes-input" minlength="5" maxlength="500" style="display:block; width:100%; min-height:64px;"></textarea>
+            </label>
+            <button id="tcBtnEjecutar" type="button" class="planes-primary-button" ${simulacion.totalMigrables ? '' : 'disabled'}>
+              Ejecutar traslado de ${simulacion.totalMigrables} estudiante(s) elegible(s)
+            </button>
           </div>
         ` : ''}
       </div>
@@ -7392,12 +7569,16 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
       planOrigenId = null;
       planDestinoId = null;
       simulacion = null;
+      poblacion = null;
+      estudiantesSeleccionados.clear();
       renderVistaTransicion();
     });
 
     document.getElementById("tcPlanOrigenSelect")?.addEventListener("change", (e) => {
       planOrigenId = e.target.value ? Number(e.target.value) : null;
       simulacion = null;
+      poblacion = null;
+      estudiantesSeleccionados.clear();
       renderVistaTransicion();
     });
 
@@ -7407,7 +7588,24 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
       renderVistaTransicion();
     });
 
+    document.getElementById("tcBtnCargarPoblacion")?.addEventListener("click", cargarPoblacion);
+    document.getElementById("tcSeleccionarTodos")?.addEventListener("change", (event) => {
+      estudiantesSeleccionados.clear();
+      if (event.target.checked) poblacion.forEach((estudiante) => estudiantesSeleccionados.add(Number(estudiante.id)));
+      simulacion = null;
+      renderVistaTransicion();
+    });
+    content.querySelectorAll("[data-tc-estudiante]").forEach((checkbox) => {
+      checkbox.addEventListener("change", (event) => {
+        const id = Number(event.target.dataset.tcEstudiante);
+        if (event.target.checked) estudiantesSeleccionados.add(id);
+        else estudiantesSeleccionados.delete(id);
+        simulacion = null;
+        renderVistaTransicion();
+      });
+    });
     document.getElementById("tcBtnSimular")?.addEventListener("click", ejecutarSimulacion);
+    document.getElementById("tcBtnEjecutar")?.addEventListener("click", confirmarYEjecutarTransicion);
 
 
   }
@@ -7415,6 +7613,131 @@ async function abrirTransicionCurricular(planOrigenIdInicial = null) {
   renderVistaTransicion();
 }
 
+
+async function abrirBandejaConvalidacionesExternas() {
+  const dialog = document.getElementById('convalidacionesExternasDialog');
+  const content = document.getElementById('convalidacionesExternasDialogContent');
+  if (!dialog || !content) return;
+  let carreraId = carrerasDisponibles[0]?.id || null;
+  let solicitudes = [];
+  const revisadasEnEstaSesion = new Set();
+
+  async function cargar() {
+    try {
+      const response = await listarConvalidacionesExternas(carreraId, 'PENDIENTE');
+      if (response?.ok === false) throw new Error(response.message || 'No fue posible consultar las solicitudes.');
+      const rows = response?.data || response;
+      if (!Array.isArray(rows)) throw new Error('La respuesta de la bandeja no es válida.');
+      solicitudes = rows;
+      render();
+    } catch (error) {
+      mostrarFeedback(error?.message || 'No fue posible cargar las convalidaciones externas.', 'error');
+    }
+  }
+
+  function render() {
+    content.innerHTML = `
+      <div style="padding:20px; display:flex; flex-direction:column; gap:14px;">
+        <header style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+          <div><h2 style="margin:0;">Convalidaciones externas pendientes</h2>
+            <p style="margin:6px 0 0; color:#475467;">Abra cada documento en la fuente institucional, coteje su contenido y registre la revisión antes de decidir.</p></div>
+          <button id="cerrarConvalidacionesExternas" type="button" class="planes-secondary-button">Cerrar</button>
+        </header>
+        <label style="max-width:420px;">Carrera
+          <select id="convalidacionesCarrera" class="planes-select" style="display:block; width:100%; margin-top:4px;">
+            ${carrerasDisponibles.map((c) => `<option value="${Number(c.id)}" ${Number(c.id) === Number(carreraId) ? 'selected' : ''}>${escapeHtml(c.codigo)} - ${escapeHtml(c.nombre)}</option>`).join('')}
+          </select>
+        </label>
+        ${solicitudes.length ? solicitudes.map((row) => {
+          const docs = Array.isArray(row.documentacion) ? row.documentacion : [];
+          const revisada = revisadasEnEstaSesion.has(Number(row.id));
+          return `<article style="border:1px solid #d0d5dd; border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;">
+            <div><strong>Solicitud #${Number(row.id)} · Estudiante #${Number(row.estudianteId)}</strong>
+              <div>${escapeHtml(row.institucionOrigen)} — ${escapeHtml(row.asignaturaOrigen)} (${escapeHtml(row.identificacionAsignatura)})</div>
+              <small>Plan #${Number(row.planDestinoId)} · asignatura destino #${Number(row.planAsignaturaDestinoId)} · ${Number(row.creditosOrigen)} créditos de origen</small>
+            </div>
+            <p style="margin:0;">Motivo de solicitud: ${escapeHtml(row.motivoSolicitud)}</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              ${docs.map((doc, index) => {
+                let link = '';
+                try { const url = new URL(doc.referencia); if (url.protocol === 'https:' && !url.username && !url.password) link = `<button type="button" class="planes-secondary-button" data-ext-open="${Number(row.id)}" data-ext-index="${index}">Abrir documento HTTPS</button>`; } catch {}
+                return `<label style="display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:start; padding:8px; background:#f8fafc; border-radius:6px;">
+                  <input type="checkbox" class="ext-doc-check" data-ext-id="${Number(row.id)}" data-ext-hash="${escapeHtml(doc.sha256)}">
+                  <span><strong>${escapeHtml(doc.nombre)}</strong><br><small>Referencia: <code>${escapeHtml(doc.referencia)}</code></small><br><small>SHA-256: <code>${escapeHtml(doc.sha256)}</code></small>${link}</span>
+                </label>`;
+              }).join('') || '<p>No hay evidencia documental; la solicitud no podrá aprobarse.</p>'}
+            </div>
+            <label>Constancia de revisión documental<textarea class="planes-input" data-ext-review-reason="${Number(row.id)}" minlength="5" maxlength="500" placeholder="Indique qué verificó en los documentos" style="display:block; width:100%; min-height:64px;"></textarea></label>
+            <button type="button" class="planes-secondary-button" data-ext-verify="${Number(row.id)}" ${!docs.length ? 'disabled' : ''}>Registrar revisión de evidencia</button>
+            <label>Motivo de la decisión<textarea class="planes-input" data-ext-decision-reason="${Number(row.id)}" minlength="5" maxlength="500" style="display:block; width:100%; min-height:64px;"></textarea></label>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="planes-primary-button" data-ext-decision="APROBADA" data-ext-id="${Number(row.id)}" ${revisada ? '' : 'disabled'}>Aprobar</button>
+              <button type="button" class="planes-secondary-button" data-ext-decision="RECHAZADA" data-ext-id="${Number(row.id)}" ${revisada ? '' : 'disabled'}>Rechazar</button>
+            </div>
+          </article>`;
+        }).join('') : '<p>No hay solicitudes pendientes para esta carrera.</p>'}
+      </div>`;
+    renderizarIconos();
+    if (!dialog.open) dialog.showModal();
+    document.getElementById('cerrarConvalidacionesExternas')?.addEventListener('click', () => dialog.close());
+    document.getElementById('convalidacionesCarrera')?.addEventListener('change', (event) => {
+      carreraId = event.target.value ? Number(event.target.value) : null;
+      revisadasEnEstaSesion.clear();
+      void cargar();
+    });
+    content.querySelectorAll('.ext-doc-check').forEach((checkbox) => checkbox.addEventListener('change', () => {
+      const id = checkbox.dataset.extId;
+      const button = content.querySelector(`[data-ext-verify="${id}"]`);
+      const all = [...content.querySelectorAll(`.ext-doc-check[data-ext-id="${id}"]`)];
+      if (button) button.disabled = !all.length || all.some((item) => !item.checked);
+    }));
+    content.querySelectorAll('[data-ext-open]').forEach((button) => button.addEventListener('click', async () => {
+      const row = solicitudes.find((item) => Number(item.id) === Number(button.dataset.extOpen));
+      const reference = row?.documentacion?.[Number(button.dataset.extIndex)]?.referencia;
+      try {
+        const result = await window.sgpa.abrirReferenciaEvidenciaConvalidacion(reference);
+        if (!result?.ok) throw new Error(result?.message || 'No se pudo abrir el documento.');
+      } catch (error) { mostrarFeedback(error?.message || 'No se pudo abrir el documento.', 'error'); }
+    }));
+    content.querySelectorAll('[data-ext-verify]').forEach((button) => button.addEventListener('click', async () => {
+      const id = Number(button.dataset.extVerify);
+      const docs = solicitudes.find((item) => Number(item.id) === id)?.documentacion || [];
+      const checks = [...content.querySelectorAll(`.ext-doc-check[data-ext-id="${id}"]`)];
+      const reason = content.querySelector(`[data-ext-review-reason="${id}"]`)?.value?.trim();
+      if (!checks.length || checks.some((item) => !item.checked) || !reason || reason.length < 5) {
+        mostrarFeedback('Abra y coteje todos los documentos e indique el resultado de la revisión.', 'error');
+        return;
+      }
+      try {
+        const response = await verificarEvidenciaConvalidacionExterna(id, {
+          hashesVerificados: docs.map((doc) => doc.sha256), motivoRevision: reason,
+          confirmacion: 'CONFIRMO_REVISION_DOCUMENTAL',
+        });
+        if (response?.ok === false) throw new Error(response.message || 'No se registró la revisión.');
+        revisadasEnEstaSesion.add(id);
+        render();
+        mostrarFeedback('Revisión documental registrada. Ya puede emitir la decisión.', 'success');
+      } catch (error) { mostrarFeedback(error?.message || 'No fue posible registrar la revisión documental.', 'error'); }
+    }));
+    content.querySelectorAll('[data-ext-decision]').forEach((button) => button.addEventListener('click', async () => {
+      const id = Number(button.dataset.extId);
+      const reason = content.querySelector(`[data-ext-decision-reason="${id}"]`)?.value?.trim();
+      if (!revisadasEnEstaSesion.has(id)) return;
+      if (!reason || reason.length < 5) { mostrarFeedback('Indique un motivo de al menos cinco caracteres.', 'error'); return; }
+      try {
+        const response = await decidirConvalidacionExterna(id, { decision: button.dataset.extDecision, motivo: reason });
+        if (response?.ok === false) throw new Error(response.message || 'No se registró la decisión.');
+        revisadasEnEstaSesion.delete(id);
+        mostrarFeedback(`Solicitud ${button.dataset.extDecision.toLowerCase()} correctamente.`, 'success');
+        await cargar();
+      } catch (error) { mostrarFeedback(error?.message || 'No fue posible decidir la solicitud.', 'error'); }
+    }));
+  }
+
+  if (!dialog.open) dialog.showModal();
+  habilitarCierreExterior(dialog);
+  await cargar();
+}
 
 export function iniciarPlanesEstudioPage() {
   instanciaActual += 1;
@@ -7441,6 +7764,10 @@ export function iniciarPlanesEstudioPage() {
 
   document.getElementById("transicionCurricularButton")?.addEventListener("click", () => {
     void abrirTransicionCurricular();
+  }, { signal });
+
+  document.getElementById("convalidacionesExternasButton")?.addEventListener("click", () => {
+    void abrirBandejaConvalidacionesExternas();
   }, { signal });
 
   document
@@ -7482,6 +7809,14 @@ export function iniciarPlanesEstudioPage() {
 
       if (button.dataset.action === "estado") {
         await alternarEstado(plan);
+        return;
+      }
+      if (button.dataset.action === "crear-version") {
+        await crearVersionDesdePlan(plan);
+        return;
+      }
+      if (button.dataset.action === "activar-version") {
+        await activarVersionDesdePlan(plan, Number(button.dataset.parentId));
       }
     }, { signal });
 

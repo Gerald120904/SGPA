@@ -412,3 +412,16 @@
 /* =========================================================
    SELECTOR INTELIGENTE DE FECHA LÍMITE (CALENDARIO SGPA)
    ========================================================= */
+
+/* Botón bloqueado de período: puede recibir clic para explicar la validación.
+   aria-disabled no concede permiso ni ejecuta la transición. */
+.periodos-page .periodos-transition-button[aria-disabled="true"] {
+  opacity: 0.52;
+  cursor: not-allowed;
+  background: #f3f4f6;
+  color: #667085;
+}
+.periodos-page .periodos-transition-button[aria-disabled="true"]:hover {
+  background: #f3f4f6;
+  border-color: #d9dee7;
+}

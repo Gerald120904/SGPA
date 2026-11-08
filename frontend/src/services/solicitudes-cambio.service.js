@@ -21,7 +21,7 @@ export const proponerRequisitoCurso = (id, datos) => invocar('proponerRequisitoC
 export const proponerEliminarRequisitoCurso = (id, relacionId) => invocar('proponerEliminarRequisitoCurso', id, relacionId);
 export const proponerCrearPlan = (datos) => invocar('proponerCrearPlan', datos);
 export const proponerActualizarPlan = (id, datos) => invocar('proponerActualizarPlan', id, datos);
-export const proponerEstadoPlan = (id, activo) => invocar('proponerEstadoPlan', id, activo);
+export const proponerEstadoPlan = (id, activo, motivo) => invocar('proponerEstadoPlan', id, activo, motivo);
 export const proponerAsignaturaPlan = (planId, datos) => invocar('proponerAsignaturaPlan', planId, datos);
 export const proponerActualizarAsignaturaPlan = (planId, id, datos) => invocar('proponerActualizarAsignaturaPlan', planId, id, datos);
 export const proponerEstadoAsignaturaPlan = (planId, id, activo) => invocar('proponerEstadoAsignaturaPlan', planId, id, activo);

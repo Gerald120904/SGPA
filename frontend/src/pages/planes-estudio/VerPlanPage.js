@@ -332,6 +332,8 @@ export function VerPlanPage({
     `;
   }
 
+  const estadoPlan = plan.estado || (plan.activo ? 'VIGENTE' : 'CERRADO');
+
   return `
     <section class="ver-plan-page">
       <!-- =================================================
@@ -409,16 +411,16 @@ export function VerPlanPage({
               class="
                 ver-plan-status
                 ${
-                  plan.activo
+                  estadoPlan === 'VIGENTE'
                     ? "is-active"
                     : "is-inactive"
                 }
               "
             >
               ${
-                plan.activo
-                  ? "Activo"
-                  : "Inactivo"
+                estadoPlan === 'EN_TRANSICION'
+                  ? "Cerrado a nuevos ingresos"
+                  : estadoPlan === 'CERRADO' ? "Cerrado definitivamente" : "Vigente"
               }
             </span>
           </div>

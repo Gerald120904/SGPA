@@ -28,3 +28,13 @@ export async function cambiarEstadoPlanEstudio(id, activo, motivo) {
   validarApi('cambiarEstadoPlanEstudio');
   return window.sgpa.cambiarEstadoPlanEstudio(id, activo, motivo);
 }
+
+export async function crearVersionPlanEstudio(id, datos) {
+  validarApi('crearVersionPlanEstudio');
+  return window.sgpa.crearVersionPlanEstudio(id, datos);
+}
+
+export async function activarVersionPlanEstudio(id, versionId, motivo) {
+  validarApi('activarVersionPlanEstudio');
+  return window.sgpa.activarVersionPlanEstudio(id, versionId, motivo);
+}

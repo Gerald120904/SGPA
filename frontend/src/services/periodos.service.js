@@ -70,3 +70,8 @@ export async function cambiarEstadoPeriodoAcademico(
       estado,
     );
 }
+
+export async function corregirPeriodoCerrado(id, datos) {
+  validarApi("corregirPeriodoCerrado");
+  return window.sgpa.corregirPeriodoCerrado(id, datos);
+}

@@ -65,7 +65,7 @@ contextBridge.exposeInMainWorld("sgpa", {
   proponerEliminarRequisitoCurso: (id, relacionId) => ipcRenderer.invoke('solicitudes:proponer-eliminar-requisito-curso', id, relacionId),
   proponerCrearPlan: (datos) => ipcRenderer.invoke('solicitudes:proponer-plan', datos),
   proponerActualizarPlan: (id, datos) => ipcRenderer.invoke('solicitudes:proponer-actualizacion-plan', id, datos),
-  proponerEstadoPlan: (id, activo) => ipcRenderer.invoke('solicitudes:proponer-estado-plan', id, activo),
+  proponerEstadoPlan: (id, activo, motivo) => ipcRenderer.invoke('solicitudes:proponer-estado-plan', id, activo, motivo),
   proponerAsignaturaPlan: (planId, datos) => ipcRenderer.invoke('solicitudes:proponer-asignatura-plan', planId, datos),
   proponerActualizarAsignaturaPlan: (planId, id, datos) => ipcRenderer.invoke('solicitudes:proponer-actualizacion-asignatura-plan', planId, id, datos),
   proponerEstadoAsignaturaPlan: (planId, id, activo) => ipcRenderer.invoke('solicitudes:proponer-estado-asignatura-plan', planId, id, activo),
@@ -221,6 +221,9 @@ contextBridge.exposeInMainWorld("sgpa", {
       datos,
     ),
 
+  corregirPeriodoCerrado: (id, datos) =>
+    ipcRenderer.invoke("periodos:corregir-cerrado", id, datos),
+
   cambiarEstadoPeriodoAcademico: (
     id,
     estado,
@@ -238,6 +241,10 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("planes-estudio:actualizar", id, datos),
   cambiarEstadoPlanEstudio: (id, activo, motivo) =>
     ipcRenderer.invoke("planes-estudio:cambiar-estado", id, activo, motivo),
+  crearVersionPlanEstudio: (id, datos) =>
+    ipcRenderer.invoke("planes-estudio:crear-version", id, datos),
+  activarVersionPlanEstudio: (id, versionId, motivo) =>
+    ipcRenderer.invoke("planes-estudio:activar-version", id, versionId, motivo),
   obtenerReglaOptativasPlan: (planId) =>
     ipcRenderer.invoke("plan-reglas-optativas:obtener", planId),
   guardarReglaOptativasPlan: (planId, datos) =>
@@ -299,6 +306,14 @@ contextBridge.exposeInMainWorld("sgpa", {
     ipcRenderer.invoke("transiciones-curriculares:ejecutar", datos),
   listarLotesTransicionCurricular: (carreraId, planOrigenId, planDestinoId) =>
     ipcRenderer.invoke("transiciones-curriculares:lotes", carreraId, planOrigenId, planDestinoId),
+  listarConvalidacionesExternas: (carreraId, estado) =>
+    ipcRenderer.invoke("convalidaciones-externas:listar", carreraId, estado),
+  verificarEvidenciaConvalidacionExterna: (id, datos) =>
+    ipcRenderer.invoke("convalidaciones-externas:verificar-evidencia", id, datos),
+  decidirConvalidacionExterna: (id, datos) =>
+    ipcRenderer.invoke("convalidaciones-externas:decidir", id, datos),
+  abrirReferenciaEvidenciaConvalidacion: (referencia) =>
+    ipcRenderer.invoke("convalidaciones-externas:abrir-evidencia", referencia),
   obtenerResumenPlan: (planId) =>
     ipcRenderer.invoke("plan-resumen:obtener", planId),
   validarPlanEstudio: (planId) =>
