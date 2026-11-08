@@ -24,6 +24,7 @@ import { FiltrarEstudiantesDto } from './dto/filtrar-estudiantes.dto';
 import { RegistrarResultadoAcademicoDto } from './dto/registrar-resultado-academico.dto';
 import { ReingresarEstudianteDto } from './dto/reingresar-estudiante.dto';
 import { EstudiantesService } from './estudiantes.service';
+import { EntregarTituloDto } from './dto/entregar-titulo.dto';
 
 @Controller('estudiantes')
 @UseGuards(AuthGuard, PermisosGuard)
@@ -175,8 +176,10 @@ export class EstudiantesController {
   evaluarGraduacion(
     @UsuarioActualId() usuarioId: number,
     @Param('id', ParseIntPipe) id: number,
+    @Query('salidaAcademicaId') salidaAcademicaId?: string,
   ) {
-    return this.estudiantesService.evaluarGraduacion(usuarioId, id);
+    const salidaId = salidaAcademicaId ? Number(salidaAcademicaId) : undefined;
+    return this.estudiantesService.evaluarGraduacion(usuarioId, id, salidaId);
   }
 
   @Post(':id/confirmar-graduacion')
@@ -206,6 +209,17 @@ export class EstudiantesController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.estudiantesService.obtenerTitulaciones(usuarioId, id);
+  }
+
+  @Post(':id/titulaciones/:tituloId/entregar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  entregarTitulo(
+    @UsuarioActualId() usuarioId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('tituloId', ParseIntPipe) tituloId: number,
+    @Body() dto: EntregarTituloDto,
+  ) {
+    return this.estudiantesService.entregarTitulo(usuarioId, id, tituloId, dto.motivo);
   }
 
   @Patch(':id/historial-academico/:historialId/corregir')

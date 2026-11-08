@@ -34,6 +34,7 @@ import { ActualizarSalidaAcademicaDto } from '../planes-estudio/dto/actualizar-s
 import { ActualizarAsignaturasSalidaDto } from '../planes-estudio/dto/actualizar-asignaturas-salida.dto';
 import { GuardarReglaOptativaPlanDto } from '../planes-estudio/dto/guardar-regla-optativa-plan.dto';
 import { ValidarImportacionPlanDto } from '../planes-estudio/dto/validar-importacion-plan.dto';
+import { exigirPlanBorrador } from '../planes-estudio/plan-versioning.guard';
 import { CambiarPlanEstudianteDto } from '../estudiantes/dto/cambiar-plan-estudiante.dto';
 import { CorregirResultadoAcademicoDto } from '../estudiantes/dto/corregir-resultado-academico.dto';
 import { RegistrarResultadoAcademicoDto } from '../estudiantes/dto/registrar-resultado-academico.dto';
@@ -105,11 +106,14 @@ export class SolicitudesCambioService {
           descripcion: plan.descripcion } }, id, this.planes.huellaPlan(plan));
   }
 
-  async proponerCambiarEstadoPlan(solicitanteId: number, id: number, activo: boolean) {
+  async proponerCambiarEstadoPlan(solicitanteId: number, id: number, activo: boolean, motivo: string) {
+    if (!motivo || motivo.trim().length < 5 || motivo.trim().length > 500) {
+      throw new BadRequestException('La propuesta de estado necesita un motivo de 5 a 500 caracteres.');
+    }
     const plan = await this.planes.obtenerPlanCompleto(id);
     return this.registrarPropuestaPlan(solicitanteId, plan.carreraId, 'CAMBIAR_ESTADO',
-      { activo, planReferencia: { codigo: plan.codigo, nombre: plan.nombre },
-        datosAnteriores: { activo: plan.activo } }, id, this.planes.huellaPlan(plan));
+      { activo, motivo: motivo.trim(), planReferencia: { codigo: plan.codigo, nombre: plan.nombre },
+        datosAnteriores: { activo: plan.activo, estado: plan.estado } }, id, this.planes.huellaPlan(plan));
   }
 
   async proponerAgregarAsignatura(solicitanteId: number, planId: number, dto: CrearPlanAsignaturaDto) {
@@ -1025,6 +1029,16 @@ export class SolicitudesCambioService {
       } else if (solicitud.modulo === 'PLANES_ESTUDIO') {
         const datos = solicitud.datosPropuestos;
         const planId = Number(datos.planId ?? solicitud.objetivoId);
+        const operacionesCurriculares = new Set([
+          'AGREGAR_ASIGNATURA', 'ACTUALIZAR_ASIGNATURA', 'CAMBIAR_ESTADO_ASIGNATURA',
+          'CARGA_MASIVA_ASIGNATURAS', 'AGREGAR_REQUISITO', 'ELIMINAR_REQUISITO',
+          'CARGA_MASIVA_REQUISITOS', 'CREAR_SALIDA', 'ACTUALIZAR_SALIDA',
+          'CAMBIAR_ESTADO_SALIDA', 'ASIGNAR_ASIGNATURAS_SALIDA', 'GUARDAR_REGLA_OPTATIVA',
+          'ELIMINAR_REGLA_OPTATIVA', 'IMPORTAR_PLAN',
+        ]);
+        if (operacionesCurriculares.has(solicitud.operacion) && Number.isInteger(planId)) {
+          await exigirPlanBorrador(manager, planId);
+        }
         if (solicitud.operacion === 'CREAR' && Number(datos.carreraId) === solicitud.carreraId) {
           const id = await this.planes.crearDesdeSolicitud(
             coordinadorId, solicitud.solicitanteId, datos as unknown as CrearPlanEstudioDto, manager,
@@ -1040,7 +1054,7 @@ export class SolicitudesCambioService {
           typeof datos.activo === 'boolean') {
           const id = await this.planes.cambiarEstadoDesdeSolicitud(
             coordinadorId, solicitud.solicitanteId, solicitud.objetivoId,
-            datos.activo, solicitud.huellaOriginal, manager,
+            datos.activo, solicitud.huellaOriginal, manager, String(datos.motivo || ''),
           );
           resultado = { planId: id };
         } else if (solicitud.operacion === 'AGREGAR_ASIGNATURA' && Number.isInteger(planId)) {

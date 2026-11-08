@@ -38,16 +38,33 @@ export class PermisosGuard implements CanActivate {
       throw new ForbiddenException('El asistente no tiene un coordinador responsable vigente.');
     }
 
+    const accesoAulasCoordinador = rolActivo === RolSistema.COORDINADOR &&
+      context.getClass()?.name === 'AulasController';
+    if (accesoAulasCoordinador) {
+      if (!this.alcanceJerarquico) {
+        throw new ForbiddenException('No se pudo verificar el alcance de carreras.');
+      }
+      const autorizadas = await this.alcanceJerarquico.obtenerCarrerasAutorizadas(usuario.sub);
+      if (!autorizadas.length) {
+        throw new ForbiddenException('No posee carreras autorizadas.');
+      }
+    }
+
     // Los módulos restantes todavía no verifican carrera y propiedad en cada recurso.
     // Hasta integrarlos, se bloquean para cuentas jerárquicas.
     if (usuario?.jerarquiaConfigurada === true && rolActivo !== RolSistema.ADMIN_GLOBAL &&
       (rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL || rolActivo === RolSistema.COORDINADOR)) {
+      const revisionDocenteConAlcance = rolActivo === RolSistema.COORDINADOR &&
+        context.getClass()?.name === 'ProfesoresController' &&
+        ['revisarPerfilProfesor', 'revisarRequisitoPerfilProfesor', 'revisarAtestadoProfesor']
+          .includes(context.getHandler()?.name);
       const moduloConAlcance = ['EstudiantesController', 'EstudiantesImportacionController', 'CarrerasController', 'CursosController', 'CursoRequisitosController',
         'PlanesEstudioController', 'PlanAsignaturasController', 'PlanRequisitosController',
         'SalidasAcademicasController', 'PlanResumenController', 'PlanValidacionesController',
         'PlanImportacionController', 'PlanReglasOptativasController', 'OptativasController',
-        'BandejaRevisionEstudiantesController', 'TransicionesCurricularesController']
-        .includes(context.getClass()?.name);
+        'BandejaRevisionEstudiantesController', 'TransicionesCurricularesController',
+        'FormulariosEstudiantesController']
+        .includes(context.getClass()?.name) || revisionDocenteConAlcance || accesoAulasCoordinador;
       const soloLecturaAsistente = request.method === 'GET' ||
         (context.getClass()?.name === 'EstudiantesImportacionController' && request.url.includes('/validar'));
       if (!moduloConAlcance || (rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL && !soloLecturaAsistente)) {

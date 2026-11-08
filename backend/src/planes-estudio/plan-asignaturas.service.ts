@@ -45,6 +45,9 @@ export class PlanAsignaturasService {
         'No se puede modificar un plan de estudio inactivo.',
       );
     }
+    if (exigirActivo && plan.estado && plan.estado !== 'BORRADOR') {
+      throw new BadRequestException('La malla curricular solo se puede modificar en un plan BORRADOR.');
+    }
 
     return plan;
   }

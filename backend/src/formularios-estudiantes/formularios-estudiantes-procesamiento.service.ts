@@ -1,5 +1,6 @@
 import { maxLength } from 'class-validator';
 import { MailService } from '../mail/mail.service';
+import { CorreoRechazoOutboxService } from './correo-rechazo-outbox.service';
 import {
   BadRequestException,
   ConflictException,
@@ -56,6 +57,8 @@ export class FormulariosEstudiantesProcesamientoService {
     private readonly motorRequisitosService?: MotorRequisitosService,
     @Optional()
     private readonly mailService?: MailService,
+    @Optional()
+    private readonly correoOutbox?: CorreoRechazoOutboxService,
   ) {}
 
   async listarSolicitudes(
@@ -583,6 +586,49 @@ export class FormulariosEstudiantesProcesamientoService {
       throw new BadRequestException(
         'El motivo de rechazo no puede superar los 500 caracteres.',
       );
+    }
+
+    if (this.correoOutbox) {
+      const correoEstudiante = respuesta.datosNormalizadosJson?.correoEstudiantil?.trim() || null;
+      const nombreEstudiante = [respuesta.datosNormalizadosJson?.primerNombre,
+        respuesta.datosNormalizadosJson?.primerApellido].filter(Boolean).join(' ') || 'Estudiante';
+      const correoId = await this.dataSource.transaction(async (manager) => {
+        const [actual] = await manager.query(
+          'SELECT estado FROM respuestas_formularios_estudiantes WHERE id = ? FOR UPDATE', [respuestaId],
+        ) as Array<{ estado: EstadoRespuestaFormulario }>;
+        if (!actual || ![EstadoRespuestaFormulario.PENDIENTE,
+          EstadoRespuestaFormulario.REQUIERE_REVISION].includes(actual.estado)) {
+          throw new ConflictException('Esta solicitud ya fue revisada.');
+        }
+        const cambio = await manager.getRepository(RespuestaFormularioEstudiante).update(
+          { id: respuestaId, estado: In([EstadoRespuestaFormulario.PENDIENTE,
+            EstadoRespuestaFormulario.REQUIERE_REVISION]) },
+          { estado: EstadoRespuestaFormulario.RECHAZADO, revisadoPorUsuarioId: usuarioId,
+            revisadoAt: new Date(), motivoRechazo: motivoLimpio, procesadoAt: null },
+        );
+        if (cambio.affected !== 1) throw new ConflictException('Esta solicitud ya fue revisada.');
+        const creado = await this.correoOutbox!.crearPendiente(manager, {
+          respuestaId, destinatario: correoEstudiante, nombreEstudiante,
+          tituloFormulario: respuesta.formulario?.titulo || 'Formulario estudiantil',
+          carreraNombre: respuesta.formulario?.carrera?.nombre || null, motivoRechazo: motivoLimpio,
+        });
+        await manager.query('DELETE FROM solicitudes_activas_estudiantes WHERE referencia_id = ?',
+          [respuestaId]);
+        await manager.query(`UPDATE registros_importacion_estudiantes
+          SET estado = 'RECHAZADO', motivo_rechazo = ?, revisado_por_usuario_id = ?, revisado_en = NOW()
+          WHERE JSON_UNQUOTE(JSON_EXTRACT(datos_json, '$.formularioRespuestaId')) = ?`,
+        [motivoLimpio, usuarioId, respuestaId]);
+        return creado;
+      });
+      respuesta.estado = EstadoRespuestaFormulario.RECHAZADO;
+      respuesta.revisadoPorUsuarioId = usuarioId;
+      respuesta.revisadoAt = new Date();
+      respuesta.motivoRechazo = motivoLimpio;
+      respuesta.procesadoAt = null;
+      // La respuesta académica queda confirmada aunque SMTP esté caído.
+      await this.correoOutbox.procesarId(correoId).catch((error) =>
+        this.logger.error(`Correo de rechazo #${correoId} pendiente: ${error instanceof Error ? error.message : String(error)}`));
+      return respuesta;
     }
 
     if (typeof this.respuestaRepo.update === 'function') {

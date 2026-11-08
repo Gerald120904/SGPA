@@ -95,6 +95,7 @@ export class FormulariosEstudiantesSyncService {
     let pendientes = 0;
     let requierenRevision = 0;
     let errores = 0;
+    let recuperadas = 0;
 
     for (const respuesta of respuestasGoogle) {
       if (!respuesta.responseId) {
@@ -109,7 +110,7 @@ export class FormulariosEstudiantesSyncService {
         },
       });
 
-      if (existente) {
+      if (existente && existente.estado !== EstadoRespuestaFormulario.ERROR) {
         ignoradasExistentes++;
         continue;
       }
@@ -174,7 +175,7 @@ export class FormulariosEstudiantesSyncService {
             ? 'El formulario corresponde a un plan de estudio EN TRANSICIÓN. No se admiten nuevos ingresos ordinarios; requiere revisión manual.'
             : null);
 
-        const entidad = this.respuestaRepo.create({
+        const datosRespuesta = {
           formularioId: formulario.id,
           googleResponseId: respuesta.responseId,
           payloadJson: respuesta as unknown as Record<string, unknown>,
@@ -183,9 +184,23 @@ export class FormulariosEstudiantesSyncService {
           detalleError: detalleErrorDuplicado,
           optativasNoDisciplinarias: datos.optativasNoDisciplinarias,
           procesadoAt: esDuplicadoPendiente ? new Date() : null,
-        });
-
-        const guardada = await this.respuestaRepo.save(entidad);
+        };
+        let guardada: RespuestaFormularioEstudiante;
+        if (existente) {
+          const cambio = await this.respuestaRepo.update(
+            { id: existente.id, estado: EstadoRespuestaFormulario.ERROR },
+            datosRespuesta as unknown as Parameters<typeof this.respuestaRepo.update>[1],
+          );
+          if (cambio.affected !== 1) {
+            ignoradasExistentes++;
+            continue;
+          }
+          guardada = Object.assign(existente, datosRespuesta);
+          recuperadas++;
+        } else {
+          guardada = await this.respuestaRepo.save(this.respuestaRepo.create(datosRespuesta));
+          nuevas++;
+        }
         if (this.bandejaRevision && !esDuplicadoPendiente) {
           await this.bandejaRevision.registrarRespuestaFormularioEnStaging(formulario, guardada).catch(() => null);
         }
@@ -199,8 +214,6 @@ export class FormulariosEstudiantesSyncService {
           ).catch(() => null);
         }
 
-        nuevas++;
-
         if (esDuplicadoPendiente) {
           // La respuesta externa se conserva para trazabilidad histórica pero no se convierte en una solicitud académica procesable
         } else if (requiereRevision) {
@@ -209,6 +222,21 @@ export class FormulariosEstudiantesSyncService {
           pendientes++;
         }
       } catch (error) {
+        const codigoSql = (error as { driverError?: { code?: string }; code?: string })?.driverError?.code ??
+          (error as { code?: string })?.code;
+        if (codigoSql === 'ER_DUP_ENTRY') {
+          // Otra sincronización ya persistió esta respuesta con la clave única de Google.
+          ignoradasExistentes++;
+          continue;
+        }
+        if (existente) {
+          await this.respuestaRepo.update(
+            { id: existente.id, estado: EstadoRespuestaFormulario.ERROR },
+            { detalleError: error instanceof Error ? error.message : 'Error desconocido al reintentar la respuesta' },
+          );
+          errores++;
+          continue;
+        }
         const entidad = this.respuestaRepo.create({
           formularioId: formulario.id,
           googleResponseId: respuesta.responseId,
@@ -243,6 +271,7 @@ export class FormulariosEstudiantesSyncService {
       pendientes,
       requierenRevision,
       errores,
+      ...(recuperadas > 0 ? { recuperadas } : {}),
     };
   }
 

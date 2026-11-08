@@ -1009,6 +1009,7 @@ export class ProfesoresService {
   private async validarAlcanceSobrePerfilProfesor(
     usuarioId: number,
     carreraId?: number,
+    rolActivo?: RolSistema,
   ): Promise<void> {
     const usuario = await this.usuarioRepository.findOne({
       where: {
@@ -1026,7 +1027,7 @@ export class ProfesoresService {
         relacion.rol?.activo && relacion.rol.nombre === RolSistema.ADMIN_GLOBAL,
     );
 
-    if (esAdmin) {
+    if (esAdmin && (!rolActivo || rolActivo === RolSistema.ADMIN_GLOBAL)) {
       return;
     }
 
@@ -1311,6 +1312,7 @@ export class ProfesoresService {
     requisitoId: number,
     revisorUsuarioId: number,
     dto: RevisarRequisitoPerfilProfesorDto,
+    rolActivo?: RolSistema,
   ) {
     await this.obtenerProfesor(profesorId);
 
@@ -1332,6 +1334,7 @@ export class ProfesoresService {
       revisorUsuarioId,
       solicitud.perfilAcademico?.carreraId ??
         solicitud.perfilAcademico?.carrera?.id,
+      rolActivo,
     );
 
     const requisito = await this.requisitoPerfilRepository.findOne({
@@ -1343,24 +1346,52 @@ export class ProfesoresService {
       );
     }
 
-    const cumplimiento = await this.cumplimientoRequisitoRepository.findOne({
-      where: {
-        profesorPerfilAcademicoId: solicitud.id,
-        requisitoPerfilAcademicoId: requisitoId,
-      },
-    });
-    if (!cumplimiento) {
-      throw new NotFoundException(
-        'No existe el registro de cumplimiento para este requisito.',
+    return this.dataSource.transaction(async (manager) => {
+      const solicitudActual = await manager.getRepository(ProfesorPerfilAcademico).findOne({
+        where: { id: solicitud.id, profesorUsuarioId: profesorId, perfilAcademicoId: perfilId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!solicitudActual || solicitudActual.estado !== EstadoPerfilProfesor.PENDIENTE) {
+        throw new ConflictException('La solicitud de perfil ya no se encuentra pendiente.');
+      }
+      const repo = manager.getRepository(CumplimientoRequisitoProfesor);
+      const cumplimiento = await repo.findOne({
+        where: {
+          profesorPerfilAcademicoId: solicitud.id,
+          requisitoPerfilAcademicoId: requisitoId,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!cumplimiento) {
+        throw new NotFoundException('No existe el registro de cumplimiento para este requisito.');
+      }
+      await this.validarAlcanceSobrePerfilProfesor(
+        revisorUsuarioId,
+        solicitud.perfilAcademico?.carreraId ?? solicitud.perfilAcademico?.carrera?.id,
+        rolActivo,
       );
-    }
-
-    cumplimiento.estado = dto.estado;
-    cumplimiento.observacionRevision = dto.observacion?.trim() || null;
-    cumplimiento.revisadoPorUsuarioId = revisorUsuarioId;
-    cumplimiento.fechaRevision = new Date();
-
-    return this.cumplimientoRequisitoRepository.save(cumplimiento);
+      const anterior = {
+        requisitoId,
+        estado: cumplimiento.estado,
+        observacion: cumplimiento.observacionRevision,
+        revisadoPorUsuarioId: cumplimiento.revisadoPorUsuarioId,
+        fechaRevision: cumplimiento.fechaRevision,
+      };
+      cumplimiento.estado = dto.estado;
+      cumplimiento.observacionRevision = dto.observacion?.trim() || null;
+      cumplimiento.revisadoPorUsuarioId = revisorUsuarioId;
+      cumplimiento.fechaRevision = new Date();
+      const guardado = await repo.save(cumplimiento);
+      await this.registrarHistorialPerfil(
+        profesorId, revisorUsuarioId, TipoHistorialPerfilProfesor.PERFIL_ACADEMICO,
+        AccionHistorialPerfilProfesor.REVISAR_REQUISITO,
+        anterior,
+        { requisitoId, estado: guardado.estado, observacion: guardado.observacionRevision,
+          revisadoPorUsuarioId: revisorUsuarioId, fechaRevision: guardado.fechaRevision },
+        null, perfilId, manager.getRepository(HistorialPerfilProfesor),
+      );
+      return guardado;
+    });
   }
 
   async revisarPerfilProfesor(
@@ -1368,6 +1399,7 @@ export class ProfesoresService {
     perfilId: number,
     revisorUsuarioId: number,
     dto: RevisarPerfilProfesorDto,
+    rolActivo?: RolSistema,
   ) {
     const profesor = await this.obtenerProfesor(profesorId);
 
@@ -1401,6 +1433,7 @@ export class ProfesoresService {
       revisorUsuarioId,
       solicitud.perfilAcademico?.carreraId ??
         solicitud.perfilAcademico?.carrera?.id,
+      rolActivo,
     );
 
     if (dto.estado === EstadoPerfilProfesor.APROBADO) {
@@ -1454,12 +1487,49 @@ export class ProfesoresService {
       const profesorPerfilRepo = manager.getRepository(ProfesorPerfilAcademico);
       const historialRepo = manager.getRepository(HistorialPerfilProfesor);
 
-      solicitud.estado = dto.estado;
-      solicitud.revisadoPorUsuarioId = revisorUsuarioId;
-      solicitud.fechaRevision = new Date();
-      solicitud.observacionRevision = dto.observacion?.trim() || null;
+      const solicitudActual = await profesorPerfilRepo.findOne({
+        where: { id: solicitud.id, profesorUsuarioId: profesorId, perfilAcademicoId: perfilId },
+        relations: { perfilAcademico: { carrera: true } },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!solicitudActual || solicitudActual.estado !== EstadoPerfilProfesor.PENDIENTE) {
+        throw new ConflictException('La solicitud de perfil ya no se encuentra pendiente.');
+      }
+      await this.validarAlcanceSobrePerfilProfesor(
+        revisorUsuarioId,
+        solicitudActual.perfilAcademico?.carreraId ?? solicitudActual.perfilAcademico?.carrera?.id,
+        rolActivo,
+      );
+      if (dto.estado === EstadoPerfilProfesor.APROBADO) {
+        if (!profesor.activo || !solicitudActual.perfilAcademico?.activo) {
+          throw new ConflictException('El profesor o perfil ya no se encuentra activo.');
+        }
+        await manager.query(
+          'SELECT id FROM requisitos_perfiles_academicos WHERE perfil_academico_id = ? AND obligatorio = 1 FOR UPDATE',
+          [perfilId],
+        );
+        await manager.query(
+          'SELECT id FROM cumplimientos_requisitos_profesor WHERE profesor_perfil_academico_id = ? FOR UPDATE',
+          [solicitudActual.id],
+        );
+        const requisitosActuales = await manager.getRepository(RequisitoPerfilAcademico).find({
+          where: { perfilAcademicoId: perfilId, obligatorio: true },
+        });
+        const cumplimientosActuales = await manager.getRepository(CumplimientoRequisitoProfesor).find({
+          where: { profesorPerfilAcademicoId: solicitudActual.id },
+        });
+        const estados = new Map(cumplimientosActuales.map((item) => [item.requisitoPerfilAcademicoId, item.estado]));
+        if (!requisitosActuales.every((item) => estados.get(item.id) === EstadoCumplimientoRequisito.CUMPLE)) {
+          throw new ConflictException('Los requisitos del perfil cambiaron antes de aprobar la solicitud.');
+        }
+      }
 
-      await profesorPerfilRepo.save(solicitud);
+      solicitudActual.estado = dto.estado;
+      solicitudActual.revisadoPorUsuarioId = revisorUsuarioId;
+      solicitudActual.fechaRevision = new Date();
+      solicitudActual.observacionRevision = dto.observacion?.trim() || null;
+
+      await profesorPerfilRepo.save(solicitudActual);
 
       const accion =
         dto.estado === EstadoPerfilProfesor.APROBADO
@@ -1939,6 +2009,7 @@ export class ProfesoresService {
     atestadoId: number,
     revisorUsuarioId: number,
     dto: RevisarAtestadoProfesorDto,
+    rolActivo?: RolSistema,
   ) {
     const profesor = await this.obtenerProfesor(profesorId);
 
@@ -1978,7 +2049,7 @@ export class ProfesoresService {
       (rel) => rel.rol?.activo && rel.rol.nombre === RolSistema.ADMIN_GLOBAL,
     );
 
-    if (!esAdminRevisor) {
+    if (!esAdminRevisor || (rolActivo && rolActivo !== RolSistema.ADMIN_GLOBAL)) {
       const tieneAlcance =
         await this.estructuraAcademicaService.tieneAlcanceSobreProfesor(
           revisorUsuarioId,

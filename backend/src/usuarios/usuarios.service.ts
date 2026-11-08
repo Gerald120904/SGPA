@@ -566,7 +566,9 @@ export class UsuariosService {
     if (!activo && this.usuarioTieneRol(usuario, RolSistema.ASISTENTE_ESTUDIANTIL)) {
       await this.dataSource.transaction(async (manager) => {
         await manager.getRepository(Usuario).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
-        await manager.getRepository(Usuario).update(id, { activo: false });
+        await manager.getRepository(Usuario).update(id, {
+          activo: false, versionAutenticacion: () => 'version_autenticacion + 1',
+        });
         await manager.getRepository(DependenciaUsuario).update(
           { asistenteId: id, activo: true },
           { activo: false, desactivadoEn: new Date(), motivoDesactivacion: 'Desactivación operativa del asistente' },
@@ -587,7 +589,9 @@ export class UsuariosService {
         const relacionadas = await dependencias.find({ where: { coordinadorId: id, activo: true } });
         const asistentes = relacionadas.map((rel) => rel.asistenteId);
         if (asistentes.length) {
-          await manager.getRepository(Usuario).update({ id: In(asistentes) }, { activo: false });
+          await manager.getRepository(Usuario).update({ id: In(asistentes) }, {
+            activo: false, versionAutenticacion: () => 'version_autenticacion + 1',
+          });
           for (const relacion of relacionadas) {
             relacion.activo = false;
             relacion.desactivadoEn = new Date();
@@ -599,7 +603,9 @@ export class UsuariosService {
           { coordinadorId: id, estado: 'PENDIENTE' },
           { estado: 'INVALIDADA', resueltoEn: new Date(), resueltoPorUsuarioId: usuarioActualId },
         );
-        await manager.getRepository(Usuario).update(id, { activo: false });
+        await manager.getRepository(Usuario).update(id, {
+          activo: false, versionAutenticacion: () => 'version_autenticacion + 1',
+        });
         await manager.getRepository(AuditoriaJerarquia).save({
           actorUsuarioId: usuarioActualId,
           objetivoUsuarioId: id,
@@ -608,7 +614,9 @@ export class UsuariosService {
         });
       });
     } else {
-      await this.usuarioRepository.update(id, { activo });
+      await this.usuarioRepository.update(id, {
+        activo, versionAutenticacion: () => 'version_autenticacion + 1',
+      });
     }
     return this.obtenerPorId(id);
   }

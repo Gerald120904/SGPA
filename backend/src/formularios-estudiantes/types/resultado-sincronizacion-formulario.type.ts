@@ -5,4 +5,5 @@ export interface ResultadoSincronizacionFormulario {
   pendientes: number;
   requierenRevision: number;
   errores: number;
+  recuperadas?: number;
 }

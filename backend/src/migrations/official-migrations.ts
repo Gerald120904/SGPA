@@ -13,6 +13,12 @@ import { AddEstudiantesRevisionYAuditoria2026103100000 } from './2026103100000-A
 import { AddSolicitudesActivasEstudiantes2026110100000 } from './2026110100000-AddSolicitudesActivasEstudiantes';
 import { AddPlanesEstudioTransicionesYAuditoria2026110101000 } from './2026110101000-AddPlanesEstudioTransicionesYAuditoria';
 import { AddOptativaRealHistorialEstudiante2026110400000 } from './2026110400000-AddOptativaRealHistorialEstudiante';
+import { AddAuditoriaPeriodosExcepcionales2026110700000 } from './2026110700000-AddAuditoriaPeriodosExcepcionales';
+import { AddCorreoRechazoOutbox2026110701000 } from './2026110701000-AddCorreoRechazoOutbox';
+import { SepararEntregaTitulos2026110702000 } from './2026110702000-SepararEntregaTitulos';
+import { VersionadoPlanesEstudio2026110703000 } from './2026110703000-VersionadoPlanesEstudio';
+import { ConvalidacionesExternas2026110704000 } from './2026110704000-ConvalidacionesExternas';
+import { AddGoogleCuentaInstitucional2026110705000 } from './2026110705000-AddGoogleCuentaInstitucional';
 
 export const OFFICIAL_MIGRATIONS = [
   InitializeOrAdoptSchema2026101400000,
@@ -30,6 +36,12 @@ export const OFFICIAL_MIGRATIONS = [
   AddSolicitudesActivasEstudiantes2026110100000,
   AddPlanesEstudioTransicionesYAuditoria2026110101000,
   AddOptativaRealHistorialEstudiante2026110400000,
+  AddAuditoriaPeriodosExcepcionales2026110700000,
+  AddCorreoRechazoOutbox2026110701000,
+  SepararEntregaTitulos2026110702000,
+  VersionadoPlanesEstudio2026110703000,
+  ConvalidacionesExternas2026110704000,
+  AddGoogleCuentaInstitucional2026110705000,
 ] as const;
 
 export const OFFICIAL_MIGRATION_NAMES = OFFICIAL_MIGRATIONS.map(

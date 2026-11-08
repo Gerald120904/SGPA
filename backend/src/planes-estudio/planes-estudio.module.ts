@@ -12,6 +12,7 @@ import { ReglaOptativaPlan } from './entities/regla-optativa-plan.entity';
 import { SalidaAcademica } from './entities/salida-academica.entity';
 import { EquivalenciaPlan } from './entities/equivalencia-plan.entity';
 import { AuditoriaPlanEstudio } from './entities/auditoria-plan-estudio.entity';
+import { ConvalidacionExterna } from './entities/convalidacion-externa.entity';
 import { HistorialNombreAsignatura } from './entities/historial-nombre-asignatura.entity';
 import { PlanAsignaturasController } from './plan-asignaturas.controller';
 import { PlanAsignaturasService } from './plan-asignaturas.service';
@@ -46,6 +47,7 @@ import { MotorRequisitosService } from './motor-requisitos/motor-requisitos.serv
       ReglaOptativaPlan,
       EquivalenciaPlan,
       AuditoriaPlanEstudio,
+      ConvalidacionExterna,
       HistorialNombreAsignatura,
       Carrera,
       Estudiante,

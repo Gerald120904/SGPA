@@ -49,6 +49,18 @@ export class TituloEstudiante {
   @Column({ type: 'varchar', length: 500, nullable: true })
   observaciones!: string | null;
 
+  @Column({ name: 'estado_entrega', type: 'varchar', length: 24, default: 'PENDIENTE' })
+  estadoEntrega!: 'PENDIENTE' | 'ENTREGADO';
+
+  @Column({ name: 'entregado_at', type: 'datetime', precision: 3, nullable: true })
+  entregadoAt!: Date | null;
+
+  @Column({ name: 'entregado_por_usuario_id', type: 'int', unsigned: true, nullable: true })
+  entregadoPorUsuarioId!: number | null;
+
+  @Column({ name: 'motivo_entrega', type: 'varchar', length: 500, nullable: true })
+  motivoEntrega!: string | null;
+
   @ManyToOne(() => Estudiante, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
   @JoinColumn({ name: 'estudiante_id', foreignKeyConstraintName: 'FK_titulos_estudiantes_estudiante' })
   estudiante!: Estudiante;

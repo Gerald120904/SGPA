@@ -15,6 +15,9 @@ export class SimularTransicionDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayNotEmpty()
+  @IsInt({ each: true })
+  @IsPositive({ each: true })
   estudianteIds?: number[];
 }
 

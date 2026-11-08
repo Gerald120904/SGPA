@@ -51,6 +51,26 @@ export class BandejaRevisionEstudiantesController {
     return this.service.obtenerDetalleRegistro(usuarioId, id);
   }
 
+  @Post(':id/aprobar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  aprobarIndividual(
+    @UsuarioActualId() usuarioId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: { motivo?: string },
+  ) {
+    return this.service.aprobarIndividual(usuarioId, id, body?.motivo);
+  }
+
+  @Post(':id/rechazar')
+  @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
+  rechazarIndividual(
+    @UsuarioActualId() usuarioId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { motivo: string },
+  ) {
+    return this.service.rechazarIndividual(usuarioId, id, body?.motivo);
+  }
+
   @Post(['aprobar-masivo', 'aprobar'])
   @Permisos(PermisoSistema.ESTUDIANTES_GESTIONAR)
   aprobarMasivo(

@@ -144,6 +144,7 @@ export class ProfesoresController {
       perfilId,
       this.obtenerUsuarioId(request),
       dto,
+      request.user!.rolActivo as RolSistema,
     );
   }
 
@@ -176,6 +177,7 @@ export class ProfesoresController {
       requisitoId,
       this.obtenerUsuarioId(request),
       dto,
+      request.user!.rolActivo as RolSistema,
     );
   }
 
@@ -256,6 +258,7 @@ export class ProfesoresController {
       atestadoId,
       this.obtenerUsuarioId(request),
       dto,
+      request.user!.rolActivo as RolSistema,
     );
   }
 

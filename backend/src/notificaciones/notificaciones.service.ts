@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { CrearNotificacionDto } from './dto/crear-notificacion.dto';
 import { Notificacion } from './entities/notificacion.entity';
 
@@ -11,8 +11,9 @@ export class NotificacionesService {
     private readonly notificacionRepository: Repository<Notificacion>,
   ) {}
 
-  async crear(dto: CrearNotificacionDto): Promise<Notificacion> {
-    const notificacion = this.notificacionRepository.create({
+  async crear(dto: CrearNotificacionDto, manager?: EntityManager): Promise<Notificacion> {
+    const repository = manager?.getRepository(Notificacion) ?? this.notificacionRepository;
+    const notificacion = repository.create({
       claveIdempotencia: dto.claveIdempotencia ?? null,
       usuarioId: dto.usuarioId,
       carreraId: dto.carreraId ?? null,
@@ -25,11 +26,11 @@ export class NotificacionesService {
       leidoAt: null,
     });
     try {
-      return await this.notificacionRepository.save(notificacion);
+      return await repository.save(notificacion);
     } catch (error) {
       const codigo = (error as { driverError?: { code?: string } })?.driverError?.code;
       if (codigo !== 'ER_DUP_ENTRY' || !dto.claveIdempotencia) throw error;
-      const existente = await this.notificacionRepository.findOne({
+      const existente = await repository.findOne({
         where: { claveIdempotencia: dto.claveIdempotencia },
       });
       if (!existente) throw error;

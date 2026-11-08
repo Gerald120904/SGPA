@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SecurityModule } from '../auth/security.module';
 import { Carrera } from '../carreras/entities/carrera.entity';
 import { EstructuraAcademicaModule } from '../estructura-academica/estructura-academica.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { PermisosModule } from '../permisos/permisos.module';
 import { EquivalenciaPlan } from '../planes-estudio/entities/equivalencia-plan.entity';
@@ -48,6 +49,7 @@ import { EvaluacionGraduacionService } from './evaluacion-graduacion.service';
     SecurityModule,
     PermisosModule,
     EstructuraAcademicaModule,
+    NotificacionesModule,
   ],
   controllers: [
     BandejaRevisionEstudiantesController,

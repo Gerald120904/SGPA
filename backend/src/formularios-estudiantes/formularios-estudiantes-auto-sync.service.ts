@@ -33,6 +33,11 @@ export class FormulariosEstudiantesAutoSyncService {
 
     this.ejecutando = true;
 
+    let procesados = 0;
+    let respuestasNuevas = 0;
+    let erroresCount = 0;
+    let ultimoError: string | undefined;
+
     try {
       const formularios = await this.formularioRepository.find({
         where: {
@@ -52,14 +57,24 @@ export class FormulariosEstudiantesAutoSyncService {
             continue;
           }
 
+          procesados++;
           await this.sincronizarFormulario(formulario);
         } catch (error) {
+          erroresCount++;
+          ultimoError = error instanceof Error ? error.message : String(error);
           this.logger.warn(
-            `No se pudo sincronizar automáticamente el formulario ${formulario.id}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+            `No se pudo sincronizar automáticamente el formulario ${formulario.id}: ${ultimoError}`,
           );
         }
+      }
+
+      if (typeof this.googleOauthService.registrarResultadoSync === 'function' && (procesados > 0 || erroresCount > 0)) {
+        const resultadoFinal = erroresCount === 0 ? 'EXITOSO' : (procesados > erroresCount ? 'PARCIAL' : 'ERROR');
+        await this.googleOauthService.registrarResultadoSync('AUTOMATICO', resultadoFinal, {
+          formulariosProcesados: procesados,
+          respuestasNuevas,
+          detalleError: ultimoError,
+        }).catch(() => null);
       }
     } catch (error) {
       this.logger.warn(

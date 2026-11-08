@@ -1,16 +1,20 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { RolSistema } from '../auth/constants/roles.constants';
+import { rolActivoDePeticion } from '../auth/active-role-context';
 import { EstadoPeriodoAcademico } from './constants/estado-periodo-academico.constant';
 import { ActualizarPeriodoAcademicoDto } from './dto/actualizar-periodo-academico.dto';
 import { CrearPeriodoAcademicoDto } from './dto/crear-periodo-academico.dto';
+import { CorregirPeriodoCerradoDto } from './dto/corregir-periodo-cerrado.dto';
 import { PeriodoAcademico } from './entities/periodo-academico.entity';
 
 @Injectable()
@@ -19,6 +23,7 @@ export class PeriodosAcademicosService implements OnApplicationBootstrap, OnModu
   constructor(
     @InjectRepository(PeriodoAcademico)
     private readonly periodoRepository: Repository<PeriodoAcademico>,
+    private readonly dataSource: DataSource,
   ) {}
 
   private generarCodigo(anio: number, ciclo: number): string {
@@ -212,12 +217,12 @@ export class PeriodosAcademicosService implements OnApplicationBootstrap, OnModu
   }
 
   private obtenerFechaActualLocal(): string {
-    const ahora = new Date();
-    const anio = ahora.getFullYear();
-    const mes = String(ahora.getMonth() + 1).padStart(2, '0');
-    const dia = String(ahora.getDate()).padStart(2, '0');
-
-    return `${anio}-${mes}-${dia}`;
+    // No depender del timezone de la PC del profesor ni del servidor.
+    const partes = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Costa_Rica', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date());
+    const fecha = (tipo: string) => partes.find((parte) => parte.type === tipo)?.value;
+    return `${fecha('year')}-${fecha('month')}-${fecha('day')}`;
   }
 
   private validarFechaParaTransicion(
@@ -427,6 +432,67 @@ export class PeriodosAcademicosService implements OnApplicationBootstrap, OnModu
 
     try {
       return await this.periodoRepository.save(periodo);
+    } catch (error) {
+      this.relanzarErrorPersistencia(error);
+    }
+  }
+
+  async corregirCerradoExcepcionalmente(
+    usuarioId: number,
+    id: number,
+    dto: CorregirPeriodoCerradoDto,
+  ): Promise<PeriodoAcademico> {
+    if (rolActivoDePeticion(usuarioId) !== RolSistema.ADMIN_GLOBAL) {
+      throw new ForbiddenException('Solo el administrador global puede corregir un período cerrado.');
+    }
+    const motivo = dto.motivo?.trim();
+    if (!motivo || motivo.length < 10 || motivo.length > 500) {
+      throw new BadRequestException('Debe indicar un motivo de al menos 10 caracteres.');
+    }
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const repo = manager.getRepository(PeriodoAcademico);
+        const periodo = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+        if (!periodo) throw new NotFoundException('Período académico no encontrado.');
+        if (periodo.estado !== EstadoPeriodoAcademico.CERRADO) {
+          throw new BadRequestException('La corrección excepcional solo corresponde a períodos cerrados.');
+        }
+        if (rolActivoDePeticion(usuarioId) !== RolSistema.ADMIN_GLOBAL) {
+          throw new ForbiddenException('La autoridad global ya no está vigente.');
+        }
+        const campos = [
+          'anio', 'ciclo', 'fechaInicio', 'fechaFin', 'fechaLimiteDisponibilidad',
+          'fechaAperturaActualizacionDocente', 'fechaLimiteEntregaDocente',
+          'fechaLimiteRevisionDocente', 'observaciones',
+        ] as const;
+        const cambios: Record<string, { anterior: unknown; nuevo: unknown }> = {};
+        for (const campo of campos) {
+          const solicitado = dto[campo];
+          if (solicitado === undefined) continue;
+          const nuevo = campo === 'observaciones'
+            ? solicitado == null ? null : String(solicitado).trim() || null
+            : solicitado;
+          if (periodo[campo] !== nuevo) {
+            cambios[campo] = { anterior: periodo[campo], nuevo };
+            (periodo as unknown as Record<string, unknown>)[campo] = nuevo;
+          }
+        }
+        if (Object.keys(cambios).length === 0) {
+          throw new BadRequestException('Indique al menos un cambio efectivo para el período cerrado.');
+        }
+        this.validarFechas(periodo.fechaInicio, periodo.fechaFin, periodo.fechaLimiteDisponibilidad);
+        const codigo = this.generarCodigo(periodo.anio, periodo.ciclo);
+        const nombre = this.generarNombre(periodo.anio, periodo.ciclo);
+        if (periodo.codigo !== codigo) cambios.codigo = { anterior: periodo.codigo, nuevo: codigo };
+        if (periodo.nombre !== nombre) cambios.nombre = { anterior: periodo.nombre, nuevo: nombre };
+        periodo.codigo = codigo;
+        periodo.nombre = nombre;
+        await repo.save(periodo);
+        await manager.query(`INSERT INTO auditoria_periodos_excepcionales
+          (periodo_id, usuario_id, motivo, cambios_json, created_at) VALUES (?, ?, ?, ?, NOW(6))`,
+        [id, usuarioId, motivo, JSON.stringify(cambios)]);
+        return periodo;
+      });
     } catch (error) {
       this.relanzarErrorPersistencia(error);
     }

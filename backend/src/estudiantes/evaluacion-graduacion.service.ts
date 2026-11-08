@@ -28,6 +28,8 @@ import { OrigenAcademico } from './constants/origen-academico.constant';
 import { ResultadoAcademico } from './constants/resultado-academico.constant';
 import { Estudiante } from './entities/estudiante.entity';
 import { HistorialAcademicoEstudiante } from './entities/historial-academico-estudiante.entity';
+import { TituloEstudiante } from './entities/titulo-estudiante.entity';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import {
   AsignaturaEvaluadaResumen,
   CategoriaOptativaEvaluada,
@@ -55,7 +57,61 @@ export class EvaluacionGraduacionService {
     private readonly dataSource: DataSource,
     @Optional()
     private readonly alcanceJerarquico?: AlcanceJerarquicoService,
+    @Optional()
+    private readonly notificacionesService?: NotificacionesService,
   ) {}
+
+  private async obtenerDestinatariosNotificacionCarrera(
+    carreraId: number,
+  ): Promise<number[]> {
+    try {
+      const candidatos = new Set<number>();
+
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        const asig = await this.dataSource.query(
+          `SELECT DISTINCT usuario_id FROM asignaciones_academicas
+           WHERE activo = 1 AND (carrera_id = ? OR area_academica_id IN (SELECT area_academica_id FROM area_carreras WHERE carrera_id = ?))
+             AND (fecha_inicio <= CURDATE() AND (fecha_fin IS NULL OR fecha_fin >= CURDATE()))`,
+          [carreraId, carreraId],
+        ).catch(() => []);
+        for (const r of asig) {
+          if (r.usuario_id) candidatos.add(Number(r.usuario_id));
+        }
+
+        const perm = await this.dataSource.query(
+          `SELECT DISTINCT usuario_id FROM permisos_carrera WHERE carrera_id = ? AND activo = 1`,
+          [carreraId],
+        ).catch(() => []);
+        for (const r of perm) {
+          if (r.usuario_id) candidatos.add(Number(r.usuario_id));
+        }
+
+        const adm = await this.dataSource.query(
+          `SELECT DISTINCT ur.usuario_id FROM usuario_roles ur
+           JOIN roles r ON r.id = ur.rol_id
+           JOIN usuarios u ON u.id = ur.usuario_id
+           WHERE r.nombre = 'ADMIN_GLOBAL' AND r.activo = 1 AND u.activo = 1`,
+        ).catch(() => []);
+        for (const r of adm) {
+          if (r.usuario_id) candidatos.add(Number(r.usuario_id));
+        }
+      }
+
+      const destinatariosValidos: number[] = [];
+      for (const destId of candidatos) {
+        try {
+          const tieneAlcance = await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+            destId,
+            carreraId,
+          );
+          if (tieneAlcance) destinatariosValidos.push(destId);
+        } catch {}
+      }
+      return destinatariosValidos;
+    } catch {
+      return [];
+    }
+  }
 
   private async validarLectura(usuarioId: number, carreraId: number): Promise<void> {
     if (this.alcanceJerarquico) {
@@ -105,6 +161,7 @@ export class EvaluacionGraduacionService {
   async evaluarGraduacion(
     usuarioId: number,
     estudianteId: number,
+    salidaAcademicaId?: number,
   ): Promise<ResultadoEvaluacionGraduacion> {
     const estudiante = await this.estudianteRepo.findOne({
       where: { id: estudianteId },
@@ -130,6 +187,17 @@ export class EvaluacionGraduacionService {
       throw new NotFoundException('El plan de estudio del estudiante no existe.');
     }
 
+    let salida: SalidaAcademica | null = null;
+    if (salidaAcademicaId) {
+      salida = await this.dataSource.getRepository(SalidaAcademica).findOne({
+        where: { id: salidaAcademicaId, planEstudioId: estudiante.planEstudioId, activo: true },
+        relations: { asignaturas: { curso: true } },
+      });
+      if (!salida) {
+        throw new NotFoundException('La salida académica solicitada no existe o no pertenece al plan del estudiante.');
+      }
+    }
+
     const asignaturasPlan = await this.planAsignaturaRepo.find({
       where: { planEstudioId: estudiante.planEstudioId, activo: true },
       relations: { curso: true },
@@ -143,9 +211,11 @@ export class EvaluacionGraduacionService {
         })
       : [];
 
-    const reglaOptativas = await this.reglaOptativaRepo.findOne({
-      where: { planEstudioId: estudiante.planEstudioId },
-    });
+    const reglaOptativas = salida
+      ? null
+      : await this.reglaOptativaRepo.findOne({
+          where: { planEstudioId: estudiante.planEstudioId },
+        });
 
     const historiales = await this.historialRepo.find({
       where: {
@@ -197,8 +267,12 @@ export class EvaluacionGraduacionService {
     };
 
     // Separación de obligatorias y optativas
-    const obligatoriasPlan = asignaturasPlan.filter((a) => a.tipo !== TipoPlanAsignatura.OPTATIVA);
-    const optativasPlan = asignaturasPlan.filter((a) => a.tipo === TipoPlanAsignatura.OPTATIVA);
+    const obligatoriasPlan = salida
+      ? ((salida.asignaturas && salida.asignaturas.length > 0)
+          ? salida.asignaturas.filter((a) => a.activo !== false)
+          : asignaturasPlan.filter((a) => a.tipo !== TipoPlanAsignatura.OPTATIVA))
+      : asignaturasPlan.filter((a) => a.tipo !== TipoPlanAsignatura.OPTATIVA);
+    const optativasPlan = salida ? [] : asignaturasPlan.filter((a) => a.tipo === TipoPlanAsignatura.OPTATIVA);
 
     const motivosBloqueo: string[] = [];
 
@@ -231,8 +305,9 @@ export class EvaluacionGraduacionService {
     }
 
     if (obligatoriasPendientes.length > 0) {
+      const contextoObligatorias = salida ? `de la salida académica '${salida.nombre}'` : 'del plan de estudios';
       motivosBloqueo.push(
-        `Faltan ${obligatoriasPendientes.length} asignaturas obligatorias por aprobar del plan de estudios.`,
+        `Faltan ${obligatoriasPendientes.length} asignaturas obligatorias por aprobar ${contextoObligatorias}.`,
       );
     }
 
@@ -348,8 +423,9 @@ export class EvaluacionGraduacionService {
       (sum, a) => sum + (Number(a.creditos) || 0), 0,
     );
 
-    const creditosRequeridosTotal =
-      creditosObligatoriosRequeridos + creditosOptativosRequeridos;
+    const creditosRequeridosTotal = salida
+      ? (Number(salida.creditosRequeridos) || creditosObligatoriosRequeridos)
+      : (creditosObligatoriosRequeridos + creditosOptativosRequeridos);
 
     // Créditos aprobados por el estudiante: suma de materias aprobadas únicas
     const creditosObligatoriosAprobados = obligatoriasCumplidas.reduce(
@@ -374,15 +450,22 @@ export class EvaluacionGraduacionService {
       0,
     );
 
-    const creditosAprobadosTotal =
-      creditosObligatoriosAprobados + creditosOptativosAprobados;
+    const creditosHistorialTotal = historiales.reduce((sum, h) => {
+      const c = h.planAsignatura?.creditos || h.creditosReconocidos || 0;
+      return sum + (Number(c) || 0);
+    }, 0);
+
+    const creditosAprobadosTotal = salida
+      ? Math.max(creditosObligatoriosAprobados, creditosHistorialTotal)
+      : (creditosObligatoriosAprobados + creditosOptativosAprobados);
 
     const cumpleCreditos =
       creditosRequeridosTotal <= 0 || creditosAprobadosTotal >= creditosRequeridosTotal;
 
     if (!cumpleCreditos) {
+      const contextoCreditos = salida ? `exigidos para la salida académica '${salida.nombre}'` : 'exigidos';
       motivosBloqueo.push(
-        `Créditos insuficientes: cuenta con ${creditosAprobadosTotal} de ${creditosRequeridosTotal} créditos exigidos.`,
+        `Créditos insuficientes: cuenta con ${creditosAprobadosTotal} de ${creditosRequeridosTotal} créditos ${contextoCreditos}.`,
       );
     }
 
@@ -390,7 +473,18 @@ export class EvaluacionGraduacionService {
     let dictamen: DictamenGraduacion;
     let condicionAcademica: CondicionAcademica;
 
-    if (estudiante.estado === EstadoEstudiante.GRADUADO) {
+    let yaTituladoSalida = false;
+    if (salida) {
+      try {
+        const titulosSalida = await this.dataSource.query(
+          `SELECT id FROM titulos_estudiantes WHERE estudiante_id = ? AND salida_academica_id = ? LIMIT 1`,
+          [estudianteId, salida.id],
+        );
+        yaTituladoSalida = titulosSalida && titulosSalida.length > 0;
+      } catch {}
+    }
+
+    if (salida ? yaTituladoSalida : estudiante.estado === EstadoEstudiante.GRADUADO) {
       dictamen = DictamenGraduacion.APTO;
       condicionAcademica = CondicionAcademica.GRADUADO;
     } else if (optativasPlan.length > 0 && !reglaOptativas) {
@@ -439,6 +533,15 @@ export class EvaluacionGraduacionService {
         nombre: plan.nombre,
         activo: plan.activo,
       },
+      salidaAcademica: salida
+        ? {
+            id: salida.id,
+            codigo: salida.codigo,
+            nombre: salida.nombre,
+            tipo: salida.tipo,
+            creditosRequeridos: Number(salida.creditosRequeridos) || 0,
+          }
+        : null,
       obligatorias: {
         total: obligatoriasPlan.length,
         aprobadasCount: obligatoriasCumplidas.length,
@@ -489,13 +592,18 @@ export class EvaluacionGraduacionService {
     }
 
     // Revalidación inmediata de requisitos
-    const evaluacion = await this.evaluarGraduacion(usuarioId, estudianteId);
+    const evaluacion = await this.evaluarGraduacion(usuarioId, estudianteId, salidaAcademicaId);
 
     if (evaluacion.dictamen !== DictamenGraduacion.APTO) {
       throw new ConflictException(
         `No es posible registrar la graduación: el estudiante no es apto. ${evaluacion.motivosBloqueo.join(' ')}`,
       );
     }
+
+    let tituloIdGenerado: number | null = null;
+    let gradoNotif: string = '';
+    let nombreTituloNotif: string = '';
+    let salidaIdNotif: number | null = null;
 
     await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Estudiante);
@@ -506,6 +614,51 @@ export class EvaluacionGraduacionService {
       });
 
       if (!estActual) throw new NotFoundException('Estudiante no encontrado.');
+
+      if (estActual.estado === EstadoEstudiante.GRADUADO && !salidaAcademicaId) {
+        throw new ConflictException('El estudiante ya se encuentra graduado oficialmente.');
+      }
+
+      // Re-verificación concurrente de calificaciones y requisitos bajo bloqueo
+      const historialesActuales = await manager.getRepository(HistorialAcademicoEstudiante).find({
+        where: {
+          estudianteId,
+          resultado: ResultadoAcademico.APROBADO,
+        },
+        relations: { planAsignatura: { curso: true } },
+      });
+
+      const aprobadasActualesPlanIds = new Set(
+        historialesActuales
+          .map((h) => h.planAsignaturaId)
+          .filter((id): id is number => typeof id === 'number'),
+      );
+      const aprobadasActualesCursoIds = new Set(
+        historialesActuales
+          .map((h) => h.planAsignatura?.cursoId)
+          .filter((id): id is number => typeof id === 'number'),
+      );
+
+      const obligatoriaPerdida = evaluacion.obligatorias.cumplidas.some(
+        (asig) => !aprobadasActualesPlanIds.has(asig.id) && (!asig.codigo || !aprobadasActualesCursoIds.has(asig.id)),
+      );
+
+      if (obligatoriaPerdida) {
+        throw new ConflictException(
+          'Las calificaciones o requisitos académicos cambiaron concurrentemente durante la aprobación. Operación cancelada.',
+        );
+      }
+
+      const creditosActuales = historialesActuales.reduce((sum, h) => {
+        const c = h.planAsignatura?.creditos || h.creditosReconocidos || 0;
+        return sum + (Number(c) || 0);
+      }, 0);
+
+      if (evaluacion.creditos.requeridosTotal > 0 && creditosActuales < evaluacion.creditos.requeridosTotal) {
+        throw new ConflictException(
+          'Las calificaciones o requisitos académicos cambiaron concurrentemente durante la aprobación. Operación cancelada.',
+        );
+      }
 
       let gradoTitulo = estActual.planEstudio?.grado || 'BACHILLERATO';
       let nombreTitulo = estActual.planEstudio?.nombre || 'Título Oficial';
@@ -522,16 +675,6 @@ export class EvaluacionGraduacionService {
         gradoTitulo = (salida.tipo as any) || gradoTitulo;
         nombreTitulo = salida.nombre || nombreTitulo;
       }
-
-      // Si es graduación del plan principal, se actualiza el estado del estudiante a GRADUADO
-      if (!salidaAcademicaId) {
-        estActual.estado = EstadoEstudiante.GRADUADO;
-      }
-      estActual.fechaGraduacion = new Date();
-      estActual.graduadoPorUsuarioId = usuarioId;
-      estActual.observacionGraduacion = observacion?.trim() || null;
-
-      await repo.save(estActual);
 
       // Comprobar si ya existe un registro previo para el mismo grado y salida académica
       const titulosPrevios = await manager.query(
@@ -555,9 +698,18 @@ export class EvaluacionGraduacionService {
             `Conflicto académico: El estudiante ya cuenta con la titulación oficial '${previo.nombre_titulo}' registrada para este grado/salida. No puede sobrescribirse con '${nombreTitulo}'.`,
           );
         }
-        // Repetición verdaderamente idéntica: comportamiento idempotente, se preserva el título original
+        // Repetición idéntica: preservar fechas, responsables y auditoría originales.
+        return;
       } else {
-        await manager.query(
+        if (!salidaAcademicaId) estActual.estado = EstadoEstudiante.GRADUADO;
+        const fechaAprobacion = new Date();
+        if (!estActual.fechaGraduacion) {
+          estActual.fechaGraduacion = fechaAprobacion;
+          estActual.graduadoPorUsuarioId = usuarioId;
+          estActual.observacionGraduacion = observacion?.trim() || null;
+        }
+        await repo.save(estActual);
+        const insertado = await manager.query(
           `INSERT INTO titulos_estudiantes (estudiante_id, plan_estudio_id, carrera_id, salida_academica_id, grado, nombre_titulo, fecha_graduacion, graduado_por_usuario_id, observaciones, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
           [
@@ -567,11 +719,22 @@ export class EvaluacionGraduacionService {
             salidaIdNormalizada,
             gradoTitulo,
             nombreTitulo,
-            estActual.fechaGraduacion,
+            fechaAprobacion,
             usuarioId,
             observacion?.trim() || null,
           ],
         );
+        tituloIdGenerado = insertado.insertId;
+        gradoNotif = gradoTitulo;
+        nombreTituloNotif = nombreTitulo;
+        salidaIdNotif = salidaIdNormalizada;
+        await manager.query(`INSERT INTO auditoria_titulos_estudiantes
+          (titulo_id, usuario_id, accion, motivo, datos_json)
+          VALUES (?, ?, 'APROBACION', ?, ?)`, [insertado.insertId, usuarioId,
+          observacion?.trim() || 'Aprobación de graduación', JSON.stringify({
+            estudianteId, planEstudioId: estActual.planEstudioId, salidaAcademicaId: salidaIdNormalizada,
+            estadoEntrega: 'PENDIENTE', nombreTitulo,
+          })]);
       }
 
       // Registrar hito de graduación en auditoría de planes
@@ -594,10 +757,75 @@ export class EvaluacionGraduacionService {
             observacionGraduacion: estActual.observacionGraduacion,
           }),
         ],
-      ).catch(() => null);
+      );
+
+      if (this.notificacionesService && tituloIdGenerado) {
+        const destinatarios = await this.obtenerDestinatariosNotificacionCarrera(estudiante.carreraId);
+        for (const destId of destinatarios) {
+          await this.notificacionesService.crear({
+            claveIdempotencia: `notif:graduacion:${tituloIdGenerado}:${destId}`,
+            usuarioId: destId,
+            carreraId: estudiante.carreraId,
+            titulo: 'Aprobación oficial de graduación',
+            mensaje: `Se aprobó oficialmente la graduación del estudiante ${estudiante.cedula} (${estudiante.nombres} ${estudiante.apellido1}) para el título "${nombreTituloNotif}" (${gradoNotif}).${observacion ? ` Observación: ${observacion.trim()}.` : ''}`,
+            tipo: 'EXITO',
+            enlace: `/estudiantes/${estudianteId}/graduacion`,
+            metadatos: {
+              estudianteId,
+              carreraId: estudiante.carreraId,
+              tituloId: tituloIdGenerado,
+              grado: gradoNotif,
+              nombreTitulo: nombreTituloNotif,
+              salidaAcademicaId: salidaIdNotif,
+              usuarioResponsableId: usuarioId,
+              observacion: observacion?.trim() || null,
+            },
+          }, manager);
+        }
+      }
     });
 
-    return this.evaluarGraduacion(usuarioId, estudianteId);
+    return this.evaluarGraduacion(usuarioId, estudianteId, salidaAcademicaId);
+  }
+
+  async entregarTitulo(usuarioId: number, estudianteId: number, tituloId: number, motivo: string): Promise<TituloEstudiante> {
+    const motivoLimpio = typeof motivo === 'string' ? motivo.trim() : '';
+    if (motivoLimpio.length < 5 || motivoLimpio.length > 500) {
+      throw new BadRequestException('El motivo de entrega debe tener entre 5 y 500 caracteres.');
+    }
+    const estudiante = await this.estudianteRepo.findOne({ where: { id: estudianteId } });
+    if (!estudiante) throw new NotFoundException('Estudiante no encontrado.');
+    await this.validarConfirmacionGraduacion(usuarioId, estudiante.carreraId);
+
+    return this.dataSource.transaction(async (manager) => {
+      const estActual = await manager.getRepository(Estudiante).findOne({
+        where: { id: estudianteId }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!estActual || estActual.carreraId !== estudiante.carreraId) {
+        throw new ConflictException('El expediente cambió durante la entrega.');
+      }
+      const repo = manager.getRepository(TituloEstudiante);
+      const titulo = await repo.findOne({ where: { id: tituloId, estudianteId },
+        lock: { mode: 'pessimistic_write' } });
+      if (!titulo) throw new NotFoundException('Título aprobado no encontrado para el estudiante.');
+      if (titulo.estadoEntrega === 'ENTREGADO' || titulo.entregadoAt) {
+        throw new ConflictException('Este título ya fue entregado.');
+      }
+      if (titulo.estadoEntrega !== 'PENDIENTE') {
+        throw new ConflictException('El título no está aprobado para entrega.');
+      }
+      titulo.estadoEntrega = 'ENTREGADO';
+      titulo.entregadoAt = new Date();
+      titulo.entregadoPorUsuarioId = usuarioId;
+      titulo.motivoEntrega = motivoLimpio;
+      await repo.save(titulo);
+      await manager.query(`INSERT INTO auditoria_titulos_estudiantes
+        (titulo_id, usuario_id, accion, motivo, datos_json)
+        VALUES (?, ?, 'ENTREGA', ?, ?)`, [titulo.id, usuarioId, motivoLimpio,
+        JSON.stringify({ estudianteId, anterior: 'PENDIENTE', nuevo: 'ENTREGADO',
+          entregadoAt: titulo.entregadoAt })]);
+      return titulo;
+    });
   }
 }
 

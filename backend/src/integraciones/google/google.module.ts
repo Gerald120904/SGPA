@@ -4,6 +4,8 @@ import { SecurityModule } from '../../auth/security.module';
 import { PermisosModule } from '../../permisos/permisos.module';
 import { GoogleConexionUsuario } from './entities/google-conexion-usuario.entity';
 import { GoogleOauthEstado } from './entities/google-oauth-estado.entity';
+import { GoogleCuentaInstitucional } from './entities/google-cuenta-institucional.entity';
+import { GoogleSyncLog } from './entities/google-sync-log.entity';
 import { GoogleOauthController } from './google-oauth.controller';
 import { GoogleOauthService } from './google-oauth.service';
 import { GoogleFormsClientService } from './google-forms-client.service';
@@ -14,6 +16,8 @@ import { GoogleDriveClientService } from './google-drive-client.service';
     TypeOrmModule.forFeature([
       GoogleConexionUsuario,
       GoogleOauthEstado,
+      GoogleCuentaInstitucional,
+      GoogleSyncLog,
     ]),
     SecurityModule,
     PermisosModule,

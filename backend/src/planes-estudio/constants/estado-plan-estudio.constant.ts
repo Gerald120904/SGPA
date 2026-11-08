@@ -1,4 +1,5 @@
 export enum EstadoPlanEstudio {
+  BORRADOR = 'BORRADOR',
   VIGENTE = 'VIGENTE',
   EN_TRANSICION = 'EN_TRANSICION',
   CERRADO = 'CERRADO',

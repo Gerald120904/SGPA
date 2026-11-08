@@ -318,6 +318,8 @@ export class EstudiantesImportacionService {
       where: { id: planEstudioId },
     });
     if (!plan) throw new BadRequestException('El plan de estudio no existe.');
+    if (plan.estado === 'BORRADOR')
+      throw new BadRequestException('No se admiten estudiantes en un plan en estado BORRADOR.');
     if (!plan.activo)
       throw new BadRequestException(
         'El plan de estudio se encuentra inactivo.',

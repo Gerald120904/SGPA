@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -177,8 +177,23 @@ export class SolicitudesCambioController {
   @Roles(RolSistema.ASISTENTE_ESTUDIANTIL)
   proponerEstadoPlan(@Req() request: Request, @Param('id', ParseIntPipe) id: number,
     @Body() dto: CambiarEstadoPlanEstudioDto) {
-    const activo = dto.activo ?? (dto.estado ? dto.estado !== 'CERRADO' : true);
-    return this.solicitudes.proponerCambiarEstadoPlan(request.user!.sub, id, activo);
+    if (dto.activo === undefined && dto.estado === undefined) {
+      throw new BadRequestException('Debe indicar el estado propuesto.');
+    }
+    if (!dto.motivo || dto.motivo.trim().length < 5) {
+      throw new BadRequestException('La propuesta debe incluir un motivo de al menos 5 caracteres.');
+    }
+    if (dto.estado === 'CERRADO') {
+      throw new BadRequestException('El archivo definitivo requiere el flujo directo de cambio de estado.');
+    }
+    if (dto.estado !== undefined && dto.activo !== undefined &&
+      dto.activo !== true) {
+      throw new BadRequestException('El estado y la propiedad activo son contradictorios.');
+    }
+    // La propuesta usa un booleano para expresar la accion: false significa
+    // cerrar nuevos ingresos, aunque el plan permanezca activo para continuidad.
+    const activo = dto.estado !== undefined ? dto.estado === 'VIGENTE' : dto.activo!;
+    return this.solicitudes.proponerCambiarEstadoPlan(request.user!.sub, id, activo, dto.motivo.trim());
   }
 
   @Post('planes-estudio/:planId/asignaturas')

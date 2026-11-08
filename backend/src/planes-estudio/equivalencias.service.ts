@@ -72,6 +72,12 @@ export class EquivalenciasService {
     if (!puede) {
       throw new ForbiddenException('No tiene permisos para gestionar equivalencias en la carrera destino.');
     }
+    const planDestino = await this.planRepo.findOne({ where: { id: dto.planDestinoId } });
+    const planOrigen = await this.planRepo.findOne({ where: { id: dto.planOrigenId } });
+    if (!planDestino || !planOrigen || planDestino.carreraId !== dto.carreraDestinoId
+      || planOrigen.carreraId !== dto.carreraOrigenId) {
+      throw new BadRequestException('Las carreras declaradas deben corresponder a los planes de origen y destino.');
+    }
 
     // Support N:1 composite equivalence
     if (dto.tipoEquivalencia === 'N_A_1' || (dto.asignaturasOrigenIds && dto.asignaturasOrigenIds.length > 1)) {
@@ -337,12 +343,24 @@ export class EquivalenciasService {
     if (new Set(equivalencias.map((eq) => eq.id)).size !== new Set(dto.equivalenciaIds).size) {
       throw new BadRequestException('Una o más equivalencias solicitadas no están activas.');
     }
+    if (equivalencias.some((eq) => eq.planDestinoId !== estudiante.planEstudioId
+      || eq.carreraDestinoId !== estudiante.carreraId)) {
+      throw new BadRequestException('Las equivalencias deben corresponder al plan de destino y carrera actuales del estudiante.');
+    }
 
     return this.dataSource.transaction(async (manager) => {
       const estudiantesBloqueados = await manager.query(
-        'SELECT id FROM estudiantes WHERE id = ? FOR UPDATE', [dto.estudianteId],
+        'SELECT id, plan_estudio_id AS planEstudioId, carrera_id AS carreraId FROM estudiantes WHERE id = ? FOR UPDATE', [dto.estudianteId],
       );
       if (!estudiantesBloqueados.length) throw new NotFoundException('Estudiante no encontrado.');
+      if (equivalencias.some((eq) => eq.planDestinoId !== Number(estudiantesBloqueados[0].planEstudioId)
+        || eq.carreraDestinoId !== Number(estudiantesBloqueados[0].carreraId))) {
+        throw new BadRequestException('El estudiante cambió de plan o carrera antes de aplicar las equivalencias.');
+      }
+      if (!(await this.alcance.puedeEjecutar(usuarioId, PermisoSistema.ESTUDIANTES_GESTIONAR,
+        Number(estudiantesBloqueados[0].carreraId)))) {
+        throw new ForbiddenException('El permiso sobre la carrera fue revocado antes de aplicar las equivalencias.');
+      }
       const historialRepo = manager.getRepository(HistorialAcademicoEstudiante);
       let aplicadas = 0;
 

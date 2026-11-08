@@ -226,7 +226,7 @@ Sistema de Gestión y Proyección Académica (SGPA)
 Universidad Nacional · Campus Nicoya
     `.trim();
 
-    await this.transporter.sendMail({
+    const entrega = await this.transporter.sendMail({
       from: remitente,
       to: destinatario,
       subject: 'Notificación sobre su solicitud | SGPA',
@@ -313,5 +313,11 @@ Universidad Nacional · Campus Nicoya
   </body>
 </html>`,
     });
+    if (!entrega.accepted?.some((correo: string) =>
+      correo.toLowerCase() === destinatario.toLowerCase())) {
+      const error = new Error('El proveedor SMTP no aceptó al destinatario original.') as Error & { responseCode: number };
+      error.responseCode = 550;
+      throw error;
+    }
   }
 }

@@ -30,6 +30,12 @@ export class PlanEstudio {
   })
   carreraId!: number;
 
+  @Column({ name: 'version_anterior_id', type: 'int', unsigned: true, nullable: true, default: null })
+  versionAnteriorId!: number | null;
+
+  @Column({ name: 'numero_version', type: 'int', unsigned: true, default: 1 })
+  numeroVersion!: number;
+
   @Column({
     type: 'varchar',
     length: 30,
@@ -75,6 +81,10 @@ export class PlanEstudio {
     name: 'carrera_id',
   })
   carrera!: Carrera;
+
+  @ManyToOne(() => PlanEstudio, { nullable: true, onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
+  @JoinColumn({ name: 'version_anterior_id', foreignKeyConstraintName: 'FK_planes_estudio_version_anterior' })
+  versionAnterior!: PlanEstudio | null;
 
   @CreateDateColumn({
     name: 'created_at',
