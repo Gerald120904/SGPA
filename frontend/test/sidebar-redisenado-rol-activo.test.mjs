@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sidebar, obtenerIconoRol, iniciarSidebar } from '../src/components/Sidebar.js';
+import { Topbar } from '../src/components/Topbar.js';
 import { guardarSesion, limpiarSesion, obtenerRolActivo } from '../src/app/session.js';
 
-test('Sidebar: renders institutional label "Rol activo" and currently active role', () => {
+test('Topbar: renders institutional label "Rol activo" and currently active role', () => {
   guardarSesion({
     usuario: {
       nombres: 'Carlos Administrador',
@@ -13,15 +14,13 @@ test('Sidebar: renders institutional label "Rol activo" and currently active rol
     }
   });
 
-  const html = Sidebar({
+  const html = Topbar({
     usuario: {
       nombres: 'Carlos Administrador',
       correo: 'admin@una.cr',
       roles: ['ADMIN_GLOBAL', 'COORDINADOR'],
       rolActivo: 'ADMIN_GLOBAL'
     },
-    roles: ['ADMIN_GLOBAL', 'COORDINADOR'],
-    permisos: []
   });
 
   // 1. Must use "Rol activo", not "Espacio Activo"
@@ -35,9 +34,10 @@ test('Sidebar: renders institutional label "Rol activo" and currently active rol
   assert.match(html, /id="btnRolActivoExpanded"/);
   assert.match(html, /id="btnRolActivoCollapsed"/);
 
-  // 4. Must distinguish account name from active role
-  assert.match(html, /Carlos Administrador/);
-  assert.match(html, /admin@una\.cr/);
+  // Account identity remains in the sidebar footer.
+  const sidebar = Sidebar({ usuario: { nombres: 'Carlos Administrador', correo: 'admin@una.cr', rolActivo: 'ADMIN_GLOBAL' }, permisos: [] });
+  assert.match(sidebar, /Carlos Administrador/);
+  assert.match(sidebar, /admin@una\.cr/);
 
   // 5. Must have accessibility attributes
   assert.match(html, /role="listbox"/);
@@ -47,7 +47,7 @@ test('Sidebar: renders institutional label "Rol activo" and currently active rol
   limpiarSesion();
 });
 
-test('Sidebar: renders Coordinador role icon and label correctly', () => {
+test('Topbar: renders Coordinador role icon and label correctly', () => {
   guardarSesion({
     usuario: {
       nombres: 'María Coordinadora',
@@ -57,15 +57,13 @@ test('Sidebar: renders Coordinador role icon and label correctly', () => {
     }
   });
 
-  const html = Sidebar({
+  const html = Topbar({
     usuario: {
       nombres: 'María Coordinadora',
       correo: 'coordinacion@una.cr',
       roles: ['COORDINADOR', 'PROFESOR'],
       rolActivo: 'COORDINADOR'
     },
-    roles: ['COORDINADOR', 'PROFESOR'],
-    permisos: []
   });
 
   assert.match(html, /Coordinador/);
@@ -77,40 +75,35 @@ test('Sidebar: renders Coordinador role icon and label correctly', () => {
   limpiarSesion();
 });
 
-test('Sidebar: collapsed mode has compact button without clipped text', () => {
-  const html = Sidebar({
+test('Topbar: role selector remains available with a compact sidebar', () => {
+  const html = Topbar({
     usuario: {
       nombres: 'Gerald',
       roles: ['ADMIN_GLOBAL', 'COORDINADOR'],
       rolActivo: 'ADMIN_GLOBAL'
     },
-    roles: ['ADMIN_GLOBAL', 'COORDINADOR'],
-    permisos: [],
-    isCollapsed: true
   });
 
-  // Sidebar container has collapsed class
-  assert.match(html, /class="sidebar\s+collapsed"/);
+  const sidebar = Sidebar({ usuario: { nombres: 'Gerald', rolActivo: 'ADMIN_GLOBAL' }, permisos: [], isCollapsed: true });
+  assert.match(sidebar, /class="sidebar\s+collapsed"/);
 
   // Compact button exists with role icon and accessible aria-label
   assert.match(html, /id="btnRolActivoCollapsed"/);
   assert.match(html, /class="role-selector-compact-btn/);
   assert.match(html, /aria-label="Rol activo: Administrador global\. Cambiar rol"/);
 
-  // Toggle button reflects collapsed state
-  assert.match(html, /title="Expandir barra lateral"/);
+  // The role selector remains accessible in the topbar while the sidebar is compact.
+  assert.match(html, /class="topbar-role-slot"/);
 });
 
-test('Sidebar: only displays roles actually assigned to the user', () => {
-  const html = Sidebar({
+test('Topbar: only displays roles actually assigned to the user', () => {
+  const html = Topbar({
     usuario: {
       nombres: 'Profesor Juan',
       correo: 'juan.profesor@una.cr',
       roles: ['PROFESOR'],
       rolActivo: 'PROFESOR'
     },
-    roles: ['PROFESOR'],
-    permisos: []
   });
 
   // Shows Profesor
@@ -126,15 +119,13 @@ test('Sidebar: only displays roles actually assigned to the user', () => {
   assert.doesNotMatch(html, /id="menuRolesFlotante"/);
 });
 
-test('Sidebar: floating menu correctly identifies active role with checkmark', () => {
-  const html = Sidebar({
+test('Topbar: floating menu correctly identifies active role with checkmark', () => {
+  const html = Topbar({
     usuario: {
       nombres: 'Usuario Multirrol',
       roles: ['ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR'],
       rolActivo: 'COORDINADOR'
     },
-    roles: ['ADMIN_GLOBAL', 'COORDINADOR', 'PROFESOR'],
-    permisos: []
   });
 
   assert.match(html, /id="menuRolesFlotante"/);
@@ -147,38 +138,26 @@ test('Sidebar: floating menu correctly identifies active role with checkmark', (
   assert.match(html, /data-rol="PROFESOR"[\s\S]*?aria-selected="false"/);
 });
 
-test('iniciarSidebar: sidebar toggle collapses and expands sidebar and updates localStorage', () => {
+test('iniciarSidebar: clears the legacy collapsed state for hover navigation', () => {
   const appShell = createMockElement('appShell', 'main');
   const sidebar = createMockElement('sidebar', 'aside');
-  const toggleBtn = createMockElement('sidebarToggle', 'button');
   const storage = new Map();
+  appShell.classList.add('sidebar-collapsed');
+  sidebar.classList.add('collapsed');
 
   globalThis.localStorage = {
     setItem: (k, v) => storage.set(k, v),
     getItem: (k) => storage.get(k) || null
   };
 
-  const elements = { appShell, sidebar, sidebarToggle: toggleBtn };
+  const elements = { appShell, sidebar };
   setupMockEnvironment(elements);
 
   iniciarSidebar();
 
-  // Initially not collapsed
-  assert.equal(appShell.classList.contains('sidebar-collapsed'), false);
-
-  // Click toggle button -> collapses
-  toggleBtn.dispatch('click');
-  assert.equal(appShell.classList.contains('sidebar-collapsed'), true);
-  assert.equal(sidebar.classList.contains('collapsed'), true);
-  assert.equal(storage.get('sgpa_sidebar_collapsed'), 'true');
-  assert.equal(toggleBtn.getAttribute('aria-label'), 'Expandir barra lateral');
-
-  // Click toggle button again -> expands
-  toggleBtn.dispatch('click');
   assert.equal(appShell.classList.contains('sidebar-collapsed'), false);
   assert.equal(sidebar.classList.contains('collapsed'), false);
   assert.equal(storage.get('sgpa_sidebar_collapsed'), 'false');
-  assert.equal(toggleBtn.getAttribute('aria-label'), 'Contraer barra lateral');
 });
 
 test('iniciarSidebar: opens and closes role floating menu on trigger click and Escape', () => {

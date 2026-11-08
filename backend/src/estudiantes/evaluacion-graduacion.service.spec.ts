@@ -206,5 +206,185 @@ describe('EvaluacionGraduacionService', () => {
 
     await expect(service.confirmarGraduacion(1, 4, 'Intento')).rejects.toThrow(ConflictException);
   });
+
+  it('evalúa correctamente la elegibilidad para una Salida Académica específica (salida lateral/diplomado)', async () => {
+    const estudianteMock = {
+      id: 5,
+      cedula: '55555555',
+      nombres: 'Estudiante',
+      apellido1: 'SalidaLateral',
+      apellido2: null,
+      correoInstitucional: 'lateral@una.ac.cr',
+      carreraId: 10,
+      planEstudioId: 20,
+      estado: EstadoEstudiante.ACTIVO,
+    };
+    estudianteRepo.findOne.mockResolvedValue(estudianteMock);
+    planRepo.findOne.mockResolvedValue({
+      id: 20,
+      codigo: 'P20',
+      nombre: 'Bachillerato y Licenciatura en Informática',
+      activo: true,
+      carrera: { id: 10, codigo: 'INF', nombre: 'Informática' },
+    });
+
+    const asig1 = { id: 201, cursoId: 601, tipo: TipoPlanAsignatura.OBLIGATORIA, creditos: 4, activo: true, curso: { codigo: 'EIF201' } };
+    const asig2 = { id: 202, cursoId: 602, tipo: TipoPlanAsignatura.OBLIGATORIA, creditos: 4, activo: true, curso: { codigo: 'EIF202' } };
+    const asigPlanCompleto = { id: 203, cursoId: 603, tipo: TipoPlanAsignatura.OBLIGATORIA, creditos: 4, activo: true, curso: { codigo: 'EIF401' } };
+
+    planAsignaturaRepo.find.mockResolvedValue([asig1, asig2, asigPlanCompleto]);
+    planRequisitoRepo.find.mockResolvedValue([]);
+
+    const salidaMock = {
+      id: 7,
+      planEstudioId: 20,
+      codigo: 'DIP-APP',
+      nombre: 'Diplomado en Aplicaciones Informáticas',
+      tipo: 'SALIDA_LATERAL',
+      creditosRequeridos: 8,
+      activo: true,
+      asignaturas: [asig1, asig2],
+    };
+
+    dataSource.getRepository = jest.fn().mockImplementation((entity) => {
+      return {
+        findOne: jest.fn().mockResolvedValue(salidaMock),
+      };
+    });
+    dataSource.query = jest.fn().mockResolvedValue([]);
+
+    historialRepo.find.mockResolvedValue([
+      { planAsignaturaId: 201, planAsignatura: asig1, resultado: ResultadoAcademico.APROBADO },
+      { planAsignaturaId: 202, planAsignatura: asig2, resultado: ResultadoAcademico.APROBADO },
+    ]);
+
+    const resultado = await service.evaluarGraduacion(1, 5, 7);
+
+    expect(resultado.dictamen).toBe(DictamenGraduacion.APTO);
+    expect(resultado.condicionAcademica).toBe(CondicionAcademica.EGRESADO);
+    expect(resultado.salidaAcademica).toBeDefined();
+    expect(resultado.salidaAcademica?.codigo).toBe('DIP-APP');
+    expect(resultado.obligatorias.pendientesCount).toBe(0);
+    expect(resultado.cumpleTodosLosRequisitos).toBe(true);
+  });
+
+  it('impide la confirmación de graduación si las calificaciones cambiaron concurrentemente y dejan al estudiante sin requisitos', async () => {
+    const estudianteMock = {
+      id: 6,
+      carreraId: 10,
+      planEstudioId: 20,
+      estado: EstadoEstudiante.ACTIVO,
+      planEstudio: { id: 20, grado: 'BACHILLERATO', nombre: 'Bachillerato' },
+    };
+    estudianteRepo.findOne.mockResolvedValue(estudianteMock);
+    planRepo.findOne.mockResolvedValue({ id: 20, carrera: { id: 10 } });
+
+    const asig1 = { id: 301, cursoId: 701, tipo: TipoPlanAsignatura.OBLIGATORIA, creditos: 4, activo: true, curso: { codigo: 'MAT' } };
+    planAsignaturaRepo.find.mockResolvedValue([asig1]);
+    planRequisitoRepo.find.mockResolvedValue([]);
+    reglaOptativaRepo.findOne.mockResolvedValue(null);
+
+    // En la evaluación inicial aparece como aprobado
+    historialRepo.find.mockResolvedValue([
+      { planAsignaturaId: 301, planAsignatura: asig1, resultado: ResultadoAcademico.APROBADO },
+    ]);
+
+    // Dentro de la transacción, simular que otra transacción concurrente modificó las notas
+    // y el historial actual bajo bloqueo ya no tiene aprobada la asignatura
+    dataSource.transaction = jest.fn().mockImplementation(async (cb) => {
+      return cb({
+        getRepository: (entity: any) => ({
+          findOne: jest.fn().mockResolvedValue({ ...estudianteMock }),
+          find: jest.fn().mockResolvedValue([]), // Vacío: nota revocada concurrentemente
+          save: jest.fn(),
+        }),
+        query: jest.fn().mockResolvedValue([]),
+      });
+    });
+
+    await expect(service.confirmarGraduacion(1, 6, 'Aprobación concurrente')).rejects.toThrow(
+      'Las calificaciones o requisitos académicos cambiaron concurrentemente durante la aprobación. Operación cancelada.',
+    );
+  });
+
+  it('rechaza la confirmación si el usuario es un ASISTENTE_ESTUDIANTIL o no posee permisos sobre la carrera', async () => {
+    estudianteRepo.findOne.mockResolvedValue({ id: 7, carreraId: 10, planEstudioId: 20 });
+
+    // Asistente estudiantil rechazado
+    alcanceJerarquico.tipoCuentaJerarquica.mockResolvedValue('ASISTENTE_ESTUDIANTIL');
+    await expect(service.confirmarGraduacion(99, 7)).rejects.toThrow(
+      'El asistente estudiantil no está autorizado para confirmar graduaciones.',
+    );
+
+    // Coordinador sin permiso sobre la carrera
+    alcanceJerarquico.tipoCuentaJerarquica.mockResolvedValue('COORDINADOR');
+    alcanceJerarquico.puedeEjecutar.mockResolvedValue(false);
+    await expect(service.confirmarGraduacion(99, 7)).rejects.toThrow(
+      'No posee permiso para confirmar graduaciones en esta carrera.',
+    );
+  });
+
+  it('permite a un ADMIN_GLOBAL confirmar graduaciones sobre cualquier carrera', async () => {
+    const estudianteMock = {
+      id: 8,
+      carreraId: 10,
+      planEstudioId: 20,
+      estado: EstadoEstudiante.ACTIVO,
+      planEstudio: { id: 20, grado: 'BACHILLERATO', nombre: 'Bachillerato' },
+    };
+    estudianteRepo.findOne.mockResolvedValue(estudianteMock);
+    planRepo.findOne.mockResolvedValue({ id: 20, carrera: { id: 10 } });
+
+    const asig1 = { id: 401, cursoId: 801, tipo: TipoPlanAsignatura.OBLIGATORIA, creditos: 4, activo: true, curso: { codigo: 'ADM1' } };
+    planAsignaturaRepo.find.mockResolvedValue([asig1]);
+    planRequisitoRepo.find.mockResolvedValue([]);
+    reglaOptativaRepo.findOne.mockResolvedValue(null);
+
+    historialRepo.find.mockResolvedValue([
+      { planAsignaturaId: 401, planAsignatura: asig1, resultado: ResultadoAcademico.APROBADO },
+    ]);
+
+    // Admin global tiene tipoCuentaJerarquica null pero tieneAlcanceSobreCarrera true
+    alcanceJerarquico.tipoCuentaJerarquica.mockResolvedValue(null);
+    estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(true);
+
+    let transaccionConfirmada = false;
+    const managerTransaccional = {
+        getRepository: () => ({
+          findOne: jest.fn().mockResolvedValue({ ...estudianteMock }),
+          find: jest.fn().mockResolvedValue([
+            { planAsignaturaId: 401, planAsignatura: asig1, resultado: ResultadoAcademico.APROBADO },
+          ]),
+          save: jest.fn().mockResolvedValue({ ...estudianteMock, estado: EstadoEstudiante.GRADUADO }),
+        }),
+        query: jest.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('SELECT') && sql.includes('titulos_estudiantes')) {
+            return []; // No previous title
+          }
+          return { insertId: 100 };
+        }),
+    };
+    const notificacionesService = {
+      crear: jest.fn(async (_dto, manager) => {
+        expect(transaccionConfirmada).toBe(false);
+        expect(manager).toBe(managerTransaccional);
+        return {};
+      }),
+    };
+    (service as any).notificacionesService = notificacionesService;
+    jest.spyOn(service as any, 'obtenerDestinatariosNotificacionCarrera').mockResolvedValue([22]);
+    dataSource.transaction = jest.fn().mockImplementation(async (cb) => {
+      const resultado = await cb(managerTransaccional);
+      transaccionConfirmada = true;
+      return resultado;
+    });
+
+    const res = await service.confirmarGraduacion(1, 8, 'Aprobado por Admin');
+    expect(res).toBeDefined();
+    expect(dataSource.transaction).toHaveBeenCalled();
+    expect(notificacionesService.crear).toHaveBeenCalledWith(expect.objectContaining({
+      claveIdempotencia: 'notif:graduacion:100:22',
+    }), managerTransaccional);
+  });
 });
 

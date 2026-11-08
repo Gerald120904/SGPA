@@ -394,5 +394,130 @@ describe('BandejaRevisionEstudiantesService', () => {
     expect(estudianteRepo.save).not.toHaveBeenCalled();
     expect(estudianteRepo.update).not.toHaveBeenCalled();
   });
+
+  it('permite revisión individual: aprobar individualmente registra auditor y fecha', async () => {
+    const registroMock: any = {
+      id: 101,
+      carreraId: 1,
+      planEstudioId: 2,
+      cedula: '301110222',
+      accion: 'ACTUALIZAR',
+      estado: 'PENDIENTE',
+      datosJson: {
+        nombres: 'María',
+        apellido1: 'Pérez',
+        apellido2: 'Gómez',
+        correoInstitucional: 'maria.perez@una.ac.cr',
+        telefono: '8888-1111',
+      },
+      aprobacionesNuevasJson: [],
+    };
+
+    registroRepo.findOne.mockImplementation(async (opts: any) => {
+      if (opts?.where?.id === 101) return registroMock;
+      return null;
+    });
+
+    estudianteRepo.findOne.mockResolvedValue({
+      id: 50,
+      cedula: '301110222',
+      carreraId: 1,
+      estado: EstadoEstudiante.ACTIVO,
+    });
+
+    const resultado = await service.aprobarIndividual(99, 101, 'Aprobación unitaria');
+
+    expect(resultado).toBeDefined();
+    expect(resultado.id).toBe(101);
+    expect(resultado.estado).toBe('APROBADO');
+    expect(resultado.revisadoPorUsuarioId).toBe(99);
+    expect(resultado.revisadoEn).toBeInstanceOf(Date);
+  });
+
+  it('permite revisión individual: rechazar individualmente registra auditor, fecha y motivo', async () => {
+    const registroMock: any = {
+      id: 102,
+      carreraId: 1,
+      estado: 'PENDIENTE',
+      datosJson: { formularioRespuestaId: null },
+    };
+
+    registroRepo.findOne.mockImplementation(async (opts: any) => {
+      if (opts?.where?.id === 102) return registroMock;
+      return null;
+    });
+
+    const resultado = await service.rechazarIndividual(99, 102, 'Documentos incompletos');
+
+    expect(resultado).toBeDefined();
+    expect(resultado.id).toBe(102);
+    expect(resultado.estado).toBe('RECHAZADO');
+    expect(resultado.revisadoPorUsuarioId).toBe(99);
+    expect(registroMock.motivoRechazo).toBe('Documentos incompletos');
+  });
+
+  it('impide duplicación de estudiantes cuando la cédula ya existe en la carrera convirtiendo a actualización', async () => {
+    const registroMock: any = {
+      id: 103,
+      carreraId: 1,
+      planEstudioId: 2,
+      cedula: '11112222',
+      accion: 'CREAR',
+      estado: 'PENDIENTE',
+      datosJson: {
+        nombres: 'Estudiante',
+        apellido1: 'Existente',
+        apellido2: null,
+        correoInstitucional: 'existente@una.ac.cr',
+        telefono: '8765-4321',
+      },
+      aprobacionesNuevasJson: [],
+    };
+
+    registroRepo.findOne.mockResolvedValue(registroMock);
+    // Simular que el estudiante ya existe
+    estudianteRepo.findOne.mockResolvedValue({
+      id: 77,
+      cedula: '11112222',
+      carreraId: 1,
+      estado: EstadoEstudiante.ACTIVO,
+    });
+
+    const res = await service.aprobarMasivo(99, { registroIds: [103] });
+
+    expect(res.aprobados).toBe(1);
+    expect(res.fallidos).toHaveLength(0);
+    expect(registroMock.accion).toBe('ACTUALIZAR');
+    expect(estudianteRepo.update).toHaveBeenCalledWith(77, expect.any(Object));
+  });
+
+  it('garantiza rollback y reporte en fallidos si ocurre un error durante la aprobación', async () => {
+    const registroMock: any = {
+      id: 104,
+      carreraId: 1,
+      planEstudioId: 2,
+      cedula: '99999999',
+      accion: 'CREAR',
+      estado: 'PENDIENTE',
+      datosJson: {
+        nombres: 'Error',
+        apellido1: 'Fatal',
+        apellido2: null,
+      },
+      aprobacionesNuevasJson: [],
+    };
+
+    registroRepo.findOne.mockResolvedValue(registroMock);
+    estudianteRepo.findOne.mockResolvedValue(null);
+    planRepo.findOne.mockResolvedValue({ id: 2, estado: 'ACTIVO' });
+    estudianteRepo.save.mockRejectedValue(new Error('Fallo de conexión o restricción única'));
+
+    const res = await service.aprobarMasivo(99, { registroIds: [104] });
+
+    expect(res.aprobados).toBe(0);
+    expect(res.fallidos).toHaveLength(1);
+    expect(res.fallidos[0].id).toBe(104);
+    expect(res.fallidos[0].error).toContain('Fallo de conexión o restricción única');
+  });
 });
 

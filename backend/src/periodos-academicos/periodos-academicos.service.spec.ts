@@ -1,15 +1,19 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { EstadoPeriodoAcademico } from './constants/estado-periodo-academico.constant';
 import { PeriodoAcademico } from './entities/periodo-academico.entity';
 import { PeriodosAcademicosService } from './periodos-academicos.service';
+import { iniciarContextoRolActivo, establecerRolActivo } from '../auth/active-role-context';
+import { RolSistema } from '../auth/constants/roles.constants';
 
 describe('PeriodosAcademicosService', () => {
   let service: PeriodosAcademicosService;
+  let dataSource: any;
 
   let periodoRepository: {
     find: jest.Mock;
@@ -46,12 +50,78 @@ describe('PeriodosAcademicosService', () => {
       create: jest.fn((datos: Partial<PeriodoAcademico>) => datos),
       save: jest.fn(),
     };
+    dataSource = { transaction: jest.fn() };
 
     service = new PeriodosAcademicosService(
       periodoRepository as unknown as Repository<PeriodoAcademico>,
+      dataSource,
     );
 
     jest.clearAllMocks();
+  });
+
+  function comoAdmin<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => iniciarContextoRolActivo({} as any, {} as any, async () => {
+      establecerRolActivo(7, RolSistema.ADMIN_GLOBAL);
+      try { resolve(await fn()); } catch (error) { reject(error); }
+    }));
+  }
+
+  it('prohibe la correccion de un periodo cerrado fuera del rol administrador global', async () => {
+    await expect(service.corregirCerradoExcepcionalmente(7, 1, {
+      motivo: 'Rectificacion institucional', observaciones: 'Corregido',
+    })).rejects.toThrow(ForbiddenException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('corrige un periodo cerrado bajo bloqueo y audita motivo, actor y valores anteriores', async () => {
+    const original = crearPeriodo({ estado: EstadoPeriodoAcademico.CERRADO });
+    const repo = { findOne: jest.fn().mockResolvedValue({ ...original }), save: jest.fn(async (p) => p) };
+    const query = jest.fn().mockResolvedValue({ insertId: 1 });
+    dataSource.transaction.mockImplementation((cb) => cb({ getRepository: () => repo, query }));
+
+    const resultado = await comoAdmin(() => service.corregirCerradoExcepcionalmente(7, 1, {
+      motivo: 'Rectificacion institucional de fecha', fechaFin: '2027-06-30',
+    }));
+    expect(resultado.fechaFin).toBe('2027-06-30');
+    expect(resultado.estado).toBe(EstadoPeriodoAcademico.CERRADO);
+    expect(repo.findOne).toHaveBeenCalledWith({ where: { id: 1 }, lock: { mode: 'pessimistic_write' } });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO auditoria_periodos_excepcionales'),
+      [1, 7, 'Rectificacion institucional de fecha', JSON.stringify({
+        fechaFin: { anterior: '2027-06-25', nuevo: '2027-06-30' },
+      })]);
+    expect(original.fechaFin).toBe('2027-06-25');
+  });
+
+  it('revierte la correccion si falla la escritura de auditoria', async () => {
+    const original = crearPeriodo({ estado: EstadoPeriodoAcademico.CERRADO });
+    const repo = { findOne: jest.fn().mockResolvedValue({ ...original }), save: jest.fn(async (p) => p) };
+    dataSource.transaction.mockImplementation(async (cb) => cb({
+      getRepository: () => repo, query: jest.fn().mockRejectedValue(new Error('fallo SQL')),
+    }));
+    await expect(comoAdmin(() => service.corregirCerradoExcepcionalmente(7, 1, {
+      motivo: 'Rectificacion institucional de fecha', fechaFin: '2027-06-30',
+    }))).rejects.toThrow('fallo SQL');
+    expect(original.fechaFin).toBe('2027-06-25');
+  });
+
+  it('rechaza una correccion sin cambios efectivos', async () => {
+    const repo = { findOne: jest.fn().mockResolvedValue(crearPeriodo({ estado: EstadoPeriodoAcademico.CERRADO })),
+      save: jest.fn() };
+    dataSource.transaction.mockImplementation((cb) => cb({ getRepository: () => repo, query: jest.fn() }));
+    await expect(comoAdmin(() => service.corregirCerradoExcepcionalmente(7, 1, {
+      motivo: 'Revision institucional sin cambios', fechaFin: '2027-06-25',
+    }))).rejects.toThrow(BadRequestException);
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('usa la fecha de Costa Rica independiente del timezone del servidor', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-11-07T01:00:00.000Z'));
+    try {
+      expect((service as any).obtenerFechaActualLocal()).toBe('2026-11-06');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('lista los periodos ordenados por año y ciclo descendente', async () => {

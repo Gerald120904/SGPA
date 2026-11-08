@@ -22,7 +22,7 @@ describe('EquivalenciasService', () => {
       find: jest.fn(),
     };
     planRepo = {
-      findOne: jest.fn(),
+      findOne: jest.fn(({ where }: any) => Promise.resolve({ id: where.id, carreraId: 10 })),
     };
     planAsignaturaRepo = {
       findOne: jest.fn(),
@@ -42,7 +42,7 @@ describe('EquivalenciasService', () => {
     dataSource = {
       transaction: jest.fn((cb) => cb({
         getRepository: jest.fn((entity) => entity === EquivalenciaPlan ? equivalenciaRepo : historialRepo),
-        query: jest.fn().mockResolvedValue([{ id: 2 }]),
+        query: jest.fn().mockResolvedValue([{ id: 42, planEstudioId: 2, carreraId: 10 }]),
       })),
     };
 
@@ -55,6 +55,14 @@ describe('EquivalenciasService', () => {
       alcance,
       dataSource,
     );
+  });
+
+  it('rechaza una carrera destino declarada distinta de la carrera real del plan', async () => {
+    await expect(service.crear(1, {
+      carreraOrigenId: 10, planOrigenId: 1, asignaturaOrigenId: 101,
+      carreraDestinoId: 20, planDestinoId: 2, asignaturaDestinoId: 201,
+    })).rejects.toThrow(BadRequestException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
   it('rechaza crear equivalencia si el usuario no tiene permisos sobre la carrera destino', async () => {
@@ -75,6 +83,9 @@ describe('EquivalenciasService', () => {
     planAsignaturaRepo.findOne
       .mockResolvedValueOnce({ id: 101, planEstudioId: 1 })
       .mockResolvedValueOnce({ id: 201, planEstudioId: 2 });
+    planRepo.findOne.mockImplementation(({ where }: any) => Promise.resolve({
+      id: where.id, carreraId: where.id === 1 ? 10 : 20,
+    }));
     equivalenciaRepo.findOne.mockResolvedValue(null);
 
     const res = await service.crear(1, {
@@ -178,12 +189,14 @@ describe('EquivalenciasService', () => {
   });
 
   it('aplica equivalencias aprobadas al historial del estudiante evitando duplicados', async () => {
-    estudianteRepo.findOne.mockResolvedValue({ id: 42, carreraId: 10 });
+    estudianteRepo.findOne.mockResolvedValue({ id: 42, carreraId: 10, planEstudioId: 2 });
     equivalenciaRepo.find.mockResolvedValue([
       {
         id: 99,
         asignaturaOrigenId: 101,
         asignaturaDestinoId: 201,
+        planDestinoId: 2,
+        carreraDestinoId: 10,
       },
     ]);
     historialRepo.findOne.mockImplementation(({ where }: any) =>
@@ -205,6 +218,22 @@ describe('EquivalenciasService', () => {
     );
   });
 
+  it('no acredita el plan destino antes de que el estudiante pertenezca a él', async () => {
+    estudianteRepo.findOne.mockResolvedValue({ id: 42, carreraId: 10, planEstudioId: 1 });
+    equivalenciaRepo.find.mockResolvedValue([{
+      id: 99, planOrigenId: 1, asignaturaOrigenId: 101,
+      planDestinoId: 2, carreraDestinoId: 10, asignaturaDestinoId: 201, activo: true,
+    }]);
+    historialRepo.findOne.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.planAsignaturaId === 101 ? { resultado: ResultadoAcademico.APROBADO } : null));
+
+    await expect(service.aplicarEquivalenciasEstudiante(1, {
+      estudianteId: 42, equivalenciaIds: [99],
+    })).rejects.toThrow('plan de destino');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(historialRepo.save).not.toHaveBeenCalled();
+  });
+
   it('rechaza aplicar una equivalencia si no existe una aprobación de la materia de origen', async () => {
     estudianteRepo.findOne.mockResolvedValue({ id: 42, carreraId: 10, planEstudioId: 2 });
     equivalenciaRepo.find.mockResolvedValue([{
@@ -212,6 +241,7 @@ describe('EquivalenciasService', () => {
       planOrigenId: 1,
       asignaturaOrigenId: 101,
       planDestinoId: 2,
+      carreraDestinoId: 10,
       asignaturaDestinoId: 201,
       asignaturaOrigen: { id: 101, tipo: 'DISCIPLINARIA' },
       asignaturaDestino: { id: 201, tipo: 'DISCIPLINARIA' },
@@ -232,6 +262,7 @@ describe('EquivalenciasService', () => {
       planOrigenId: 1,
       asignaturaOrigenId: origenId,
       planDestinoId: 2,
+      carreraDestinoId: 10,
       asignaturaDestinoId: 201,
       activo: true,
       justificacion: `[COMPUESTA_N1:GRUPO:1:2:[101,102]]`,
@@ -246,6 +277,37 @@ describe('EquivalenciasService', () => {
       estudianteId: 42,
       equivalenciaIds: [1],
     })).rejects.toThrow('Faltan asignaturas de origen aprobadas');
+    expect(historialRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('revierte la acreditacion si el plan cambia antes de adquirir el bloqueo', async () => {
+    estudianteRepo.findOne.mockResolvedValue({ id: 42, carreraId: 10, planEstudioId: 2 });
+    equivalenciaRepo.find.mockResolvedValue([{
+      id: 99, planOrigenId: 1, asignaturaOrigenId: 101,
+      planDestinoId: 2, carreraDestinoId: 10, asignaturaDestinoId: 201, activo: true,
+    }]);
+    dataSource.transaction.mockImplementation((cb) => cb({
+      query: jest.fn().mockResolvedValue([{ id: 42, planEstudioId: 3, carreraId: 10 }]),
+      getRepository: jest.fn(() => historialRepo),
+    }));
+
+    await expect(service.aplicarEquivalenciasEstudiante(1, {
+      estudianteId: 42, equivalenciaIds: [99],
+    })).rejects.toThrow('de plan o carrera');
+    expect(historialRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('revierte la acreditacion si se revoca el permiso antes de escribir', async () => {
+    estudianteRepo.findOne.mockResolvedValue({ id: 42, carreraId: 10, planEstudioId: 2 });
+    equivalenciaRepo.find.mockResolvedValue([{
+      id: 99, planOrigenId: 1, asignaturaOrigenId: 101,
+      planDestinoId: 2, carreraDestinoId: 10, asignaturaDestinoId: 201, activo: true,
+    }]);
+    alcance.puedeEjecutar.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    await expect(service.aplicarEquivalenciasEstudiante(1, {
+      estudianteId: 42, equivalenciaIds: [99],
+    })).rejects.toThrow(ForbiddenException);
     expect(historialRepo.save).not.toHaveBeenCalled();
   });
 });

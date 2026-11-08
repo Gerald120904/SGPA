@@ -734,8 +734,21 @@ describe('UsuariosService', () => {
 
     expect(usuarioRepository.update).toHaveBeenCalledWith(2, {
       activo: false,
+      versionAutenticacion: expect.any(Function),
     });
     expect(resultado.activo).toBe(false);
+  });
+
+  it('rota la version de sesion al reactivar una cuenta', async () => {
+    usuarioRepository.findOne
+      .mockResolvedValueOnce(crearUsuario({ id: 2, activo: false }))
+      .mockResolvedValueOnce(crearUsuario({ id: 2, activo: true }));
+
+    await service.cambiarEstado(2, true, 1);
+
+    expect(usuarioRepository.update).toHaveBeenCalledWith(2, {
+      activo: true, versionAutenticacion: expect.any(Function),
+    });
   });
 
   it('impide reactivar un asistente cuya dependencia fue desactivada', async () => {

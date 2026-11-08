@@ -4,6 +4,7 @@ import { RolSistema } from '../../auth/constants/roles.constants';
 import { PermisoSistema } from '../constants/permisos.constant';
 import { PermisosGuard } from './permisos.guard';
 import { PermisosService } from '../permisos.service';
+import { AlcanceJerarquicoService } from '../alcance-jerarquico.service';
 
 describe('PermisosGuard', () => {
   let guard: PermisosGuard;
@@ -19,10 +20,10 @@ describe('PermisosGuard', () => {
     );
   });
 
-  function crearContexto(user: any, method?: string, clase?: string, params?: Record<string, string>): ExecutionContext {
+  function crearContexto(user: any, method?: string, clase?: string, params?: Record<string, string>, handler?: string): ExecutionContext {
     if (user && !user.rolActivo && user.roles?.length === 1) user.rolActivo = user.roles[0];
     return {
-      getHandler: jest.fn(),
+      getHandler: jest.fn().mockReturnValue(handler ? { name: handler } : undefined),
       getClass: jest.fn().mockReturnValue(clase ? { name: clase } : undefined),
       switchToHttp: jest.fn().mockReturnValue({
         getRequest: jest.fn().mockReturnValue({ user, method, params }),
@@ -134,6 +135,66 @@ describe('PermisosGuard', () => {
     reflector.getAllAndOverride.mockReturnValue([PermisoSistema.ESTUDIANTES_GESTIONAR]);
     await expect(guard.canActivate(crearContexto(coordinador, 'POST', 'BandejaRevisionEstudiantesController'))).rejects.toThrow(ForbiddenException);
     await expect(guard.canActivate(crearContexto({ sub: 1, roles: [RolSistema.ADMIN_GLOBAL] }, 'POST', 'BandejaRevisionEstudiantesController'))).resolves.toBe(true);
+  });
+
+  it('limita al coordinador las revisiones docentes con permiso y bloquea otras rutas', async () => {
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.PERFILES_DOCENTES_VALIDAR]);
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+    const coordinador = { sub: 3, roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: true };
+    await expect(guard.canActivate(crearContexto(coordinador, 'PATCH', 'ProfesoresController', {},
+      'revisarPerfilProfesor'))).resolves.toBe(true);
+    await expect(guard.canActivate(crearContexto(coordinador, 'PATCH', 'ProfesoresController', {},
+      'revisarRequisitoPerfilProfesor'))).resolves.toBe(true);
+    await expect(guard.canActivate(crearContexto(coordinador, 'PATCH', 'ProfesoresController', {},
+      'listar'))).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(crearContexto({ sub: 5, roles: [RolSistema.ASISTENTE_ESTUDIANTIL],
+      jerarquiaConfigurada: true }, 'PATCH', 'ProfesoresController', {},
+    'revisarPerfilProfesor'))).rejects.toThrow(ForbiddenException);
+  });
+
+  it('limita la gestión de aulas del coordinador por rol activo, permisos y carrera autorizada', async () => {
+    const mockAlcance = {
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([1]),
+      puedeEjecutar: jest.fn().mockResolvedValue(true),
+    };
+    const guardConAlcance = new PermisosGuard(
+      reflector as unknown as Reflector,
+      permisosService as unknown as PermisosService,
+      mockAlcance as unknown as AlcanceJerarquicoService,
+    );
+    reflector.getAllAndOverride.mockReturnValue([PermisoSistema.AULAS_GESTIONAR]);
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+
+    const coord = { sub: 3, roles: [RolSistema.COORDINADOR], jerarquiaConfigurada: false };
+    await expect(guardConAlcance.canActivate(crearContexto(coord, 'POST', 'AulasController'))).resolves.toBe(true);
+    expect(mockAlcance.obtenerCarrerasAutorizadas).toHaveBeenCalledWith(coord.sub);
+    expect(permisosService.usuarioTienePermisos).toHaveBeenCalledWith(
+      coord.sub, [PermisoSistema.AULAS_GESTIONAR], RolSistema.COORDINADOR,
+    );
+
+    mockAlcance.obtenerCarrerasAutorizadas.mockResolvedValue([]);
+    await expect(guardConAlcance.canActivate(crearContexto(coord, 'POST', 'AulasController')))
+      .rejects.toThrow(ForbiddenException);
+
+    mockAlcance.obtenerCarrerasAutorizadas.mockResolvedValue([1]);
+    permisosService.usuarioTienePermisos.mockResolvedValue(false);
+    await expect(guardConAlcance.canActivate(crearContexto(coord, 'POST', 'AulasController')))
+      .rejects.toThrow(ForbiddenException);
+
+    await expect(guardConAlcance.canActivate(crearContexto({
+      sub: 5, roles: [RolSistema.COORDINADOR, RolSistema.PROFESOR],
+    }, 'POST', 'AulasController'))).rejects.toThrow(ForbiddenException);
+
+    permisosService.usuarioTienePermisos.mockResolvedValue(false);
+    const profesor = { sub: 6, roles: [RolSistema.PROFESOR] };
+    await expect(guard.canActivate(crearContexto(profesor, 'POST', 'AulasController')))
+      .rejects.toThrow(ForbiddenException);
+    permisosService.usuarioTienePermisos.mockResolvedValue(true);
+    await expect(guard.canActivate(crearContexto(profesor, 'POST', 'AulasController'))).resolves.toBe(true);
+
+    const asistente = { sub: 7, roles: [RolSistema.ASISTENTE_ESTUDIANTIL], jerarquiaConfigurada: true };
+    await expect(guardConAlcance.canActivate(crearContexto(asistente, 'POST', 'AulasController')))
+      .rejects.toThrow(ForbiddenException);
   });
 
   it('lanza ForbiddenException si el usuario no posee los permisos requeridos', async () => {

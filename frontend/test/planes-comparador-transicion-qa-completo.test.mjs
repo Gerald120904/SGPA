@@ -13,6 +13,8 @@ class MockElement extends EventTarget {
     this.dataset = {};
     this._checked = false;
     this._html = '';
+    this.disabled = false;
+    this.textContent = '';
   }
   set innerHTML(html) {
     this._html = html;
@@ -45,7 +47,7 @@ function crearEntornoDOM() {
   const dinamicos = new Map();
 
   const mockBody = new MockElement('body', null);
-  mockBody.appendChild = () => {};
+  mockBody.appendChild = (elemento) => dinamicos.set(elemento.id, elemento);
   const doc = {
     body: mockBody,
     createElement(tag) {
@@ -53,12 +55,13 @@ function crearEntornoDOM() {
       el.appendChild = () => {};
       el.setAttribute = () => {};
       el.addEventListener = () => {};
-      el.remove = () => {};
+      el.remove = () => dinamicos.delete(el.id);
       return el;
     },
     limpiarDinamicos() { dinamicos.clear(); },
     getElementById(id) {
       if (fijos.has(id)) return fijos.get(id);
+      if (dinamicos.has(id)) return dinamicos.get(id);
       for (const nombre of ['comparadorPlanesDialogContent', 'transicionCurricularDialogContent']) {
         const cont = fijos.get(nombre);
         if (cont && cont.innerHTML.includes(`id="${id}"`)) {
@@ -69,6 +72,11 @@ function crearEntornoDOM() {
       return null;
     },
     buscarTodos(raiz, sel) {
+      const matchId = sel.match(/^#([\w-]+)$/);
+      if (matchId && raiz.innerHTML.includes(`id="${matchId[1]}"`)) {
+        if (!dinamicos.has(matchId[1])) dinamicos.set(matchId[1], new MockElement(matchId[1], doc));
+        return [dinamicos.get(matchId[1])];
+      }
       const matchAttr = sel.match(/^\[(data-[a-z-]+)\]$/);
       if (matchAttr) {
         const attr = matchAttr[1];
@@ -117,8 +125,10 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
     eliminarEq: [],
     listarEq: [],
     simular: [],
+    ejecuciones: [],
     listarAsig: []
   };
+  let respuestaEjecucion = { ok: false, message: 'Fallo backend QA' };
 
   const planesFixture = [
     { id: 111, carreraId: 160, codigo: 'QA-PLAN-ORIGEN', nombre: 'Plan Origen QA', activo: true },
@@ -173,11 +183,14 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
         equivalenciasFixture = equivalenciasFixture.filter(e => e.id !== id);
         return { ok: true, data: { success: true, eliminadas: 1 } };
       },
+      consultarPoblacionTransicion: async () => ({ ok: true, data: [
+        { id: 71, cedula: 'QA-EST-01', nombreCompleto: 'Estudiante Todo Aprobado' },
+        { id: 74, cedula: 'QA-EST-04', nombreCompleto: 'Estudiante N1 Incompleta' },
+        { id: 78, cedula: 'QA-EST-08', nombreCompleto: 'Estudiante Retirado' },
+      ] }),
       simularTransicionCurricular: async (payload) => {
         llamadasIPC.simular.push(payload);
-        return {
-          ok: true,
-          data: {
+        const data = {
             carreraId: payload.carreraId,
             planOrigenId: payload.planOrigenId,
             planDestinoId: payload.planDestinoId,
@@ -225,9 +238,17 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
                 asignaturasSinEquivalencia: []
               }
             ]
-          }
-        };
-      }
+          };
+        data.estudiantes = data.estudiantes.filter((estudiante) => payload.estudianteIds.includes(Number(estudiante.estudianteId)));
+        data.totalAnalizados = data.estudiantes.length;
+        data.totalMigrables = data.estudiantes.filter((estudiante) => estudiante.puedeMigrar).length;
+        data.totalConflictos = data.estudiantes.filter((estudiante) => !estudiante.puedeMigrar).length;
+        return { ok: true, data };
+      },
+      ejecutarTransicionCurricular: async (payload) => {
+        llamadasIPC.ejecuciones.push(payload);
+        return respuestaEjecucion;
+      },
     }
   };
 
@@ -315,10 +336,19 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
       doc.getElementById('tcPlanDestinoSelect').change('112');
       await tick();
 
+      doc.getElementById('tcBtnCargarPoblacion').click();
+      await tick();
+      assert.match(doc.getElementById('transicionCurricularDialogContent').innerHTML, /Seleccionados: 3/);
+      doc.getElementById('transicionCurricularDialogContent').querySelectorAll('[data-tc-estudiante]')[0].check(false);
+      assert.match(doc.getElementById('transicionCurricularDialogContent').innerHTML, /Seleccionados: 2/);
+      doc.getElementById('tcSeleccionarTodos').check(true);
+      assert.match(doc.getElementById('transicionCurricularDialogContent').innerHTML, /Seleccionados: 3/);
+
       doc.getElementById('tcBtnSimular').click();
       await tick();
 
       assert.equal(llamadasIPC.simular.length, 1, 'Debe haber invocado simularTransicionCurricular');
+      assert.deepEqual(llamadasIPC.simular[0].estudianteIds, [71, 74, 78]);
       const htmlSim = doc.getElementById('transicionCurricularDialogContent').innerHTML;
 
       // 1. Estadísticas
@@ -340,8 +370,74 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
       assert.match(htmlSim, /QA-EST-08/);
       assert.match(htmlSim, /RETIRADO/, 'Muestra diagnóstico de conflicto');
 
-      // Mensaje de solo lectura y bloqueo institucional
-      assert.match(htmlSim, /La ejecución de cambios de plan permanece pendiente/);
+      // Ejecución disponible solo para estudiantes elegibles y con motivo obligatorio
+      assert.match(htmlSim, /id="tcBtnEjecutar"/);
+      assert.match(htmlSim, /Ejecutar traslado de 2 estudiante\(s\) elegible\(s\)/);
+      assert.match(htmlSim, /id="tcMotivoEjecucion"/);
+
+      const botónTraslado = doc.getElementById('tcBtnEjecutar');
+      doc.getElementById('tcMotivoEjecucion').value = 'Ajuste curricular aprobado';
+
+      botónTraslado.click();
+      assert.equal(botónTraslado.disabled, true, 'El botón se bloquea desde la primera confirmación.');
+      let confirmación = doc.getElementById('sgpaConfirmDialog');
+      assert.match(confirmación.innerHTML, /Estudiantes seleccionados: 3/);
+      assert.match(confirmación.innerHTML, /QA-PLAN-ORIGEN/);
+      assert.match(confirmación.innerHTML, /QA-PLAN-DESTINO/);
+      assert.match(confirmación.innerHTML, /2 elegible\(s\) de 3; 1 con conflicto/);
+      confirmación.querySelector('#sgpaConfirmCancel').click();
+      await tick();
+      assert.equal(llamadasIPC.ejecuciones.length, 0, 'Cancelar la primera confirmación no traslada estudiantes.');
+      assert.equal(botónTraslado.disabled, false, 'Cancelar restablece el botón.');
+
+      botónTraslado.click();
+      doc.getElementById('sgpaConfirmAccept').click();
+      await tick();
+      confirmación = doc.getElementById('sgpaConfirmDialog');
+      assert.match(confirmación.innerHTML, /Autorizar ejecución definitiva/);
+      confirmación.querySelector('#sgpaConfirmCancel').click();
+      await tick();
+      assert.equal(llamadasIPC.ejecuciones.length, 0, 'Cancelar la confirmación final tampoco traslada estudiantes.');
+      assert.equal(botónTraslado.disabled, false, 'La cancelación final restablece el botón.');
+
+      let resolverTraslado;
+      respuestaEjecucion = new Promise((resolve) => { resolverTraslado = resolve; });
+      botónTraslado.click();
+      doc.getElementById('sgpaConfirmAccept').click();
+      await tick();
+      doc.getElementById('sgpaConfirmAccept').click();
+      await tick();
+      assert.equal(llamadasIPC.ejecuciones.length, 1, 'El lote llega una sola vez a IPC.');
+      assert.deepEqual(llamadasIPC.ejecuciones[0].estudianteIds, [71, 74]);
+      assert.equal(botónTraslado.disabled, true, 'El botón sigue bloqueado durante IPC.');
+      botónTraslado.click();
+      await tick();
+      assert.equal(llamadasIPC.ejecuciones.length, 1, 'Clics repetidos no duplican la ejecución pendiente.');
+      resolverTraslado({ ok: false, message: 'Error backend simulado' });
+      await tick();
+      assert.equal(botónTraslado.disabled, false, 'Un error backend restablece el botón.');
+      assert.equal(llamadasIPC.ejecuciones.length, 1);
+
+      respuestaEjecucion = { ok: true, data: { migrados: 1, solicitados: 1, fallidos: [] } };
+      const quitarSeleccion = (id) => doc.getElementById('transicionCurricularDialogContent')
+        .querySelectorAll('[data-tc-estudiante]')
+        .find((checkbox) => Number(checkbox.dataset.tcEstudiante) === id);
+      quitarSeleccion(74).check(false);
+      await tick();
+      quitarSeleccion(78).check(false);
+      await tick();
+      doc.getElementById('tcBtnSimular').click();
+      await tick();
+      assert.equal(llamadasIPC.simular.at(-1).estudianteIds.length, 1, 'La simulación individual incluye solo un estudiante.');
+      doc.getElementById('tcMotivoEjecucion').value = 'Traslado individual QA';
+      doc.getElementById('tcBtnEjecutar').click();
+      doc.getElementById('sgpaConfirmAccept').click();
+      await tick();
+      doc.getElementById('sgpaConfirmAccept').click();
+      await tick();
+      assert.equal(llamadasIPC.ejecuciones.length, 2);
+      assert.deepEqual(llamadasIPC.ejecuciones[1].estudianteIds, [71], 'La ejecución individual solo envía el estudiante elegido.');
+      assert.equal(doc.getElementById('tcBtnEjecutar'), null, 'El éxito refresca la simulación ejecutada.');
 
       // Cerrar diálogo
       doc.getElementById('cerrarTransicionBtn').click();

@@ -288,7 +288,7 @@ test('shell.openExternal recibe URLs de OAuth o formularios validadas', () => {
     (match) => match[1].trim(),
   );
 
-  assert.deepEqual(calls, ['urlValidada', 'urlValidada']);
+  assert.deepEqual(calls, ['urlValidada', 'urlValidada', 'urlValidada']);
   assert.match(mainSource, /url\.protocol !== ["']https:["']/);
   assert.match(mainSource, /HOSTS_OAUTH_GOOGLE_PERMITIDOS/);
   assert.match(mainSource, /validarUrlExternaFormulario\(\s*urlResuelta,/);

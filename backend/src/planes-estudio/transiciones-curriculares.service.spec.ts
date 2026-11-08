@@ -9,10 +9,13 @@ import { RolSistema } from '../auth/constants/roles.constants';
 describe('TransicionesCurricularesService', () => {
   let service: TransicionesCurricularesService;
   let planRepo: any;
+  let carreraRepo: any;
+  let usuarioRepo: any;
   let planAsignaturaRepo: any;
   let estudianteRepo: any;
   let historialRepo: any;
   let equivalenciaRepo: any;
+  let reglaOptativaRepo: any;
   let alcance: any;
   let dataSource: any;
   let mockQueryBuilder: any;
@@ -20,10 +23,12 @@ describe('TransicionesCurricularesService', () => {
   beforeEach(() => {
     planRepo = {
       findOne: jest.fn().mockImplementation(({ where }: any) =>
-        Promise.resolve({ id: where?.id || 1, carreraId: 10 }),
+        Promise.resolve({ id: where?.id || 1, carreraId: 10, activo: true, estado: 'VIGENTE' }),
       ),
       find: jest.fn(),
     };
+    carreraRepo = { findOne: jest.fn().mockResolvedValue({ id: 10, activo: true }) };
+    usuarioRepo = { findOne: jest.fn().mockResolvedValue({ id: 1, activo: true }) };
     planAsignaturaRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
@@ -52,21 +57,14 @@ describe('TransicionesCurricularesService', () => {
     equivalenciaRepo = {
       find: jest.fn().mockResolvedValue([]),
     };
+    reglaOptativaRepo = { findOne: jest.fn().mockResolvedValue(null) };
     alcance = {
       tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR'),
       puedeEjecutar: jest.fn().mockResolvedValue(true),
       obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([10]),
     };
     dataSource = {
-      transaction: jest.fn((cb) =>
-        cb({
-          getRepository: jest.fn((entity) => {
-            if (entity.name === 'Estudiante') return estudianteRepo;
-            return historialRepo;
-          }),
-          query: jest.fn().mockResolvedValue([]),
-        }),
-      ),
+      transaction: jest.fn((cb) => cb(crearManagerPrueba())),
       query: jest.fn().mockResolvedValue([]),
     };
 
@@ -76,10 +74,42 @@ describe('TransicionesCurricularesService', () => {
       estudianteRepo,
       historialRepo,
       equivalenciaRepo,
+      reglaOptativaRepo,
       alcance,
       dataSource,
     );
   });
+
+  function crearManagerPrueba(overrides: any = {}) {
+    return {
+      getRepository: jest.fn((entity) => {
+        const repos: Record<string, any> = {
+          Estudiante: estudianteRepo,
+          HistorialAcademicoEstudiante: historialRepo,
+          PlanEstudio: planRepo,
+          PlanAsignatura: planAsignaturaRepo,
+          EquivalenciaPlan: equivalenciaRepo,
+          ReglaOptativaPlan: reglaOptativaRepo,
+          Carrera: carreraRepo,
+          Usuario: usuarioRepo,
+        };
+        return repos[entity.name];
+      }),
+      query: jest.fn((sql: string) => {
+        if (sql.includes('SELECT r.nombre')) return Promise.resolve([{ nombre: RolSistema.COORDINADOR }]);
+        if (sql.includes('SELECT id FROM permisos_carrera')) return Promise.resolve([{ id: 1 }]);
+        return Promise.resolve([]);
+      }),
+      ...overrides,
+    };
+  }
+
+  function ejecutarComoCoordinador<T>(operacion: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => iniciarContextoRolActivo({} as any, {} as any, () => {
+      establecerRolActivo(1, RolSistema.COORDINADOR);
+      operacion().then(resolve, reject);
+    }));
+  }
 
   describe('listarLotesAuditoria', () => {
     it('limita carreras aunque no se envie filtro y aplica origen y destino', async () => {
@@ -144,6 +174,82 @@ describe('TransicionesCurricularesService', () => {
   });
 
   describe('simularTransicion', () => {
+    it('reconoce una optativa aprobada en un espacio de igual categoria con creditos del plan destino', async () => {
+      planAsignaturaRepo.find.mockResolvedValueOnce([{ id: 111, planEstudioId: 1, tipo: TipoPlanAsignatura.OPTATIVA,
+        tipoOptativa: 'ABIERTA', creditos: 3 }]).mockResolvedValueOnce([
+        { id: 211, planEstudioId: 2, tipo: TipoPlanAsignatura.OPTATIVA,
+          tipoOptativa: 'ABIERTA', creditos: 4, activo: true, codigoReferencia: 'OPT-DEST' },
+      ]);
+      reglaOptativaRepo.findOne.mockResolvedValue({ cantidadDisciplinarias: 0, cantidadAbiertas: 1, cantidadSede: 0 });
+      mockQueryBuilder.getMany.mockResolvedValueOnce([{ id: 101, cedula: 'QA', nombres: 'Ana', apellido1: 'Rojas',
+        estado: EstadoEstudiante.ACTIVO, planEstudioId: 1, carreraId: 10 }]);
+      historialRepo.find.mockResolvedValueOnce([{ id: 900, estudianteId: 101, planAsignaturaId: 111,
+        planEstudioContextoId: 1, cursoOptativoId: 77, tipoOptativaReal: 'ABIERTA',
+        codigoOptativaReal: 'OPT-REAL', nombreOptativaReal: 'Optativa real', creditosOptativaReal: 3,
+        resultado: ResultadoAcademico.APROBADO, reconocimientoOptativo: 'RECONOCIDO',
+        planAsignatura: { id: 111, planEstudioId: 1, tipo: TipoPlanAsignatura.OPTATIVA,
+          tipoOptativa: 'ABIERTA', creditos: 3 },
+      }]);
+
+      const resultado = await service.simularTransicion(1, { carreraId: 10, planOrigenId: 1, planDestinoId: 2 });
+      expect(resultado.estudiantes[0].puedeMigrar).toBe(true);
+      expect(resultado.estudiantes[0].asignaturasReconocidas).toEqual([
+        expect.objectContaining({ asignaturaDestinoId: 211, creditos: 4, tipoEquivalencia: 'OPTATIVA',
+          historialOrigenId: 900, cursoOptativoId: 77 }),
+      ]);
+      expect(historialRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('no duplica creditos si dos registros representan la misma optativa real', async () => {
+      planAsignaturaRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: 211, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: 'ABIERTA', creditos: 4, activo: true },
+        { id: 212, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: 'ABIERTA', creditos: 4, activo: true },
+      ]);
+      reglaOptativaRepo.findOne.mockResolvedValue({ cantidadDisciplinarias: 0, cantidadAbiertas: 2, cantidadSede: 0 });
+      mockQueryBuilder.getMany.mockResolvedValueOnce([{ id: 101, cedula: 'QA', nombres: 'Ana', apellido1: 'Rojas',
+        estado: EstadoEstudiante.ACTIVO, planEstudioId: 1, carreraId: 10 }]);
+      historialRepo.find.mockResolvedValueOnce([900, 901].map((id) => ({
+        id, estudianteId: 101, planAsignaturaId: 111, planEstudioContextoId: 1,
+        cursoOptativoId: 77, tipoOptativaReal: 'ABIERTA', resultado: ResultadoAcademico.APROBADO,
+        reconocimientoOptativo: 'RECONOCIDO',
+        planAsignatura: { id: 111, planEstudioId: 1, tipo: TipoPlanAsignatura.OPTATIVA },
+      })));
+
+      const resultado = await service.simularTransicion(1, { carreraId: 10, planOrigenId: 1, planDestinoId: 2 });
+      expect(resultado.estudiantes[0].asignaturasReconocidas).toHaveLength(1);
+      expect(resultado.estudiantes[0].asignaturasReconocidas[0].creditos).toBe(4);
+      expect(resultado.estudiantes[0].observacionesAcademicas?.join(' ')).toContain('no se duplican créditos');
+    });
+
+    it('conserva la optativa aprobada solo en historial cuando la categoria destino no tiene cupo', async () => {
+      planAsignaturaRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: 211, tipo: TipoPlanAsignatura.OPTATIVA, tipoOptativa: 'DISCIPLINARIA', creditos: 4, activo: true },
+      ]);
+      reglaOptativaRepo.findOne.mockResolvedValue({ cantidadDisciplinarias: 1, cantidadAbiertas: 0, cantidadSede: 0 });
+      mockQueryBuilder.getMany.mockResolvedValueOnce([{ id: 101, cedula: 'QA', nombres: 'Ana', apellido1: 'Rojas',
+        estado: EstadoEstudiante.ACTIVO, planEstudioId: 1, carreraId: 10 }]);
+      historialRepo.find.mockResolvedValueOnce([{
+        id: 900, estudianteId: 101, planAsignaturaId: 111, planEstudioContextoId: 1,
+        cursoOptativoId: 77, tipoOptativaReal: 'ABIERTA', resultado: ResultadoAcademico.APROBADO,
+        reconocimientoOptativo: 'RECONOCIDO',
+        planAsignatura: { id: 111, planEstudioId: 1, tipo: TipoPlanAsignatura.OPTATIVA },
+      }]);
+
+      const resultado = await service.simularTransicion(1, { carreraId: 10, planOrigenId: 1, planDestinoId: 2 });
+      expect(resultado.estudiantes[0].puedeMigrar).toBe(true);
+      expect(resultado.estudiantes[0].asignaturasReconocidas).toHaveLength(0);
+      expect(resultado.estudiantes[0].asignaturasSinEquivalencia).toHaveLength(1);
+      expect(resultado.estudiantes[0].observacionesAcademicas?.join(' ')).toContain('sin espacio disponible');
+    });
+
+    it('rechaza una seleccion vacia para no simular inadvertidamente a toda la poblacion', async () => {
+      await expect(service.simularTransicion(1, {
+        carreraId: 10, planOrigenId: 1, planDestinoId: 2, estudianteIds: [],
+      })).rejects.toThrow(BadRequestException);
+      expect(estudianteRepo.find).not.toHaveBeenCalled();
+      expect(estudianteRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
+
     it('marca pendiente la optativa real aprobada sin decidir su reconocimiento en el destino', async () => {
       mockQueryBuilder.getMany.mockResolvedValueOnce([{
         id: 101, cedula: 'QA', nombres: 'Prueba', apellido1: 'Optativa',
@@ -221,6 +327,7 @@ describe('TransicionesCurricularesService', () => {
       equivalenciaRepo.find.mockResolvedValue([
         {
           id: 1,
+          carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
           planOrigenId: 1,
           asignaturaOrigenId: 101,
           planDestinoId: 2,
@@ -277,6 +384,7 @@ describe('TransicionesCurricularesService', () => {
       equivalenciaRepo.find.mockResolvedValue([
         {
           id: 5,
+          carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
           planOrigenId: 1,
           asignaturaOrigenId: 101,
           planDestinoId: 2,
@@ -284,6 +392,12 @@ describe('TransicionesCurricularesService', () => {
           activo: true,
           justificacion: '[COMPUESTA_N1:GRP1:1:2:[101,102]] Fusión de asignaturas',
           asignaturaDestino: { id: 201, cursoId: 50, creditos: 4, curso: { codigo: 'PROG_AV', nombre: 'Progra Avanzada' } },
+        },
+        {
+          id: 6, carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
+          planOrigenId: 1, asignaturaOrigenId: 102,
+          planDestinoId: 2, asignaturaDestinoId: 201, activo: true,
+          justificacion: '[COMPUESTA_N1:GRP1:2:2:[101,102]] Fusión de asignaturas',
         },
       ]);
 
@@ -303,41 +417,64 @@ describe('TransicionesCurricularesService', () => {
     });
   });
 
+  it('no reconoce N:1 si falta una rama oficial aunque todas las materias estén aprobadas', async () => {
+    planAsignaturaRepo.find
+      .mockResolvedValueOnce([{ id: 101, creditos: 3 }, { id: 102, creditos: 4 }])
+      .mockResolvedValueOnce([{ id: 201, creditos: 5, curso: { codigo: 'DEST', nombre: 'Destino' } }]);
+    mockQueryBuilder.getMany.mockResolvedValueOnce([{
+      id: 10, cedula: '10', nombres: 'Ana', apellido1: 'Mora',
+      estado: EstadoEstudiante.ACTIVO, planEstudioId: 1, carreraId: 10,
+    }]);
+    historialRepo.find.mockResolvedValue([
+      { estudianteId: 10, planAsignaturaId: 101, resultado: ResultadoAcademico.APROBADO },
+      { estudianteId: 10, planAsignaturaId: 102, resultado: ResultadoAcademico.APROBADO },
+    ]);
+    equivalenciaRepo.find.mockResolvedValue([{
+      id: 1, carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
+      planOrigenId: 1, asignaturaOrigenId: 101, planDestinoId: 2,
+      asignaturaDestinoId: 201, activo: true,
+      justificacion: '[COMPUESTA_N1:GRP:1:2:[101,102]] Aprobada',
+    }]);
+
+    const resultado = await service.simularTransicion(1, {
+      carreraId: 10, planOrigenId: 1, planDestinoId: 2,
+    });
+    expect(resultado.estudiantes[0].asignaturasReconocidas).toHaveLength(0);
+    expect(resultado.estudiantes[0].puedeMigrar).toBe(false);
+    expect(resultado.estudiantes[0].conflictos.join(' ')).toContain('incompleta');
+  });
+
   describe('ejecutarTransicion', () => {
     it.each(['historial', 'auditoria'])('revierte la transicion si falla %s', async (paso) => {
       const expediente = { id: 101, carreraId: 10, planEstudioId: 1, estado: EstadoEstudiante.ACTIVO, periodoIngresoId: 1 };
-      jest.spyOn(service, 'simularTransicion').mockResolvedValue({
-        carreraId: 10, planOrigenId: 1, planDestinoId: 2, totalAnalizados: 1,
-        totalMigrables: 1, totalConflictos: 0,
-        estudiantes: [{ estudianteId: 101, puedeMigrar: true, conflictos: [], asignaturasReconocidas: [] } as any],
-      });
+      estudianteRepo.find.mockResolvedValue([expediente]);
       dataSource.transaction.mockImplementation(async (cb: any) => {
         const copia = { ...expediente };
-        const manager = {
-          getRepository: (entity: any) => entity.name === 'Estudiante'
-            ? { findOne: jest.fn().mockResolvedValue(copia), save: jest.fn().mockResolvedValue(copia) }
-            : historialRepo,
-          query: jest.fn((sql: string) => sql.includes(paso === 'historial' ? 'historial_planes_estudiantes' : 'auditoria_planes_estudio')
-            ? Promise.reject(new Error('fallo de escritura')) : Promise.resolve([])),
-        };
+        const manager = crearManagerPrueba({ query: jest.fn((sql: string) => {
+          if (sql.includes('SELECT r.nombre')) return Promise.resolve([{ nombre: RolSistema.COORDINADOR }]);
+          if (sql.includes('SELECT id FROM permisos_carrera')) return Promise.resolve([{ id: 1 }]);
+          return sql.includes(paso === 'historial' ? 'historial_planes_estudiantes' : 'auditoria_planes_estudio')
+            ? Promise.reject(new Error('fallo de escritura')) : Promise.resolve([]);
+        }) });
+        const repoOriginal = manager.getRepository;
+        manager.getRepository = jest.fn((entity: any) => entity.name === 'Estudiante'
+          ? { find: jest.fn().mockResolvedValue([copia]), findOne: jest.fn().mockResolvedValue(copia), save: jest.fn().mockResolvedValue(copia) }
+          : repoOriginal(entity));
         const resultado = await cb(manager);
         Object.assign(expediente, copia);
         return resultado;
       });
-      const res = await service.ejecutarTransicion(1, { carreraId: 10, planOrigenId: 1,
-        planDestinoId: 2, estudianteIds: [101], motivo: 'Cambio curricular oficial' });
+      const res = await ejecutarComoCoordinador(() => service.ejecutarTransicion(1, { carreraId: 10, planOrigenId: 1,
+        planDestinoId: 2, estudianteIds: [101], motivo: 'Cambio curricular oficial' }));
       expect(res.migrados).toBe(0);
       expect(res.fallidos).toEqual([{ estudianteId: 101, error: 'fallo de escritura' }]);
       expect(expediente.planEstudioId).toBe(1);
     });
 
     it('revalida el plan bajo bloqueo si otro proceso lo cambio tras la simulacion', async () => {
-      jest.spyOn(service, 'simularTransicion').mockResolvedValue({ carreraId: 10, planOrigenId: 1,
-        planDestinoId: 2, totalAnalizados: 1, totalMigrables: 1, totalConflictos: 0,
-        estudiantes: [{ estudianteId: 101, puedeMigrar: true, conflictos: [], asignaturasReconocidas: [] } as any] });
       estudianteRepo.findOne.mockResolvedValue({ id: 101, carreraId: 10, planEstudioId: 3, estado: EstadoEstudiante.ACTIVO });
-      const res = await service.ejecutarTransicion(1, { carreraId: 10, planOrigenId: 1,
-        planDestinoId: 2, estudianteIds: [101], motivo: 'Cambio curricular oficial' });
+      const res = await ejecutarComoCoordinador(() => service.ejecutarTransicion(1, { carreraId: 10, planOrigenId: 1,
+        planDestinoId: 2, estudianteIds: [101], motivo: 'Cambio curricular oficial' }));
       expect(res.migrados).toBe(0);
       expect(estudianteRepo.save).not.toHaveBeenCalled();
     });
@@ -397,6 +534,7 @@ describe('TransicionesCurricularesService', () => {
       equivalenciaRepo.find.mockResolvedValue([
         {
           id: 1,
+          carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
           planOrigenId: 1,
           asignaturaOrigenId: 101,
           planDestinoId: 2,
@@ -408,13 +546,13 @@ describe('TransicionesCurricularesService', () => {
 
       historialRepo.findOne.mockResolvedValue(null);
 
-      const res = await service.ejecutarTransicion(1, {
+      const res = await ejecutarComoCoordinador(() => service.ejecutarTransicion(1, {
         carreraId: 10,
         planOrigenId: 1,
         planDestinoId: 2,
         estudianteIds: [101],
         motivo: 'Migración oficial al nuevo plan de estudios 2026',
-      });
+      }));
 
       expect(res.solicitados).toBe(1);
       expect(res.migrados).toBe(1);
@@ -423,29 +561,30 @@ describe('TransicionesCurricularesService', () => {
 
     it('rechaza ejecución si un asistente intenta ejecutar sin propuesta', async () => {
       alcance.tipoCuentaJerarquica.mockResolvedValue('ASISTENTE_ESTUDIANTIL');
-      await expect(
-        service.ejecutarTransicion(1, {
+      await new Promise<void>((resolve, reject) => iniciarContextoRolActivo({} as any, {} as any, () => {
+        establecerRolActivo(1, RolSistema.ASISTENTE_ESTUDIANTIL);
+        expect(service.ejecutarTransicion(1, {
           carreraId: 10,
           planOrigenId: 1,
           planDestinoId: 2,
           estudianteIds: [101],
           motivo: 'Migración no autorizada directa',
-        }),
-      ).rejects.toThrow(ForbiddenException);
+        })).rejects.toThrow(ForbiddenException).then(resolve, reject);
+      }));
     });
 
     it('escenario PO 47/3: migra 47 expedientes válidos y conserva intactos los 3 conflictivos con causa individual', async () => {
       // 50 estudiantes en total
       const ids50 = Array.from({ length: 50 }, (_, i) => i + 1);
 
-      planAsignaturaRepo.find
-        .mockResolvedValueOnce([
-          { id: 101, cursoId: 40, creditos: 4, curso: { codigo: 'MAT100', nombre: 'Intro Mate' } },
-          { id: 102, cursoId: 41, creditos: 4, curso: { codigo: 'MAT101', nombre: 'Álgebra I' } },
-        ])
-        .mockResolvedValueOnce([
-          { id: 201, cursoId: 50, creditos: 8, curso: { codigo: 'MAT200', nombre: 'Matemática Integrada' } },
-        ]);
+      planAsignaturaRepo.find.mockImplementation(({ where }: any) => Promise.resolve(
+        where.planEstudioId === 1
+          ? [
+            { id: 101, planEstudioId: 1, cursoId: 40, creditos: 4, curso: { codigo: 'MAT100', nombre: 'Intro Mate' } },
+            { id: 102, planEstudioId: 1, cursoId: 41, creditos: 4, curso: { codigo: 'MAT101', nombre: 'Álgebra I' } },
+          ]
+          : [{ id: 201, planEstudioId: 2, cursoId: 50, creditos: 8, curso: { codigo: 'MAT200', nombre: 'Matemática Integrada' } }],
+      ));
 
       // Mapeo de estudiantes con 3 conflictos reales (no requisitos académicos pendientes):
       // - Estudiante 48: pertenencia incorrecta al plan de origen (plan 99 != 1)
@@ -495,6 +634,7 @@ describe('TransicionesCurricularesService', () => {
       equivalenciaRepo.find.mockResolvedValue([
         {
           id: 1,
+          carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
           planOrigenId: 1,
           asignaturaOrigenId: 101,
           planDestinoId: 2,
@@ -505,6 +645,7 @@ describe('TransicionesCurricularesService', () => {
         },
         {
           id: 2,
+          carreraOrigenId: 10, carreraDestinoId: 10, autorizadoPorUsuarioId: 7,
           planOrigenId: 1,
           asignaturaOrigenId: 102,
           planDestinoId: 2,
@@ -517,13 +658,13 @@ describe('TransicionesCurricularesService', () => {
 
       historialRepo.findOne.mockResolvedValue(null);
 
-      const resultado = await service.ejecutarTransicion(1, {
+      const resultado = await ejecutarComoCoordinador(() => service.ejecutarTransicion(1, {
         carreraId: 10,
         planOrigenId: 1,
         planDestinoId: 2,
         estudianteIds: ids50,
         motivo: 'Transición institucional masiva cohorte 2026',
-      });
+      }));
 
       // Verificaciones estrictas
       expect(resultado.solicitados).toBe(50);

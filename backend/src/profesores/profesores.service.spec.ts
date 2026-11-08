@@ -124,6 +124,7 @@ describe('ProfesoresService', () => {
 
   let manager: {
     getRepository: jest.Mock;
+    query: jest.Mock;
   };
 
   let dataSource: {
@@ -273,6 +274,7 @@ describe('ProfesoresService', () => {
     };
 
     manager = {
+      query: jest.fn().mockResolvedValue([]),
       getRepository: jest.fn((entidad) => {
         if (entidad === ProfesorCarrera) {
           return profesorCarreraRepository;
@@ -1092,6 +1094,7 @@ describe('ProfesoresService', () => {
 
       profesorPerfilRepository.findOne
         .mockResolvedValueOnce(solicitudPendiente)
+        .mockResolvedValueOnce({ ...solicitudPendiente })
         .mockResolvedValueOnce({
           ...solicitudPendiente,
           estado: EstadoPerfilProfesor.APROBADO,
@@ -1110,6 +1113,44 @@ describe('ProfesoresService', () => {
           accion: AccionHistorialPerfilProfesor.APROBAR_PERFIL,
         }),
       );
+    });
+
+    it('impide aprobar si un requisito cambia antes de confirmar', async () => {
+      usuarioRepository.findOne.mockResolvedValue(crearProfesor());
+      const pendiente = {
+        id: 100, profesorUsuarioId: 10, perfilAcademicoId: 1,
+        estado: EstadoPerfilProfesor.PENDIENTE, perfilAcademico: perfilSeguridad,
+      } as ProfesorPerfilAcademico;
+      profesorPerfilRepository.findOne.mockResolvedValue(pendiente);
+      requisitoPerfilRepository.find.mockResolvedValue([{ id: 50, perfilAcademicoId: 1, obligatorio: true }]);
+      cumplimientoRequisitoRepository.find
+        .mockResolvedValueOnce([{ requisitoPerfilAcademicoId: 50, estado: EstadoCumplimientoRequisito.CUMPLE }])
+        .mockResolvedValueOnce([{ requisitoPerfilAcademicoId: 50, estado: EstadoCumplimientoRequisito.PENDIENTE }]);
+
+      await expect(service.revisarPerfilProfesor(10, 1, 2, {
+        estado: EstadoPerfilProfesor.APROBADO,
+      })).rejects.toThrow(ConflictException);
+      expect(manager.query).toHaveBeenCalledWith(expect.stringContaining('FOR UPDATE'), [100]);
+      expect(profesorPerfilRepository.save).not.toHaveBeenCalled();
+      expect(historialPerfilRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('el rol coordinador activo no hereda alcance global de otra asignacion', async () => {
+      usuarioRepository.findOne
+        .mockResolvedValueOnce(crearProfesor())
+        .mockResolvedValueOnce(crearProfesor({ id: 2, usuarioRoles: [{ rol: {
+          nombre: RolSistema.ADMIN_GLOBAL, activo: true,
+        } }] as never }));
+      profesorPerfilRepository.findOne.mockResolvedValue({
+        id: 100, profesorUsuarioId: 10, perfilAcademicoId: 1,
+        estado: EstadoPerfilProfesor.PENDIENTE, perfilAcademico: perfilSeguridad,
+      });
+      estructuraAcademicaService.tieneAlcanceSobreCarrera.mockResolvedValue(false);
+
+      await expect(service.revisarPerfilProfesor(10, 1, 2, {
+        estado: EstadoPerfilProfesor.APROBADO,
+      }, RolSistema.COORDINADOR)).rejects.toThrow(ForbiddenException);
+      expect(profesorPerfilRepository.save).not.toHaveBeenCalled();
     });
 
     it('profesor puede tener varios perfiles', async () => {
@@ -1509,6 +1550,16 @@ describe('ProfesoresService', () => {
           fechaRevision: expect.any(Date),
         }),
       );
+      expect(cumplimientoRequisitoRepository.findOne).toHaveBeenCalledWith(expect.objectContaining({
+        lock: { mode: 'pessimistic_write' },
+      }));
+      expect(historialPerfilRepository.save).toHaveBeenCalledWith(expect.objectContaining({
+        accion: AccionHistorialPerfilProfesor.REVISAR_REQUISITO,
+        usuarioAccionId: 2,
+        perfilAcademicoId: 1,
+        datosAnteriores: expect.objectContaining({ requisitoId: 50 }),
+        datosNuevos: expect.objectContaining({ requisitoId: 50, estado }),
+      }));
     });
 
     it('impide revisar un requisito fuera del alcance académico', async () => {
@@ -1566,6 +1617,7 @@ describe('ProfesoresService', () => {
       usuarioRepository.findOne.mockResolvedValue(crearProfesor());
       profesorPerfilRepository.findOne
         .mockResolvedValueOnce(solicitud)
+        .mockResolvedValueOnce({ ...solicitud })
         .mockResolvedValueOnce({
           ...solicitud,
           estado: EstadoPerfilProfesor.RECHAZADO,

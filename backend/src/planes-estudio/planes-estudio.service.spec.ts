@@ -142,6 +142,9 @@ describe('PlanesEstudioService', () => {
       nombre: 'Plan de Bachillerato 2012-10',
       descripcion: 'Plan de estudios',
       activo: true,
+      estado: EstadoPlanEstudio.BORRADOR,
+      numeroVersion: 1,
+      versionAnteriorId: null,
     });
     expect(resultado).toEqual(guardado);
   });
@@ -195,7 +198,6 @@ describe('PlanesEstudioService', () => {
     const actualizado = crearPlan({
       codigo: 'BA-INFORM 2026',
       nombre: 'Plan actualizado',
-      grado: GradoAcademico.LICENCIATURA,
     });
     planRepository.findOne
       .mockResolvedValueOnce(existente)
@@ -205,18 +207,41 @@ describe('PlanesEstudioService', () => {
     const resultado = await service.actualizar(1, {
       codigo: ' ba-inform 2026 ',
       nombre: ' Plan actualizado ',
-      grado: GradoAcademico.LICENCIATURA,
     });
 
     expect(planRepository.save).toHaveBeenCalledWith(
       expect.objectContaining({
         carreraId: 1,
-        grado: GradoAcademico.LICENCIATURA,
+        grado: GradoAcademico.BACHILLERATO,
         codigo: 'BA-INFORM 2026',
         nombre: 'Plan actualizado',
       }),
     );
     expect(resultado).toEqual(actualizado);
+  });
+
+  it('bloquea el cambio de grado sobre una versión existente', async () => {
+    planRepository.findOne.mockResolvedValue(crearPlan());
+    await expect(service.actualizar(1, { grado: GradoAcademico.LICENCIATURA }))
+      .rejects.toThrow('nueva versión');
+    expect(planRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('audita de forma transaccional una edición menor realizada por un usuario', async () => {
+    const plan = crearPlan();
+    const repoTx = { findOne: jest.fn().mockResolvedValueOnce(plan).mockResolvedValueOnce(null),
+      save: jest.fn().mockResolvedValue(plan) };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoTx), query: jest.fn().mockResolvedValue([]) };
+    const dataSource = { transaction: jest.fn(async (callback) => callback(manager)) };
+    planRepository.findOne.mockResolvedValue(crearPlan({ nombre: 'Nombre corregido' }));
+    service = new PlanesEstudioService(planRepository as unknown as Repository<PlanEstudio>,
+      carreraRepository as unknown as Repository<Carrera>, alcance as never, undefined, dataSource as never);
+
+    await service.actualizar(1, { nombre: 'Nombre corregido' }, 9);
+
+    expect(repoTx.save).toHaveBeenCalled();
+    expect(manager.query).toHaveBeenCalledWith(expect.stringContaining('EDICION_MENOR'),
+      expect.arrayContaining([1, 9]));
   });
 
   it('permite dejar la descripción en null', async () => {
@@ -237,15 +262,70 @@ describe('PlanesEstudioService', () => {
     expect(resultado.descripcion).toBeNull();
   });
 
-  it('cambia el estado del plan', async () => {
-    planRepository.findOne
-      .mockResolvedValueOnce(crearPlan())
-      .mockResolvedValueOnce(crearPlan({ activo: false }));
+  it('cierra nuevos ingresos sin impedir que los estudiantes actuales sigan en el plan', async () => {
+    const original = crearPlan();
+    const resultante = crearPlan({ estado: EstadoPlanEstudio.EN_TRANSICION, activo: true });
+    planRepository.findOne.mockResolvedValueOnce(original).mockResolvedValueOnce(resultante);
+    const repoEnTransaccion = {
+      findOne: jest.fn().mockResolvedValue(original),
+      save: jest.fn().mockResolvedValue(resultante),
+    };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoEnTransaccion), query: jest.fn() };
+    const dataSource = { transaction: jest.fn(async (callback) => callback(manager)) };
+    service = new PlanesEstudioService(
+      planRepository as unknown as Repository<PlanEstudio>,
+      carreraRepository as unknown as Repository<Carrera>,
+      alcance as never, undefined, dataSource as never,
+    );
 
-    const resultado = await service.cambiarEstado(1, false);
+    const resultado = await service.cambiarEstado(1, {
+      activo: false, motivo: 'Cierre de admisiones 2027',
+    }, 27);
 
-    expect(planRepository.update).toHaveBeenCalledWith(1, { activo: false });
-    expect(resultado.activo).toBe(false);
+    expect(resultado.estado).toBe(EstadoPlanEstudio.EN_TRANSICION);
+    expect(repoEnTransaccion.save).toHaveBeenCalledWith(expect.objectContaining({
+      estado: EstadoPlanEstudio.EN_TRANSICION, activo: true,
+    }));
+    expect(manager.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO auditoria_planes_estudio'),
+      [1, 'CAMBIO_ESTADO', 'VIGENTE', 'EN_TRANSICION', 'Cierre de admisiones 2027', 27],
+    );
+    expect(planRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('impide archivo definitivo con estudiantes activos (no impide EN_TRANSICION)', async () => {
+    planRepository.findOne.mockResolvedValue(crearPlan());
+    const repoEnTransaccion = { findOne: jest.fn().mockResolvedValue(crearPlan()), save: jest.fn() };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoEnTransaccion),
+      query: jest.fn().mockResolvedValue([{ total: 2 }]) };
+    const dataSource = { transaction: jest.fn(async (callback) => callback(manager)) };
+    service = new PlanesEstudioService(
+      planRepository as unknown as Repository<PlanEstudio>,
+      carreraRepository as unknown as Repository<Carrera>,
+      alcance as never, undefined, dataSource as never,
+    );
+    await expect(service.cambiarEstado(1, {
+      estado: EstadoPlanEstudio.CERRADO, motivo: 'Archivo definitivo autorizado',
+    }, 27)).rejects.toThrow('Use EN_TRANSICION');
+    expect(repoEnTransaccion.save).not.toHaveBeenCalled();
+  });
+
+  it('no oculta fallos de auditoria y no hace escrituras fuera de transaccion', async () => {
+    planRepository.findOne.mockResolvedValue(crearPlan());
+    const repoEnTransaccion = { findOne: jest.fn().mockResolvedValue(crearPlan()),
+      save: jest.fn().mockResolvedValue({}) };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoEnTransaccion),
+      query: jest.fn().mockRejectedValue(new Error('DB sin tabla de auditoria')) };
+    const dataSource = { transaction: jest.fn(async (callback) => callback(manager)) };
+    service = new PlanesEstudioService(
+      planRepository as unknown as Repository<PlanEstudio>,
+      carreraRepository as unknown as Repository<Carrera>,
+      alcance as never, undefined, dataSource as never,
+    );
+    await expect(service.cambiarEstado(1, {
+      activo: false, motivo: 'Cierre de admisiones 2027',
+    }, 27)).rejects.toThrow('DB sin tabla de auditoria');
+    expect(planRepository.update).not.toHaveBeenCalled();
   });
 
   it('convierte un duplicado de MySQL en conflicto', async () => {
@@ -263,5 +343,43 @@ describe('PlanesEstudioService', () => {
         nombre: 'Plan de Bachillerato',
       }),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('audita una edicion propuesta por asistente dentro de la transaccion', async () => {
+    const plan = crearPlan();
+    const repoTx = { findOne: jest.fn().mockResolvedValue(plan), save: jest.fn().mockResolvedValue(plan) };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoTx), query: jest.fn().mockResolvedValue([]) };
+    alcance.puedeEjecutar.mockResolvedValueOnce(true);
+
+    await service.actualizarDesdeSolicitud(9, 12, 1, { nombre: 'Nombre corregido' },
+      service.huellaPlan(plan), manager as never);
+
+    expect(repoTx.save).toHaveBeenCalledTimes(1);
+    expect(manager.query).toHaveBeenCalledWith(expect.stringContaining('EDICION_MENOR'),
+      expect.arrayContaining([1, 9, expect.stringContaining('"propuestaPorUsuarioId":12')]));
+  });
+
+  it('impide cambiar el grado mediante una solicitud de asistente', async () => {
+    const plan = crearPlan();
+    const repoTx = { findOne: jest.fn().mockResolvedValue(plan), save: jest.fn() };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoTx), query: jest.fn() };
+    alcance.puedeEjecutar.mockResolvedValueOnce(true);
+
+    await expect(service.actualizarDesdeSolicitud(9, 12, 1,
+      { grado: GradoAcademico.LICENCIATURA }, service.huellaPlan(plan), manager as never))
+      .rejects.toThrow(ConflictException);
+    expect(repoTx.save).not.toHaveBeenCalled();
+    expect(manager.query).not.toHaveBeenCalled();
+  });
+
+  it('impide activar por solicitud un borrador derivado y saltarse la activación auditada', async () => {
+    const draft = crearPlan({ estado: EstadoPlanEstudio.BORRADOR, versionAnteriorId: 1, numeroVersion: 2 });
+    const repoTx = { findOne: jest.fn().mockResolvedValue(draft), save: jest.fn() };
+    const manager = { getRepository: jest.fn().mockReturnValue(repoTx), query: jest.fn() };
+    await expect(service.cambiarEstadoDesdeSolicitud(9, 12, draft.id, true,
+      service.huellaPlan(draft), manager as never, 'Activar por solicitud'))
+      .rejects.toThrow('El estado de una versión derivada debe cambiarse mediante el flujo auditado de activación.');
+    expect(repoTx.save).not.toHaveBeenCalled();
+    expect(manager.query).not.toHaveBeenCalled();
   });
 });

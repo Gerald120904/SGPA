@@ -107,6 +107,61 @@ describe('EstudiantesService', () => {
     );
   });
 
+  it('permite reingresar al mismo plan EN_TRANSICION sin forzar migracion', async () => {
+    const inactivo = { ...estudiante, estado: EstadoEstudiante.INACTIVO } as Estudiante;
+    estudiantes.findOne.mockResolvedValue(inactivo);
+    planes.findOne.mockResolvedValue({ id: 10, carreraId: 1, activo: true, estado: 'EN_TRANSICION' });
+
+    const resultado = await service.reingresar(3, 7);
+
+    expect(resultado.cambioPlanRealizado).toBe(false);
+    expect(estudiantes.save).toHaveBeenCalledWith(expect.objectContaining({
+      id: 7, planEstudioId: 10, estado: EstadoEstudiante.ACTIVO,
+    }));
+    expect(historialPlanes.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un cambio de plan por reingreso hacia EN_TRANSICION', async () => {
+    estudiantes.findOne.mockResolvedValue({ ...estudiante, estado: EstadoEstudiante.INACTIVO });
+    planes.findOne
+      .mockResolvedValueOnce({ id: 10, carreraId: 1, activo: true, estado: 'VIGENTE' })
+      .mockResolvedValueOnce({ id: 11, carreraId: 1, activo: true, estado: 'EN_TRANSICION' });
+    periodos.findOne.mockResolvedValue(periodoIngreso);
+
+    await expect(service.reingresar(3, 7, { nuevoPlanId: 11, periodoCambioId: 1 }))
+      .rejects.toThrow('cerrado a nuevos ingresos');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('impide reingreso con traslado a una carrera ajena', async () => {
+    estudiantes.findOne.mockResolvedValue({ ...estudiante, estado: EstadoEstudiante.INACTIVO });
+    planes.findOne
+      .mockResolvedValueOnce({ id: 10, carreraId: 1, activo: true, estado: 'VIGENTE' })
+      .mockResolvedValueOnce({ id: 11, carreraId: 2, activo: true, estado: 'VIGENTE' });
+    periodos.findOne.mockResolvedValue(periodoIngreso);
+
+    await expect(service.reingresar(3, 7, { nuevoPlanId: 11, periodoCambioId: 1 }))
+      .rejects.toThrow('misma carrera');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('valida el plan destino en la aprobacion de reingreso propuesto', async () => {
+    const inactivo = { ...estudiante, estado: EstadoEstudiante.INACTIVO } as Estudiante;
+    const huella = service.huellaEstudiante(inactivo);
+    estudiantes.findOne.mockResolvedValue(inactivo);
+    planes.findOne
+      .mockResolvedValueOnce({ id: 10, carreraId: 1, activo: true, estado: 'EN_TRANSICION' })
+      .mockResolvedValueOnce({ id: 11, carreraId: 1, activo: true, estado: 'EN_TRANSICION' });
+    const manager = { getRepository: (entity: unknown) =>
+      entity === Estudiante ? estudiantes : entity === PlanEstudio ? planes : historialPlanes };
+
+    await expect(service.reingresarDesdeSolicitud(3, 7, 1,
+      { nuevoPlanId: 11, periodoCambioId: 1 }, huella, manager as never))
+      .rejects.toThrow('cerrado a nuevos ingresos');
+    expect(estudiantes.save).not.toHaveBeenCalled();
+    expect(historialPlanes.save).not.toHaveBeenCalled();
+  });
+
   it('permite consultar el expediente graduado a un usuario autorizado', async () => {
     const graduado = { ...estudiante, estado: EstadoEstudiante.GRADUADO } as Estudiante;
     estudiantes.findOne.mockResolvedValue(graduado);
@@ -210,6 +265,16 @@ describe('EstudiantesService', () => {
         periodoIngresoId: 1,
       }),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('impide asignar estudiantes a una versión BORRADOR', async () => {
+    carreras.findOne.mockResolvedValue({ id: 1, activo: true });
+    planes.findOne.mockResolvedValue({ id: 10, carreraId: 1, activo: true, estado: 'BORRADOR' });
+    await expect(service.crear(3, {
+      cedula: '1', nombres: 'Ana', apellido1: 'Mora', correoInstitucional: 'ana@una.cr',
+      carreraId: 1, planEstudioId: 10, periodoIngresoId: 1,
+    })).rejects.toThrow('No se admiten estudiantes en un plan en estado BORRADOR.');
+    expect(estudiantes.save).not.toHaveBeenCalled();
   });
 
   it('aplica alcance por carrera', async () => {
@@ -612,6 +677,12 @@ describe('EstudiantesService', () => {
     planes.findOne.mockResolvedValue({ id: 11, carreraId: 1, activo: true });
     periodos.findOne.mockResolvedValue({ id: 4 });
 
+    const managerTransaccional = { getRepository: jest.fn((entidad) => entidad === Estudiante ? estudiantes : historialPlanes) };
+    dataSource.transaction.mockImplementation(async (callback) => callback(managerTransaccional));
+    const notificacionesService = { crear: jest.fn().mockResolvedValue({}) };
+    (service as any).notificacionesService = notificacionesService;
+    jest.spyOn(service as any, 'obtenerDestinatariosNotificacionCarrera').mockResolvedValue([22]);
+
     await service.cambiarPlan(3, 7, { planNuevoId: 11, periodoCambioId: 4 });
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
@@ -622,6 +693,9 @@ describe('EstudiantesService', () => {
       planEstudioId: 11,
       carreraId: 1,
     });
+    expect(notificacionesService.crear).toHaveBeenCalledWith(expect.objectContaining({
+      claveIdempotencia: expect.stringMatching(/^notif:cambio-plan:/),
+    }), managerTransaccional);
   });
 
   it('rechaza un cambio de plan anterior al período de ingreso', async () => {

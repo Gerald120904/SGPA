@@ -76,6 +76,9 @@ test('los clics reales abren y cierran comparador y transición sin duplicar lis
       consultas.equivalencias.push([origen, destino]);
       return { ok: true, data: [{ id: 7, asignaturaOrigenId: 100, asignaturaDestinoId: 200, justificacion: 'Registrada' }] };
     },
+    consultarPoblacionTransicion: async () => ({ ok: true, data: [
+      { id: 7, cedula: 'QA-7', nombreCompleto: 'Estudiante QA' },
+    ] }),
     simularTransicionCurricular: async () => {
       consultas.simulaciones += 1;
       return { ok: true, data: { totalAnalizados: 0, totalMigrables: 0, totalConflictos: 0, estudiantes: [] } };
@@ -108,11 +111,14 @@ test('los clics reales abren y cierran comparador y transición sin duplicar lis
     documento.getElementById('transicionCurricularButton').click();
     await tick();
     assert.equal(documento.getElementById('transicionCurricularDialog').open, true);
+    documento.getElementById('tcBtnCargarPoblacion').click();
+    await tick();
     documento.getElementById('tcBtnSimular').click();
     await tick();
     assert.equal(consultas.simulaciones, 1);
     assert.match(documento.getElementById('transicionCurricularDialogContent').innerHTML, /No hay estudiantes/);
-    assert.doesNotMatch(documento.getElementById('transicionCurricularDialogContent').innerHTML, /id="tcBtnEjecutar"/);
+    assert.match(documento.getElementById('transicionCurricularDialogContent').innerHTML, /id="tcBtnEjecutar"/);
+    assert.match(documento.getElementById('transicionCurricularDialogContent').innerHTML, /disabled/);
     documento.getElementById('cerrarTransicionBtn').click();
     assert.equal(documento.getElementById('transicionCurricularDialog').open, false);
     assert.equal(consultas.escrituras, 0);

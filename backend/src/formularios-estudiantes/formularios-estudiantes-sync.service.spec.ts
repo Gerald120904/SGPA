@@ -20,6 +20,7 @@ describe('FormulariosEstudiantesSyncService', () => {
     find: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+    update: jest.Mock;
   };
   let googleFormsClient: {
     listarRespuestas: jest.Mock;
@@ -58,6 +59,7 @@ describe('FormulariosEstudiantesSyncService', () => {
       find: jest.fn().mockResolvedValue([]),
       create: jest.fn((datos) => ({ id: 50, ...datos })),
       save: jest.fn(async (r) => ({ id: r.id ?? 50, ...r })),
+      update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
     googleFormsClient = {
@@ -232,6 +234,50 @@ describe('FormulariosEstudiantesSyncService', () => {
           optativasNoDisciplinarias: 'Teatro',
         }),
       );
+    });
+
+    it('recupera una respuesta con ERROR sin crear otra fila', async () => {
+      respuestaRepo.findOne.mockResolvedValue({
+        id: 10, formularioId: 1, googleResponseId: 'resp-1', estado: EstadoRespuestaFormulario.ERROR,
+      });
+      googleFormsClient.listarRespuestas.mockResolvedValue([{ responseId: 'resp-1', answers: {} }]);
+
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
+
+      expect(resultado).toMatchObject({ nuevas: 0, recuperadas: 1, pendientes: 1, errores: 0 });
+      expect(respuestaRepo.update).toHaveBeenCalledWith(
+        { id: 10, estado: EstadoRespuestaFormulario.ERROR },
+        expect.objectContaining({ estado: EstadoRespuestaFormulario.PENDIENTE }),
+      );
+      expect(respuestaRepo.create).not.toHaveBeenCalled();
+      expect(respuestaRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('conserva el error y su detalle cuando falla nuevamente la normalización', async () => {
+      respuestaRepo.findOne.mockResolvedValue({
+        id: 10, formularioId: 1, googleResponseId: 'resp-1', estado: EstadoRespuestaFormulario.ERROR,
+      });
+      googleFormsClient.listarRespuestas.mockResolvedValue([{ responseId: 'resp-1' }]);
+      normalizador.normalizar.mockImplementation(() => { throw new Error('Mapa de preguntas incompleto'); });
+
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
+
+      expect(resultado).toMatchObject({ nuevas: 0, errores: 1 });
+      expect(respuestaRepo.update).toHaveBeenCalledWith(
+        { id: 10, estado: EstadoRespuestaFormulario.ERROR },
+        { detalleError: 'Mapa de preguntas incompleto' },
+      );
+      expect(respuestaRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('trata la inserción concurrente de la misma respuesta como idempotente', async () => {
+      googleFormsClient.listarRespuestas.mockResolvedValue([{ responseId: 'resp-concurrente' }]);
+      respuestaRepo.save.mockRejectedValueOnce({ code: 'ER_DUP_ENTRY' });
+
+      const resultado = await service.sincronizar(formularioId, usuarioBId);
+
+      expect(resultado).toMatchObject({ nuevas: 0, ignoradasExistentes: 1, errores: 0 });
+      expect(respuestaRepo.save).toHaveBeenCalledTimes(1);
     });
 
     it('ignora respuestas ya existentes en la BD (idempotencia) sin duplicar', async () => {

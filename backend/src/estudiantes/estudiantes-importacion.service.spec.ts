@@ -106,6 +106,12 @@ describe('EstudiantesImportacionService', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
+  it('rechaza una importación dirigida a una versión BORRADOR', async () => {
+    planRepository.findOne.mockResolvedValue({ ...plan, estado: 'BORRADOR' });
+    await expect(service.validar(9, dto())).rejects.toThrow('No se admiten estudiantes en un plan en estado BORRADOR.');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
   it('resuelve una optativa sin Curso por su código de referencia', async () => {
     asignaturaRepository.find.mockResolvedValue([{
       id: 5, planEstudioId: 2, cursoId: null, curso: null,
