@@ -6,6 +6,7 @@ import {
   activarVersionPlanEstudio,
   listarPlanesEstudio,
 } from "../../services/planes-estudio.service.js";
+import { obtenerPresentacionEstadoPlan } from "./plan-status-presentation.mjs";
 import {
   crearEquivalenciaPlan,
   listarEquivalenciasPlanes,
@@ -566,11 +567,13 @@ function renderizarPlanes() {
           </td>
 
           <td>
-            <span class="plan-status ${
-              (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE" ? "plan-status-active" : "plan-status-inactive"
-            }">
-              ${plan.estado === "BORRADOR" ? `Borrador · v${Number(plan.numeroVersion || 1)}` : plan.estado === "EN_TRANSICION" ? `Histórico · v${Number(plan.numeroVersion || 1)}` : (plan.estado === "CERRADO" || !plan.activo) ? `Cerrado · v${Number(plan.numeroVersion || 1)}` : `Vigente · v${Number(plan.numeroVersion || 1)}`}
-            </span>
+            ${(() => {
+              const presentacionEstado = obtenerPresentacionEstadoPlan(plan);
+              const claseEstado = presentacionEstado.clase === "is-active"
+                ? "plan-status-active"
+                : "plan-status-inactive";
+              return `<span class="plan-status ${claseEstado}">${escapeHtml(presentacionEstado.etiqueta)} · v${Number(plan.numeroVersion || 1)}</span>`;
+            })()}
           </td>
 
           <td class="planes-actions">
@@ -7055,14 +7058,14 @@ async function abrirComparadorPlanes(carreraIdInicial = null, planOrigenIdInicia
             <span style="font-weight: 600; font-size: 13px;">Plan Origen</span>
             <select id="compPlanOrigenSelect" class="planes-select" style="width: 100%; margin-top: 4px;">
               <option value="">Seleccione plan origen...</option>
-              ${planesCarrera.map((p) => `<option value="${p.id}" ${Number(p.id) === Number(planOrigenId) ? 'selected' : ''}>${escapeHtml(p.codigo)} - ${escapeHtml(p.nombre)} (${p.activo ? 'Vigente' : 'Inactivo'})</option>`).join('')}
+              ${planesCarrera.map((p) => `<option value="${p.id}" ${Number(p.id) === Number(planOrigenId) ? 'selected' : ''}>${escapeHtml(p.codigo)} - ${escapeHtml(p.nombre)} (${escapeHtml(obtenerPresentacionEstadoPlan(p).etiqueta)})</option>`).join('')}
             </select>
           </label>
           <label>
             <span style="font-weight: 600; font-size: 13px;">Plan Destino</span>
             <select id="compPlanDestinoSelect" class="planes-select" style="width: 100%; margin-top: 4px;">
               <option value="">Seleccione plan destino...</option>
-              ${planesCarrera.map((p) => `<option value="${p.id}" ${Number(p.id) === Number(planDestinoId) ? 'selected' : ''}>${escapeHtml(p.codigo)} - ${escapeHtml(p.nombre)} (${p.activo ? 'Vigente' : 'Inactivo'})</option>`).join('')}
+              ${planesCarrera.map((p) => `<option value="${p.id}" ${Number(p.id) === Number(planDestinoId) ? 'selected' : ''}>${escapeHtml(p.codigo)} - ${escapeHtml(p.nombre)} (${escapeHtml(obtenerPresentacionEstadoPlan(p).etiqueta)})</option>`).join('')}
             </select>
           </label>
         </div>

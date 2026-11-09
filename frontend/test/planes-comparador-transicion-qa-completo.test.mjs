@@ -131,8 +131,8 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
   let respuestaEjecucion = { ok: false, message: 'Fallo backend QA' };
 
   const planesFixture = [
-    { id: 111, carreraId: 160, codigo: 'QA-PLAN-ORIGEN', nombre: 'Plan Origen QA', activo: true },
-    { id: 112, carreraId: 160, codigo: 'QA-PLAN-DESTINO', nombre: 'Plan Destino QA', activo: true },
+    { id: 111, carreraId: 160, codigo: 'QA-PLAN-ORIGEN', nombre: 'Plan Origen QA', activo: true, estado: 'EN_TRANSICION' },
+    { id: 112, carreraId: 160, codigo: 'QA-PLAN-DESTINO', nombre: 'Plan Destino QA', activo: true, estado: 'VIGENTE' },
     { id: 109, carreraId: 160, codigo: 'QA-PLAN-VACIO', nombre: 'Plan Vacío QA', activo: true }
   ];
 
@@ -265,6 +265,12 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
     iniciarPlanesEstudioPage();
     await tick();
 
+    await t.test('QA-00: El listado presenta EN_TRANSICION y VIGENTE según su estado académico', () => {
+      const html = doc.getElementById('planesContent').innerHTML;
+      assert.match(html, /Cerrado a nuevos ingresos · v1/, 'EN_TRANSICION no debe presentarse como Histórico ni Vigente');
+      assert.match(html, /Vigente · v1/, 'VIGENTE conserva su etiqueta académica');
+    });
+
     // 1. COMPARADOR DE PLANES
     await t.test('QA-01: Apertura, carga de asignaturas y equivalencias existentes', async () => {
       doc.getElementById('comparadorPlanesButton').click();
@@ -275,6 +281,8 @@ test('QA-01, QA-02, QA-03 y QA-05: auditoría funcional del comparador y la tran
       // Comprobar que cargó asignaturas origen y destino
       assert.match(html, /QA-MAT-01/, 'Debe mostrar QA-MAT-01');
       assert.match(html, /QA-MAT-101/, 'Debe mostrar QA-MAT-101');
+      assert.match(html, /Plan Origen QA \(Cerrado a nuevos ingresos\)/, 'EN_TRANSICION debe mantenerse distinto de vigente aunque activo=true');
+      assert.match(html, /Plan Destino QA \(Vigente\)/, 'VIGENTE conserva su etiqueta académica');
       assert.match(html, /Cálculo I/);
       assert.match(html, /Cálculo Diferencial e Integral/);
 

@@ -2,6 +2,7 @@
 import {
   escapeHtml
 } from "../../utils/html.js";
+import { obtenerPresentacionEstadoPlan } from "./plan-status-presentation.mjs";
 
 
 /* =========================================================
@@ -332,7 +333,7 @@ export function VerPlanPage({
     `;
   }
 
-  const estadoPlan = plan.estado || (plan.activo ? 'VIGENTE' : 'CERRADO');
+  const presentacionEstado = obtenerPresentacionEstadoPlan(plan);
 
   return `
     <section class="ver-plan-page">
@@ -411,16 +412,12 @@ export function VerPlanPage({
               class="
                 ver-plan-status
                 ${
-                  estadoPlan === 'VIGENTE'
-                    ? "is-active"
-                    : "is-inactive"
+                  presentacionEstado.clase
                 }
               "
             >
               ${
-                estadoPlan === 'EN_TRANSICION'
-                  ? "Cerrado a nuevos ingresos"
-                  : estadoPlan === 'CERRADO' ? "Cerrado definitivamente" : "Vigente"
+                presentacionEstado.etiqueta
               }
             </span>
           </div>
