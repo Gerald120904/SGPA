@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { EstadoPeriodoAcademico } from './constants/estado-periodo-academico.constant';
 import { PeriodoAcademico } from './entities/periodo-academico.entity';
 import { PeriodosAcademicosService } from './periodos-academicos.service';
@@ -78,7 +78,7 @@ describe('PeriodosAcademicosService', () => {
     const original = crearPeriodo({ estado: EstadoPeriodoAcademico.CERRADO });
     const repo = { findOne: jest.fn().mockResolvedValue({ ...original }), save: jest.fn(async (p) => p) };
     const query = jest.fn().mockResolvedValue({ insertId: 1 });
-    dataSource.transaction.mockImplementation((cb) => cb({ getRepository: () => repo, query }));
+    dataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb({ getRepository: () => repo, query } as unknown as EntityManager));
 
     const resultado = await comoAdmin(() => service.corregirCerradoExcepcionalmente(7, 1, {
       motivo: 'Rectificacion institucional de fecha', fechaFin: '2027-06-30',
@@ -96,9 +96,9 @@ describe('PeriodosAcademicosService', () => {
   it('revierte la correccion si falla la escritura de auditoria', async () => {
     const original = crearPeriodo({ estado: EstadoPeriodoAcademico.CERRADO });
     const repo = { findOne: jest.fn().mockResolvedValue({ ...original }), save: jest.fn(async (p) => p) };
-    dataSource.transaction.mockImplementation(async (cb) => cb({
+    dataSource.transaction.mockImplementation(async (cb: (manager: EntityManager) => Promise<unknown>) => cb({
       getRepository: () => repo, query: jest.fn().mockRejectedValue(new Error('fallo SQL')),
-    }));
+    } as unknown as EntityManager));
     await expect(comoAdmin(() => service.corregirCerradoExcepcionalmente(7, 1, {
       motivo: 'Rectificacion institucional de fecha', fechaFin: '2027-06-30',
     }))).rejects.toThrow('fallo SQL');
@@ -108,7 +108,7 @@ describe('PeriodosAcademicosService', () => {
   it('rechaza una correccion sin cambios efectivos', async () => {
     const repo = { findOne: jest.fn().mockResolvedValue(crearPeriodo({ estado: EstadoPeriodoAcademico.CERRADO })),
       save: jest.fn() };
-    dataSource.transaction.mockImplementation((cb) => cb({ getRepository: () => repo, query: jest.fn() }));
+    dataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb({ getRepository: () => repo, query: jest.fn() } as unknown as EntityManager));
     await expect(comoAdmin(() => service.corregirCerradoExcepcionalmente(7, 1, {
       motivo: 'Revision institucional sin cambios', fechaFin: '2027-06-25',
     }))).rejects.toThrow(BadRequestException);

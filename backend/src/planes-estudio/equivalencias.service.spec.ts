@@ -3,6 +3,7 @@ import { EquivalenciasService } from './equivalencias.service';
 import { OrigenAcademico } from '../estudiantes/constants/origen-academico.constant';
 import { ResultadoAcademico } from '../estudiantes/constants/resultado-academico.constant';
 import { EquivalenciaPlan } from './entities/equivalencia-plan.entity';
+import { EntityManager } from 'typeorm';
 
 describe('EquivalenciasService', () => {
   let service: EquivalenciasService;
@@ -117,7 +118,7 @@ describe('EquivalenciasService', () => {
 
   it('guarda todas las ramas de una N a 1 dentro de una transacción', async () => {
     planAsignaturaRepo.findOne.mockImplementation(({ where }: any) => Promise.resolve({ id: where.id }));
-    equivalenciaRepo.save.mockImplementation((rows) => Promise.resolve(rows));
+    equivalenciaRepo.save.mockImplementation((rows: EquivalenciaPlan | EquivalenciaPlan[]) => Promise.resolve(rows));
 
     await service.crear(1, {
       carreraOrigenId: 10, planOrigenId: 1, carreraDestinoId: 10, planDestinoId: 2,
@@ -149,7 +150,7 @@ describe('EquivalenciasService', () => {
     }));
     equivalenciaRepo.findOne.mockResolvedValue(ramas[0]);
     equivalenciaRepo.find.mockResolvedValue(ramas);
-    equivalenciaRepo.save.mockImplementation((rows) => Promise.resolve(rows));
+    equivalenciaRepo.save.mockImplementation((rows: EquivalenciaPlan | EquivalenciaPlan[]) => Promise.resolve(rows));
 
     const resultado = await service.eliminar(1, 1);
     expect(resultado.eliminadas).toBe(2);
@@ -286,10 +287,10 @@ describe('EquivalenciasService', () => {
       id: 99, planOrigenId: 1, asignaturaOrigenId: 101,
       planDestinoId: 2, carreraDestinoId: 10, asignaturaDestinoId: 201, activo: true,
     }]);
-    dataSource.transaction.mockImplementation((cb) => cb({
+    dataSource.transaction.mockImplementation((cb: (manager: EntityManager) => Promise<unknown>) => cb({
       query: jest.fn().mockResolvedValue([{ id: 42, planEstudioId: 3, carreraId: 10 }]),
       getRepository: jest.fn(() => historialRepo),
-    }));
+    } as unknown as EntityManager));
 
     await expect(service.aplicarEquivalenciasEstudiante(1, {
       estudianteId: 42, equivalenciaIds: [99],

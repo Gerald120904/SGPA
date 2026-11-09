@@ -54,6 +54,9 @@ describe('PlanesEstudioService', () => {
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
     ...cambios,
+    versionAnteriorId: cambios.versionAnteriorId ?? null,
+    numeroVersion: cambios.numeroVersion ?? 1,
+    versionAnterior: cambios.versionAnterior ?? null,
   });
 
   beforeEach(() => {
