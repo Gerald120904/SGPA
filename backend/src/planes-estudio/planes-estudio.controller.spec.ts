@@ -244,7 +244,7 @@ describe('PlanesEstudioController', () => {
       .send(dto)
       .expect(200, { id: 1 });
 
-    expect(service.actualizar).toHaveBeenCalledWith(1, dto);
+    expect(service.actualizar).toHaveBeenCalledWith(1, dto, 1);
   });
 
   it('rechaza carreraId durante la actualización', async () => {
@@ -266,10 +266,32 @@ describe('PlanesEstudioController', () => {
     await request(app.getHttpServer())
       .patch('/planes-estudio/1/estado')
       .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
-      .send({ activo: false })
+      .send({ activo: false, motivo: 'Cierre de nuevas matriculas' })
       .expect(200, { id: 1 });
 
-    expect(service.cambiarEstado).toHaveBeenCalledWith(1, false);
+    expect(service.cambiarEstado).toHaveBeenCalledWith(
+      1, { activo: false, motivo: 'Cierre de nuevas matriculas' }, 1,
+    );
+  });
+
+  it('rechaza solicitudes sin estado', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
+    await request(app.getHttpServer())
+      .patch('/planes-estudio/1/estado')
+      .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
+      .send({ motivo: 'Falta estado' })
+      .expect(400);
+    expect(service.cambiarEstado).not.toHaveBeenCalled();
+  });
+
+  it('rechaza indicadores de estado contradictorios', async () => {
+    permisosAsignados.add(PermisoSistema.PLANES_ESTUDIO_GESTIONAR);
+    await request(app.getHttpServer())
+      .patch('/planes-estudio/1/estado')
+      .set('Authorization', `Bearer ${await token('ADMIN_GLOBAL')}`)
+      .send({ estado: 'CERRADO', activo: true, motivo: 'Estado contradictorio' })
+      .expect(400);
+    expect(service.cambiarEstado).not.toHaveBeenCalled();
   });
 
   it('rechaza estado que no sea boolean', async () => {

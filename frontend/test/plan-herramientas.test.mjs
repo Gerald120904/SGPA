@@ -12,3 +12,12 @@ test('el detalle conserva herramientas académicas y retira Importar y Plantilla
   assert.match(html, /revisarPlanButton/);
   assert.doesNotMatch(html, /importarExcelPlanButton|plantillaExcelPlanButton/);
 });
+
+test('el detalle distingue un plan EN_TRANSICION de uno vigente', () => {
+  const html = VerPlanPage({
+    plan: { id: 2, nombre: 'Plan en transición', codigo: 'PLAN-2', activo: true, estado: 'EN_TRANSICION' },
+    resumenPlan: {},
+  });
+  assert.match(html, /Cerrado a nuevos ingresos/);
+  assert.doesNotMatch(html, />\s*Activo\s*</);
+});

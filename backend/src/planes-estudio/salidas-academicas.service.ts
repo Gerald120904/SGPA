@@ -119,6 +119,9 @@ export class SalidasAcademicasService {
         'No se puede modificar un plan de estudio inactivo.',
       );
     }
+    if (exigirActivo && plan.estado && plan.estado !== 'BORRADOR') {
+      throw new BadRequestException('Las salidas académicas solo se pueden modificar en un plan BORRADOR.');
+    }
 
     return plan;
   }

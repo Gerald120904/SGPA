@@ -1021,8 +1021,8 @@ ipcMain.handle('solicitudes:proponer-plan', async (_event, datos) =>
   ejecutarPeticionAutenticada('/solicitudes-cambio/planes-estudio', { method: 'POST', body: datos }));
 ipcMain.handle('solicitudes:proponer-actualizacion-plan', async (_event, id, datos) =>
   ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${id}/actualizar`, { method: 'POST', body: datos }));
-ipcMain.handle('solicitudes:proponer-estado-plan', async (_event, id, activo) =>
-  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${id}/estado`, { method: 'POST', body: { activo } }));
+ipcMain.handle('solicitudes:proponer-estado-plan', async (_event, id, activo, motivo) =>
+  ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${id}/estado`, { method: 'POST', body: { activo, motivo } }));
 ipcMain.handle('solicitudes:proponer-asignatura-plan', async (_event, planId, datos) =>
   ejecutarPeticionAutenticada(`/solicitudes-cambio/planes-estudio/${planId}/asignaturas`, { method: 'POST', body: datos }));
 ipcMain.handle('solicitudes:proponer-actualizacion-asignatura-plan', async (_event, planId, id, datos) =>
@@ -1148,6 +1148,14 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
+  "periodos:corregir-cerrado",
+  async (_event, id, datos) => ejecutarPeticionAutenticada(
+    `/periodos-academicos/${id}/correccion-excepcional`,
+    { method: "PATCH", body: datos },
+  ),
+);
+
+ipcMain.handle(
   "periodos:cambiar-estado",
   async (_event, id, estado) => {
     return ejecutarPeticionAutenticada(
@@ -1204,6 +1212,14 @@ ipcMain.handle("planes-estudio:cambiar-estado", async (_event, id, activo, motiv
     body,
   });
 });
+
+ipcMain.handle("planes-estudio:crear-version", async (_event, id, datos) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/${id}/versiones`, { method: "POST", body: datos }));
+
+ipcMain.handle("planes-estudio:activar-version", async (_event, id, versionId, motivo) =>
+  ejecutarPeticionAutenticada(`/planes-estudio/${id}/versiones/${versionId}/activar`, {
+    method: "POST", body: { motivo },
+  }));
 
 /* =========================================================
    REGLA DE OPTATIVAS DEL PLAN
@@ -1508,6 +1524,37 @@ ipcMain.handle("transiciones-curriculares:lotes", async (_event, carreraId, plan
   if (planDestinoId) params.push(`planDestinoId=${planDestinoId}`);
   const query = params.length ? `?${params.join("&")}` : "";
   return ejecutarPeticionAutenticada(`/planes-estudio/transiciones/lotes${query}`);
+});
+
+ipcMain.handle("convalidaciones-externas:listar", async (_event, carreraId, estado) => {
+  const params = new URLSearchParams();
+  if (carreraId) params.set('carreraId', String(carreraId));
+  if (estado) params.set('estado', String(estado));
+  const query = params.toString();
+  return ejecutarPeticionAutenticada(`/planes-estudio/transiciones/convalidaciones-externas${query ? `?${query}` : ''}`);
+});
+
+ipcMain.handle("convalidaciones-externas:verificar-evidencia", async (_event, id, datos) => {
+  return ejecutarPeticionAutenticada(`/planes-estudio/transiciones/convalidaciones-externas/${Number(id)}/verificar-evidencia`, {
+    method: 'POST', body: datos,
+  });
+});
+
+ipcMain.handle("convalidaciones-externas:decidir", async (_event, id, datos) => {
+  return ejecutarPeticionAutenticada(`/planes-estudio/transiciones/convalidaciones-externas/${Number(id)}/decision`, {
+    method: 'POST', body: datos,
+  });
+});
+
+ipcMain.handle("convalidaciones-externas:abrir-evidencia", async (_event, referencia) => {
+  let parsed;
+  try { parsed = new URL(String(referencia)); } catch { return { ok: false, message: 'La referencia no es una URL válida.' }; }
+  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+    return { ok: false, message: 'Solo se pueden abrir referencias HTTPS institucionales.' };
+  }
+  const urlValidada = parsed.toString();
+  await shell.openExternal(urlValidada);
+  return { ok: true, abierto: true };
 });
 
 ipcMain.handle("plan-resumen:obtener", async (_event, planId) => {

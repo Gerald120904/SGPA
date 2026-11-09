@@ -26,10 +26,15 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Falta un rol activo autorizado.');
     }
 
+    const revisionDocenteConAlcance = rolActivo === RolSistema.COORDINADOR &&
+      context.getClass()?.name === 'ProfesoresController' &&
+      ['revisarPerfilProfesor', 'revisarRequisitoPerfilProfesor', 'revisarAtestadoProfesor']
+        .includes(context.getHandler()?.name);
     if (usuario?.jerarquiaConfigurada === true &&
       rolActivo !== RolSistema.ADMIN_GLOBAL &&
       (rolActivo === RolSistema.COORDINADOR || rolActivo === RolSistema.ASISTENTE_ESTUDIANTIL) &&
-      !['JerarquiaUsuariosController', 'SolicitudesCambioController'].includes(context.getClass()?.name)) {
+      !['JerarquiaUsuariosController', 'SolicitudesCambioController'].includes(context.getClass()?.name) &&
+      !revisionDocenteConAlcance) {
       throw new ForbiddenException('Esta ruta no verifica aún el alcance por carrera.');
     }
 

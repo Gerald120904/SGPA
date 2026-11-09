@@ -6,6 +6,7 @@ import { EstructuraAcademicaService } from '../estructura-academica/estructura-a
 import { PeriodoAcademico } from '../periodos-academicos/entities/periodo-academico.entity';
 import { PlanAsignatura } from '../planes-estudio/entities/plan-asignatura.entity';
 import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
+import { EstadoPlanEstudio } from '../planes-estudio/constants/estado-plan-estudio.constant';
 import { FuenteRegistroAcademico } from './constants/fuente-registro-academico.constant';
 import { ResultadoAcademico } from './constants/resultado-academico.constant';
 import { ImportarEstudiantesDto } from './dto/importar-estudiantes.dto';
@@ -103,6 +104,12 @@ describe('EstudiantesImportacionService', () => {
       errores: 0,
       aprobacionesNuevas: 1,
     });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una importación dirigida a una versión BORRADOR', async () => {
+    planRepository.findOne.mockResolvedValue({ ...plan, estado: EstadoPlanEstudio.BORRADOR });
+    await expect(service.validar(9, dto())).rejects.toThrow('No se admiten estudiantes en un plan en estado BORRADOR.');
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 

@@ -47,6 +47,7 @@ import { Estudiante } from './entities/estudiante.entity';
 import { HistorialAcademicoEstudiante } from './entities/historial-academico-estudiante.entity';
 import { HistorialPlanEstudiante } from './entities/historial-plan-estudiante.entity';
 import { EvaluacionGraduacionService } from './evaluacion-graduacion.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 @Injectable()
 export class EstudiantesService {
@@ -78,7 +79,61 @@ export class EstudiantesService {
     private readonly equivalenciaRepository?: Repository<EquivalenciaPlan>,
     @Optional()
     private readonly evaluacionGraduacionService?: EvaluacionGraduacionService,
+    @Optional()
+    private readonly notificacionesService?: NotificacionesService,
   ) {}
+
+  private async obtenerDestinatariosNotificacionCarrera(
+    carreraId: number,
+  ): Promise<number[]> {
+    try {
+      const candidatos = new Set<number>();
+
+      if (this.dataSource && typeof this.dataSource.query === 'function') {
+        const asig = await this.dataSource.query(
+          `SELECT DISTINCT usuario_id FROM asignaciones_academicas
+           WHERE activo = 1 AND (carrera_id = ? OR area_academica_id IN (SELECT area_academica_id FROM area_carreras WHERE carrera_id = ?))
+             AND (fecha_inicio <= CURDATE() AND (fecha_fin IS NULL OR fecha_fin >= CURDATE()))`,
+          [carreraId, carreraId],
+        ).catch(() => []);
+        for (const r of asig) {
+          if (r.usuario_id) candidatos.add(Number(r.usuario_id));
+        }
+
+        const perm = await this.dataSource.query(
+          `SELECT DISTINCT usuario_id FROM permisos_carrera WHERE carrera_id = ? AND activo = 1`,
+          [carreraId],
+        ).catch(() => []);
+        for (const r of perm) {
+          if (r.usuario_id) candidatos.add(Number(r.usuario_id));
+        }
+
+        const adm = await this.dataSource.query(
+          `SELECT DISTINCT ur.usuario_id FROM usuario_roles ur
+           JOIN roles r ON r.id = ur.rol_id
+           JOIN usuarios u ON u.id = ur.usuario_id
+           WHERE r.nombre = 'ADMIN_GLOBAL' AND r.activo = 1 AND u.activo = 1`,
+        ).catch(() => []);
+        for (const r of adm) {
+          if (r.usuario_id) candidatos.add(Number(r.usuario_id));
+        }
+      }
+
+      const destinatariosValidos: number[] = [];
+      for (const destId of candidatos) {
+        try {
+          const tieneAlcance = await this.estructuraAcademicaService.tieneAlcanceSobreCarrera(
+            destId,
+            carreraId,
+          );
+          if (tieneAlcance) destinatariosValidos.push(destId);
+        } catch {}
+      }
+      return destinatariosValidos;
+    } catch {
+      return [];
+    }
+  }
 
   async listar(usuarioId: number, filtros: FiltrarEstudiantesDto) {
     const tipo = await this.alcanceJerarquico.tipoCuentaJerarquica(usuarioId);
@@ -681,6 +736,7 @@ export class EstudiantesService {
       estudiante.periodoIngreso,
       'El período del cambio de plan',
     );
+    let historialPlanId: number | null = null;
     await this.dataSource.transaction(async (manager) => {
       const estudiantes = manager.getRepository(Estudiante);
       const historiales = manager.getRepository(HistorialPlanEstudiante);
@@ -688,7 +744,7 @@ export class EstudiantesService {
         ? `[GRADUACION_PREVIA: plan=${estudiante.planEstudioId}, fecha=${estudiante.fechaGraduacion ? new Date(estudiante.fechaGraduacion).toISOString() : 'N/A'}, usuario=${estudiante.graduadoPorUsuarioId || 'N/A'}] ${dto.motivo?.trim() || 'Continuidad académica a Licenciatura tras graduación'}`
         : dto.motivo?.trim() || null;
 
-      await historiales.save(
+      const historialGuardado = await historiales.save(
         historiales.create({
           estudianteId,
           planAnteriorId: estudiante.planEstudioId,
@@ -698,6 +754,7 @@ export class EstudiantesService {
           cambiadoPorUsuarioId: usuarioId,
         }),
       );
+      historialPlanId = historialGuardado.id;
       const datosActualizacion: Partial<Estudiante> = {
         planEstudioId: dto.planNuevoId,
         carreraId: planNuevo.carreraId,
@@ -754,7 +811,42 @@ export class EstudiantesService {
           }
         }
       }
+
+      if (this.notificacionesService) {
+        const carrerasNotificar = new Set<number>([estudiante.carreraId]);
+        if (planNuevo.carreraId) carrerasNotificar.add(planNuevo.carreraId);
+        const destinatariosMap = new Map<number, number>();
+        for (const cId of carrerasNotificar) {
+          const dests = await this.obtenerDestinatariosNotificacionCarrera(cId);
+          for (const destId of dests) {
+            if (!destinatariosMap.has(destId)) destinatariosMap.set(destId, cId);
+          }
+        }
+        const nombrePlan = planNuevo.codigo ? `${planNuevo.codigo} - ${planNuevo.nombre}` : planNuevo.nombre;
+        for (const [destId, cId] of destinatariosMap.entries()) {
+          await this.notificacionesService.crear({
+            claveIdempotencia: `notif:cambio-plan:${historialPlanId}:${destId}`,
+            usuarioId: destId,
+            carreraId: cId,
+            titulo: 'Cambio de plan de estudio',
+            mensaje: `Se realizó un cambio directo de plan de estudio para el estudiante ${estudiante.cedula} (${estudiante.nombres} ${estudiante.apellido1}) hacia el plan ${nombrePlan}.${dto.motivo ? ` Motivo: ${dto.motivo.trim()}.` : ''}`,
+            tipo: 'INFO',
+            enlace: `/estudiantes/${estudianteId}`,
+            metadatos: {
+              estudianteId,
+              carreraId: cId,
+              historialPlanId,
+              planAnteriorId: estudiante.planEstudioId,
+              planNuevoId: dto.planNuevoId,
+              periodoCambioId: dto.periodoCambioId,
+              motivo: dto.motivo?.trim() || null,
+              usuarioResponsableId: usuarioId,
+            },
+          }, manager);
+        }
+      }
     });
+
     return this.obtenerPorId(usuarioId, estudianteId);
   }
 
@@ -1231,6 +1323,9 @@ export class EstudiantesService {
       where: { id: planEstudioId },
     });
     if (!plan) throw new BadRequestException('El plan de estudio no existe.');
+    if (plan.estado === 'BORRADOR') {
+      throw new BadRequestException('No se admiten estudiantes en un plan en estado BORRADOR.');
+    }
     if (!plan.activo)
       throw new BadRequestException(
         'El plan de estudio se encuentra inactivo.',
@@ -1373,6 +1468,12 @@ export class EstudiantesService {
       if (!planNuevo || !planNuevo.activo) {
         throw new BadRequestException('El nuevo plan seleccionado no existe o está inactivo.');
       }
+      if (planNuevo.estado !== 'VIGENTE') {
+        throw new BadRequestException('El plan de destino está cerrado a nuevos ingresos.');
+      }
+      if (planNuevo.carreraId !== estudiante.carreraId) {
+        throw new BadRequestException('El plan de destino debe pertenecer a la misma carrera.');
+      }
       const periodoCambio = await this.periodoRepository.findOne({ where: { id: dto.periodoCambioId } });
       if (!periodoCambio) {
         throw new BadRequestException('El período de cambio no existe.');
@@ -1465,11 +1566,22 @@ export class EstudiantesService {
       throw new ConflictException('Un estudiante graduado no puede reingresar.');
     }
 
+    const planRepo = manager.getRepository(PlanEstudio);
+    const planActual = await planRepo.findOne({ where: { id: estudiante.planEstudioId } });
+    if ((!planActual || !planActual.activo) && !dto.nuevoPlanId) {
+      throw new BadRequestException('El plan original está cerrado definitivamente; seleccione un plan vigente.');
+    }
+
     if (dto.nuevoPlanId) {
-      const planRepo = manager.getRepository(PlanEstudio);
       const planNuevo = await planRepo.findOne({ where: { id: dto.nuevoPlanId } });
       if (!planNuevo || !planNuevo.activo) {
         throw new BadRequestException('El plan nuevo no existe o está inactivo.');
+      }
+      if (planNuevo.estado !== 'VIGENTE') {
+        throw new BadRequestException('El plan de destino está cerrado a nuevos ingresos.');
+      }
+      if (planNuevo.carreraId !== estudiante.carreraId) {
+        throw new BadRequestException('El plan de destino debe pertenecer a la misma carrera.');
       }
       const periodoRepo = manager.getRepository(PeriodoAcademico);
       const periodoCambio = await periodoRepo.findOne({ where: { id: dto.periodoCambioId } });
@@ -1647,25 +1759,36 @@ export class EstudiantesService {
       );
     }
 
-    const registroActual = await this.historialAcademicoRepository.findOne({
-      where: { id: historialId, estudianteId },
-      relations: { planAsignatura: true },
-    });
-
-    if (!registroActual) {
-      throw new NotFoundException('Registro de historial académico no encontrado.');
-    }
-
     if (!dto.motivo || dto.motivo.trim().length < 5) {
       throw new BadRequestException('El motivo de la corrección es obligatorio y debe tener al menos 5 caracteres.');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(Estudiante).findOne({ where: { id: estudianteId }, lock: { mode: 'pessimistic_write' } });
-      const auditoriaRepo = manager.getRepository(AuditoriaHistorialAcademico);
-      const histRepo = manager.getRepository(HistorialAcademicoEstudiante);
+    let auditoriaId: number | null = null;
+    let resultadoAnterior: string | null = null;
+    let nombreAsignatura = 'asignatura';
 
-      await auditoriaRepo.save(
+    const resultadoFinal = await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Estudiante).findOne({ where: { id: estudianteId }, lock: { mode: 'pessimistic_write' } });
+      const histRepo = manager.getRepository(HistorialAcademicoEstudiante);
+      const registroActual = await histRepo.findOne({
+        where: { id: historialId, estudianteId },
+        lock: { mode: 'pessimistic_write' },
+        relations: { planAsignatura: true },
+      });
+
+      if (!registroActual) {
+        throw new NotFoundException('Registro de historial académico no encontrado.');
+      }
+
+      resultadoAnterior = registroActual.resultado;
+      nombreAsignatura =
+        registroActual.planAsignatura?.nombreReferencia ||
+        registroActual.planAsignatura?.codigoReferencia ||
+        'asignatura';
+
+      const auditoriaRepo = manager.getRepository(AuditoriaHistorialAcademico);
+
+      const auditoriaGuardada = await auditoriaRepo.save(
         auditoriaRepo.create({
           estudianteId,
           historialAcademicoId: historialId,
@@ -1681,6 +1804,7 @@ export class EstudiantesService {
           usuarioResponsableId: usuarioId,
         }),
       );
+      auditoriaId = auditoriaGuardada.id;
 
       registroActual.resultado = dto.resultado;
       if (dto.origenAcademico) registroActual.origenAcademico = dto.origenAcademico;
@@ -1689,8 +1813,35 @@ export class EstudiantesService {
 
       await histRepo.save(registroActual);
 
+      if (this.notificacionesService) {
+        const destinatarios = await this.obtenerDestinatariosNotificacionCarrera(estudiante.carreraId);
+        for (const destId of destinatarios) {
+          await this.notificacionesService.crear({
+            claveIdempotencia: `notif:corr-nota:${auditoriaId}:${destId}`,
+            usuarioId: destId,
+            carreraId: estudiante.carreraId,
+            titulo: 'Corrección de resultado académico',
+            mensaje: `Se registró una corrección directa en el resultado de ${nombreAsignatura} para el estudiante ${estudiante.cedula} (${estudiante.nombres} ${estudiante.apellido1}): ${resultadoAnterior} -> ${dto.resultado}. Motivo: ${dto.motivo.trim()}.`,
+            tipo: 'ADVERTENCIA',
+            enlace: `/estudiantes/${estudianteId}/historial-academico`,
+            metadatos: {
+              estudianteId,
+              historialId,
+              auditoriaId,
+              carreraId: estudiante.carreraId,
+              resultadoAnterior,
+              resultadoNuevo: dto.resultado,
+              motivo: dto.motivo.trim(),
+              usuarioResponsableId: usuarioId,
+            },
+          }, manager);
+        }
+      }
+
       return this.mapearHistorialAcademicoSeguro(registroActual);
     });
+
+    return resultadoFinal;
   }
 
   async corregirResultadoDesdeSolicitud(
@@ -1783,11 +1934,11 @@ export class EstudiantesService {
     }));
   }
 
-  async evaluarGraduacion(usuarioId: number, id: number) {
+  async evaluarGraduacion(usuarioId: number, id: number, salidaAcademicaId?: number) {
     if (!this.evaluacionGraduacionService) {
       throw new Error('Servicio de evaluación de graduación no disponible.');
     }
-    return this.evaluacionGraduacionService.evaluarGraduacion(usuarioId, id);
+    return this.evaluacionGraduacionService.evaluarGraduacion(usuarioId, id, salidaAcademicaId);
   }
 
   async graduarEstudiante(usuarioId: number, id: number, observacion?: string, salidaAcademicaId?: number) {
@@ -1795,6 +1946,11 @@ export class EstudiantesService {
       throw new Error('Servicio de graduación no disponible.');
     }
     return this.evaluacionGraduacionService.confirmarGraduacion(usuarioId, id, observacion, salidaAcademicaId);
+  }
+
+  async entregarTitulo(usuarioId: number, estudianteId: number, tituloId: number, motivo: string) {
+    if (!this.evaluacionGraduacionService) throw new Error('Servicio de graduación no disponible.');
+    return this.evaluacionGraduacionService.entregarTitulo(usuarioId, estudianteId, tituloId, motivo);
   }
 
   /**
@@ -1846,11 +2002,11 @@ export class EstudiantesService {
   async obtenerTitulaciones(usuarioId: number, estudianteId: number) {
     const estudiante = await this.obtenerPorId(usuarioId, estudianteId);
     if (this.dataSource && typeof this.dataSource.query === 'function') {
-      try {
         const titulos = await this.dataSource.query(
           `SELECT t.id, t.estudiante_id, t.plan_estudio_id, t.carrera_id, t.salida_academica_id,
                   t.grado, t.nombre_titulo, t.fecha_graduacion, t.graduado_por_usuario_id,
-                  t.observaciones, t.created_at,
+                  t.observaciones, t.estado_entrega, t.entregado_at,
+                  t.entregado_por_usuario_id, t.motivo_entrega, t.created_at,
                   p.codigo AS plan_codigo, p.nombre AS plan_nombre,
                   c.codigo AS carrera_codigo, c.nombre AS carrera_nombre
            FROM titulos_estudiantes t
@@ -1860,33 +2016,7 @@ export class EstudiantesService {
            ORDER BY t.fecha_graduacion ASC`,
           [estudiante.id],
         );
-        if (Array.isArray(titulos) && titulos.length > 0) {
-          return titulos;
-        }
-      } catch {
-        // Fallback si la tabla aún no fue creada en MySQL físico
-      }
-    }
-
-    if (estudiante.fechaGraduacion) {
-      return [
-        {
-          id: 1,
-          estudiante_id: estudiante.id,
-          plan_estudio_id: estudiante.planEstudioId,
-          carrera_id: estudiante.carreraId,
-          salida_academica_id: null,
-          grado: (estudiante.planEstudio as any)?.grado || 'BACHILLERATO',
-          nombre_titulo: estudiante.planEstudio?.nombre || 'Título Oficial',
-          fecha_graduacion: estudiante.fechaGraduacion,
-          graduado_por_usuario_id: estudiante.graduadoPorUsuarioId,
-          observaciones: estudiante.observacionGraduacion,
-          plan_codigo: estudiante.planEstudio?.codigo,
-          plan_nombre: estudiante.planEstudio?.nombre,
-          carrera_codigo: estudiante.carrera?.codigo,
-          carrera_nombre: estudiante.carrera?.nombre,
-        },
-      ];
+        return Array.isArray(titulos) ? titulos : [];
     }
     return [];
   }

@@ -78,6 +78,9 @@ describe('CursosService', () => {
   const plan: PlanEstudio = {
     id: 2,
     carreraId: 1,
+    versionAnteriorId: null,
+    numeroVersion: 1,
+    versionAnterior: null,
     grado: GradoAcademico.BACHILLERATO,
     codigo: 'PLAN-2026',
     nombre: 'Plan 2026',

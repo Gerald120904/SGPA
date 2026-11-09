@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -18,6 +19,8 @@ import { ActualizarPlanEstudioDto } from './dto/actualizar-plan-estudio.dto';
 import { CambiarEstadoPlanEstudioDto } from './dto/cambiar-estado-plan-estudio.dto';
 import { PlanesAlcanceGuard } from './guards/planes-alcance.guard';
 import { UsuarioActualId } from '../auth/decorators/usuario-actual-id.decorator';
+import { CrearVersionPlanEstudioDto } from './dto/crear-version-plan-estudio.dto';
+import { ActivarVersionPlanEstudioDto } from './dto/activar-version-plan-estudio.dto';
 
 @Controller('planes-estudio')
 @UseGuards(AuthGuard, PermisosGuard, PlanesAlcanceGuard)
@@ -47,8 +50,9 @@ export class PlanesEstudioController {
   actualizar(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ActualizarPlanEstudioDto,
+    @UsuarioActualId() usuarioId?: number,
   ) {
-    return this.planesEstudioService.actualizar(id, dto);
+    return this.planesEstudioService.actualizar(id, dto, usuarioId);
   }
 
   @Patch(':id/estado')
@@ -58,9 +62,29 @@ export class PlanesEstudioController {
     @Body() dto: CambiarEstadoPlanEstudioDto,
     @UsuarioActualId() usuarioId?: number,
   ) {
-    if (dto.estado !== undefined || dto.motivo !== undefined) {
-      return this.planesEstudioService.cambiarEstado(id, dto, usuarioId);
+    if (dto.estado === undefined && dto.activo === undefined) {
+      throw new BadRequestException('Debe indicar el estado o la propiedad activo.');
     }
-    return this.planesEstudioService.cambiarEstado(id, dto.activo!);
+    if (dto.estado !== undefined && dto.activo !== undefined) {
+      const activoEsperado = dto.estado !== 'CERRADO';
+      if (dto.activo !== activoEsperado) {
+        throw new BadRequestException('El estado y la propiedad activo son contradictorios.');
+      }
+    }
+    return this.planesEstudioService.cambiarEstado(id, dto, usuarioId);
+  }
+
+  @Post(':id/versiones')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
+  crearVersion(@Param('id', ParseIntPipe) id: number, @Body() dto: CrearVersionPlanEstudioDto,
+    @UsuarioActualId() usuarioId: number) {
+    return this.planesEstudioService.crearVersion(id, dto, usuarioId);
+  }
+
+  @Post(':id/versiones/:versionId/activar')
+  @Permisos(PermisoSistema.PLANES_ESTUDIO_GESTIONAR)
+  activarVersion(@Param('id', ParseIntPipe) id: number, @Param('versionId', ParseIntPipe) versionId: number,
+    @Body() dto: ActivarVersionPlanEstudioDto, @UsuarioActualId() usuarioId: number) {
+    return this.planesEstudioService.activarVersion(id, versionId, dto.motivo, usuarioId);
   }
 }

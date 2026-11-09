@@ -509,6 +509,47 @@ export class BandejaRevisionEstudiantesService {
     };
   }
 
+  async aprobarIndividual(
+    usuarioId: number,
+    id: number,
+    motivo?: string,
+  ): Promise<{ id: number; estado: string; revisadoPorUsuarioId: number; revisadoEn: Date }> {
+    const res = await this.aprobarMasivo(usuarioId, { registroIds: [id] });
+    if (res.fallidos.length > 0) {
+      throw new BadRequestException(res.fallidos[0].error);
+    }
+    const reg = await this.registroRepo.findOne({ where: { id } });
+    if (!reg) throw new NotFoundException('Registro no encontrado.');
+    return {
+      id: reg.id,
+      estado: reg.estado,
+      revisadoPorUsuarioId: reg.revisadoPorUsuarioId!,
+      revisadoEn: reg.revisadoEn!,
+    };
+  }
+
+  async rechazarIndividual(
+    usuarioId: number,
+    id: number,
+    motivo: string,
+  ): Promise<{ id: number; estado: string; revisadoPorUsuarioId: number; revisadoEn: Date }> {
+    if (!motivo || motivo.trim().length < 3) {
+      throw new BadRequestException('El motivo de rechazo debe tener al menos 3 caracteres.');
+    }
+    const res = await this.rechazarMasivo(usuarioId, { rechazos: [{ id, motivo: motivo.trim() }] });
+    if (res.fallidos.length > 0) {
+      throw new BadRequestException(res.fallidos[0].error);
+    }
+    const reg = await this.registroRepo.findOne({ where: { id } });
+    if (!reg) throw new NotFoundException('Registro no encontrado.');
+    return {
+      id: reg.id,
+      estado: reg.estado,
+      revisadoPorUsuarioId: reg.revisadoPorUsuarioId!,
+      revisadoEn: reg.revisadoEn!,
+    };
+  }
+
   async devolverPropuesta(
     usuarioId: number,
     registroIds: number[],

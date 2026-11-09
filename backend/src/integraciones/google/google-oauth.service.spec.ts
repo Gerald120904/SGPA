@@ -7,6 +7,8 @@ import * as crypto from 'crypto';
 import { GoogleOauthService } from './google-oauth.service';
 import { GoogleConexionUsuario } from './entities/google-conexion-usuario.entity';
 import { GoogleOauthEstado } from './entities/google-oauth-estado.entity';
+import { GoogleCuentaInstitucional } from './entities/google-cuenta-institucional.entity';
+import { GoogleSyncLog } from './entities/google-sync-log.entity';
 
 describe('GoogleOauthService', () => {
   let service: GoogleOauthService;
@@ -19,6 +21,16 @@ describe('GoogleOauthService', () => {
     findOne: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+  };
+  let institucionalRepo: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+  };
+  let syncLogRepo: {
+    create: jest.Mock;
+    save: jest.Mock;
+    find: jest.Mock;
   };
   let configService: {
     get: jest.Mock;
@@ -38,6 +50,18 @@ describe('GoogleOauthService', () => {
       findOne: jest.fn(),
       create: jest.fn((dto) => ({ ...dto })),
       save: jest.fn((entity) => Promise.resolve({ id: 1, ...entity })),
+    };
+
+    institucionalRepo = {
+      findOne: jest.fn(),
+      create: jest.fn((dto) => ({ ...dto })),
+      save: jest.fn((entity) => Promise.resolve({ id: 1, ...entity })),
+    };
+
+    syncLogRepo = {
+      create: jest.fn((dto) => ({ ...dto })),
+      save: jest.fn((entity) => Promise.resolve({ id: 1, ...entity })),
+      find: jest.fn().mockResolvedValue([]),
     };
 
     configService = {
@@ -67,6 +91,14 @@ describe('GoogleOauthService', () => {
         {
           provide: getRepositoryToken(GoogleOauthEstado),
           useValue: googleOauthEstadoRepo,
+        },
+        {
+          provide: getRepositoryToken(GoogleCuentaInstitucional),
+          useValue: institucionalRepo,
+        },
+        {
+          provide: getRepositoryToken(GoogleSyncLog),
+          useValue: syncLogRepo,
         },
         {
           provide: ConfigService,
@@ -611,6 +643,107 @@ describe('GoogleOauthService', () => {
       googleConexionRepo.findOne.mockResolvedValue(null);
 
       await expect(service.desconectar(99)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('Cuenta Institucional Principal Autorizada', () => {
+    it('obtenerEstadoInstitucional retorna DESCONECTADA cuando no hay cuenta configurada', async () => {
+      institucionalRepo.findOne.mockResolvedValue(null);
+
+      const estado = await service.obtenerEstadoInstitucional();
+
+      expect(estado.configurada).toBe(false);
+      expect(estado.conectada).toBe(false);
+      expect(estado.estado).toBe('DESCONECTADA');
+      expect(estado.googleEmail).toBeNull();
+    });
+
+    it('conectarCuentaInstitucionalManual vincula la cuenta institucional y cifra el refresh token', async () => {
+      institucionalRepo.findOne.mockResolvedValue(null);
+
+      const cuenta = await service.conectarCuentaInstitucionalManual(1, {
+        googleEmail: 'admision-institucional@una.cr',
+        refreshToken: 'refresh-token-institucional-12345',
+      });
+
+      expect(cuenta).toBeDefined();
+      expect(cuenta.googleEmail).toBe('admision-institucional@una.cr');
+      expect(cuenta.activo).toBe(true);
+      expect(cuenta.autorizadoPorUsuarioId).toBe(1);
+      expect(cuenta.refreshTokenCifrado).toBeDefined();
+      expect(institucionalRepo.save).toHaveBeenCalled();
+    });
+
+    it('puedeSincronizarAutomaticamente retorna true si la cuenta institucional está conectada sin requerir cuenta de usuario', async () => {
+      institucionalRepo.findOne.mockResolvedValue({
+        id: 1,
+        activo: true,
+        refreshTokenCifrado: 'encrypted_token',
+      });
+
+      const puede = await service.puedeSincronizarAutomaticamente(undefined);
+      expect(puede).toBe(true);
+
+      const puedeConUsuarioSinConexion = await service.puedeSincronizarAutomaticamente(999);
+      expect(puedeConUsuarioSinConexion).toBe(true);
+    });
+
+    it('reconectarCuentaInstitucional reactiva la cuenta y limpia errores previos', async () => {
+      const cuentaExistente = {
+        id: 1,
+        googleEmail: 'institucional@una.cr',
+        activo: false,
+        ultimoError: 'Token expirado',
+        revocadoAt: new Date(),
+        autorizadoPorUsuarioId: 1,
+      };
+      institucionalRepo.findOne.mockResolvedValue(cuentaExistente);
+
+      const reconectada = await service.reconectarCuentaInstitucional(2);
+
+      expect(reconectada.activo).toBe(true);
+      expect(reconectada.ultimoError).toBeNull();
+      expect(reconectada.revocadoAt).toBeNull();
+      expect(reconectada.autorizadoPorUsuarioId).toBe(2);
+      expect(institucionalRepo.save).toHaveBeenCalledWith(cuentaExistente);
+    });
+
+    it('desconectarCuentaInstitucional desactiva la cuenta y marca fecha de revocación', async () => {
+      const cuentaExistente = {
+        id: 1,
+        googleEmail: 'institucional@una.cr',
+        refreshTokenCifrado: null,
+        activo: true,
+        revocadoAt: null,
+      };
+      institucionalRepo.findOne.mockResolvedValue(cuentaExistente);
+
+      await service.desconectarCuentaInstitucional(1);
+
+      expect(cuentaExistente.activo).toBe(false);
+      expect(cuentaExistente.revocadoAt).toBeInstanceOf(Date);
+      expect(institucionalRepo.save).toHaveBeenCalledWith(cuentaExistente);
+    });
+
+    it('registrarResultadoSync actualiza métricas en cuenta institucional y persiste log de auditoría', async () => {
+      const cuentaExistente = {
+        id: 1,
+        syncExitosos: 5,
+        syncFallidos: 1,
+        ultimoSyncAt: null,
+        ultimoError: 'Error previo',
+      };
+      institucionalRepo.findOne.mockResolvedValue(cuentaExistente);
+
+      await service.registrarResultadoSync('AUTOMATICO', 'EXITOSO', {
+        formulariosProcesados: 3,
+        respuestasNuevas: 10,
+      });
+
+      expect(cuentaExistente.syncExitosos).toBe(6);
+      expect(cuentaExistente.ultimoError).toBeNull();
+      expect(cuentaExistente.ultimoSyncAt).toBeInstanceOf(Date);
+      expect(syncLogRepo.save).toHaveBeenCalled();
     });
   });
 });

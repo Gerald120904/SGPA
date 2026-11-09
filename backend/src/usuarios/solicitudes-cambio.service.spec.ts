@@ -1,9 +1,10 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { EstudiantesService } from '../estudiantes/estudiantes.service';
 import { CursosService } from '../cursos/cursos.service';
 import { CursoRequisitosService } from '../cursos/curso-requisitos.service';
 import { PlanesEstudioService } from '../planes-estudio/planes-estudio.service';
+import { PlanEstudio } from '../planes-estudio/entities/plan-estudio.entity';
 import { AlcanceJerarquicoService } from '../permisos/alcance-jerarquico.service';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
@@ -21,6 +22,7 @@ describe('SolicitudesCambioService', () => {
     cambiarEstadoDesdeSolicitud: jest.Mock; cambiarPlanDesdeSolicitud: jest.Mock;
     registrarResultadoDesdeSolicitud: jest.Mock };
   let service: SolicitudesCambioService;
+  let planEnTransaccion: { id: number; estado: string; versionAnteriorId: number | null };
   let cursos: { contextoCreacion: jest.Mock; obtenerCursoCompleto: jest.Mock;
     huellaCurso: jest.Mock; validarDelegacionCompleta: jest.Mock; crearDesdeSolicitud: jest.Mock;
     actualizarDesdeSolicitud: jest.Mock; cambiarEstadoDesdeSolicitud: jest.Mock };
@@ -90,8 +92,11 @@ describe('SolicitudesCambioService', () => {
     };
     const auditoriaRepo = { save: jest.fn(async (dato) => dato) };
     const dependenciasRepo = { findOne: jest.fn(async () => ({ coordinadorId: 1, asistenteId: 3, activo: true })) };
+    planEnTransaccion = { id: 70, estado: 'BORRADOR', versionAnteriorId: null };
+    const planRepo = { findOne: jest.fn(async () => planEnTransaccion) };
     const manager = { getRepository: (entidad: unknown) => entidad === SolicitudCambio ? solicitudRepo :
-      entidad === Usuario ? { findOne: jest.fn().mockResolvedValue({ id: 1, usuarioRoles: [{ rol: { nombre: 'COORDINADOR' } }] }) } : auditoriaRepo };
+      entidad === Usuario ? { findOne: jest.fn().mockResolvedValue({ id: 1, usuarioRoles: [{ rol: { nombre: 'COORDINADOR' } }] }) } :
+        entidad === PlanEstudio ? planRepo : auditoriaRepo };
     const dataSource = { transaction: jest.fn(async (fn) => fn(manager)) };
     alcance = {
       puedeEjecutar: jest.fn().mockResolvedValue(true),
@@ -240,10 +245,10 @@ describe('SolicitudesCambioService', () => {
     await service.aprobar(1, actualizacion.id);
     expect(planes.actualizarDesdeSolicitud).toHaveBeenCalledWith(1, 3, 70,
       expect.objectContaining({ nombre: 'Plan nuevo' }), 'c'.repeat(64), expect.anything());
-    const estado = await service.proponerCambiarEstadoPlan(3, 70, false);
+    const estado = await service.proponerCambiarEstadoPlan(3, 70, false, 'Cierre de nuevas admisiones');
     await service.aprobar(1, estado.id);
     expect(planes.cambiarEstadoDesdeSolicitud).toHaveBeenCalledWith(1, 3, 70, false,
-      'c'.repeat(64), expect.anything());
+      'c'.repeat(64), expect.anything(), 'Cierre de nuevas admisiones');
   });
 
   const propuesta = { carreraId: 10, cedula: '123', nombres: 'Ana', apellido1: 'Mora',
@@ -485,6 +490,15 @@ describe('SolicitudesCambioService', () => {
     expect(planAsignaturas.crearDesdeSolicitud).not.toHaveBeenCalled();
     expect(solicitud.estado).toBe('RECHAZADA');
     expect(solicitud.motivoRechazo).toBe('No cumple requisitos curriculares');
+  });
+
+  it('no aprueba cambios curriculares sobre planes vigentes', async () => {
+    const solicitud = await service.proponerAgregarAsignatura(3, 70, {
+      nivel: 1, ciclo: 1, creditos: 3, tipo: 'OBLIGATORIA', codigoReferencia: 'MAT-2', nombreReferencia: 'Matemática II',
+    } as any);
+    planEnTransaccion.estado = 'VIGENTE';
+    await expect(service.aprobar(1, solicitud.id)).rejects.toThrow(BadRequestException);
+    expect(planAsignaturas.crearDesdeSolicitud).not.toHaveBeenCalled();
   });
 
   it('revocación de permiso de planes invalida la solicitud sin aplicar', async () => {

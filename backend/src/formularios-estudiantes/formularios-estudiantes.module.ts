@@ -26,6 +26,7 @@ import { FormulariosPublicosWebController } from './formularios-publicos-web.con
 import { FormulariosPublicosService } from './formularios-publicos.service';
 import { RateLimitPublicoGuard } from './guards/rate-limit-publico.guard';
 import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta-formulario.service';
+import { CorreoRechazoOutboxService } from './correo-rechazo-outbox.service';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { NormalizadorRespuestaFormularioService } from './normalizador-respuesta
     FormulariosPublicosService,
     RateLimitPublicoGuard,
     NormalizadorRespuestaFormularioService,
+    CorreoRechazoOutboxService,
   ],
   exports: [
     FormulariosEstudiantesService,

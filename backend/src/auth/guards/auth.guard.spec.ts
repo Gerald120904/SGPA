@@ -68,6 +68,24 @@ describe('AuthGuard', () => {
       .rejects.toThrow(UnauthorizedException);
   });
 
+  it('revoca inmediatamente tokens de dos dispositivos al cambiar la version de sesion', async () => {
+    const usuario = {
+      id: 42, activo: true, versionAutenticacion: 1,
+      usuarioRoles: [{ rol: { nombre: 'PROFESOR', activo: true } }],
+    };
+    usuarioRepository.findOne.mockImplementation(async () => usuario);
+    jwtService.verifyAsync.mockImplementation(async (token: string) => ({
+      sub: 42, correo: 'profesor@una.cr', rolActivo: 'PROFESOR', av: 1,
+      dispositivo: token,
+    }));
+    await expect(guard.canActivate(crearContexto('Bearer dispositivo-a'))).resolves.toBe(true);
+    await expect(guard.canActivate(crearContexto('Bearer dispositivo-b'))).resolves.toBe(true);
+
+    usuario.versionAutenticacion = 2;
+    await expect(guard.canActivate(crearContexto('Bearer dispositivo-a'))).rejects.toThrow(UnauthorizedException);
+    await expect(guard.canActivate(crearContexto('Bearer dispositivo-b'))).rejects.toThrow(UnauthorizedException);
+  });
+
   function crearContexto(authHeader?: string): ExecutionContext {
     const request: { headers: Record<string, string | undefined>; user?: any } = {
       headers: {

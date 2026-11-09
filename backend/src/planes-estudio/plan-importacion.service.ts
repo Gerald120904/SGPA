@@ -502,6 +502,9 @@ export class PlanImportacionService {
         null,
         'No se puede importar información a un plan inactivo.',
       );
+    if (plan.estado && plan.estado !== 'BORRADOR')
+      this.agregar(problemas, 'ERROR', 'PLAN_HISTORICO', 'PLAN', null,
+        'La importación curricular solo se permite en un plan BORRADOR.');
     const [asignaturasExistentes, salidasExistentes, reglaOptativas] =
       await Promise.all([
         this.asignaturaRepository.count({ where: { planEstudioId: planId } }),

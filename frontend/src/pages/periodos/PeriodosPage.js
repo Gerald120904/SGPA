@@ -2,6 +2,7 @@ import {
   actualizarPeriodoAcademico,
   cambiarEstadoPeriodoAcademico,
   crearPeriodoAcademico,
+  corregirPeriodoCerrado,
   listarPeriodosAcademicos,
 } from "../../services/periodos.service.js";
 
@@ -34,6 +35,7 @@ import {
 
 import {
   usuarioTienePermiso,
+  obtenerRolActivo,
 } from "../../app/session.js";
 
 import {
@@ -656,6 +658,11 @@ function renderizarPeriodos() {
 
 
                   ${accionesEstado}
+                  ${puedeGestionar && periodo.estado === 'CERRADO' && obtenerRolActivo() === 'ADMIN_GLOBAL'
+                    ? `<button class="periodos-icon-button" type="button" data-action="corregir-cerrado"
+                        data-id="${periodo.id}" title="Corrección excepcional auditada">
+                        <i data-lucide="pencil" aria-hidden="true"></i>
+                      </button>` : ''}
 
                 </div>
 
@@ -796,6 +803,7 @@ async function cargarPeriodos(
 
 function abrirFormulario(
   periodo = null,
+  excepcional = false,
 ) {
   const dialog =
     document.getElementById(
@@ -1019,6 +1027,10 @@ function abrirFormulario(
 
     </label>
 
+    ${excepcional ? `<label class="sgpa-form-wide"><span>Motivo institucional obligatorio</span>
+      <textarea id="periodoMotivoExcepcional" minlength="10" maxlength="500" rows="3" required
+        placeholder="Explique la corrección del período cerrado"></textarea></label>` : ''}
+
   `;
 
 
@@ -1029,12 +1041,12 @@ function abrirFormulario(
         "periodoForm",
 
       title:
-        editando
+        excepcional ? "Corrección excepcional de período cerrado" : editando
           ? "Editar periodo académico"
           : "Nuevo periodo académico",
 
       description:
-        editando
+        excepcional ? "Solo administrador global. El motivo y los cambios quedarán auditados." : editando
           ? "Actualice las fechas y datos del periodo."
           : "Registre un nuevo ciclo académico en el SGPA.",
 
@@ -1050,7 +1062,7 @@ function abrirFormulario(
         "guardarPeriodoButton",
 
       submitText:
-        editando
+        excepcional ? "Guardar corrección auditada" : editando
           ? "Guardar cambios"
           : "Crear periodo",
 
@@ -1244,6 +1256,15 @@ function abrirFormulario(
                 observaciones,
               };
 
+        if (excepcional) {
+          const motivo = document.getElementById("periodoMotivoExcepcional")?.value?.trim() || "";
+          if (motivo.length < 10) {
+            mostrarErrorFormulario("Indique un motivo institucional de al menos 10 caracteres.");
+            return;
+          }
+          datos.motivo = motivo;
+        }
+
 
         if (guardarButton) {
           guardarButton.disabled =
@@ -1254,7 +1275,9 @@ function abrirFormulario(
         try {
 
           const resultado =
-            editando
+            excepcional
+              ? await corregirPeriodoCerrado(periodo.id, datos)
+              : editando
               ? await actualizarPeriodoAcademico(
                   periodo.id,
                   datos,
@@ -1508,6 +1531,14 @@ export function iniciarPeriodosPage() {
           return;
         }
 
+
+        if (
+          button.dataset.action ===
+          "corregir-cerrado"
+        ) {
+          abrirFormulario(periodo, true);
+          return;
+        }
 
         if (
           button.dataset.action ===

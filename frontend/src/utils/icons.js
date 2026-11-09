@@ -94,6 +94,7 @@ import {
   ToggleLeft,
 
   GitBranch,
+  GitBranchPlus,
 
   List,
   ListChecks,
@@ -273,6 +274,7 @@ export function renderizarIconos() {
       ToggleLeft,
 
       GitBranch,
+      GitBranchPlus,
       ArrowLeft,
 
       List,

@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -13,6 +14,8 @@ import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Permisos } from '../permisos/decorators/permisos.decorator';
 import { PermisosGuard } from '../permisos/guards/permisos.guard';
 import { ActualizarPeriodoAcademicoDto } from './dto/actualizar-periodo-academico.dto';
+import { CorregirPeriodoCerradoDto } from './dto/corregir-periodo-cerrado.dto';
+import type { Request } from 'express';
 import { CambiarEstadoPeriodoAcademicoDto } from './dto/cambiar-estado-periodo-academico.dto';
 import { CrearPeriodoAcademicoDto } from './dto/crear-periodo-academico.dto';
 import { PeriodosAcademicosService } from './periodos-academicos.service';
@@ -49,6 +52,16 @@ export class PeriodosAcademicosController {
     @Body() dto: ActualizarPeriodoAcademicoDto,
   ) {
     return this.periodosAcademicosService.actualizar(id, dto);
+  }
+
+  @Patch(':id/correccion-excepcional')
+  @Permisos(PermisoSistema.PERIODOS_GESTIONAR)
+  corregirCerradoExcepcionalmente(
+    @Req() request: Request,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CorregirPeriodoCerradoDto,
+  ) {
+    return this.periodosAcademicosService.corregirCerradoExcepcionalmente(request.user!.sub, id, dto);
   }
 
   @Patch(':id/estado')

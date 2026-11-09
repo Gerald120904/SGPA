@@ -2,6 +2,7 @@
 import {
   escapeHtml
 } from "../../utils/html.js";
+import { obtenerPresentacionEstadoPlan } from "./plan-status-presentation.mjs";
 
 
 /* =========================================================
@@ -332,6 +333,8 @@ export function VerPlanPage({
     `;
   }
 
+  const presentacionEstado = obtenerPresentacionEstadoPlan(plan);
+
   return `
     <section class="ver-plan-page">
       <!-- =================================================
@@ -409,16 +412,12 @@ export function VerPlanPage({
               class="
                 ver-plan-status
                 ${
-                  plan.activo
-                    ? "is-active"
-                    : "is-inactive"
+                  presentacionEstado.clase
                 }
               "
             >
               ${
-                plan.activo
-                  ? "Activo"
-                  : "Inactivo"
+                presentacionEstado.etiqueta
               }
             </span>
           </div>

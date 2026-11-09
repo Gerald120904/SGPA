@@ -44,6 +44,22 @@ describe('RolesGuard', () => {
     expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
   });
 
+  it('abre solo revisiones docentes con alcance explicito al coordinador', () => {
+    reflector.getAllAndOverride.mockReturnValue(undefined);
+    const contexto = (handler: string) => ({
+      getHandler: jest.fn().mockReturnValue({ name: handler }),
+      getClass: jest.fn().mockReturnValue({ name: 'ProfesoresController' }),
+      switchToHttp: () => ({ getRequest: () => ({ user: {
+        roles: [RolSistema.COORDINADOR], rolActivo: RolSistema.COORDINADOR,
+        jerarquiaConfigurada: true,
+      } }) }),
+    }) as unknown as ExecutionContext;
+    expect(guard.canActivate(contexto('revisarPerfilProfesor'))).toBe(true);
+    expect(guard.canActivate(contexto('revisarRequisitoPerfilProfesor'))).toBe(true);
+    expect(guard.canActivate(contexto('revisarAtestadoProfesor'))).toBe(true);
+    expect(() => guard.canActivate(contexto('listar'))).toThrow(ForbiddenException);
+  });
+
   it('permite un usuario con un rol autorizado', () => {
     reflector.getAllAndOverride.mockReturnValue([RolSistema.ADMIN_GLOBAL]);
 

@@ -70,6 +70,13 @@ export interface ResultadoEvaluacionGraduacion {
     nombre: string;
     activo: boolean;
   };
+  salidaAcademica?: {
+    id: number;
+    codigo: string;
+    nombre: string;
+    tipo: string;
+    creditosRequeridos: number;
+  } | null;
   obligatorias: {
     total: number;
     aprobadasCount: number;

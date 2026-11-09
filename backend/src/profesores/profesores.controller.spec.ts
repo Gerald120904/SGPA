@@ -483,6 +483,7 @@ describe('ProfesoresController', () => {
         estado: EstadoPerfilProfesor.APROBADO,
         observacion: 'Aprobado',
       },
+      'ASISTENTE_ESTUDIANTIL',
     );
   });
 
@@ -625,7 +626,7 @@ describe('ProfesoresController', () => {
 
     expect(
       profesoresService.revisarRequisitoPerfilProfesor,
-    ).toHaveBeenCalledWith(10, 1, 50, 2, dto);
+    ).toHaveBeenCalledWith(10, 1, 50, 2, dto, 'ASISTENTE_ESTUDIANTIL');
   });
 
   it('no permite PENDIENTE como revisión manual final', async () => {
@@ -749,6 +750,7 @@ describe('ProfesoresController', () => {
       1,
       2,
       dto,
+      'ASISTENTE_ESTUDIANTIL',
     );
   });
 
