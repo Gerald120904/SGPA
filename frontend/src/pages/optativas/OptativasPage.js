@@ -6,7 +6,12 @@ import { listarOptativas, listarCarrerasElegiblesOptativa, crearOptativa, actual
 import { obtenerRolActivo, usuarioTienePermiso } from '../../app/session.js';
 import { PERMISOS, ROLES } from '../../config/permissions.js';
 import { escapeHtml } from '../../utils/html.js';
+import { confirmarAccion } from '../../utils/confirm.js';
+import { mostrarAdvertencia, mostrarError } from '../../components/AlertModal.js';
 import { proponerCrearOptativa, proponerActualizarOptativa, proponerEstadoOptativa } from '../../services/solicitudes-cambio.service.js';
+import { CATEGORIAS_OPTATIVA, obtenerEtiquetaCategoria, filtrarOptativas } from './optativas.helpers.js';
+
+export { CATEGORIAS_OPTATIVA, obtenerEtiquetaCategoria, filtrarOptativas };
 
 let optativas = [];
 let carreras = [];
@@ -104,20 +109,17 @@ function renderizar() {
   const nodo = document.getElementById('optativasResultado');
   if (!nodo) return;
 
-  const termino = document.getElementById('buscarOptativa')?.value.trim().toLocaleLowerCase() || '';
+  const termino = document.getElementById('buscarOptativa')?.value || '';
   const tipo = document.getElementById('tipoOptativaFiltro')?.value || '';
   const estado = document.getElementById('estadoOptativaFiltro')?.value || '';
-  const visibles = optativas.filter((o) => {
-    const coincide = `${o.curso?.codigo ?? ''} ${o.curso?.nombre ?? ''}`.toLocaleLowerCase().includes(termino);
-    return coincide && (!tipo || o.tipo === tipo) && (!estado || Boolean(o.activo) === (estado === 'ACTIVA'));
-  });
+  const visibles = filtrarOptativas(optativas, { busqueda: termino, tipo, estado });
 
   const gestionar = puedeGestionar();
   const filas = visibles.map((o) => `
     <tr>
       <td><strong class="optativas-codigo">${escapeHtml(o.curso?.codigo ?? '—')}</strong></td>
       <td><strong>${escapeHtml(o.curso?.nombre ?? '—')}</strong></td>
-      <td>${escapeHtml(({ DISCIPLINARIA: 'Disciplinaria', ABIERTA: 'Abierta', SEDE: 'Sede' })[o.tipo] || o.tipo || '—')}</td>
+      <td>${escapeHtml(obtenerEtiquetaCategoria(o.tipo))}</td>
       <td>${escapeHtml(o.carreraOrigen?.nombre ?? 'Institucional')}</td>
       <td>${StatusBadge({ label: o.activo ? 'Activa' : 'Inactiva', tone: o.activo ? 'success' : 'neutral' })}</td>
       ${gestionar ? `
@@ -210,7 +212,17 @@ export function iniciarOptativasPage() {
     const estado = evento.target.closest('[data-estado-optativa]');
     if (estado) {
       const optativa = optativas.find((o) => o.id === Number(estado.dataset.estadoOptativa));
-      if (!optativa || !window.confirm(`${optativa.activo ? 'Desactivar' : 'Activar'} ${optativa.curso?.nombre}?`)) return;
+      if (!optativa) return;
+      const accion = optativa.activo ? 'Desactivar' : 'Activar';
+      const confirmado = typeof confirmarAccion === 'function'
+        ? await confirmarAccion({
+            titulo: `${accion} optativa`,
+            mensaje: `¿Desea ${accion.toLowerCase()} "${optativa.curso?.nombre || 'la optativa'}"?`,
+            textoConfirmar: accion,
+            peligro: optativa.activo,
+          })
+        : (typeof window !== 'undefined' && typeof window.confirm === 'function' ? window.confirm(`${accion} ${optativa.curso?.nombre}?`) : true);
+      if (!confirmado) return;
       try {
         const respuesta = await (esAsistente() ? proponerEstadoOptativa : cambiarEstadoOptativa)(optativa.id, !optativa.activo);
         if (!respuesta?.ok) throw new Error(respuesta?.message || 'No fue posible cambiar el estado.');
@@ -224,8 +236,14 @@ export function iniciarOptativasPage() {
     const id = Number(form.dataset.id) || null;
     const tipo = form.elements.tipo.value;
     const carreraOrigenId = Number(form.elements.carreraOrigenId.value) || null;
-    if (tipo === 'DISCIPLINARIA' && !carreraOrigenId) { window.alert('Seleccione la carrera de origen.'); return; }
-    if (obtenerRolActivo() !== ROLES.ADMIN_GLOBAL && tipo !== 'DISCIPLINARIA') { window.alert('Las optativas institucionales requieren el rol de administrador global.'); return; }
+    if (tipo === 'DISCIPLINARIA' && !carreraOrigenId) {
+      mostrarAdvertencia({ titulo: 'Dato requerido', mensaje: 'Seleccione la carrera de origen.' });
+      return;
+    }
+    if (obtenerRolActivo() !== ROLES.ADMIN_GLOBAL && tipo !== 'DISCIPLINARIA') {
+      mostrarAdvertencia({ titulo: 'Rol no autorizado', mensaje: 'Las optativas institucionales requieren el rol de administrador global.' });
+      return;
+    }
     const datos = id
       ? { tipo, carreraOrigenId, descripcion: form.elements.descripcion.value.trim() }
       : { codigo: form.elements.codigo.value.trim().toUpperCase(), nombre: form.elements.nombre.value.trim(), tipo, ...(carreraOrigenId ? { carreraOrigenId } : {}), descripcion: form.elements.descripcion.value.trim() };
@@ -236,7 +254,9 @@ export function iniciarOptativasPage() {
       if (!respuesta?.ok) throw new Error(respuesta?.message || 'No fue posible guardar la optativa.');
       document.getElementById('optativaDialog').close();
       await cargar(actual);
-    } catch (error) { window.alert(error.message); }
+    } catch (error) {
+      mostrarError({ titulo: 'Error al guardar', mensaje: error.message || 'No fue posible guardar la optativa.' });
+    }
   });
   if (puedeGestionar()) {
     listarCarrerasElegiblesOptativa().then((r) => {
