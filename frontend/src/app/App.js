@@ -4,69 +4,10 @@ import {
 } from '../pages/login/LoginPage.js';
 
 import {
-  HomePage,
-  iniciarHomePage
-} from '../pages/home/HomePage.js';
-
-import {
-  ModulesPage
-} from '../pages/modules/ModulesPage.js';
-
-import {
-  UsuariosPage,
-  iniciarUsuariosPage
-} from '../pages/usuarios/UsuariosPage.js';
-import { MisAsistentesPage, iniciarMisAsistentesPage } from '../pages/usuarios/MisAsistentesPage.js';
-
-import {
-  CarrerasPage,
-  iniciarCarrerasPage
-} from '../pages/carreras/CarrerasPage.js';
-
-import {
-  PlanesEstudioPage,
-  iniciarPlanesEstudioPage
-} from '../pages/planes-estudio/PlanesEstudioPage.js';
-
-import {
-  PerfilesAcademicosPage,
-  iniciarPerfilesAcademicosPage
-} from '../pages/perfiles-academicos/PerfilesAcademicosPage.js';
-
-import {
-  CursosPage,
-  iniciarCursosPage
-} from '../pages/cursos/CursosPage.js';
-import { OptativasPage, iniciarOptativasPage } from '../pages/optativas/OptativasPage.js';
-
-import {
-  PeriodosPage,
-  iniciarPeriodosPage
-} from '../pages/periodos/PeriodosPage.js';
-
-import {
-  ProfesoresPage,
-  iniciarProfesoresPage
-} from '../pages/profesores/ProfesoresPage.js';
-
-import {
-  AulasPage,
-  iniciarAulasPage
-} from '../pages/aulas/AulasPage.js';
-
-import {
-  FormulariosEstudiantesPage,
-  iniciarFormulariosEstudiantesPage
-} from '../pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
-
-import {
-  EstudiantesPage,
-  iniciarEstudiantesPage
-} from '../pages/estudiantes/EstudiantesPage.js';
-
-import {
   ModulePlaceholderPage
 } from '../pages/shared/ModulePlaceholderPage.js';
+
+import { obtenerCicloVidaPagina } from './page-lifecycle.js';
 
 import {
   montarAppLayout
@@ -221,56 +162,6 @@ function mostrarSinPermisos() {
   appRoot.innerHTML = pantallaSinPermisos();
 }
 
-
-/* =========================================================
-   PÁGINAS IMPLEMENTADAS
-   ========================================================= */
-
-const PAGE_RENDERERS = {
-
-  home:
-    HomePage,
-
-  dashboard:
-    ModulesPage,
-
-  usuarios:
-    UsuariosPage,
-
-  'mis-asistentes':
-    MisAsistentesPage,
-
-  carreras:
-    CarrerasPage,
-
-  'planes-estudio':
-    PlanesEstudioPage,
-
-  'perfiles-academicos':
-    PerfilesAcademicosPage,
-
-  cursos:
-    CursosPage,
-
-  optativas:
-    OptativasPage,
-
-  periodos:
-    PeriodosPage,
-
-  profesores:
-    ProfesoresPage,
-
-  aulas:
-    AulasPage,
-
-  'formularios-estudiantes':
-    FormulariosEstudiantesPage,
-
-  estudiantes:
-    EstudiantesPage
-
-};
 
 
 /* =========================================================
@@ -572,10 +463,7 @@ function renderizarRuta(
      BUSCAR RENDERER
      ======================================================= */
 
-  const renderer =
-    PAGE_RENDERERS[
-      module.id
-    ];
+  const page = obtenerCicloVidaPagina(module.id);
 
 
   console.log(
@@ -587,7 +475,7 @@ function renderizarRuta(
         module.id,
 
       renderer:
-        renderer?.name ||
+        page?.render?.name ||
         'placeholder'
     }
   );
@@ -597,10 +485,10 @@ function renderizarRuta(
      RENDER
      ======================================================= */
 
-  if (renderer) {
+  if (page) {
 
     contentArea.innerHTML =
-      renderer();
+      page.render();
 
   } else {
 
@@ -628,108 +516,7 @@ function renderizarRuta(
      INICIALIZADORES DE PÁGINAS
      ======================================================= */
 
-  if (module.id === 'home') {
-    iniciarHomePage();
-  }
-
-  if (
-    module.id === 'usuarios'
-  ) {
-
-    iniciarUsuariosPage();
-
-  }
-
-  if (module.id === 'mis-asistentes') {
-    iniciarMisAsistentesPage();
-  }
-
-
-  if (
-    module.id === 'carreras'
-  ) {
-
-    iniciarCarrerasPage();
-
-  }
-
-
-  if (
-    module.id ===
-    'planes-estudio'
-  ) {
-
-    iniciarPlanesEstudioPage();
-
-  }
-
-  if (
-    module.id ===
-    'perfiles-academicos'
-  ) {
-
-    iniciarPerfilesAcademicosPage();
-
-  }
-
-
-  if (
-    module.id === 'cursos'
-  ) {
-
-    iniciarCursosPage();
-
-  }
-
-  if (module.id === 'optativas') {
-    iniciarOptativasPage();
-  }
-
-
-  if (
-    module.id === 'periodos'
-  ) {
-
-    iniciarPeriodosPage();
-
-  }
-
-
-  if (
-    module.id === 'profesores'
-  ) {
-
-    iniciarProfesoresPage();
-
-  }
-
-
-  if (
-    module.id === 'aulas'
-  ) {
-
-    iniciarAulasPage();
-
-  }
-
-
-  if (
-    module.id ===
-    'formularios-estudiantes'
-  ) {
-
-    iniciarFormulariosEstudiantesPage();
-
-  }
-
-
-  if (
-    module.id === 'estudiantes'
-  ) {
-
-    iniciarEstudiantesPage();
-
-  }
+  page?.initialize?.();
 
 }
 
