@@ -4,16 +4,7 @@ import {
   conectarGoogleFormularios,
   desconectarGoogleFormularios,
   crearFormularioEstudiantes,
-  sincronizarFormularioEstudiantes,
-  cerrarFormularioEstudiantes,
-  listarRespuestasFormularioEstudiantes,
   abrirEnlaceFormularioEstudiantes,
-  publicarFormularioEstudiantes,
-  regenerarTokenFormularioEstudiantes,
-  obtenerUrlPublicaFormulario,
-  aceptarSolicitudFormulario,
-  rechazarSolicitudFormulario,
-  obtenerTicketVistaPreviaFormulario
 } from '../../services/formularios-estudiantes.service.js';
 
 import {
@@ -30,7 +21,6 @@ import {
 
 import {
   mostrarError,
-  mostrarAdvertencia,
   mostrarExito
 } from '../../components/AlertModal.js';
 
@@ -44,7 +34,6 @@ import {
 
 import {
   escapeHtml,
-  calcularLongitudTexto
 } from '../../utils/html.js';
 
 import {
@@ -98,7 +87,19 @@ import {
   construirDatosCrearFormulario,
   asignaturasElegiblesParaFormulario,
   agruparAsignaturasVistaPrevia,
+  extraerResultadoFormularioServicio,
+  normalizarEstadoGoogle,
+  obtenerPresentacionEstadoFormulario,
 } from './formularios-estudiantes.helpers.js';
+import { abrirDialogoRespuestasFormulario } from './FormularioRespuestasDialog.js';
+import {
+  copiarEnlaceFormulario,
+  abrirVistaPreviaFormulario,
+  sincronizarFormularioAction,
+  publicarFormularioAction,
+  regenerarTokenFormularioAction,
+  cerrarFormularioAction,
+} from './FormularioAcciones.js';
 
 export {
   LIMITES_FORMULARIO,
@@ -222,7 +223,10 @@ function renderizarEstadoGoogle() {
 
   if (!contenedor) return;
 
-  if (estadoGoogle.requiereReautenticacion) {
+  if (
+    estadoGoogle.requiereReautenticacion ||
+    estadoGoogle.estado === 'REQUIERE_REAUTENTICACION'
+  ) {
     contenedor.innerHTML = `
       <div class="formularios-google-status formularios-google-disconnected">
         <span class="formularios-google-dot" aria-hidden="true"></span>
@@ -390,28 +394,13 @@ function renderizarFilaFormulario(
   const operable =
     publicado || cerrado;
 
-  const tonosEstado = {
-    PUBLICADO: 'success',
-    CERRADO: 'neutral',
-    CREADO: 'info',
-    CREANDO: 'info',
-    ERROR: 'danger'
-  };
-
-  const estadoLabels = {
-    PUBLICADO: 'PUBLICADO',
-    CERRADO: 'CERRADO',
-    CREANDO: 'BORRADOR',
-    CREADO: 'BORRADOR',
-    ERROR: 'ERROR'
-  };
+  const presentacionEstado =
+    obtenerPresentacionEstadoFormulario(formulario.estado);
 
   const estadoBadge =
     StatusBadge({
-      label: estadoLabels[formulario.estado] || formulario.estado || 'Sin estado',
-      tone:
-        tonosEstado[formulario.estado] ||
-        'neutral'
+      label: presentacionEstado.label,
+      tone: presentacionEstado.tone
     });
 
   const badgeProveedor = `
@@ -740,740 +729,38 @@ async function manejarAccionFormulario(event) {
 
   switch (accion) {
     case 'copiar-enlace':
-      await copiarEnlaceFormulario(
-        formulario
-      );
+      await copiarEnlaceFormulario(formulario);
       break;
 
     case 'abrir-enlace':
       if (formulario.responderUri) {
-        await abrirEnlaceFormularioEstudiantes(
-          formulario.responderUri
-        );
+        await abrirEnlaceFormularioEstudiantes(formulario.responderUri);
       }
       break;
 
     case 'vista-previa':
-      if (formulario.id) {
-        try {
-          let previewUrl = null;
-          if (typeof obtenerTicketVistaPreviaFormulario === 'function') {
-            const ticketRes = await obtenerTicketVistaPreviaFormulario(formulario.id);
-            if (ticketRes?.data?.url) {
-              previewUrl = ticketRes.data.url;
-            } else if (ticketRes?.url) {
-              previewUrl = ticketRes.url;
-            }
-          }
-          if (!previewUrl && formulario.responderUri) {
-            previewUrl = formulario.responderUri.includes('?')
-              ? `${formulario.responderUri}&preview=true`
-              : `${formulario.responderUri}?preview=true`;
-          }
-          if (previewUrl) {
-            await abrirEnlaceFormularioEstudiantes(previewUrl);
-          }
-        } catch (err) {
-          console.error('Error al generar vista previa segura:', err);
-          if (formulario.responderUri) {
-            const fallbackUrl = formulario.responderUri.includes('?')
-              ? `${formulario.responderUri}&preview=true`
-              : `${formulario.responderUri}?preview=true`;
-            await abrirEnlaceFormularioEstudiantes(fallbackUrl);
-          }
-        }
-      }
+      await abrirVistaPreviaFormulario(formulario);
       break;
 
     case 'ver-respuestas':
-      await verRespuestasFormulario(
-        formulario
-      );
+      await abrirDialogoRespuestasFormulario(formulario);
       break;
 
     case 'publicar':
-      await publicarFormulario(
-        formulario,
-        button
-      );
+      await publicarFormularioAction(formulario, button, cargarFormularios);
       break;
 
     case 'regenerar-token':
-      await regenerarTokenFormulario(
-        formulario,
-        button
-      );
+      await regenerarTokenFormularioAction(formulario, button, cargarFormularios);
       break;
 
     case 'sincronizar':
-      await sincronizarFormulario(
-        formulario,
-        button
-      );
+      await sincronizarFormularioAction(formulario, button, cargarFormularios);
       break;
 
     case 'cerrar':
-      await cerrarFormulario(
-        formulario,
-        button
-      );
+      await cerrarFormularioAction(formulario, button, cargarFormularios);
       break;
-  }
-}
-
-async function copiarEnlaceFormulario(
-  formulario
-) {
-  if (!formulario.responderUri) {
-    mostrarError({
-      titulo:
-        'Enlace no disponible',
-      mensaje:
-        'Este formulario no posee un enlace de respuesta disponible.'
-    });
-
-    return;
-  }
-
-  try {
-    const enlaceResuelto =
-      await obtenerUrlPublicaFormulario(formulario.responderUri);
-
-    await navigator.clipboard.writeText(
-      enlaceResuelto || formulario.responderUri
-    );
-
-    mostrarExito({
-      titulo:
-        'Enlace copiado',
-      mensaje:
-        'El enlace del formulario fue copiado al portapapeles.'
-    });
-  } catch (error) {
-    mostrarError({
-      titulo:
-        'No fue posible copiar el enlace',
-      mensaje:
-        error?.message ||
-        'No se pudo acceder al portapapeles.'
-    });
-  }
-}
-
-async function verRespuestasFormulario(
-  formulario
-) {
-  const dialog =
-    document.getElementById(
-      'formularioEstudianteDialog'
-    );
-
-  const content =
-    document.getElementById(
-      'formularioEstudianteDialogContent'
-    );
-
-  if (!dialog || !content) {
-    return;
-  }
-
-  content.innerHTML =
-    FormDialog({
-      formId:
-        'respuestasFormularioEstudianteForm',
-
-      title:
-        'Respuestas del formulario',
-
-      description:
-        formulario.titulo,
-
-      body: `
-        <div
-          id="respuestasFormularioContent"
-        >
-          <div
-            class="sgpa-table-empty"
-            role="status"
-          >
-            <strong>
-              Cargando respuestas...
-            </strong>
-          </div>
-        </div>
-      `,
-
-      cancelButtonId:
-        'cerrarRespuestasFormularioButton',
-
-      cancelText:
-        'Cerrar',
-
-      showFooter:
-        true,
-
-      layout:
-        'custom'
-    });
-
-  renderizarIconos();
-  dialog.showModal();
-  habilitarCierreExterior(dialog);
-
-  document
-    .getElementById(
-      'cerrarRespuestasFormularioButton'
-    )
-    ?.addEventListener(
-      'click',
-      () => dialog.close()
-    );
-
-  try {
-    const res =
-      await listarRespuestasFormularioEstudiantes(
-        formulario.id
-      );
-
-    if (res && res.ok === false) {
-      throw new Error(
-        res.message || 'No fue posible cargar las respuestas.'
-      );
-    }
-
-    const data = res?.data ?? res;
-
-    const respuestas =
-      Array.isArray(data)
-        ? data
-        : [];
-
-    renderizarRespuestasFormulario(
-      respuestas,
-      formulario
-    );
-  } catch (error) {
-    dialog.close();
-
-    mostrarError({
-      titulo:
-        'No fue posible cargar las respuestas',
-      mensaje:
-        error?.message ||
-        'Ocurrió un error al consultar la bandeja de respuestas.'
-    });
-  }
-}
-
-function renderizarRespuestasFormulario(
-  respuestas,
-  formulario
-) {
-  const contenedor =
-    document.getElementById(
-      'respuestasFormularioContent'
-    );
-
-  if (!contenedor) {
-    return;
-  }
-
-  const rows =
-    respuestas
-      .map(
-        (r) => renderizarFilaRespuesta(r, formulario)
-      )
-      .join('');
-
-  contenedor.innerHTML =
-    DataTable({
-      columns: [
-        'Estudiante',
-        'Identificación',
-        'Correo',
-        'Aprobadas',
-        'Estado',
-        'Procesada',
-        'Detalle',
-        'Acciones'
-      ],
-
-      rows,
-
-      emptyMessage:
-        'Este formulario todavía no tiene respuestas registradas.',
-
-      ariaLabel:
-        'Respuestas del formulario'
-    });
-
-  renderizarIconos();
-
-  contenedor.querySelectorAll('.btn-accion-aprobar-resp').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const respuestaId = Number(btn.getAttribute('data-id'));
-      const nombreEstudiante = btn.getAttribute('data-estudiante') || 'el estudiante';
-
-      const confirmado = await confirmarAccion({
-        titulo: 'Aprobar respuesta',
-        mensaje: `¿Desea aprobar la solicitud de ${nombreEstudiante} e incorporar sus materias aprobadas al expediente?`,
-        textoConfirmar: 'Aprobar respuesta',
-        peligro: false
-      });
-
-      if (!confirmado) return;
-
-      const fila = btn.closest('tr');
-      if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = true));
-
-      try {
-        const resultado = await aceptarSolicitudFormulario(respuestaId);
-        if (resultado && resultado.ok === false) {
-          throw new Error(resultado.message || 'No fue posible aprobar la solicitud.');
-        }
-
-        mostrarExito({
-          titulo: 'Solicitud aprobada',
-          mensaje: 'La respuesta fue procesada correctamente y registrada en el historial académico.'
-        });
-
-        if (formulario?.id) {
-          const res = await listarRespuestasFormularioEstudiantes(formulario.id);
-          const data = res?.data ?? res;
-          renderizarRespuestasFormulario(Array.isArray(data) ? data : [], formulario);
-        }
-      } catch (error) {
-        mostrarError({
-          titulo: 'No fue posible aprobar la respuesta',
-          mensaje: error?.message || 'La respuesta requiere revisión antes de poder incorporarse.'
-        });
-        if (formulario?.id) {
-          const res = await listarRespuestasFormularioEstudiantes(formulario.id);
-          const data = res?.data ?? res;
-          renderizarRespuestasFormulario(Array.isArray(data) ? data : [], formulario);
-        } else if (fila) {
-          fila.querySelectorAll('button').forEach((b) => (b.disabled = false));
-        }
-      }
-    });
-  });
-
-  contenedor.querySelectorAll('.btn-accion-rechazar-resp').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const respuestaId = Number(btn.getAttribute('data-id'));
-      const nombreEstudiante = btn.getAttribute('data-estudiante') || 'el estudiante';
-
-      const motivo = window.prompt(`Ingrese el motivo del rechazo para la respuesta de ${nombreEstudiante} (obligatorio, máximo 500 caracteres):`);
-      if (motivo === null) return;
-      const motivoLimpio = motivo.trim();
-      if (!motivoLimpio) {
-        mostrarAdvertencia({
-          titulo: 'Motivo obligatorio',
-          mensaje: 'El motivo de rechazo es obligatorio y no puede consistir únicamente en espacios en blanco.'
-        });
-        return;
-      }
-      const longitudMotivo = calcularLongitudTexto(motivoLimpio);
-      if (longitudMotivo > 500) {
-        mostrarAdvertencia({
-          titulo: 'Límite de caracteres excedido',
-          mensaje: `El motivo de rechazo no puede superar los 500 caracteres (longitud ingresada: ${longitudMotivo}).`
-        });
-        return;
-      }
-
-      const fila = btn.closest('tr');
-      if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = true));
-
-      try {
-        const resultado = await rechazarSolicitudFormulario(respuestaId, motivoLimpio);
-        if (resultado && resultado.ok === false) {
-          throw new Error(resultado.message || 'No fue posible rechazar la solicitud.');
-        }
-
-        mostrarExito({
-          titulo: 'Solicitud rechazada',
-          mensaje: 'La respuesta fue rechazada.'
-        });
-
-        if (formulario?.id) {
-          const res = await listarRespuestasFormularioEstudiantes(formulario.id);
-          const data = res?.data ?? res;
-          renderizarRespuestasFormulario(Array.isArray(data) ? data : [], formulario);
-        }
-      } catch (error) {
-        mostrarError({
-          titulo: 'No fue posible rechazar la respuesta',
-          mensaje: error?.message || 'Ocurrió un error al rechazar la respuesta.'
-        });
-        if (fila) fila.querySelectorAll('button').forEach((b) => (b.disabled = false));
-      }
-    });
-  });
-}
-
-function renderizarFilaRespuesta(
-  respuesta,
-  formulario
-) {
-  const datos =
-    respuesta.datosNormalizadosJson;
-
-  const nombre =
-    datos
-      ? [
-          datos.primerNombre,
-          datos.segundoNombre,
-          datos.primerApellido,
-          datos.segundoApellido
-        ]
-          .filter(Boolean)
-          .join(' ')
-      : 'Sin normalizar';
-
-  const identificacion =
-    datos?.identificacion ??
-    '—';
-
-  const correo =
-    datos?.correoEstudiantil ??
-    '—';
-
-  const aprobadas =
-    Array.isArray(
-      datos?.asignaturasAprobadas
-    )
-      ? datos.asignaturasAprobadas.length
-      : 0;
-
-  const codigos = Array.isArray(datos?.asignaturasAprobadas)
-    ? datos.asignaturasAprobadas
-        .map((a) => {
-          const cod = a.codigo || (a.planAsignaturaId ? `ID #${a.planAsignaturaId}` : '');
-          return a.nombre ? `${cod} — ${a.nombre}` : cod;
-        })
-        .filter(Boolean)
-        .join(', ')
-    : '';
-
-  const aprobadasHtml = aprobadas > 0
-    ? `<span title="${escapeHtml(codigos)}" style="cursor:help;"><strong>${aprobadas}</strong> asignaturas<small style="display:block;color:var(--text-muted);font-size:0.75rem;">${escapeHtml(codigos)}</small></span>`
-    : `<span class="text-muted">0 asignaturas</span>`;
-
-  const esPendiente =
-    respuesta.estado === 'PENDIENTE' ||
-    respuesta.estado === 'REQUIERE_REVISION';
-
-  const accionesHtml = esPendiente
-    ? `
-      <div class="sgpa-table-actions" style="display:inline-flex;gap:4px;">
-        <button
-          type="button"
-          class="btn btn-sm btn-primary btn-accion-aprobar-resp"
-          data-id="${respuesta.id}"
-          data-estudiante="${escapeHtml(nombre)}"
-          title="Aprobar solicitud e incorporar materias"
-        >
-          <i data-lucide="check" aria-hidden="true"></i>
-          Aprobar
-        </button>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-danger btn-accion-rechazar-resp"
-          data-id="${respuesta.id}"
-          data-estudiante="${escapeHtml(nombre)}"
-          title="Rechazar solicitud con motivo"
-        >
-          <i data-lucide="x" aria-hidden="true"></i>
-          Rechazar
-        </button>
-      </div>
-    `
-    : `
-      <span class="text-muted">—</span>
-    `;
-
-  return `
-    <tr>
-      <td>
-        ${escapeHtml(nombre)}
-      </td>
-
-      <td>
-        ${escapeHtml(
-          identificacion
-        )}
-      </td>
-
-      <td>
-        ${escapeHtml(correo)}
-      </td>
-
-      <td>
-        ${aprobadasHtml}
-      </td>
-
-      <td>
-        ${escapeHtml(
-          respuesta.estado ||
-          '—'
-        )}
-      </td>
-
-      <td>
-        ${escapeHtml(
-          formatearFechaHora(
-            respuesta.procesadoAt || respuesta.revisadoAt
-          )
-        )}
-      </td>
-
-      <td>
-        ${escapeHtml(
-          respuesta.detalleError ||
-          datos?.optativasNoDisciplinarias ||
-          '—'
-        )}
-      </td>
-
-      <td>
-        ${accionesHtml}
-      </td>
-    </tr>
-  `;
-}
-
-function formatearFechaHora(
-  valor
-) {
-  if (!valor) {
-    return '—';
-  }
-
-  const fecha =
-    new Date(valor);
-
-  if (
-    Number.isNaN(
-      fecha.getTime()
-    )
-  ) {
-    return String(valor);
-  }
-
-  return new Intl.DateTimeFormat(
-    'es-CR',
-    {
-      dateStyle:
-        'medium',
-
-      timeStyle:
-        'short'
-    }
-  ).format(fecha);
-}
-
-async function sincronizarFormulario(
-  formulario,
-  button
-) {
-  button.disabled = true;
-
-  try {
-    const res =
-      await sincronizarFormularioEstudiantes(
-        formulario.id
-      );
-
-    if (res && res.ok === false) {
-      throw new Error(
-        res.message || 'No fue posible sincronizar las respuestas.'
-      );
-    }
-
-    const resultado = res?.data ?? res;
-
-    mostrarExito({
-      titulo:
-        'Respuestas sincronizadas',
-
-      mensaje:
-        `Google reportó ${resultado.recibidasGoogle ?? 0} respuestas. ` +
-        `${resultado.nuevas ?? 0} nuevas, ` +
-        `${resultado.ignoradasExistentes ?? 0} ya existentes, ` +
-        `${resultado.errores ?? 0} con error.`
-    });
-
-    await cargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo:
-        'No fue posible sincronizar',
-      mensaje:
-        error?.message ||
-        'Ocurrió un error al consultar Google Forms.'
-    });
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function publicarFormulario(
-  formulario,
-  button
-) {
-  const aceptado = await confirmarAccion({
-    titulo: 'Publicar formulario',
-    mensaje: `¿Desea publicar el formulario "${formulario.titulo}"? Quedará disponible inmediatamente para recibir respuestas de los estudiantes mediante su enlace público institucional.`,
-    textoConfirmar: 'Publicar formulario',
-    peligro: false
-  });
-
-  if (!aceptado) return;
-
-  button.disabled = true;
-
-  try {
-    const res = await publicarFormularioEstudiantes(formulario.id);
-    if (res && res.ok === false) {
-      throw new Error(res.message || 'No fue posible publicar el formulario.');
-    }
-
-    mostrarExito({
-      titulo: 'Formulario publicado',
-      mensaje: `El formulario "${formulario.titulo}" ahora está disponible públicamente.`
-    });
-
-    await cargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo: 'No fue posible publicar el formulario',
-      mensaje: error?.message || 'Ocurrió un error al publicar el formulario.'
-    });
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function regenerarTokenFormulario(
-  formulario,
-  button
-) {
-  const aceptado = await confirmarAccion({
-    titulo: 'Regenerar enlace público',
-    mensaje: `Al regenerar el enlace del formulario "${formulario.titulo}", el enlace anterior quedará INVALIDADO de inmediato y los estudiantes requerirán el nuevo enlace para responder. ¿Desea continuar?`,
-    textoConfirmar: 'Regenerar enlace',
-    peligro: true
-  });
-
-  if (!aceptado) return;
-
-  button.disabled = true;
-
-  try {
-    const res = await regenerarTokenFormularioEstudiantes(formulario.id);
-    if (res && res.ok === false) {
-      throw new Error(res.message || 'No fue posible regenerar el enlace público.');
-    }
-
-    mostrarExito({
-      titulo: 'Enlace regenerado',
-      mensaje: 'Se generó un nuevo enlace público. El enlace anterior ya no aceptará respuestas.'
-    });
-
-    await cargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo: 'No fue posible regenerar el enlace',
-      mensaje: error?.message || 'Ocurrió un error al regenerar el enlace público.'
-    });
-  } finally {
-    button.disabled = false;
-  }
-}
-
-async function cerrarFormulario(
-  formulario,
-  button
-) {
-  const esInterno = formulario.proveedor === 'INTERNO';
-  const aceptado =
-    await confirmarAccion({
-      titulo:
-        'Cerrar formulario',
-
-      mensaje: esInterno
-        ? `El formulario institucional "${formulario.titulo}" dejará de aceptar respuestas de estudiantes de inmediato. Las respuestas registradas se conservarán.`
-        : `El formulario "${formulario.titulo}" dejará de aceptar nuevas respuestas. Las respuestas existentes se conservarán.`,
-
-      textoConfirmar:
-        'Cerrar formulario',
-
-      peligro: true
-    });
-
-  if (!aceptado) {
-    return;
-  }
-
-  button.disabled = true;
-
-  try {
-    const res = await cerrarFormularioEstudiantes(
-      formulario.id
-    );
-
-    if (res && res.ok === false) {
-      throw new Error(
-        res.message || 'No fue posible cerrar el formulario.'
-      );
-    }
-
-    let sincronizacionFinal = null;
-    if (!esInterno) {
-      try {
-        const resultadoSync = await sincronizarFormularioEstudiantes(
-          formulario.id,
-        );
-        if (resultadoSync && resultadoSync.ok !== false) {
-          sincronizacionFinal = resultadoSync.data ?? resultadoSync;
-        }
-      } catch (error) {
-        console.error(
-          'El formulario se cerró, pero falló la sincronización final:',
-          error,
-        );
-      }
-    }
-
-    mostrarExito({
-      titulo: 'Formulario cerrado',
-      mensaje: esInterno
-        ? `El formulario institucional "${formulario.titulo}" fue cerrado y ya no acepta respuestas.`
-        : (sincronizacionFinal
-            ? (
-                'Google Forms dejó de aceptar nuevas respuestas. ' +
-                `La sincronización final detectó ${
-                  sincronizacionFinal.nuevas ?? 0
-                } respuesta(s) nueva(s).`
-              )
-            : (
-                'Google Forms dejó de aceptar nuevas respuestas. ' +
-                'La información existente permanece disponible.'
-              )),
-    });
-
-    await cargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo:
-        'No fue posible cerrar el formulario',
-      mensaje:
-        error?.message ||
-        'Ocurrió un error al cerrar el formulario.'
-    });
-  } finally {
-    button.disabled = false;
   }
 }
 
@@ -2270,80 +1557,33 @@ async function abrirNuevoFormulario() {
 }
 
 async function cargarFormularios() {
-  const resultado =
-    await listarFormulariosEstudiantes();
-
-  if (resultado && resultado.ok === false) {
-    throw new Error(
-      resultado.message ||
-      'No fue posible consultar los formularios.'
-    );
-  }
-
-  const data = resultado?.data ?? resultado;
-
-  formularios =
-    Array.isArray(data)
-      ? data
-      : [];
-
+  const resultado = await listarFormulariosEstudiantes();
+  const data = extraerResultadoFormularioServicio(
+    resultado,
+    'No fue posible consultar los formularios.',
+  );
+  formularios = Array.isArray(data) ? data : [];
   renderizarTabla();
 }
 
 function registrarActualizacionAlVolver() {
-  if (
-    observadorFocusRegistrado
-  ) {
+  if (observadorFocusRegistrado) {
     return;
   }
 
-  window.addEventListener(
-    'focus',
-    async () => {
-      const pagina =
-        document.getElementById(
-          'formulariosEstudiantesPage'
-        );
+  window.addEventListener('focus', async () => {
+    const pagina = document.getElementById('formulariosEstudiantesPage');
+    if (!pagina) return;
 
-      if (!pagina) return;
-
-      try {
-        const google =
-          await obtenerEstadoGoogleFormularios();
-
-        const googleData = google?.data ?? google;
-
-        estadoGoogle = {
-          conectado:
-            Boolean(
-              googleData?.conectado
-            ),
-
-          requiereReautenticacion:
-            Boolean(
-              googleData?.requiereReautenticacion ||
-              googleData?.estado === 'REQUIERE_REAUTENTICACION'
-            ),
-
-          estado:
-            googleData?.estado ??
-            'DESCONECTADO',
-
-          googleEmail:
-            googleData?.googleEmail ??
-            null
-        };
-
-        renderizarEstadoGoogle();
-        renderizarAcciones();
-      } catch (error) {
-        console.error(
-          'No se pudo actualizar el estado de Google:',
-          error
-        );
-      }
+    try {
+      const google = await obtenerEstadoGoogleFormularios();
+      estadoGoogle = normalizarEstadoGoogle(google);
+      renderizarEstadoGoogle();
+      renderizarAcciones();
+    } catch (error) {
+      console.error('No se pudo actualizar el estado de Google:', error);
     }
-  );
+  });
 
   observadorFocusRegistrado = true;
 }
@@ -2351,81 +1591,35 @@ function registrarActualizacionAlVolver() {
 export async function iniciarFormulariosEstudiantesPage() {
   renderizarCarga();
 
-  const contenido =
-    document.getElementById(
-      'formulariosEstudiantesContent'
-    );
+  const contenido = document.getElementById('formulariosEstudiantesContent');
 
-  contenido?.removeEventListener(
-    'click',
-    manejarAccionFormulario
-  );
-  contenido?.addEventListener(
-    'click',
-    manejarAccionFormulario
-  );
+  contenido?.removeEventListener('click', manejarAccionFormulario);
+  contenido?.addEventListener('click', manejarAccionFormulario);
 
   try {
-    const [
-      google,
-      resultadoFormularios
-    ] = await Promise.all([
+    const [google, resultadoFormularios] = await Promise.all([
       obtenerEstadoGoogleFormularios(),
-      listarFormulariosEstudiantes()
+      listarFormulariosEstudiantes(),
     ]);
 
-    const googleData = google?.data ?? google;
-
-    estadoGoogle = {
-      conectado:
-        Boolean(googleData?.conectado),
-
-      requiereReautenticacion:
-        Boolean(
-          googleData?.requiereReautenticacion ||
-          googleData?.estado === 'REQUIERE_REAUTENTICACION'
-        ),
-
-      estado:
-        googleData?.estado ??
-        'DESCONECTADO',
-
-      googleEmail:
-        googleData?.googleEmail ?? null
-    };
-
-    if (resultadoFormularios && resultadoFormularios.ok === false) {
-      throw new Error(
-        resultadoFormularios.message || 'No fue posible consultar los formularios.'
-      );
-    }
-
-    const data = resultadoFormularios?.data ?? resultadoFormularios;
-
-    formularios =
-      Array.isArray(data)
-        ? data
-        : [];
+    estadoGoogle = normalizarEstadoGoogle(google);
+    const data = extraerResultadoFormularioServicio(
+      resultadoFormularios,
+      'No fue posible consultar los formularios.',
+    );
+    formularios = Array.isArray(data) ? data : [];
 
     renderizarEstadoGoogle();
     renderizarAcciones();
     renderizarTabla();
     registrarActualizacionAlVolver();
   } catch (error) {
-    console.error(
-      'Error al cargar Formularios:',
-      error
-    );
-
+    console.error('Error al cargar Formularios:', error);
     formularios = [];
     renderizarTabla();
-
     mostrarError({
-      titulo:
-        'No fue posible cargar Formularios',
-      mensaje:
-        error?.message ||
-        'Ocurrió un error al cargar la información.'
+      titulo: 'No fue posible cargar Formularios',
+      mensaje: error?.message || 'Ocurrió un error al cargar la información.',
     });
   }
 }

@@ -1,6 +1,6 @@
 /**
- * SGPA — Funciones puras de validación, transformación y vista previa de Formularios de Estudiantes.
- * FRONTEND-REF-MASTER
+ * SGPA — Funciones puras de validación, transformación, estado y vista previa de Formularios de Estudiantes.
+ * FRONTEND-ORDER-003
  */
 
 export const LIMITES_FORMULARIO = Object.freeze({ titulo: 255, descripcion: 1000 });
@@ -82,4 +82,109 @@ export function agruparAsignaturasVistaPrevia(asignaturas = []) {
     estructura.set(nivel, ciclosNivel);
   });
   return estructura;
+}
+
+export function extraerResultadoFormularioServicio(res, mensajePorDefecto) {
+  if (res && res.ok === false) {
+    throw new Error(res.message || mensajePorDefecto);
+  }
+  return res?.data ?? res;
+}
+
+export function normalizarEstadoGoogle(google) {
+  const googleData = google?.data ?? google;
+  return {
+    conectado: Boolean(googleData?.conectado),
+    requiereReautenticacion: Boolean(
+      googleData?.requiereReautenticacion ||
+        googleData?.estado === 'REQUIERE_REAUTENTICACION',
+    ),
+    estado: googleData?.estado ?? 'DESCONECTADO',
+    googleEmail: googleData?.googleEmail ?? null,
+  };
+}
+
+const TONOS_ESTADO_FORMULARIO = Object.freeze({
+  PUBLICADO: 'success',
+  CERRADO: 'neutral',
+  CREADO: 'info',
+  CREANDO: 'info',
+  ERROR: 'danger',
+});
+
+const ETIQUETAS_ESTADO_FORMULARIO = Object.freeze({
+  PUBLICADO: 'PUBLICADO',
+  CERRADO: 'CERRADO',
+  CREANDO: 'BORRADOR',
+  CREADO: 'BORRADOR',
+  ERROR: 'ERROR',
+});
+
+export function obtenerPresentacionEstadoFormulario(estado) {
+  return {
+    label: ETIQUETAS_ESTADO_FORMULARIO[estado] || estado || 'Sin estado',
+    tone: TONOS_ESTADO_FORMULARIO[estado] || 'neutral',
+  };
+}
+
+export function formatearFechaHoraFormulario(valor) {
+  if (!valor) {
+    return '—';
+  }
+
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) {
+    return String(valor);
+  }
+
+  return new Intl.DateTimeFormat('es-CR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(fecha);
+}
+
+export function obtenerResumenRespuestaEstudiante(respuesta = {}) {
+  const datos = respuesta.datosNormalizadosJson;
+  const nombre = datos
+    ? [
+        datos.primerNombre,
+        datos.segundoNombre,
+        datos.primerApellido,
+        datos.segundoApellido,
+      ]
+        .filter(Boolean)
+        .join(' ')
+    : 'Sin normalizar';
+
+  const listaAprobadas = Array.isArray(datos?.asignaturasAprobadas)
+    ? datos.asignaturasAprobadas
+    : [];
+  const codigos = listaAprobadas
+    .map((a) => {
+      const cod = a.codigo || (a.planAsignaturaId ? `ID #${a.planAsignaturaId}` : '');
+      return a.nombre ? `${cod} — ${a.nombre}` : cod;
+    })
+    .filter(Boolean)
+    .join(', ');
+
+  return {
+    nombre,
+    identificacion: datos?.identificacion ?? '—',
+    correo: datos?.correoEstudiantil ?? '—',
+    aprobadas: listaAprobadas.length,
+    codigos,
+    esPendiente:
+      respuesta.estado === 'PENDIENTE' ||
+      respuesta.estado === 'REQUIERE_REVISION',
+    fechaProcesado: formatearFechaHoraFormulario(
+      respuesta.procesadoAt || respuesta.revisadoAt,
+    ),
+    detalle:
+      respuesta.detalleError || datos?.optativasNoDisciplinarias || '—',
+  };
+}
+
+export function resolverUrlVistaPreviaFormulario(formulario, ticketRes) {
+  const ticketUrl = ticketRes?.data?.url || ticketRes?.url || null;
+  return ticketUrl;
 }
