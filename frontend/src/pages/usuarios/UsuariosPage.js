@@ -31,6 +31,19 @@ import { DataTable } from '../../components/DataTable.js';
 import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
 import { StatCard } from '../../components/StatCard.js';
 import { StatusBadge } from '../../components/StatusBadge.js';
+import {
+  nombreVisibleRol,
+  obtenerEstadoSeleccionPermisosCarrera,
+  establecerSeleccionPermisosCarrera,
+  filtrarListaUsuarios,
+} from './usuarios.helpers.js';
+
+export {
+  nombreVisibleRol,
+  obtenerEstadoSeleccionPermisosCarrera,
+  establecerSeleccionPermisosCarrera,
+  filtrarListaUsuarios,
+};
 
 let instanciaActual = 0;
 
@@ -134,15 +147,6 @@ function obtenerRoles(usuario) {
         : rol
     ))
     .filter((rol) => rol?.nombre);
-}
-
-export function nombreVisibleRol(nombre) {
-  return {
-    ADMIN_GLOBAL: 'Administrador global',
-    COORDINADOR: 'Coordinador',
-    PROFESOR: 'Profesor',
-    ASISTENTE_ESTUDIANTIL: 'Asistente estudiantil',
-  }[nombre] || nombre;
 }
 
 function mensajeResultado(resultado, mensajePredeterminado) {
@@ -322,40 +326,6 @@ function obtenerCodigosPermisos(
       )
       .filter(Boolean),
   );
-}
-
-export function obtenerEstadoSeleccionPermisosCarrera(
-  permisos,
-) {
-  const editables = Array.from(
-    permisos || [],
-  ).filter(
-    (permiso) => !permiso.disabled,
-  );
-  const seleccionados = editables.filter(
-    (permiso) => permiso.checked,
-  ).length;
-
-  return {
-    checked:
-      editables.length > 0 &&
-      seleccionados === editables.length,
-    indeterminate:
-      seleccionados > 0 &&
-      seleccionados < editables.length,
-    disabled: editables.length === 0,
-  };
-}
-
-export function establecerSeleccionPermisosCarrera(
-  permisos,
-  seleccionado,
-) {
-  Array.from(permisos || [])
-    .filter((permiso) => !permiso.disabled)
-    .forEach((permiso) => {
-      permiso.checked = Boolean(seleccionado);
-    });
 }
 
 export async function iniciarUsuariosPage() {
