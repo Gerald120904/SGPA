@@ -1,6 +1,6 @@
 /**
- * SGPA — Constantes y funciones auxiliares del módulo Perfiles Académicos.
- * FRONTEND-REF-MASTER
+ * SGPA — Constantes, clasificación y funciones auxiliares puras del módulo Perfiles Académicos.
+ * FRONTEND-ORDER-003
  */
 
 export const TIPOS_REQUISITO_PERFIL = [
@@ -76,4 +76,41 @@ export function encontrarDuplicadoEnLineas(elementos = []) {
     vistos.add(clave);
   }
   return null;
+}
+
+export function clasificarAreasPerfil(areas = []) {
+  const lista = Array.isArray(areas) ? areas : [];
+  return {
+    disciplinares: lista.filter((area) => area.tipo === 'DISCIPLINAR'),
+    estrategicas: lista.filter((area) => area.tipo === 'ESTRATEGICA'),
+  };
+}
+
+export function clasificarRequisitosPerfil(requisitos = []) {
+  const lista = Array.isArray(requisitos) ? requisitos : [];
+  return {
+    obligatorios: lista.filter((item) => item.obligatorio && !CONDICIONES_PERFIL.has(item.tipo)),
+    facultativos: lista.filter((item) => !item.obligatorio && !CONDICIONES_PERFIL.has(item.tipo)),
+    condiciones: lista.filter((item) => CONDICIONES_PERFIL.has(item.tipo)),
+  };
+}
+
+export function obtenerCursosCarreraOrdenados(catalogo = [], carreraId) {
+  return (Array.isArray(catalogo) ? catalogo : [])
+    .filter(
+      (curso) =>
+        curso.activo !== false &&
+        (curso.carreras ?? []).some((carrera) => carrera.id === carreraId),
+    )
+    .sort((a, b) => String(a.codigo).localeCompare(String(b.codigo)));
+}
+
+export function filtrarCursosPerfilPorBusqueda(cursosCarrera = [], busqueda = '') {
+  const query = String(busqueda || '').trim().toLowerCase();
+  if (!query) return cursosCarrera;
+  return cursosCarrera.filter((curso) =>
+    [curso.codigo, curso.nombre]
+      .filter(Boolean)
+      .some((valor) => String(valor).toLowerCase().includes(query)),
+  );
 }
