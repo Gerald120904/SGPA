@@ -1,6 +1,6 @@
 /**
- * SGPA — Funciones auxiliares y constantes puras del módulo Períodos Académicos.
- * FRONTEND-REF-MASTER
+ * SGPA — Funciones auxiliares, reglas institucionales de calendario y constantes puras de Períodos Académicos.
+ * FRONTEND-ORDER-003
  */
 
 export const ESTADOS_PERIODO = {
@@ -83,4 +83,73 @@ export function filtrarPeriodosAcademicos(periodos = [], busqueda = '', estado =
 
     return coincideBusqueda && coincideEstado;
   });
+}
+
+export function calcularFechaMaximaDisponibilidad(fechaInicio) {
+  const partes = String(fechaInicio || '').split('-').map(Number);
+  if (partes.length !== 3 || partes.some(Number.isNaN)) {
+    return null;
+  }
+  const [anio, mes, dia] = partes;
+  const diaAnterior = new Date(anio, mes - 1, dia - 1);
+  return [
+    diaAnterior.getFullYear(),
+    String(diaAnterior.getMonth() + 1).padStart(2, '0'),
+    String(diaAnterior.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+export function validarYConstruirDatosPeriodo({
+  anio,
+  ciclo,
+  fechaInicio = '',
+  fechaFin = '',
+  fechaLimiteDisponibilidad = '',
+  observaciones = '',
+  motivo = '',
+  editando = false,
+  estructuraBloqueada = false,
+  excepcional = false,
+} = {}) {
+  if (!estructuraBloqueada) {
+    if (fechaFin <= fechaInicio) {
+      return {
+        ok: false,
+        error: 'La fecha de finalización debe ser posterior a la fecha de inicio.',
+      };
+    }
+
+    if (fechaLimiteDisponibilidad >= fechaInicio) {
+      return {
+        ok: false,
+        error:
+          'La fecha límite de disponibilidad debe ser anterior al inicio del periodo.',
+      };
+    }
+  }
+
+  const datos =
+    editando && estructuraBloqueada
+      ? { observaciones }
+      : {
+          anio,
+          ciclo,
+          fechaInicio,
+          fechaFin,
+          fechaLimiteDisponibilidad,
+          observaciones,
+        };
+
+  if (excepcional) {
+    const motivoLimpio = String(motivo || '').trim();
+    if (motivoLimpio.length < 10) {
+      return {
+        ok: false,
+        error: 'Indique un motivo institucional de al menos 10 caracteres.',
+      };
+    }
+    datos.motivo = motivoLimpio;
+  }
+
+  return { ok: true, datos };
 }

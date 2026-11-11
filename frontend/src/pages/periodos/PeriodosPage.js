@@ -1,8 +1,4 @@
 import {
-  actualizarPeriodoAcademico,
-  cambiarEstadoPeriodoAcademico,
-  crearPeriodoAcademico,
-  corregirPeriodoCerrado,
   listarPeriodosAcademicos,
 } from "../../services/periodos.service.js";
 
@@ -18,16 +14,6 @@ import {
   FormDialog,
   habilitarCierreExterior,
 } from "../../components/FormDialog.js";
-
-import {
-  mostrarError,
-  mostrarExito,
-  mostrarAdvertencia,
-} from "../../components/AlertModal.js";
-
-import {
-  confirmarAccion,
-} from "../../utils/confirm.js";
 
 import {
   escapeHtml,
@@ -55,7 +41,13 @@ import {
   formatearFechaPeriodo as formatearFecha,
   esPeriodoEditable as periodoEditable,
   filtrarPeriodosAcademicos,
+  calcularFechaMaximaDisponibilidad,
+  validarYConstruirDatosPeriodo,
 } from "./periodos.helpers.js";
+import {
+  ejecutarGuardadoPeriodo,
+  ejecutarCambioEstadoPeriodo,
+} from "./PeriodoAcciones.js";
 
 export {
   ESTADOS,
@@ -873,15 +865,8 @@ function abrirFormulario(
   const inputFechaInicio = document.getElementById("periodoFechaInicio");
   const inputFechaLimite = document.getElementById("periodoFechaLimite");
   const actualizarLimiteDisponibilidad = () => {
-    const partes = inputFechaInicio?.value?.split("-").map(Number);
-    if (partes?.length === 3 && !partes.some(Number.isNaN)) {
-      const [anio, mes, dia] = partes;
-      const diaAnterior = new Date(anio, mes - 1, dia - 1);
-      const fechaMaxima = [
-        diaAnterior.getFullYear(),
-        String(diaAnterior.getMonth() + 1).padStart(2, "0"),
-        String(diaAnterior.getDate()).padStart(2, "0"),
-      ].join("-");
+    const fechaMaxima = calcularFechaMaximaDisponibilidad(inputFechaInicio?.value);
+    if (fechaMaxima) {
       inputFechaLimite.max = fechaMaxima;
     } else {
       inputFechaLimite?.removeAttribute("max");
@@ -892,351 +877,69 @@ function abrirFormulario(
     inputFechaInicio.addEventListener("change", actualizarLimiteDisponibilidad);
   }
 
-  const cerrar =
-    () => dialog.close();
-
+  const cerrar = () => dialog.close();
 
   document
-    .getElementById(
-      "cancelarPeriodoButton",
-    )
-    ?.addEventListener(
-      "click",
-      cerrar,
-    );
-
+    .getElementById("cancelarPeriodoButton")
+    ?.addEventListener("click", cerrar);
 
   document
-    .getElementById(
-      "periodoForm",
-    )
-    ?.addEventListener(
-      "submit",
-      async (event) => {
+    .getElementById("periodoForm")
+    ?.addEventListener("submit", async (event) => {
+      event.preventDefault();
 
-        event.preventDefault();
+      const errorBox = document.getElementById("periodoFormError");
+      const guardarButton = document.getElementById("guardarPeriodoButton");
+      const mostrarErrorFormulario = (mensaje) => {
+        if (!errorBox) return;
+        errorBox.textContent = mensaje;
+        errorBox.classList.remove("hidden");
+      };
 
+      errorBox?.classList.add("hidden");
 
-        const anio =
-          Number(
-            document
-              .getElementById(
-                "periodoAnio",
-              )
-              ?.value,
-          );
+      const validacion = validarYConstruirDatosPeriodo({
+        anio: Number(document.getElementById("periodoAnio")?.value),
+        ciclo: Number(document.getElementById("periodoCiclo")?.value),
+        fechaInicio: document.getElementById("periodoFechaInicio")?.value || "",
+        fechaFin: document.getElementById("periodoFechaFin")?.value || "",
+        fechaLimiteDisponibilidad:
+          document.getElementById("periodoFechaLimite")?.value || "",
+        observaciones:
+          document.getElementById("periodoObservaciones")?.value?.trim() || "",
+        motivo: document.getElementById("periodoMotivoExcepcional")?.value || "",
+        editando,
+        estructuraBloqueada,
+        excepcional,
+      });
 
+      if (!validacion.ok) {
+        mostrarErrorFormulario(validacion.error);
+        return;
+      }
 
-        const ciclo =
-          Number(
-            document
-              .getElementById(
-                "periodoCiclo",
-              )
-              ?.value,
-          );
-
-
-        const fechaInicio =
-          document
-            .getElementById(
-              "periodoFechaInicio",
-            )
-            ?.value || "";
-
-
-        const fechaFin =
-          document
-            .getElementById(
-              "periodoFechaFin",
-            )
-            ?.value || "";
-
-
-        const fechaLimiteDisponibilidad =
-          document
-            .getElementById(
-              "periodoFechaLimite",
-            )
-            ?.value || "";
-
-
-        const observaciones =
-          document
-            .getElementById(
-              "periodoObservaciones",
-            )
-            ?.value
-            ?.trim() || "";
-
-
-        const errorBox =
-          document.getElementById(
-            "periodoFormError",
-          );
-
-
-        const guardarButton =
-          document.getElementById(
-            "guardarPeriodoButton",
-          );
-
-
-        const mostrarErrorFormulario =
-          (mensaje) => {
-
-            if (!errorBox) {
-              return;
-            }
-
-            errorBox.textContent =
-              mensaje;
-
-            errorBox.classList.remove(
-              "hidden",
-            );
-
-          };
-
-
-        errorBox?.classList.add(
-          "hidden",
-        );
-
-
-        if (!estructuraBloqueada) {
-          if (
-            fechaFin <=
-            fechaInicio
-          ) {
-
-            mostrarErrorFormulario(
-              "La fecha de finalización debe ser posterior a la fecha de inicio.",
-            );
-
-            return;
-          }
-
-
-          if (
-            fechaLimiteDisponibilidad >=
-            fechaInicio
-          ) {
-
-            mostrarErrorFormulario(
-              "La fecha límite de disponibilidad debe ser anterior al inicio del periodo.",
-            );
-
-            return;
-          }
-        }
-
-
-        const datos =
-          editando &&
-          estructuraBloqueada
-            ? {
-                observaciones,
-              }
-            : {
-                anio,
-                ciclo,
-                fechaInicio,
-                fechaFin,
-                fechaLimiteDisponibilidad,
-                observaciones,
-              };
-
-        if (excepcional) {
-          const motivo = document.getElementById("periodoMotivoExcepcional")?.value?.trim() || "";
-          if (motivo.length < 10) {
-            mostrarErrorFormulario("Indique un motivo institucional de al menos 10 caracteres.");
-            return;
-          }
-          datos.motivo = motivo;
-        }
-
-
-        if (guardarButton) {
-          guardarButton.disabled =
-            true;
-        }
-
-
-        try {
-
-          const resultado =
-            excepcional
-              ? await corregirPeriodoCerrado(periodo.id, datos)
-              : editando
-              ? await actualizarPeriodoAcademico(
-                  periodo.id,
-                  datos,
-                )
-              : await crearPeriodoAcademico(
-                  datos,
-                );
-
-
-          if (!resultado?.ok) {
-            throw new Error(
-              resultado?.message ||
-                "No fue posible guardar el periodo.",
-            );
-          }
-
-
-          cerrar();
-
-
-          mostrarExito({
-
-            titulo:
-              editando
-                ? "Periodo actualizado"
-                : "Periodo creado",
-
-            mensaje:
-              editando
-                ? "El periodo académico fue actualizado correctamente."
-                : "El nuevo periodo académico fue creado en estado borrador.",
-
-          });
-
-
-          await cargarPeriodos(
-            instanciaActual,
-          );
-
-        } catch (error) {
-
-          mostrarError({
-
-            titulo:
-              editando
-                ? "No se pudo actualizar el periodo"
-                : "No se pudo crear el periodo",
-
-            mensaje:
-              error?.message ||
-              "No fue posible guardar el periodo académico.",
-
-          });
-
-        } finally {
-
-          if (guardarButton) {
-            guardarButton.disabled =
-              false;
-          }
-
-        }
-
-      },
-    );
+      await ejecutarGuardadoPeriodo({
+        periodo,
+        editando,
+        excepcional,
+        datos: validacion.datos,
+        guardarButton,
+        cerrarDialogo: cerrar,
+        recargarPeriodos: () => cargarPeriodos(instanciaActual),
+      });
+    });
 }
-
 
 /* =========================================================
    CAMBIAR ESTADO
    ========================================================= */
 
-async function cambiarEstado(
-  periodo,
-  nuevoEstado,
-) {
-  const transicion =
-    (
-      TRANSICIONES[
-        periodo.estado
-      ] || []
-    ).find(
-      (item) =>
-        item.estado ===
-        nuevoEstado,
-    );
-
-
-  if (!transicion) {
-    return;
-  }
-
-
-  const confirmado =
-    await confirmarAccion({
-
-      titulo:
-        transicion.titulo,
-
-      mensaje:
-        `¿Desea cambiar "${periodo.nombre}" de ${obtenerNombreEstado(
-          periodo.estado,
-        )} a ${obtenerNombreEstado(
-          nuevoEstado,
-        )}?`,
-
-      textoConfirmar:
-        transicion.texto,
-
-      peligro:
-        transicion.peligro,
-
-    });
-
-
-  if (!confirmado) {
-    return;
-  }
-
-
-  try {
-
-    const resultado =
-      await cambiarEstadoPeriodoAcademico(
-        periodo.id,
-        nuevoEstado,
-      );
-
-
-    if (!resultado?.ok) {
-      throw new Error(
-        resultado?.message ||
-          "No fue posible cambiar el estado del periodo.",
-      );
-    }
-
-
-    mostrarExito({
-
-      titulo:
-        "Estado actualizado",
-
-      mensaje:
-        `El periodo quedó en estado "${obtenerNombreEstado(
-          nuevoEstado,
-        )}".`,
-
-    });
-
-
-    await cargarPeriodos(
-      instanciaActual,
-    );
-
-  } catch (error) {
-
-    mostrarError({
-
-      titulo:
-        "No se pudo cambiar el estado",
-
-      mensaje:
-        error?.message ||
-        "No fue posible actualizar el periodo académico.",
-
-    });
-
-  }
+async function cambiarEstado(periodo, nuevoEstado) {
+  await ejecutarCambioEstadoPeriodo({
+    periodo,
+    nuevoEstado,
+    recargarPeriodos: () => cargarPeriodos(instanciaActual),
+  });
 }
 
 
@@ -1348,24 +1051,10 @@ export function iniciarPeriodosPage() {
           button.dataset.action ===
           "estado"
         ) {
-          // Botón visualmente inhabilitado, pero accesible al clic para explicar el motivo.
-          // Nunca se envía al backend una transición declarada no disponible.
-          const informacion = Array.isArray(periodo.transicionesEstado)
-            ? periodo.transicionesEstado.find((item) => item.estado === button.dataset.estado)
-            : null;
-          if (informacion?.disponible === false) {
-            mostrarAdvertencia({
-              titulo: "Acción no disponible",
-              mensaje: informacion.motivo || "Esta transición no está disponible para el periodo seleccionado.",
-            });
-            return;
-          }
-
           await cambiarEstado(
             periodo,
             button.dataset.estado,
           );
-
         }
 
       },

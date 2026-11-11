@@ -9,7 +9,10 @@ import {
   formatearFechaPeriodo,
   esPeriodoEditable,
   filtrarPeriodosAcademicos,
+  calcularFechaMaximaDisponibilidad,
+  validarYConstruirDatosPeriodo,
 } from '../src/pages/periodos/periodos.helpers.js';
+import { ejecutarCambioEstadoPeriodo } from '../src/pages/periodos/PeriodoAcciones.js';
 
 test('periodos.helpers — mapeo de nombres de estados', () => {
   assert.equal(obtenerNombreEstadoPeriodo('BORRADOR'), 'Borrador');
@@ -73,4 +76,119 @@ test('periodos.helpers — transiciones de estado oficiales', () => {
   assert.deepEqual(TRANSICIONES_PERIODO.EN_CURSO.map((t) => t.estado), ['CERRADO']);
   assert.deepEqual(TRANSICIONES_PERIODO.CERRADO, []);
   assert.deepEqual(TRANSICIONES_PERIODO.CANCELADO, []);
+});
+
+test('periodos.helpers — validación de calendario, estructura bloqueada y corrección de período cerrado', () => {
+  assert.equal(calcularFechaMaximaDisponibilidad('2026-03-01'), '2026-02-28');
+  assert.equal(calcularFechaMaximaDisponibilidad(''), null);
+
+  const fechaInvalida = validarYConstruirDatosPeriodo({
+    anio: 2026,
+    ciclo: 1,
+    fechaInicio: '2026-03-10',
+    fechaFin: '2026-03-05',
+    fechaLimiteDisponibilidad: '2026-03-01',
+  });
+  assert.equal(fechaInvalida.ok, false);
+  assert.match(fechaInvalida.error, /posterior a la fecha de inicio/);
+
+  const limiteTardio = validarYConstruirDatosPeriodo({
+    anio: 2026,
+    ciclo: 1,
+    fechaInicio: '2026-03-10',
+    fechaFin: '2026-06-20',
+    fechaLimiteDisponibilidad: '2026-03-10',
+  });
+  assert.equal(limiteTardio.ok, false);
+  assert.match(limiteTardio.error, /anterior al inicio/);
+
+  const bloqueado = validarYConstruirDatosPeriodo({
+    observaciones: 'Solo texto',
+    editando: true,
+    estructuraBloqueada: true,
+  });
+  assert.deepEqual(bloqueado, { ok: true, datos: { observaciones: 'Solo texto' } });
+
+  const motivoCorto = validarYConstruirDatosPeriodo({
+    anio: 2026,
+    ciclo: 1,
+    fechaInicio: '2026-03-10',
+    fechaFin: '2026-06-20',
+    fechaLimiteDisponibilidad: '2026-03-01',
+    excepcional: true,
+    motivo: 'corto',
+  });
+  assert.equal(motivoCorto.ok, false);
+  assert.match(motivoCorto.error, /al menos 10 caracteres/);
+
+  const excepcionalValido = validarYConstruirDatosPeriodo({
+    anio: 2026,
+    ciclo: 1,
+    fechaInicio: '2026-03-10',
+    fechaFin: '2026-06-20',
+    fechaLimiteDisponibilidad: '2026-03-01',
+    observaciones: 'Corrección aprobada',
+    excepcional: true,
+    motivo: 'Ajuste oficial aprobado por dirección',
+  });
+  assert.equal(excepcionalValido.ok, true);
+  assert.equal(excepcionalValido.datos.motivo, 'Ajuste oficial aprobado por dirección');
+});
+
+test('PeriodoAcciones — impide transiciones no disponibles declaradas por el backend', async () => {
+  const alertEl = {
+    id: 'sgpaAlertDialog',
+    open: false,
+    classList: { add: () => {}, remove: () => {} },
+    addEventListener: () => {},
+    querySelector: () => null,
+    getBoundingClientRect: () => ({ left: 0, right: 100, top: 0, bottom: 100 }),
+    showModal() {
+      this.open = true;
+    },
+    close() {
+      this.open = false;
+    },
+  };
+  let htmlAlerta = '';
+  Object.defineProperty(alertEl, 'innerHTML', {
+    get: () => htmlAlerta,
+    set: (v) => {
+      htmlAlerta = v;
+    },
+  });
+
+  globalThis.document = {
+    body: { appendChild: () => {} },
+    getElementById: (id) => (id === 'sgpaAlertDialog' ? alertEl : null),
+    createElement: () => alertEl,
+    querySelectorAll: () => [],
+  };
+  let llamadoServicio = false;
+  globalThis.window = {
+    setTimeout,
+    clearTimeout,
+    sgpa: {
+      cambiarEstadoPeriodoAcademico: async () => {
+        llamadoServicio = true;
+        return { ok: true };
+      },
+    },
+  };
+
+  await ejecutarCambioEstadoPeriodo({
+    periodo: {
+      id: 4,
+      nombre: 'I Ciclo 2026',
+      estado: 'BORRADOR',
+      transicionesEstado: [
+        { estado: 'EN_PREPARACION', disponible: false, motivo: 'Falta definir fechas' },
+      ],
+    },
+    nuevoEstado: 'EN_PREPARACION',
+    recargarPeriodos: async () => {},
+  });
+
+  assert.equal(llamadoServicio, false);
+  assert.match(htmlAlerta, /Falta definir fechas/);
 });
