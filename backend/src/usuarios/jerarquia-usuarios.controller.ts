@@ -129,6 +129,12 @@ export class JerarquiaUsuariosController {
     return this.jerarquia.vincularAsistente(request.user!.sub, id, dto.carreras);
   }
 
+  @Post('asistentes/:id/invitacion/procesar')
+  @Roles(RolSistema.COORDINADOR)
+  procesarInvitacionPendiente(@Req() request: Request, @Param('id', ParseIntPipe) id: number) {
+    return this.jerarquia.procesarInvitacionPendiente(request.user!.sub, id);
+  }
+
   @Post('asistentes')
   @Roles(RolSistema.COORDINADOR)
   crearAsistente(@Req() request: Request, @Body() dto: CrearAsistenteJerarquicoDto) {

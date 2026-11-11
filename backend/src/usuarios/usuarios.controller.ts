@@ -87,8 +87,8 @@ export class UsuariosController {
   }
 
   @Post(':id/invitacion/reintentar')
-  reintentarInvitacion(@Param('id', ParseIntPipe) id: number) {
-    return this.usuariosService.reintentarInvitacion(id);
+  reintentarInvitacion(@Param('id', ParseIntPipe) id: number, @Req() request: Request) {
+    return this.usuariosService.reintentarInvitacion(id, request.user!.sub);
   }
 
   @Delete(':id/roles/:rolId')

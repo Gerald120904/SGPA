@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
@@ -124,13 +124,47 @@ describe('JerarquiaUsuariosService', () => {
   });
 
   it('rechaza que un coordinador edite al asistente de otro', async () => {
-    const alcance = { ...scope, puedeAdministrarAsistente: jest.fn().mockResolvedValue(false) };
+    const alcance = { ...scope, tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR') };
+    const dependencias = { findOne: jest.fn().mockResolvedValue(null) };
     service = new JerarquiaUsuariosService(
       { transaction: tx } as any, usuarios as any, {} as any, {} as any,
-      {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, dependencias as any, {} as any,
       alcance as any, {} as any,
     );
     await expect(service.obtenerAsistente(3, 4)).rejects.toThrow(ForbiddenException);
+    expect(dependencias.findOne).toHaveBeenCalledWith({ where: { coordinadorId: 3, asistenteId: 4, activo: true } });
+  });
+
+  it('permite editar una cuenta inactiva del propietario si tiene una invitacion pendiente vigente', async () => {
+    const usuariosRepo = { findOne: jest.fn(async ({ where }) => where.id === 2
+      ? cuenta(2, RolSistema.COORDINADOR)
+      : { ...cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL, false), passwordResetTokenHash: 'hash', passwordResetExpiresAt: new Date(Date.now() + 60_000) }) };
+    const dependencias = { findOne: jest.fn().mockResolvedValue({ coordinadorId: 2, asistenteId: 4, activo: true }) };
+    const alcance = { ...scope, tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR') };
+    const usuariosSvc = { invitacionPendienteVigente: jest.fn().mockResolvedValue(true) };
+    service = new JerarquiaUsuariosService(
+      { transaction: tx } as any, usuariosRepo as any, {} as any, {} as any,
+      {} as any, { find: jest.fn().mockResolvedValue([]) } as any,
+      { find: jest.fn().mockResolvedValue([]) } as any, dependencias as any, {} as any,
+      alcance as any, usuariosSvc as any,
+    );
+    await expect(service.obtenerAsistente(2, 4)).resolves.toEqual({ usuarioId: 4, carreras: [] });
+    expect(usuariosSvc.invitacionPendienteVigente).toHaveBeenCalledWith(4);
+  });
+
+  it('bloquea la edicion de cuentas inactivas sin invitacion vigente', async () => {
+    const usuariosRepo = { findOne: jest.fn(async ({ where }) => where.id === 2
+      ? cuenta(2, RolSistema.COORDINADOR)
+      : cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL, false)) };
+    const dependencias = { findOne: jest.fn().mockResolvedValue({ coordinadorId: 2, asistenteId: 4, activo: true }) };
+    const alcance = { ...scope, tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR') };
+    const usuariosSvc = { invitacionPendienteVigente: jest.fn().mockResolvedValue(false) };
+    service = new JerarquiaUsuariosService(
+      { transaction: tx } as any, usuariosRepo as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, dependencias as any, {} as any,
+      alcance as any, usuariosSvc as any,
+    );
+    await expect(service.obtenerAsistente(2, 4)).rejects.toThrow(ConflictException);
   });
 
   it('revoca la ultima carrera y permiso del coordinador sin dejar acceso activo', async () => {

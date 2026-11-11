@@ -3,6 +3,7 @@ import { ROLES } from '../../config/permissions.js';
 import {
   listarMisAlcancesJerarquia, listarMisAsistentes, obtenerAsistenteJerarquia,
   crearAsistenteJerarquia, configurarAsistenteJerarquia,
+  procesarInvitacionAsistenteJerarquia,
   obtenerConfiguracionAsistentesJerarquia,
 } from '../../services/jerarquia.service.js';
 import {
@@ -199,6 +200,7 @@ export async function iniciarMisAsistentesPage() {
     alcances: [],
     asistentes: [],
     solicitudes: [],
+    procesandoInvitaciones: new Set(),
     configuracion: { envioInvitacionHabilitado: false },
   };
   const crearAsistenteButton = pagina.querySelector('#crearAsistenteButton');
@@ -207,6 +209,22 @@ export async function iniciarMisAsistentesPage() {
   function mensaje(texto, error = false) {
     feedback.textContent = texto;
     feedback.className = `usuarios-feedback ${error ? 'is-error' : ''}`;
+  }
+
+  function insigniaInvitacion(asistente) {
+    const estadoInvitacion = asistente.invitacion?.estado || 'SIN_INVITACION';
+    const presentaciones = {
+      PENDIENTE: ['Invitación pendiente', 'warning'],
+      EN_PROCESO: ['Procesando invitación', 'info'],
+      ENVIADA: ['Invitación enviada', 'success'],
+      FALLIDA: ['Envío fallido', 'danger'],
+      INCIERTA: ['Resultado incierto', 'warning'],
+      CADUCADA: ['Invitación vencida', 'neutral'],
+      ACEPTADA: ['Invitación aceptada', 'success'],
+      SIN_INVITACION: ['Sin invitación', 'neutral'],
+    };
+    const [label, tone] = presentaciones[estadoInvitacion] || ['Estado desconocido', 'neutral'];
+    return StatusBadge({ label, tone });
   }
 
   async function cargar() {
@@ -265,10 +283,13 @@ export async function iniciarMisAsistentesPage() {
             </header>
             ${estado.asistentes.length ? `<ul class="mis-asistentes-lista">${estado.asistentes.map((a) => `<li class="mis-asistentes-persona">
               <span class="mis-asistentes-avatar" aria-hidden="true">${escapeHtml((a.nombres || 'A').trim().charAt(0).toLocaleUpperCase('es-CR'))}</span>
-              <span class="mis-asistentes-persona-detalle"><strong>${escapeHtml(`${a.nombres} ${a.apellido1}`)}</strong><span>${escapeHtml(a.correo)}</span></span>
+              <span class="mis-asistentes-persona-detalle"><strong>${escapeHtml(`${a.nombres} ${a.apellido1}`)}</strong><span>${escapeHtml(a.correo)}</span>${insigniaInvitacion(a)}${!a.activo ? '<span>Cuenta inactiva hasta aceptar la invitación.</span>' : ''}</span>
               <button type="button" data-action="editar-asistente" data-id="${a.id}" class="mis-asistentes-btn mis-asistentes-btn-secondary">
                 <i data-lucide="pencil" aria-hidden="true"></i><span>Editar delegación</span>
               </button>
+              ${a.invitacion?.puedeProcesar ? `<button type="button" data-action="procesar-invitacion" data-id="${a.id}" class="mis-asistentes-btn mis-asistentes-btn-secondary" ${estado.procesandoInvitaciones.has(Number(a.id)) ? 'disabled' : ''}>
+                <i data-lucide="mail" aria-hidden="true"></i><span>${estado.procesandoInvitaciones.has(Number(a.id)) ? 'Procesando\u2026' : 'Enviar invitaci\u00f3n'}</span>
+              </button>` : ''}
             </li>`).join('')}</ul>` : '<p class="mis-asistentes-empty">No hay asistentes asignados.</p>'}
           </section>`}
         <section class="mis-asistentes-panel" aria-label="Solicitudes de cambio">
@@ -480,6 +501,32 @@ export async function iniciarMisAsistentesPage() {
         const datos = verificar(await obtenerAsistenteJerarquia(Number(boton.dataset.id)), 'No se pudo cargar la delegación.');
         abrirFormulario(Number(boton.dataset.id), datos.carreras);
       } catch (error) { mensaje(error.message, true); }
+      return;
+    }
+    if (accion === 'procesar-invitacion') {
+      const id = Number(boton.dataset.id);
+      if (estado.procesandoInvitaciones.has(id)) return;
+      estado.procesandoInvitaciones.add(id);
+      boton.disabled = true;
+      boton.querySelector('span').textContent = 'Procesando\u2026';
+      try {
+        const resultado = verificar(await procesarInvitacionAsistenteJerarquia(id), 'No se pudo procesar la invitaci\u00f3n.');
+        const mensajes = {
+          ENVIADA: ['La invitaci\u00f3n fue enviada.', false],
+          FALLIDA: ['El servidor SMTP rechaz\u00f3 el destinatario. Revis\u00e1 el correo y solicit\u00e1 una renovaci\u00f3n autorizada.', true],
+          INCIERTA: ['No se pudo confirmar el env\u00edo. No se reintentar\u00e1 autom\u00e1ticamente.', true],
+          CADUCADA: ['La invitaci\u00f3n caduc\u00f3. Se requiere una renovaci\u00f3n autorizada.', true],
+          LIMITE_ALCANZADO: ['Se alcanz\u00f3 el l\u00edmite de intentos; se requiere revisi\u00f3n administrativa.', true],
+          EN_PROCESO: ['La invitaci\u00f3n ya est\u00e1 en procesamiento.', false],
+          PENDIENTE: ['La invitaci\u00f3n contin\u00faa pendiente.', false],
+        };
+        const [texto, esError] = mensajes[resultado.estado] || ['No se pudo confirmar el estado de la invitaci\u00f3n.', true];
+        mensaje(texto, esError);
+      } catch (error) { mensaje(error.message, true); }
+      finally {
+        estado.procesandoInvitaciones.delete(id);
+        await cargar();
+      }
       return;
     }
     if (accion === 'aprobar') {

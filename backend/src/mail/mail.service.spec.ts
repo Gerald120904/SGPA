@@ -1,25 +1,37 @@
+﻿import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
 import { MailService } from './mail.service';
 
-describe('MailService rechazo de formulario', () => {
-  const detalles = { solicitudId: 7, tituloFormulario: 'Ingreso', motivoRechazo: 'Falta atestado' };
-  const crear = (sendMail: jest.Mock) => {
-    const mail = new MailService({ get: (key: string) => key === 'MAIL_FROM' ? 'sgpa@una.ac.cr' : undefined } as never);
-    (mail as any).transporter = { sendMail };
-    return mail;
-  };
+jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
 
-  it('confirma la entrega solo si SMTP aceptó al destinatario original', async () => {
-    const sendMail = jest.fn().mockResolvedValue({ accepted: ['alumna@una.ac.cr'], rejected: [] });
-    await expect(crear(sendMail).enviarNotificacionRechazoSolicitud(
-      'alumna@una.ac.cr', 'Alumna', detalles)).resolves.toBeUndefined();
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({
-      to: 'alumna@una.ac.cr', text: expect.stringContaining('Falta atestado'),
-    }));
+describe('MailService invitaciones', () => {
+  const enviar = jest.fn();
+  let service: MailService;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail: enviar });
+    service = new MailService({ get: (key: string) => ({
+      SMTP_HOST: 'smtp.test.invalid', SMTP_PORT: '587', SMTP_SECURE: 'false',
+      SMTP_USER: 'test-user', SMTP_PASSWORD: 'test-password', MAIL_FROM: 'sgpa@example.invalid',
+    }[key]) } as unknown as ConfigService);
   });
 
-  it('rechaza una respuesta SMTP que no aceptó al destinatario', async () => {
-    const mail = crear(jest.fn().mockResolvedValue({ accepted: [], rejected: ['alumna@una.ac.cr'] }));
-    await expect(mail.enviarNotificacionRechazoSolicitud(
-      'alumna@una.ac.cr', 'Alumna', detalles)).rejects.toMatchObject({ responseCode: 550 });
+  it('acepta una respuesta SMTP que confirma el destinatario', async () => {
+    enviar.mockResolvedValue({ accepted: ['persona@example.invalid'] });
+    await expect(service.enviarInvitacion('persona@example.invalid', 'Persona', 'https://example.invalid/#token'))
+      .resolves.toBeUndefined();
+    expect(enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('clasifica el rechazo SMTP del destinatario como definitivo', async () => {
+    enviar.mockResolvedValue({ accepted: [], rejected: ['persona@example.invalid'] });
+    await expect(service.enviarInvitacion('persona@example.invalid', 'Persona', 'https://example.invalid/#token'))
+      .rejects.toMatchObject({ definitive: true, code: 'SMTP_DESTINATARIO_RECHAZADO' });
+  });
+
+  it('preserva como incierto un error de transporte sin respuesta SMTP', async () => {
+    enviar.mockRejectedValue(Object.assign(new Error('transporte interrumpido'), { code: 'ECONNRESET' }));
+    await expect(service.enviarInvitacion('persona@example.invalid', 'Persona', 'https://example.invalid/#token'))
+      .rejects.toMatchObject({ code: 'ECONNRESET' });
   });
 });

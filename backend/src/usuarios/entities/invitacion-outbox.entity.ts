@@ -11,7 +11,7 @@ import {
 import { Usuario } from './usuario.entity';
 
 export type EstadoInvitacion =
-  'PENDIENTE' | 'EN_PROCESO' | 'ENVIADA' | 'INCIERTA' | 'ACEPTADA' | 'CADUCADA';
+  'PENDIENTE' | 'EN_PROCESO' | 'ENVIADA' | 'INCIERTA' | 'FALLIDA' | 'ACEPTADA' | 'CADUCADA';
 
 @Entity({ name: 'invitacion_outbox' })
 @Index('UQ_c908f31ae39be47c676a4d3ec91', ['usuarioId'], { unique: true })

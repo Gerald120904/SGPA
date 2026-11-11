@@ -546,6 +546,11 @@ ipcMain.handle('jerarquia:configurar-asistente', async (_event, id, carreras) =>
     method: 'PUT', body: { carreras },
   }));
 
+ipcMain.handle('jerarquia:procesar-invitacion-asistente', async (_event, id) =>
+  ejecutarPeticionAutenticada(`/jerarquia-usuarios/asistentes/${id}/invitacion/procesar`, {
+    method: 'POST',
+  }));
+
 ipcMain.handle('jerarquia:auditoria', async (_event, id) =>
   ejecutarPeticionAutenticada(`/jerarquia-usuarios/auditoria/${id}`));
 
