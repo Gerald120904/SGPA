@@ -28,21 +28,23 @@ import { confirmarAccion } from '../../utils/confirm.js';
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 
-const TIPOS_REQUISITO = [
-  'FORMACION_ACADEMICA',
-  'IDIOMA_INSTRUMENTAL',
-  'EXPERIENCIA_DOCENTE',
-  'GRADO_COMPLEMENTARIO',
-  'IDIOMA_GLOBAL',
-  'EXPERIENCIA_PROFESIONAL',
-  'CAPACITACIONES',
-  'OTROS',
-  'JORNADA',
-  'HORARIO',
-  'CAMPUS',
-];
+import {
+  TIPOS_REQUISITO_PERFIL as TIPOS_REQUISITO,
+  CONDICIONES_PERFIL as CONDICIONES,
+  filtrarPerfilesAcademicos,
+  formatearEtiquetaTipo,
+  formatearFechaPerfil,
+  extraerLineasTexto,
+  encontrarDuplicadoEnLineas,
+} from './perfiles-academicos.helpers.js';
 
-const CONDICIONES = new Set(['JORNADA', 'HORARIO', 'CAMPUS']);
+export {
+  TIPOS_REQUISITO,
+  CONDICIONES,
+  filtrarPerfilesAcademicos,
+  formatearEtiquetaTipo,
+  formatearFechaPerfil,
+};
 
 let perfiles = [];
 let carreras = [];
@@ -181,18 +183,7 @@ function perfilesFiltrados() {
   const texto = document.getElementById('perfilesBuscar')?.value?.trim().toLowerCase() || '';
   const estado = document.getElementById('perfilesEstado')?.value || 'TODOS';
 
-  return perfiles.filter((perfil) => {
-    const coincideTexto = !texto || [
-      perfil.codigo,
-      perfil.nombre,
-      perfil.numeroPerfil,
-      perfil.carrera?.nombre,
-    ].filter(Boolean).some((valor) => String(valor).toLowerCase().includes(texto));
-    const coincideEstado = estado === 'TODOS' ||
-      (estado === 'ACTIVOS' && perfil.activo) ||
-      (estado === 'INACTIVOS' && !perfil.activo);
-    return coincideTexto && coincideEstado;
-  });
+  return filtrarPerfilesAcademicos(perfiles, texto, estado);
 }
 
 function renderizarListado() {
@@ -1547,38 +1538,27 @@ function campo(etiqueta, id, valor, placeholder = '', tipo = 'text') {
 }
 
 function lineas(id) {
-  return (document.getElementById(id)?.value || '').split('\n').map((linea) => linea.trim()).filter(Boolean);
+  return extraerLineasTexto(document.getElementById(id)?.value);
 }
 
 function validarLineasUnicas(elementos, nombre) {
-  const vistos = new Set();
-
-  for (const elemento of elementos) {
-    const clave = elemento.trim().toLocaleLowerCase('es');
-
-    if (vistos.has(clave)) {
-      mostrarError({
-        titulo: `${nombre} duplicada`,
-        mensaje: `La entrada "${elemento}" está repetida.`,
-      });
-      return false;
-    }
-
-    vistos.add(clave);
+  const duplicado = encontrarDuplicadoEnLineas(elementos);
+  if (duplicado) {
+    mostrarError({
+      titulo: `${nombre} duplicada`,
+      mensaje: `La entrada "${duplicado}" está repetida.`,
+    });
+    return false;
   }
-
   return true;
 }
 
 function etiquetaTipo(valor) {
-  if (!valor) return 'No registrado';
-  return String(valor).toLowerCase().split('_').map((parte) => parte.charAt(0).toUpperCase() + parte.slice(1)).join(' ');
+  return formatearEtiquetaTipo(valor);
 }
 
 function formatearFecha(fecha) {
-  if (!fecha) return null;
-  const [anio, mes, dia] = String(fecha).slice(0, 10).split('-');
-  return anio && mes && dia ? `${dia}/${mes}/${anio}` : fecha;
+  return formatearFechaPerfil(fecha);
 }
 
 function mostrarFallo(mensaje) {

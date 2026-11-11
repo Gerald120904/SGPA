@@ -46,124 +46,29 @@ import {
   renderizarIconos,
 } from "../../utils/icons.js";
 
+import {
+  ESTADOS_PERIODO as ESTADOS,
+  TRANSICIONES_PERIODO as TRANSICIONES,
+  obtenerTonoEstadoPeriodo as obtenerTonoEstado,
+  obtenerNombreEstadoPeriodo as obtenerNombreEstado,
+  obtenerNombreCicloPeriodo as obtenerNombreCiclo,
+  formatearFechaPeriodo as formatearFecha,
+  esPeriodoEditable as periodoEditable,
+  filtrarPeriodosAcademicos,
+} from "./periodos.helpers.js";
+
+export {
+  ESTADOS,
+  TRANSICIONES,
+  obtenerTonoEstado,
+  obtenerNombreEstado,
+  obtenerNombreCiclo,
+  formatearFecha,
+  periodoEditable,
+};
 
 let periodos = [];
 let instanciaActual = 0;
-
-
-const ESTADOS = {
-  BORRADOR: "Borrador",
-
-  EN_PREPARACION:
-    "En preparación",
-
-  EN_CURSO:
-    "En curso",
-
-  CERRADO:
-    "Cerrado",
-
-  CANCELADO:
-    "Cancelado",
-};
-
-
-function obtenerTonoEstado(
-  estado,
-) {
-  const tonos = {
-    BORRADOR: "neutral",
-    EN_PREPARACION: "info",
-    EN_CURSO: "success",
-    CERRADO: "neutral",
-    CANCELADO: "danger",
-  };
-
-  return tonos[estado] || "neutral";
-}
-
-
-const TRANSICIONES = {
-  BORRADOR: [
-    {
-      estado:
-        "EN_PREPARACION",
-
-      texto:
-        "Preparar",
-
-      titulo:
-        "Pasar periodo a preparación",
-
-      peligro:
-        false,
-    },
-
-    {
-      estado:
-        "CANCELADO",
-
-      texto:
-        "Cancelar",
-
-      titulo:
-        "Cancelar periodo",
-
-      peligro:
-        true,
-    },
-  ],
-
-  EN_PREPARACION: [
-    {
-      estado:
-        "EN_CURSO",
-
-      texto:
-        "Iniciar",
-
-      titulo:
-        "Iniciar periodo académico",
-
-      peligro:
-        false,
-    },
-
-    {
-      estado:
-        "CANCELADO",
-
-      texto:
-        "Cancelar",
-
-      titulo:
-        "Cancelar periodo",
-
-      peligro:
-        true,
-    },
-  ],
-
-  EN_CURSO: [
-    {
-      estado:
-        "CERRADO",
-
-      texto:
-        "Cerrar",
-
-      titulo:
-        "Cerrar periodo académico",
-
-      peligro:
-        true,
-    },
-  ],
-
-  CERRADO: [],
-
-  CANCELADO: [],
-};
 
 
 function puedeGestionarPeriodos() {
@@ -312,130 +217,16 @@ export function PeriodosPage() {
 
 
 /* =========================================================
-   FORMATOS
-   ========================================================= */
-
-function obtenerNombreEstado(
-  estado,
-) {
-  return (
-    ESTADOS[estado] ||
-    estado ||
-    "Sin estado"
-  );
-}
-
-
-function obtenerNombreCiclo(
-  ciclo,
-) {
-  const ciclos = {
-    1: "I Ciclo",
-    2: "II Ciclo",
-    3: "Verano",
-  };
-
-  return (
-    ciclos[ciclo] ||
-    `Ciclo ${ciclo}`
-  );
-}
-
-
-function formatearFecha(
-  fecha,
-) {
-  if (!fecha) {
-    return "—";
-  }
-
-  const partes =
-    String(fecha).split("-");
-
-  if (partes.length !== 3) {
-    return fecha;
-  }
-
-  const [
-    anio,
-    mes,
-    dia,
-  ] = partes;
-
-  return `${dia}/${mes}/${anio}`;
-}
-
-
-function periodoEditable(
-  periodo,
-) {
-  return [
-    "BORRADOR",
-    "EN_PREPARACION",
-  ].includes(
-    periodo.estado,
-  );
-}
-
-
-/* =========================================================
    FILTROS
    ========================================================= */
 
 function obtenerPeriodosFiltrados() {
   const busqueda =
-    document
-      .getElementById(
-        "periodosBuscar",
-      )
-      ?.value
-      ?.trim()
-      .toLowerCase() || "";
-
+    document.getElementById("periodosBuscar")?.value?.trim() || "";
   const estado =
-    document
-      .getElementById(
-        "periodosEstado",
-      )
-      ?.value || "";
+    document.getElementById("periodosEstado")?.value || "";
 
-
-  return periodos.filter(
-    (periodo) => {
-
-      const coincideBusqueda =
-        !busqueda ||
-        [
-          periodo.codigo,
-          periodo.nombre,
-          periodo.anio,
-          periodo.ciclo,
-        ]
-          .filter(
-            (valor) =>
-              valor !== undefined &&
-              valor !== null,
-          )
-          .some(
-            (valor) =>
-              String(valor)
-                .toLowerCase()
-                .includes(busqueda),
-          );
-
-
-      const coincideEstado =
-        !estado ||
-        periodo.estado === estado;
-
-
-      return (
-        coincideBusqueda &&
-        coincideEstado
-      );
-
-    },
-  );
+  return filtrarPeriodosAcademicos(periodos, busqueda, estado);
 }
 
 

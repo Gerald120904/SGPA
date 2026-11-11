@@ -16,6 +16,9 @@ import { confirmarAccion } from '../../utils/confirm.js';
 import { DataTable } from '../../components/DataTable.js';
 import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
 import { mostrarExito, mostrarError } from '../../components/AlertModal.js';
+import { filtrarCarreras } from './carreras.helpers.js';
+
+export { filtrarCarreras };
 
 let carreras = [];
 let instanciaActual = 0;
@@ -138,27 +141,7 @@ function obtenerCarrerasFiltradas() {
     '';
   const estado = document.getElementById('carrerasEstado')?.value || 'TODAS';
 
-  return carreras.filter((carrera) => {
-    const coincideBusqueda =
-      !busqueda ||
-      [carrera.codigo, carrera.nombre, carrera.descripcion]
-        .filter(Boolean)
-        .some((valor) =>
-          String(valor).toLowerCase().includes(busqueda),
-        );
-
-    let coincideEstado = true;
-
-    if (estado === 'ACTIVAS') {
-      coincideEstado = carrera.activo === true;
-    }
-
-    if (estado === 'INACTIVAS') {
-      coincideEstado = carrera.activo === false;
-    }
-
-    return coincideBusqueda && coincideEstado;
-  });
+  return filtrarCarreras(carreras, busqueda, estado);
 }
 
 function renderizarCarreras() {
