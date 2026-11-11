@@ -7,6 +7,7 @@ import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
+import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
 
 function leerConfigProyecto() {
   const posiblesRutas = [
@@ -71,7 +72,7 @@ const consultarBackend = async (route, options) => {
 
 
 
-let accessToken = null;
+const estadoSesion = crearEstadoSesionAutenticada();
 
 const HOSTS_OAUTH_GOOGLE_PERMITIDOS = new Set(["accounts.google.com"]);
 
@@ -113,7 +114,8 @@ function resolverUrlPublicaFormulario(responderUri) {
 }
 
 async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
-  if (!accessToken) {
+  const contextoSesion = opciones.contextoSesion || estadoSesion.capturarSesion();
+  if (!contextoSesion || !estadoSesion.sigueVigente(contextoSesion)) {
     return {
       ok: false,
       status: 401,
@@ -121,7 +123,7 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
     };
   }
 
-  const tokenUsado = accessToken;
+  const tokenUsado = contextoSesion.token;
   const { method = "GET", body } = opciones;
   const headers = {
     Authorization: `Bearer ${tokenUsado}`,
@@ -151,8 +153,7 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
 
     if (!response.ok) {
       if (response.status === 401) {
-        if (accessToken === tokenUsado) {
-          accessToken = null;
+        if (invalidarSesionPor401(estadoSesion, contextoSesion, response.status)) {
           BrowserWindow.getAllWindows().forEach((ventana) =>
             ventana.webContents.send('auth:invalidada'));
         }
@@ -174,7 +175,7 @@ async function ejecutarPeticionAutenticada(ruta, opciones = {}) {
       data,
     };
   } catch (error) {
-    console.error(`Error solicitando ${method} ${ruta}:`, error);
+    console.error(`Error solicitando ${method} ${ruta}.`);
 
     return {
       ok: false,
@@ -198,6 +199,7 @@ if (started) {
 
 
 ipcMain.handle("auth:login", async (_event, credenciales) => {
+  const contextoLogin = estadoSesion.iniciarLogin();
   try {
     const response = await consultarBackend('/auth/login', {
       method: "POST",
@@ -212,6 +214,10 @@ ipcMain.handle("auth:login", async (_event, credenciales) => {
 
     const data = await response.json();
 
+    if (!estadoSesion.loginSigueVigente(contextoLogin)) {
+      return { ok: false, status: 409, message: 'La sesión cambió durante el inicio de sesión. Vuelva a intentarlo.' };
+    }
+
     if (!response.ok) {
       return {
         ok: false,
@@ -220,14 +226,19 @@ ipcMain.handle("auth:login", async (_event, credenciales) => {
       };
     }
 
-    accessToken = data.accessToken;
+    if (!estadoSesion.confirmarLogin(contextoLogin, data.accessToken)) {
+      return { ok: false, status: 409, message: 'La sesión cambió durante el inicio de sesión. Vuelva a intentarlo.' };
+    }
 
     return {
       ok: true,
       usuario: data.usuario,
     };
   } catch (error) {
-    console.error("Error al conectar con el backend:", error);
+    if (!estadoSesion.loginSigueVigente(contextoLogin)) {
+      return { ok: false, status: 409, message: 'La sesión cambió durante el inicio de sesión. Vuelva a intentarlo.' };
+    }
+    console.error("Error al conectar con el backend durante el inicio de sesión.");
     return {
       ok: false,
       status: 0,
@@ -236,44 +247,7 @@ ipcMain.handle("auth:login", async (_event, credenciales) => {
   }
 });
 
-ipcMain.handle("auth:cambiar-rol-activo", async (_event, nuevoRol) => {
-  try {
-    const resultado = await ejecutarPeticionAutenticada("/auth/cambiar-rol-activo", {
-      method: "POST",
-      body: { rol: nuevoRol },
-    });
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    if (resultado.data?.accessToken) {
-      accessToken = resultado.data.accessToken;
-    }
-
-    return {
-      ok: true,
-      usuario: resultado.data?.usuario,
-      accessToken: resultado.data?.accessToken,
-    };
-  } catch (error) {
-    console.error("Error al cambiar rol activo en backend:", error);
-    return {
-      ok: false,
-      status: 0,
-      message: "No se pudo cambiar el rol activo.",
-    };
-  }
-});
-
-ipcMain.handle('auth:cambiar-carrera-activa', async (_event, carreraId) => {
-  const resultado = await ejecutarPeticionAutenticada('/auth/cambiar-carrera-activa', {
-    method: 'POST', body: { carreraId },
-  });
-  if (!resultado.ok) return resultado;
-  accessToken = resultado.data.accessToken;
-  return { ok: true, usuario: resultado.data.usuario };
-});
+registrarCambiosContextoAutenticado(ipcMain, estadoSesion, ejecutarPeticionAutenticada);
 
 ipcMain.handle("app:verificar-identidad", async () => {
   try {
@@ -295,7 +269,7 @@ ipcMain.handle("app:verificar-identidad", async () => {
 
 ipcMain.handle('app:backend-config', () => ({ url: apiUrl }));
 ipcMain.handle('app:configurar-backend', async (_event, value) => {
-  if (accessToken) return { ok: false, message: 'Cierre la sesión antes de cambiar el servidor.' };
+  if (estadoSesion.obtenerToken()) return { ok: false, message: 'Cierre la sesión antes de cambiar el servidor.' };
   try {
     const candidate = normalizarUrlBackend(value);
     const identidad = await verificarIdentidadBackend(
@@ -390,7 +364,8 @@ ipcMain.handle("auth:restablecer-password", async (_event, datos) => {
 });
 
 ipcMain.handle("auth:perfil", async () => {
-  if (!accessToken) {
+  const contextoSesion = estadoSesion.capturarSesion();
+  if (!contextoSesion) {
     return {
       ok: false,
       message: "No existe una sesión activa.",
@@ -398,7 +373,7 @@ ipcMain.handle("auth:perfil", async () => {
   }
 
   try {
-    const tokenUsado = accessToken;
+    const tokenUsado = contextoSesion.token;
     const response = await consultarBackend('/auth/perfil', {
       method: "GET",
       headers: {
@@ -409,8 +384,7 @@ ipcMain.handle("auth:perfil", async () => {
     const data = await response.json();
 
     if (!response.ok) {
-      if (response.status === 401 && accessToken === tokenUsado) {
-        accessToken = null;
+      if (invalidarSesionPor401(estadoSesion, contextoSesion, response.status)) {
         BrowserWindow.getAllWindows().forEach((ventana) =>
           ventana.webContents.send('auth:invalidada'));
       }
@@ -426,7 +400,7 @@ ipcMain.handle("auth:perfil", async () => {
       usuario: data,
     };
   } catch (error) {
-    console.error(error);
+    console.error("Error al consultar el perfil de sesión.");
     return {
       ok: false,
       message: "No se pudo conectar con el servidor.",
@@ -435,7 +409,7 @@ ipcMain.handle("auth:perfil", async () => {
 });
 
 ipcMain.handle("auth:logout", () => {
-  accessToken = null;
+  estadoSesion.cerrarSesion();
   return {
     ok: true,
   };
