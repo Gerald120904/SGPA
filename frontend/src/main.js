@@ -7,6 +7,7 @@ import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 import { registrarAulasConsultasIpc } from "./electron/ipc/aulas.ipc.js";
 import { registrarAulasCrudIpc } from "./electron/ipc/aulas-crud.ipc.js";
+import { registrarAulasEquipamientosIpc } from "./electron/ipc/aulas-equipamientos.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -199,6 +200,10 @@ registrarAulasConsultasIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasCrudIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasEquipamientosIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1992,47 +1997,6 @@ ipcMain.handle(
 /* =========================================================
    AULAS - EQUIPAMIENTO
    ========================================================= */
-
-ipcMain.handle(
-  'aulas:equipamientos:crear',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/aulas/equipamientos',
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:equipamientos:actualizar',
-  async (_event, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/equipamientos/${id}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:equipamientos:cambiar-estado',
-  async (_event, id, activo) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/equipamientos/${id}/estado`,
-      {
-        method: 'PATCH',
-        body: {
-          activo,
-        },
-      },
-    );
-  },
-);
 
 ipcMain.handle(
   'aulas:equipo-aula:asignar',
