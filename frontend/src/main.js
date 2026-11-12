@@ -11,6 +11,7 @@ import { registrarAulasEquipamientosIpc } from "./electron/ipc/aulas-equipamient
 import { registrarAulasEquipoAulaIpc } from "./electron/ipc/aulas-equipo-aula.ipc.js";
 import { registrarAulasIndisponibilidadesIpc } from "./electron/ipc/aulas-indisponibilidades.ipc.js";
 import { registrarAulasReservasIpc } from "./electron/ipc/aulas-reservas.ipc.js";
+import { registrarAulasDisponibilidadesIpc } from "./electron/ipc/aulas-disponibilidades.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -219,6 +220,10 @@ registrarAulasIndisponibilidadesIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasReservasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasDisponibilidadesIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -2005,63 +2010,6 @@ ipcMain.handle(
   async (_event, periodoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-disponibilidad/${periodoId}/historial`,
-    );
-  },
-);
-
-/* =========================================================
-   AULAS - DISPONIBILIDAD BASE
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:disponibilidades:crear',
-  async (
-    _event,
-    aulaId,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/disponibilidades`,
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-
-ipcMain.handle(
-  'aulas:disponibilidades:actualizar',
-  async (
-    _event,
-    aulaId,
-    id,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/disponibilidades/${id}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-
-ipcMain.handle(
-  'aulas:disponibilidades:eliminar',
-  async (
-    _event,
-    aulaId,
-    id,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/disponibilidades/${id}`,
-      {
-        method: 'DELETE',
-      },
     );
   },
 );
