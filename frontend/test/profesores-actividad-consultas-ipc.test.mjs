@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -92,6 +92,13 @@ test('conserva mutaciones de atestados/proyectos en main, errores HTTP y rechazo
   for (const canal of CANALES_ACTIVIDAD) {
     assert.equal((mainSource.match(new RegExp(`['"]${canal}['"]`, 'g')) || []).length, 0);
   }
+  const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
+  const profesoresSources = [
+    mainSource,
+    ...readdirSync(ipcDir)
+      .filter((name) => /^profesores.*\.ipc\.js$/.test(name))
+      .map((name) => readFileSync(path.join(ipcDir, name), 'utf8')),
+  ].join('\n');
   for (const escritura of [
     'profesores:crear-atestado',
     'profesores:actualizar-atestado',
@@ -100,6 +107,6 @@ test('conserva mutaciones de atestados/proyectos en main, errores HTTP y rechazo
     'profesores:actualizar-proyecto',
     'profesores:cambiar-estado-proyecto',
   ]) {
-    assert.match(mainSource, new RegExp(`['"]${escritura}['"]`));
+    assert.match(profesoresSources, new RegExp(`['"]${escritura}['"]`));
   }
 });

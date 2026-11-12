@@ -97,13 +97,19 @@ test('propaga errores HTTP y rechazos sin alterar respuestas ni agregar validaci
   );
 });
 
-test('conserva 14 canales modularizados, 15 inline en main, 29 de Profesores y 32 de Aulas', () => {
+test('conserva los 3 canales de autogestión extraídos, los 29 de Profesores y los 32 de Aulas sin duplicados', () => {
   const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
   const mainProfesores = [...mainSource.matchAll(/['"](profesores:[^'"]+)['"]/g)].map(
     (m) => m[1],
   );
-  assert.equal(mainProfesores.length, 15);
-  assert.equal(new Set(mainProfesores).size, 15);
+  const autogestionSource = readFileSync(
+    path.join(ipcDir, 'profesores-autogestion-consultas.ipc.js'),
+    'utf8',
+  );
+  const canalesModulo = [...autogestionSource.matchAll(/['"](profesores:[^'"]+)['"]/g)].map(
+    (m) => m[1],
+  );
+  assert.deepEqual(canalesModulo, CANALES_AUTOGESTION);
 
   const profesoresModules = readdirSync(ipcDir)
     .filter((name) => /^profesores.*\.ipc\.js$/.test(name))
@@ -113,8 +119,6 @@ test('conserva 14 canales modularizados, 15 inline en main, 29 de Profesores y 3
     const src = readFileSync(path.join(ipcDir, archivo), 'utf8');
     for (const match of src.matchAll(/['"](profesores:[^'"]+)['"]/g)) modularizados.push(match[1]);
   }
-  assert.equal(modularizados.length, 14);
-  assert.equal(new Set(modularizados).size, 14);
 
   const todosProfesores = [...mainProfesores, ...modularizados];
   assert.equal(todosProfesores.length, 29);

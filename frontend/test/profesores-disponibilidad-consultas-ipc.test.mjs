@@ -99,14 +99,19 @@ test('propaga errores HTTP, conserva escritura en main y preserva los 32 canales
   for (const canal of CANALES_DISPONIBILIDAD) {
     assert.equal((mainSource.match(new RegExp(`['"]${canal}['"]`, 'g')) || []).length, 0);
   }
+  const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
+  const profesoresSources = [
+    mainSource,
+    ...readdirSync(ipcDir)
+      .filter((name) => /^profesores.*\.ipc\.js$/.test(name))
+      .map((name) => readFileSync(path.join(ipcDir, name), 'utf8')),
+  ].join('\n');
   for (const escritura of [
     'profesores:guardar-mi-disponibilidad',
     'profesores:copiar-mi-disponibilidad',
   ]) {
-    assert.match(mainSource, new RegExp(`['"]${escritura}['"]`));
+    assert.match(profesoresSources, new RegExp(`['"]${escritura}['"]`));
   }
-
-  const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
   const aulasModules = readdirSync(ipcDir)
     .filter((name) => /^aulas.*\.ipc\.js$/.test(name))
     .sort();

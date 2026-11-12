@@ -18,6 +18,10 @@ import { registrarProfesoresPerfilesConsultasIpc } from "./electron/ipc/profesor
 import { registrarProfesoresAutogestionConsultasIpc } from "./electron/ipc/profesores-autogestion-consultas.ipc.js";
 import { registrarProfesoresActividadConsultasIpc } from "./electron/ipc/profesores-actividad-consultas.ipc.js";
 import { registrarProfesoresDisponibilidadConsultasIpc } from "./electron/ipc/profesores-disponibilidad-consultas.ipc.js";
+import { registrarProfesoresRevisionesIpc } from "./electron/ipc/profesores-revisiones.ipc.js";
+import { registrarProfesoresAutogestionEscrituraIpc } from "./electron/ipc/profesores-autogestion-escritura.ipc.js";
+import { registrarProfesoresProyectosIpc } from "./electron/ipc/profesores-proyectos.ipc.js";
+import { registrarProfesoresDisponibilidadEscrituraIpc } from "./electron/ipc/profesores-disponibilidad-escritura.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -254,6 +258,22 @@ registrarProfesoresActividadConsultasIpc({
   ejecutarPeticionAutenticada,
 });
 registrarProfesoresDisponibilidadConsultasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresRevisionesIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresAutogestionEscrituraIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresProyectosIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresDisponibilidadEscrituraIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1657,245 +1677,6 @@ ipcMain.handle(
       {
         method: "PATCH",
         body: { activo },
-      },
-    );
-  },
-);
-
-/* =========================================================
-   PROFESORES - PERFILES Y ATESTADOS
-   ========================================================= */
-
-ipcMain.handle(
-  'profesores:revisar-requisito-perfil',
-  async (
-    _event,
-    profesorId,
-    perfilId,
-    requisitoId,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/perfiles/${perfilId}/requisitos/${requisitoId}/revision`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:guardar-evidencias-requisito',
-  async (_event, perfilId, requisitoId, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/perfiles/${perfilId}/requisitos/${requisitoId}/evidencias`,
-      {
-        method: 'PUT',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:revisar-perfil',
-  async (
-    _event,
-    profesorId,
-    perfilId,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/perfiles/${perfilId}/revision`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:inactivar-perfil',
-  async (
-    _event,
-    profesorId,
-    perfilId,
-    observacion,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/perfiles/${perfilId}/inactivar`,
-      {
-        method: 'PATCH',
-        body: {
-          observacion,
-        },
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:revisar-atestado',
-  async (
-    _event,
-    profesorId,
-    atestadoId,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/atestados/${atestadoId}/revision`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-/* =========================================================
-   PROFESORES - AUTOGESTIÓN
-   ========================================================= */
-
-ipcMain.handle(
-  'profesores:actualizar-mis-carreras',
-  async (_event, carreraIds) => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/carreras',
-      {
-        method: 'PUT',
-        body: {
-          carreraIds,
-        },
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:solicitar-perfil',
-  async (_event, perfilAcademicoId) => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/perfiles',
-      {
-        method: 'POST',
-        body: {
-          perfilAcademicoId,
-        },
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:crear-atestado',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/atestados',
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:actualizar-atestado',
-  async (_event, atestadoId, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/atestados/${atestadoId}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:inactivar-mi-atestado',
-  async (_event, atestadoId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/atestados/${atestadoId}/inactivar`,
-      {
-        method: 'PATCH',
-      },
-    );
-  },
-);
-
-/* =========================================================
-   PROFESORES - PROYECTOS / LABORATORIOS
-   ========================================================= */
-
-ipcMain.handle(
-  'profesores:crear-proyecto',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/proyectos',
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:actualizar-proyecto',
-  async (_event, proyectoId, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/proyectos/${proyectoId}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:cambiar-estado-proyecto',
-  async (_event, proyectoId, activo) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/proyectos/${proyectoId}/estado`,
-      {
-        method: 'PATCH',
-        body: {
-          activo,
-        },
-      },
-    );
-  },
-);
-
-/* =========================================================
-   PROFESORES - MI DISPONIBILIDAD
-   ========================================================= */
-
-ipcMain.handle(
-  'profesores:guardar-mi-disponibilidad',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-disponibilidad',
-      {
-        method: 'PUT',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:copiar-mi-disponibilidad',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-disponibilidad/copiar',
-      {
-        method: 'POST',
-        body: datos,
       },
     );
   },
