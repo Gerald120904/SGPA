@@ -9,6 +9,7 @@ import { registrarAulasConsultasIpc } from "./electron/ipc/aulas.ipc.js";
 import { registrarAulasCrudIpc } from "./electron/ipc/aulas-crud.ipc.js";
 import { registrarAulasEquipamientosIpc } from "./electron/ipc/aulas-equipamientos.ipc.js";
 import { registrarAulasEquipoAulaIpc } from "./electron/ipc/aulas-equipo-aula.ipc.js";
+import { registrarAulasIndisponibilidadesIpc } from "./electron/ipc/aulas-indisponibilidades.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -209,6 +210,10 @@ registrarAulasEquipamientosIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasEquipoAulaIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasIndisponibilidadesIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1995,56 +2000,6 @@ ipcMain.handle(
   async (_event, periodoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-disponibilidad/${periodoId}/historial`,
-    );
-  },
-);
-
-/* =========================================================
-   AULAS - INDISPONIBILIDADES
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:indisponibilidades:crear',
-  async (_event, aulaId, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/indisponibilidades`,
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:indisponibilidades:actualizar',
-  async (_event, aulaId, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/indisponibilidades/${id}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:indisponibilidades:cambiar-estado',
-  async (
-    _event,
-    aulaId,
-    id,
-    activo,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/indisponibilidades/${id}/estado`,
-      {
-        method: 'PATCH',
-        body: {
-          activo,
-        },
-      },
     );
   },
 );

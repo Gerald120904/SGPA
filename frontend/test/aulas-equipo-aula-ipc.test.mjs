@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -114,12 +114,13 @@ test('conserva null/undefined y propaga sin cambios respuestas de error y rechaz
 });
 
 test('mantiene los 32 canales de Aulas registrados una sola vez y los cuatro delegados desde main', () => {
+  const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
   const aulasFiles = [
     'src/main.js',
-    'src/electron/ipc/aulas.ipc.js',
-    'src/electron/ipc/aulas-crud.ipc.js',
-    'src/electron/ipc/aulas-equipamientos.ipc.js',
-    'src/electron/ipc/aulas-equipo-aula.ipc.js',
+    ...readdirSync(ipcDir)
+      .filter((name) => /^aulas.*\.ipc\.js$/.test(name))
+      .sort()
+      .map((name) => path.join('src', 'electron', 'ipc', name)),
   ];
   const canales = [];
   for (const relativeFile of aulasFiles) {
