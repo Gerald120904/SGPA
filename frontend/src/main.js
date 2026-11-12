@@ -6,6 +6,7 @@ import started from "electron-squirrel-startup";
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
 import { registrarAulasConsultasIpc } from "./electron/ipc/aulas.ipc.js";
+import { registrarAulasCrudIpc } from "./electron/ipc/aulas-crud.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -194,6 +195,10 @@ registrarEstudiantesImportacionIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasConsultasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasCrudIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1980,51 +1985,6 @@ ipcMain.handle(
   async (_event, periodoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-disponibilidad/${periodoId}/historial`,
-    );
-  },
-);
-
-/* =========================================================
-   AULAS
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:crear',
-  async (_event, datos) => {
-    return ejecutarPeticionAutenticada(
-      '/aulas',
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:actualizar',
-  async (_event, id, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${id}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:cambiar-estado',
-  async (_event, id, activo) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${id}/estado`,
-      {
-        method: 'PATCH',
-        body: {
-          activo,
-        },
-      },
     );
   },
 );
