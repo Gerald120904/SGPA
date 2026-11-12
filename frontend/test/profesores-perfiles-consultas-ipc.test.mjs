@@ -120,16 +120,23 @@ test('conserva casos límite null/undefined, errores HTTP y rechazos de transpor
   );
 });
 
-test('conserva los 23 handlers restantes en main, 29 canales de Profesores y 32 canales de Aulas sin duplicados', () => {
+test('conserva los 3 canales extraídos, los 29 canales de Profesores y 32 canales de Aulas sin duplicados', () => {
   const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
   const mainProfesores = [...mainSource.matchAll(/['"](profesores:[^'"]+)['"]/g)].map(
     (match) => match[1],
   );
-  assert.equal(mainProfesores.length, 23);
-  assert.equal(new Set(mainProfesores).size, 23);
   for (const canal of CANALES_PERFILES_CONSULTAS) {
     assert.equal((mainSource.match(new RegExp(`['"]${canal}['"]`, 'g')) || []).length, 0);
   }
+
+  const perfilesConsultasSource = readFileSync(
+    path.join(ipcDir, 'profesores-perfiles-consultas.ipc.js'),
+    'utf8',
+  );
+  const canalesModulo = [
+    ...perfilesConsultasSource.matchAll(/['"](profesores:[^'"]+)['"]/g),
+  ].map((match) => match[1]);
+  assert.deepEqual(canalesModulo, CANALES_PERFILES_CONSULTAS);
 
   const profesoresModules = readdirSync(ipcDir)
     .filter((name) => /^profesores.*\.ipc\.js$/.test(name))

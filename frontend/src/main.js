@@ -15,6 +15,9 @@ import { registrarAulasDisponibilidadesIpc } from "./electron/ipc/aulas-disponib
 import { registrarAulasAsignacionIpc } from "./electron/ipc/aulas-asignacion.ipc.js";
 import { registrarProfesoresConsultasIpc } from "./electron/ipc/profesores-consultas.ipc.js";
 import { registrarProfesoresPerfilesConsultasIpc } from "./electron/ipc/profesores-perfiles-consultas.ipc.js";
+import { registrarProfesoresAutogestionConsultasIpc } from "./electron/ipc/profesores-autogestion-consultas.ipc.js";
+import { registrarProfesoresActividadConsultasIpc } from "./electron/ipc/profesores-actividad-consultas.ipc.js";
+import { registrarProfesoresDisponibilidadConsultasIpc } from "./electron/ipc/profesores-disponibilidad-consultas.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -239,6 +242,18 @@ registrarProfesoresConsultasIpc({
   ejecutarPeticionAutenticada,
 });
 registrarProfesoresPerfilesConsultasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresAutogestionConsultasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresActividadConsultasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresDisponibilidadConsultasIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1744,15 +1759,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'profesores:mis-carreras-disponibles',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/carreras-disponibles',
-    );
-  },
-);
-
-ipcMain.handle(
   'profesores:actualizar-mis-carreras',
   async (_event, carreraIds) => {
     return ejecutarPeticionAutenticada(
@@ -1768,24 +1774,6 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  'profesores:mis-perfiles',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/perfiles',
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:perfiles-disponibles',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/perfiles-disponibles',
-    );
-  },
-);
-
-ipcMain.handle(
   'profesores:solicitar-perfil',
   async (_event, perfilAcademicoId) => {
     return ejecutarPeticionAutenticada(
@@ -1796,15 +1784,6 @@ ipcMain.handle(
           perfilAcademicoId,
         },
       },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:mis-atestados',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/atestados',
     );
   },
 );
@@ -1852,15 +1831,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'profesores:mis-proyectos',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil/proyectos',
-    );
-  },
-);
-
-ipcMain.handle(
   'profesores:crear-proyecto',
   async (_event, datos) => {
     return ejecutarPeticionAutenticada(
@@ -1906,24 +1876,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'profesores:periodos-mi-disponibilidad',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-disponibilidad/periodos',
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:consultar-mi-disponibilidad',
-  async (_event, periodoId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-disponibilidad/${periodoId}`,
-    );
-  },
-);
-
-ipcMain.handle(
   'profesores:guardar-mi-disponibilidad',
   async (_event, datos) => {
     return ejecutarPeticionAutenticada(
@@ -1945,15 +1897,6 @@ ipcMain.handle(
         method: 'POST',
         body: datos,
       },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:historial-mi-disponibilidad',
-  async (_event, periodoId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-disponibilidad/${periodoId}/historial`,
     );
   },
 );
