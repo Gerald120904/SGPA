@@ -10,6 +10,7 @@ import { registrarAulasCrudIpc } from "./electron/ipc/aulas-crud.ipc.js";
 import { registrarAulasEquipamientosIpc } from "./electron/ipc/aulas-equipamientos.ipc.js";
 import { registrarAulasEquipoAulaIpc } from "./electron/ipc/aulas-equipo-aula.ipc.js";
 import { registrarAulasIndisponibilidadesIpc } from "./electron/ipc/aulas-indisponibilidades.ipc.js";
+import { registrarAulasReservasIpc } from "./electron/ipc/aulas-reservas.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -214,6 +215,10 @@ registrarAulasEquipoAulaIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasIndisponibilidadesIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasReservasIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -2002,51 +2007,6 @@ ipcMain.handle(
       `/profesores/mi-disponibilidad/${periodoId}/historial`,
     );
   },
-);
-
-/* =========================================================
-   AULAS - RESERVAS EXTRAORDINARIAS
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:reservas:crear',
-  async (_event, aulaId, datos) =>
-    ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/reservas`,
-      {
-        method: 'POST',
-        body: datos,
-      },
-    ),
-);
-
-ipcMain.handle(
-  'aulas:reservas:actualizar',
-  async (_event, aulaId, id, datos) =>
-    ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/reservas/${id}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    ),
-);
-
-ipcMain.handle(
-  'aulas:reservas:cambiar-estado',
-  async (
-    _event,
-    aulaId,
-    id,
-    activo,
-  ) =>
-    ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/reservas/${id}/estado`,
-      {
-        method: 'PATCH',
-        body: { activo },
-      },
-    ),
 );
 
 /* =========================================================
