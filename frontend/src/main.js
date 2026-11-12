@@ -5,6 +5,7 @@ import started from "electron-squirrel-startup";
 
 import { registrarPlanImportacionIpc } from "./electron/ipc/plan-importacion.ipc.js";
 import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-importacion.ipc.js";
+import { registrarAulasConsultasIpc } from "./electron/ipc/aulas.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -190,6 +191,10 @@ registrarPlanImportacionIpc({
   ejecutarPeticionAutenticada,
 });
 registrarEstudiantesImportacionIpc({
+  ejecutarPeticionAutenticada,
+});
+registrarAulasConsultasIpc({
+  ipcMain,
   ejecutarPeticionAutenticada,
 });
 
@@ -1984,33 +1989,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'aulas:listar',
-  async (_event, filtros = {}) => {
-    const resultado = await ejecutarPeticionAutenticada(
-      construirRutaConFiltros('/aulas', filtros),
-    );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      aulas: resultado.data,
-    };
-  },
-);
-
-ipcMain.handle(
-  'aulas:obtener',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${id}`,
-    );
-  },
-);
-
-ipcMain.handle(
   'aulas:crear',
   async (_event, datos) => {
     return ejecutarPeticionAutenticada(
@@ -2056,25 +2034,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'aulas:equipamientos:listar',
-  async () => {
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        '/aulas/equipamientos',
-      );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      equipamientos: resultado.data,
-    };
-  },
-);
-
-ipcMain.handle(
   'aulas:equipamientos:crear',
   async (_event, datos) => {
     return ejecutarPeticionAutenticada(
@@ -2112,25 +2071,6 @@ ipcMain.handle(
         },
       },
     );
-  },
-);
-
-ipcMain.handle(
-  'aulas:equipo-aula:listar',
-  async (_event, aulaId) => {
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        `/aulas/${aulaId}/equipamientos`,
-      );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      equipamientos: resultado.data,
-    };
   },
 );
 
@@ -2206,34 +2146,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'aulas:indisponibilidades:listar',
-  async (_event, aulaId) => {
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        `/aulas/${aulaId}/indisponibilidades`,
-      );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      indisponibilidades: resultado.data,
-    };
-  },
-);
-
-ipcMain.handle(
-  'aulas:indisponibilidades:obtener',
-  async (_event, aulaId, id) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/indisponibilidades/${id}`,
-    );
-  },
-);
-
-ipcMain.handle(
   'aulas:indisponibilidades:crear',
   async (_event, aulaId, datos) => {
     return ejecutarPeticionAutenticada(
@@ -2284,33 +2196,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'aulas:reservas:listar',
-  async (_event, aulaId) => {
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        `/aulas/${aulaId}/reservas`,
-      );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      reservas: resultado.data,
-    };
-  },
-);
-
-ipcMain.handle(
-  'aulas:reservas:obtener',
-  async (_event, aulaId, id) =>
-    ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/reservas/${id}`,
-    ),
-);
-
-ipcMain.handle(
   'aulas:reservas:crear',
   async (_event, aulaId, datos) =>
     ejecutarPeticionAutenticada(
@@ -2352,69 +2237,8 @@ ipcMain.handle(
 );
 
 /* =========================================================
-   AULAS - OCUPACIÓN
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:ocupacion',
-  async (
-    _event,
-    aulaId,
-    filtros,
-  ) => {
-    const params =
-      new URLSearchParams({
-        fechaHoraInicio:
-          filtros.fechaHoraInicio,
-
-        fechaHoraFin:
-          filtros.fechaHoraFin,
-      });
-
-
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/ocupacion?${params.toString()}`,
-    );
-  },
-);
-
-/* =========================================================
    AULAS - DISPONIBILIDAD BASE
    ========================================================= */
-
-ipcMain.handle(
-  'aulas:disponibilidades:listar',
-  async (
-    _event,
-    aulaId,
-    periodoId,
-  ) => {
-    const params =
-      new URLSearchParams({
-        periodoId:
-          String(periodoId),
-      });
-
-
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        `/aulas/${aulaId}/disponibilidades?${params.toString()}`,
-      );
-
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-
-    return {
-      ok: true,
-      disponibilidades:
-        resultado.data,
-    };
-  },
-);
-
 
 ipcMain.handle(
   'aulas:disponibilidades:crear',
@@ -2517,28 +2341,6 @@ ipcMain.handle(
 );
 
 
-/* =========================================================
-   AULAS - AUDITORÍA
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:auditoria:listar',
-  async (_event, aulaId) => {
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        `/aulas/${aulaId}/auditoria`,
-      );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      auditoria: resultado.data,
-    };
-  },
-);
 /* =========================================================
    FORMULARIOS DE ESTUDIANTES
    ========================================================= */
