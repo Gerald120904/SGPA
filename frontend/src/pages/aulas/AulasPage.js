@@ -93,6 +93,8 @@ import {
   LIMITES_AULAS_POR_ORIGEN,
   DIAS_SEMANA_AULA,
   TIPOS_INDISPONIBILIDAD,
+  prefijoVisibleEspacio,
+  compararAulasPorEstadoYNumero,
 } from './aulas.helpers.js';
 
 import {
@@ -464,15 +466,6 @@ function obtenerNombreEspecialAula(
 }
 
 
-function prefijoVisibleEspacio(
-  tipo,
-) {
-  return tipo === 'SALA'
-    ? 'Sala'
-    : 'Aula';
-}
-
-
 function construirNombreAula(
   numero,
   nombreEspecial = '',
@@ -652,46 +645,6 @@ function construirSugerenciaDesdeSlot(
 }
 
 
-function claseTipoPlano(
-  tipo,
-) {
-  switch (tipo) {
-    case 'AUDITORIO':
-      return 'is-auditorio';
-    case 'LABORATORIO':
-      return 'is-laboratorio';
-    case 'SALA':
-      return 'is-sala';
-    default:
-      return 'is-aula';
-  }
-}
-
-
-function etiquetaPrincipalSlot(
-  slot,
-  aula = null,
-) {
-  const tipo =
-    aula?.tipo ||
-    slot?.tipo ||
-    'AULA';
-
-  const numero =
-    obtenerNumeroAula(aula) ??
-    slot?.numero ??
-    '';
-
-  if (slot?.etiquetaPlano) {
-    return slot.etiquetaPlano;
-  }
-
-  return numero
-    ? `${prefijoVisibleEspacio(tipo)} ${numero}`
-    : prefijoVisibleEspacio(tipo);
-}
-
-
 function renderizarSlotPlanoRegistrable(
   slot,
   idsFiltradas,
@@ -741,13 +694,7 @@ function compararAulasPorNumero(
 }
 
 
-export function compararAulasPorEstadoYNumero(a, b) {
-  if (a.activo !== b.activo) {
-    return a.activo === true ? -1 : 1;
-  }
-
-  return compararAulasPorNumero(a, b);
-}
+export { compararAulasPorEstadoYNumero };
 
 function nombreTipoIndisponibilidad(
   tipo,
