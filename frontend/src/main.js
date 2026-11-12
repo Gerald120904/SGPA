@@ -8,6 +8,7 @@ import { registrarEstudiantesImportacionIpc } from "./electron/ipc/estudiantes-i
 import { registrarAulasConsultasIpc } from "./electron/ipc/aulas.ipc.js";
 import { registrarAulasCrudIpc } from "./electron/ipc/aulas-crud.ipc.js";
 import { registrarAulasEquipamientosIpc } from "./electron/ipc/aulas-equipamientos.ipc.js";
+import { registrarAulasEquipoAulaIpc } from "./electron/ipc/aulas-equipo-aula.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -204,6 +205,10 @@ registrarAulasCrudIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasEquipamientosIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasEquipoAulaIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1990,77 +1995,6 @@ ipcMain.handle(
   async (_event, periodoId) => {
     return ejecutarPeticionAutenticada(
       `/profesores/mi-disponibilidad/${periodoId}/historial`,
-    );
-  },
-);
-
-/* =========================================================
-   AULAS - EQUIPAMIENTO
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:equipo-aula:asignar',
-  async (_event, aulaId, datos) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/equipamientos`,
-      {
-        method: 'POST',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:equipo-aula:actualizar',
-  async (
-    _event,
-    aulaId,
-    equipamientoId,
-    datos,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/equipamientos/${equipamientoId}`,
-      {
-        method: 'PATCH',
-        body: datos,
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:equipo-aula:desasignar',
-  async (
-    _event,
-    aulaId,
-    equipamientoId,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/equipamientos/${equipamientoId}`,
-      {
-        method: 'DELETE',
-      },
-    );
-  },
-);
-
-ipcMain.handle(
-  'aulas:equipo-aula:cambiar-estado',
-  async (
-    _event,
-    aulaId,
-    equipamientoId,
-    activo,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/equipamientos/${equipamientoId}/estado`,
-      {
-        method: 'PATCH',
-        body: {
-          activo,
-        },
-      },
     );
   },
 );
