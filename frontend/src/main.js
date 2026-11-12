@@ -14,6 +14,7 @@ import { registrarAulasReservasIpc } from "./electron/ipc/aulas-reservas.ipc.js"
 import { registrarAulasDisponibilidadesIpc } from "./electron/ipc/aulas-disponibilidades.ipc.js";
 import { registrarAulasAsignacionIpc } from "./electron/ipc/aulas-asignacion.ipc.js";
 import { registrarProfesoresConsultasIpc } from "./electron/ipc/profesores-consultas.ipc.js";
+import { registrarProfesoresPerfilesConsultasIpc } from "./electron/ipc/profesores-perfiles-consultas.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -234,6 +235,10 @@ registrarAulasAsignacionIpc({
   ejecutarPeticionAutenticada,
 });
 registrarProfesoresConsultasIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresPerfilesConsultasIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1647,15 +1652,6 @@ ipcMain.handle(
    ========================================================= */
 
 ipcMain.handle(
-  'profesores:expediente-perfil',
-  async (_event, profesorId, perfilId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/perfiles/${perfilId}/expediente`,
-    );
-  },
-);
-
-ipcMain.handle(
   'profesores:revisar-requisito-perfil',
   async (
     _event,
@@ -1670,15 +1666,6 @@ ipcMain.handle(
         method: 'PATCH',
         body: datos,
       },
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:mi-expediente-perfil',
-  async (_event, perfilId) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/mi-perfil/perfiles/${perfilId}/expediente`,
     );
   },
 );
@@ -1755,15 +1742,6 @@ ipcMain.handle(
 /* =========================================================
    PROFESORES - AUTOGESTIÓN
    ========================================================= */
-
-ipcMain.handle(
-  'profesores:mi-perfil',
-  async () => {
-    return ejecutarPeticionAutenticada(
-      '/profesores/mi-perfil',
-    );
-  },
-);
 
 ipcMain.handle(
   'profesores:mis-carreras-disponibles',

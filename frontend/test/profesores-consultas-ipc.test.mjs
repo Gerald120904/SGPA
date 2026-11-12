@@ -119,25 +119,40 @@ test('conserva null/undefined, propaga errores y no cambia rechazos', async () =
   );
 });
 
-test('la extracción retira esos tres canales y conserva los demás handlers inline', () => {
+test('la extracción retira esos tres canales y conserva los 29 canales de Profesores sin duplicados', () => {
+  const ipcDir = path.join(frontendDir, 'src', 'electron', 'ipc');
+  const profesoresFiles = [
+    'src/main.js',
+    ...readdirSync(ipcDir)
+      .filter((name) => /^profesores.*\.ipc\.js$/.test(name))
+      .sort()
+      .map((name) => path.join('src', 'electron', 'ipc', name)),
+  ];
   const moduleSource = readFileSync(
-    path.join(frontendDir, 'src', 'electron', 'ipc', 'profesores-consultas.ipc.js'),
+    path.join(ipcDir, 'profesores-consultas.ipc.js'),
     'utf8',
   );
-  const remainingMainChannels = [...mainSource.matchAll(/['"](profesores:[^'"]+)['"]/g)]
-    .map((match) => match[1]);
   const extractedModuleChannels = [...moduleSource.matchAll(/['"](profesores:[^'"]+)['"]/g)]
     .map((match) => match[1]);
+  const allProfesoresChannels = [];
+  for (const relativePath of profesoresFiles) {
+    const source = readFileSync(path.join(frontendDir, relativePath), 'utf8');
+    for (const match of source.matchAll(/['"](profesores:[^'"]+)['"]/g)) {
+      allProfesoresChannels.push(match[1]);
+    }
+  }
 
-  assert.equal(remainingMainChannels.length, 26);
-  assert.equal(new Set(remainingMainChannels).size, 26);
   assert.equal(extractedModuleChannels.length, 3);
   assert.equal(new Set(extractedModuleChannels).size, 3);
-  assert.equal(new Set([...remainingMainChannels, ...extractedModuleChannels]).size, 29);
+  assert.equal(allProfesoresChannels.length, 29);
+  assert.equal(new Set(allProfesoresChannels).size, 29);
 
   for (const canal of CANALES_EXTRAIDOS) {
     assert.equal((mainSource.match(new RegExp(`['"]${canal}['"]`, 'g')) || []).length, 0);
   }
+  const combinedProfesoresSource = profesoresFiles
+    .map((relativePath) => readFileSync(path.join(frontendDir, relativePath), 'utf8'))
+    .join('\n');
   for (const canal of [
     'profesores:expediente-perfil',
     'profesores:revisar-requisito-perfil',
@@ -148,7 +163,7 @@ test('la extracción retira esos tres canales y conserva los demás handlers inl
     'profesores:periodos-mi-disponibilidad',
     'profesores:historial-mi-disponibilidad',
   ]) {
-    assert.match(mainSource, new RegExp(`['"]${canal}['"]`));
+    assert.match(combinedProfesoresSource, new RegExp(`['"]${canal}['"]`));
   }
 });
 
