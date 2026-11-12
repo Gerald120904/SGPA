@@ -51,6 +51,45 @@ export const TIPOS_INDISPONIBILIDAD = Object.freeze({
   OTRO: 'Otro',
 });
 
+export const TIPOS_RESERVA = Object.freeze({
+  EXAMEN: 'Examen',
+  REUNION: 'Reunión',
+  ACTIVIDAD: 'Actividad',
+  CONFERENCIA: 'Conferencia',
+  EVENTO: 'Evento',
+  OTRO: 'Otro',
+});
+
+export const RECOMENDACIONES_CAPACIDAD = Object.freeze({
+  SOBRECAPACIDAD: 'Sobrecapacidad',
+  AL_LIMITE: 'Al límite',
+  AJUSTADA: 'Ajustada',
+  RECOMENDADA: 'Recomendada',
+  MUY_RECOMENDADA: 'Muy recomendada',
+});
+
+export const ACCIONES_AUDITORIA_AULA = Object.freeze({
+  CREAR: 'Creación',
+  ACTUALIZAR: 'Actualización',
+  CAMBIAR_ESTADO: 'Cambio de estado',
+  ASIGNAR_EQUIPAMIENTO: 'Asignación de equipamiento',
+  ACTUALIZAR_EQUIPAMIENTO: 'Actualización de equipamiento',
+  CAMBIAR_ESTADO_EQUIPAMIENTO: 'Cambio de estado del equipamiento',
+  DESASIGNAR_EQUIPAMIENTO: 'Retiro de equipamiento del aula',
+  CREAR_DISPONIBILIDAD: 'Creación de disponibilidad',
+  ACTUALIZAR_DISPONIBILIDAD: 'Actualización de disponibilidad',
+  ELIMINAR_DISPONIBILIDAD: 'Eliminación de disponibilidad',
+});
+
+export const ENTIDADES_AUDITORIA_AULA = Object.freeze({
+  AULA: 'Aula',
+  EQUIPAMIENTO: 'Equipamiento',
+  AULA_EQUIPAMIENTO: 'Equipamiento del aula',
+  INDISPONIBILIDAD: 'Indisponibilidad',
+  RESERVA: 'Reserva',
+  DISPONIBILIDAD_AULA: 'Disponibilidad del aula',
+});
+
 export function nombreTipoAula(tipo) {
   return TIPOS_AULA[tipo] || tipo || '—';
 }
@@ -210,4 +249,200 @@ export function formatearFechaHora(valor) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(fecha);
+}
+
+export function nombreTipoReserva(tipo) {
+  return TIPOS_RESERVA[tipo] || tipo || '—';
+}
+
+export function nombreRecomendacionCapacidad(valor) {
+  return RECOMENDACIONES_CAPACIDAD[valor] || 'Sin evaluar';
+}
+
+export function nombreOrigenOcupacion(origen) {
+  const nombres = {
+    RESERVA: 'Reserva',
+    INDISPONIBILIDAD: 'Indisponibilidad',
+  };
+
+  return nombres[origen] || origen || '—';
+}
+
+export function nombreAccionAuditoria(accion) {
+  return ACCIONES_AUDITORIA_AULA[accion] || accion || '—';
+}
+
+export function nombreEntidadAuditoria(entidad) {
+  return ENTIDADES_AUDITORIA_AULA[entidad] || entidad || '—';
+}
+
+export function obtenerDetalleAuditoria(detalle) {
+  if (!detalle) {
+    return null;
+  }
+
+  if (typeof detalle === 'object') {
+    return detalle;
+  }
+
+  try {
+    return JSON.parse(detalle);
+  } catch {
+    return detalle;
+  }
+}
+
+export function detalleAuditoriaTexto(detalle) {
+  const valor = obtenerDetalleAuditoria(detalle);
+
+  if (valor === null) {
+    return '';
+  }
+
+  if (typeof valor === 'string') {
+    return valor;
+  }
+
+  return JSON.stringify(valor, null, 2);
+}
+
+export function periodoPermiteEditarDisponibilidad(periodo) {
+  return ['BORRADOR', 'EN_PREPARACION'].includes(periodo?.estado);
+}
+
+export function seleccionarPeriodoPreferido(periodos = []) {
+  if (!Array.isArray(periodos) || !periodos.length) {
+    return null;
+  }
+
+  return (
+    periodos.find((periodo) => periodo.estado === 'EN_PREPARACION') ||
+    periodos.find((periodo) => periodo.estado === 'EN_CURSO') ||
+    periodos.find((periodo) => periodo.estado === 'BORRADOR') ||
+    periodos[0]
+  );
+}
+
+export function normalizarFechaHoraInput(valor) {
+  if (!valor) {
+    return valor;
+  }
+
+  return valor.length === 16 ? `${valor}:00` : valor;
+}
+
+export function fechaHoraLocalParaInput(fecha) {
+  const pad = (valor) => String(valor).padStart(2, '0');
+
+  return [
+    fecha.getFullYear(),
+    '-',
+    pad(fecha.getMonth() + 1),
+    '-',
+    pad(fecha.getDate()),
+    'T',
+    pad(fecha.getHours()),
+    ':',
+    pad(fecha.getMinutes()),
+  ].join('');
+}
+
+export function obtenerRangoOcupacionInicial(referencia = new Date()) {
+  const inicio = new Date(
+    referencia.getFullYear(),
+    referencia.getMonth(),
+    referencia.getDate(),
+    0,
+    0,
+  );
+
+  const fin = new Date(
+    referencia.getFullYear(),
+    referencia.getMonth(),
+    referencia.getDate(),
+    23,
+    59,
+  );
+
+  return {
+    inicio: fechaHoraLocalParaInput(inicio),
+    fin: fechaHoraLocalParaInput(fin),
+  };
+}
+
+export function horaCorta(hora) {
+  if (!hora) {
+    return '—';
+  }
+
+  return String(hora).slice(0, 5);
+}
+
+export function normalizarHoraFormulario(valor) {
+  const texto = String(valor || '').trim();
+  const match = texto.match(/^(\d{1,2}):(\d{1,2})/);
+
+  if (!match) {
+    return '';
+  }
+
+  const hora = Number(match[1]);
+  const minuto = Number(match[2]);
+
+  if (
+    !Number.isInteger(hora) ||
+    !Number.isInteger(minuto) ||
+    hora < 0 ||
+    hora > 23 ||
+    minuto < 0 ||
+    minuto > 59
+  ) {
+    return '';
+  }
+
+  return `${String(hora).padStart(2, '0')}:${String(minuto).padStart(2, '0')}`;
+}
+
+export function separarFechaHoraFormulario(valor) {
+  const texto = String(valor || '').trim();
+
+  if (!texto) {
+    return {
+      fecha: '',
+      hora: '',
+    };
+  }
+
+  const [fecha = '', hora = ''] = texto.split('T');
+
+  return {
+    fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : '',
+    hora: normalizarHoraFormulario(hora),
+  };
+}
+
+export function fechaParaInput(valor) {
+  if (!valor) {
+    return '';
+  }
+
+  const fecha = new Date(valor);
+
+  if (Number.isNaN(fecha.getTime())) {
+    return '';
+  }
+
+  const pad = (numero) => String(numero).padStart(2, '0');
+
+  return [
+    fecha.getFullYear(),
+    '-',
+    pad(fecha.getMonth() + 1),
+    '-',
+    pad(fecha.getDate()),
+    'T',
+    pad(fecha.getHours()),
+    ':',
+    pad(fecha.getMinutes()),
+  ].join('');
 }

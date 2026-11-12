@@ -5,6 +5,10 @@
 
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
+import { confirmarAccion } from '../../utils/confirm.js';
+import { mostrarError, mostrarExito } from '../../components/AlertModal.js';
+import { cambiarEstadoAula } from '../../services/aulas.service.js';
+import { validarGestionAulas } from './aulas.context.js';
 import {
   PLANO_SECTOR_PRINCIPAL_P2,
   PLANO_SECTOR_HUMANISTICO,
@@ -85,20 +89,19 @@ export function renderizarSlotPlanoRegistrable({
         ${seleccionada ? 'is-selected' : ''}
       "
       ${incluirArea ? `style="grid-area: ${slot.area};"` : ''}
-      ${
-        aula
-          ? `data-plano-aula-id="${aula.id}"`
-          : `data-plano-slot-key="${slot.key}"`
-      }
+      ${aula
+      ? `data-plano-aula-id="${aula.id}"`
+      : `data-plano-slot-key="${slot.key}"`
+    }
       aria-label="${escapeHtml(
-        aula
-          ? nombreVisibleAula(aula)
-          : mostrarComoAdministrativo
-            ? numeroAdministrativo
-              ? `Área administrativa correspondiente al Aula ${numeroAdministrativo}`
-              : 'Área administrativa disponible para habilitar como aula'
-            : `Registrar ${etiqueta}`,
-      )}"
+      aula
+        ? nombreVisibleAula(aula)
+        : mostrarComoAdministrativo
+          ? numeroAdministrativo
+            ? `Área administrativa correspondiente al Aula ${numeroAdministrativo}`
+            : 'Área administrativa disponible para habilitar como aula'
+          : `Registrar ${etiqueta}`,
+    )}"
     >
       <strong>${escapeHtml(etiqueta)}</strong>
       <span>${escapeHtml(subtitulo)}</span>
@@ -169,9 +172,8 @@ export function renderizarFichaPlanoAula(aula, puedeGestionar = false) {
           Ver detalle
         </button>
 
-        ${
-          puedeGestionar
-            ? `
+        ${puedeGestionar
+      ? `
               <button
                 type="button"
                 class="aulas-primary-button"
@@ -182,8 +184,8 @@ export function renderizarFichaPlanoAula(aula, puedeGestionar = false) {
                 Editar aula
               </button>
             `
-            : ''
-        }
+      : ''
+    }
       </div>
     </div>
   `;
@@ -406,9 +408,8 @@ export function renderizarPlanoAulas({
           </section>
         </div>
 
-        ${
-          otrasAulas.length
-            ? `
+        ${otrasAulas.length
+      ? `
               <div class="aulas-plan-other">
                 <div>
                   <strong>Otros espacios registrados</strong>
@@ -418,8 +419,8 @@ export function renderizarPlanoAulas({
                 </div>
                 <div class="aulas-plan-other-list">
                   ${otrasAulas
-                    .map(
-                      (aula) => `
+        .map(
+          (aula) => `
                         <button
                           type="button"
                           class="aulas-plan-other-item"
@@ -428,23 +429,323 @@ export function renderizarPlanoAulas({
                           <strong>${escapeHtml(nombreVisibleAula(aula))}</strong>
                           <span>
                             ${escapeHtml(
-                              aula.ubicacion || nombreOrigen(aula.origen),
-                            )}
+            aula.ubicacion || nombreOrigen(aula.origen),
+          )}
                           </span>
                         </button>
                       `,
-                    )
-                    .join('')}
+        )
+        .join('')}
                 </div>
               </div>
             `
-            : ''
-        }
+      : ''
+    }
       </div>
     </section>
   `;
 
   if (typeof document !== 'undefined') {
     renderizarIconos();
+  }
+}
+
+export function obtenerSlotRegistrablePorKey(key) {
+  return (
+    TODAS_LAS_AREAS_REGISTRABLES.find((item) => item.key === key) || null
+  );
+}
+
+export function obtenerAulaParaSlot(slot, aulas = []) {
+  return (
+    aulas.find((aula) => aulaCoincideConSlot(aula, slot)) || null
+  );
+}
+
+export function construirSugerenciaDesdeSlot(slot) {
+  if (!slot) {
+    return null;
+  }
+
+  return {
+    numero: slot.numero || '',
+    codigo: slot.codigo || '',
+    nombreEspecial: slot.nombreEspecial || '',
+    ubicacion: slot.ubicacion || '',
+    tipo: slot.tipo || 'AULA',
+    tipoMobiliario: slot.tipoMobiliario || 'SIN_ESPECIFICAR',
+    origen: slot.origen || 'UNA',
+    capacidad: slot.capacidad || '',
+    referenciaPlano: slot.referenciaPlano || '',
+  };
+}
+
+export function abrirAccionesAulaPlano({
+  aula,
+  puedeGestionar = false,
+  onVerDetalle = null,
+  onEditarAula = null,
+  onCambiarDisponibilidad = null,
+} = {}) {
+  if (!aula) {
+    return;
+  }
+
+  document.getElementById('aulasPlanoActionDialog')?.remove();
+
+  const dialog = document.createElement('dialog');
+  dialog.id = 'aulasPlanoActionDialog';
+  dialog.className = 'sgpa-confirm-dialog aulas-plan-action-dialog';
+
+  const puedeEditar = Boolean(puedeGestionar);
+  const permiteCambioDisponibilidad = puedeEditar && aula.tipo === 'AULA';
+  const aulaHabilitada = aula.activo === true;
+
+  dialog.innerHTML = `
+    <div
+      class="sgpa-confirm-card aulas-plan-action-card"
+    >
+      <div
+        class="aulas-plan-action-icon"
+        aria-hidden="true"
+      >
+        ?
+      </div>
+
+      <div
+        class="aulas-plan-action-content"
+      >
+        <span>
+          ${aulaHabilitada ? 'Aula seleccionada' : 'Espacio administrativo'}
+        </span>
+
+        <h3>
+          ¿Qué desea hacer?
+        </h3>
+
+        <p>
+          ${escapeHtml(nombreVisibleAula(aula))}
+          ·
+          ${escapeHtml(aula.ubicacion || 'Sin ubicación especificada')}
+        </p>
+
+        ${
+          !aulaHabilitada
+            ? `
+                <div class="aulas-plan-action-notice">
+                  Este espacio está deshabilitado para asignaciones académicas
+                  y se representa como área administrativa en el plano.
+                </div>
+              `
+            : ''
+        }
+      </div>
+
+      <div
+        class="aulas-plan-action-buttons"
+      >
+        <button
+          type="button"
+          id="aulasPlanoVerAula"
+          class="aulas-plan-action-view"
+        >
+          <i
+            data-lucide="eye"
+            aria-hidden="true"
+          ></i>
+          Ver aula
+        </button>
+
+        ${
+          puedeEditar
+            ? `
+                <button
+                  type="button"
+                  id="aulasPlanoEditarAula"
+                  class="aulas-plan-action-edit"
+                >
+                  <i
+                    data-lucide="pencil"
+                    aria-hidden="true"
+                  ></i>
+                  Editar aula
+                </button>
+              `
+            : ''
+        }
+
+        ${
+          permiteCambioDisponibilidad
+            ? `
+                <button
+                  type="button"
+                  id="aulasPlanoCambiarDisponibilidad"
+                  class="aulas-plan-action-availability ${
+                    aulaHabilitada ? 'is-disable' : 'is-enable'
+                  }"
+                >
+                  <i
+                    data-lucide="${
+                      aulaHabilitada ? 'circle-pause' : 'circle-check'
+                    }"
+                    aria-hidden="true"
+                  ></i>
+                  ${aulaHabilitada ? 'Deshabilitar aula' : 'Habilitar aula'}
+                </button>
+              `
+            : ''
+        }
+
+        <button
+          type="button"
+          id="aulasPlanoCerrarAcciones"
+          class="aulas-plan-action-cancel"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+
+  const cerrar = () => {
+    if (dialog.open) {
+      dialog.close();
+    }
+
+    dialog.remove();
+  };
+
+  dialog
+    .querySelector('#aulasPlanoCerrarAcciones')
+    ?.addEventListener('click', cerrar);
+
+  dialog
+    .querySelector('#aulasPlanoVerAula')
+    ?.addEventListener('click', async () => {
+      cerrar();
+      if (typeof onVerDetalle === 'function') {
+        await onVerDetalle(aula.id);
+      }
+    });
+
+  dialog
+    .querySelector('#aulasPlanoEditarAula')
+    ?.addEventListener('click', () => {
+      cerrar();
+      if (typeof onEditarAula === 'function') {
+        onEditarAula(aula);
+      }
+    });
+
+  dialog
+    .querySelector('#aulasPlanoCambiarDisponibilidad')
+    ?.addEventListener('click', async () => {
+      cerrar();
+      if (typeof onCambiarDisponibilidad === 'function') {
+        await onCambiarDisponibilidad(aula);
+      }
+    });
+
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault();
+    cerrar();
+  });
+
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) {
+      cerrar();
+    }
+  });
+
+  dialog.showModal();
+
+  if (typeof document !== 'undefined') {
+    renderizarIconos();
+  }
+}
+
+export async function solicitarHabilitacionSlotAdministrativo({
+  slot,
+  onAbrirFormulario = null,
+} = {}) {
+  if (!slot) {
+    return;
+  }
+
+  const tieneNumero =
+    Number.isInteger(Number(slot.numero)) && Number(slot.numero) > 0;
+
+  const confirmado = await confirmarAccion({
+    titulo: tieneNumero
+      ? `Habilitar Aula ${slot.numero}`
+      : 'Habilitar espacio administrativo',
+    mensaje: tieneNumero
+      ? `El espacio correspondiente al Aula ${slot.numero} está siendo utilizado actualmente como área administrativa. ¿Desea iniciar su habilitación como aula académica? Al continuar se abrirá el formulario para completar sus datos antes de registrarla.`
+      : 'Este espacio del Edificio 2 está siendo utilizado actualmente como área administrativa. ¿Desea habilitarlo como aula académica? Al continuar podrá asignarle el número de aula y completar sus datos antes de registrarlo.',
+    textoConfirmar: 'Habilitar aula',
+    peligro: false,
+  });
+
+  if (!confirmado) {
+    return;
+  }
+
+  if (typeof onAbrirFormulario === 'function') {
+    onAbrirFormulario(null, construirSugerenciaDesdeSlot(slot));
+  }
+}
+
+export async function cambiarDisponibilidadAcademicaAulaPlano({
+  aula,
+  onActualizado = null,
+} = {}) {
+  if (!aula || !validarGestionAulas()) {
+    return;
+  }
+
+  const habilitar = aula.activo === false;
+
+  const confirmado = await confirmarAccion({
+    titulo: habilitar ? 'Habilitar aula' : 'Deshabilitar aula',
+    mensaje: habilitar
+      ? `¿Desea habilitar nuevamente "${nombreVisibleAula(aula)}" como espacio académico? El aula volverá a estar disponible para asignaciones.`
+      : `¿Desea deshabilitar "${nombreVisibleAula(aula)}" como espacio académico? En el plano se mostrará como área administrativa y dejará de estar disponible para asignaciones mientras permanezca deshabilitada.`,
+    textoConfirmar: habilitar ? 'Habilitar' : 'Deshabilitar',
+    peligro: !habilitar,
+  });
+
+  if (!confirmado) {
+    return;
+  }
+
+  try {
+    const resultado = await cambiarEstadoAula(aula.id, habilitar);
+
+    if (!resultado?.ok) {
+      throw new Error(
+        resultado?.message ||
+          'No fue posible actualizar la disponibilidad académica del aula.',
+      );
+    }
+
+    mostrarExito({
+      titulo: habilitar ? 'Aula habilitada' : 'Aula deshabilitada',
+      mensaje: habilitar
+        ? 'El aula volvió a quedar disponible como espacio académico.'
+        : 'El aula quedó deshabilitada y se mostrará como espacio administrativo en el plano.',
+    });
+
+    if (typeof onActualizado === 'function') {
+      await onActualizado();
+    }
+  } catch (error) {
+    mostrarError({
+      titulo: 'No se pudo actualizar el aula',
+      mensaje:
+        error?.message ||
+        'No fue posible actualizar la disponibilidad académica del aula.',
+    });
   }
 }
