@@ -12,6 +12,7 @@ import { registrarAulasEquipoAulaIpc } from "./electron/ipc/aulas-equipo-aula.ip
 import { registrarAulasIndisponibilidadesIpc } from "./electron/ipc/aulas-indisponibilidades.ipc.js";
 import { registrarAulasReservasIpc } from "./electron/ipc/aulas-reservas.ipc.js";
 import { registrarAulasDisponibilidadesIpc } from "./electron/ipc/aulas-disponibilidades.ipc.js";
+import { registrarAulasAsignacionIpc } from "./electron/ipc/aulas-asignacion.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -224,6 +225,10 @@ registrarAulasReservasIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasDisponibilidadesIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarAulasAsignacionIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -2013,54 +2018,6 @@ ipcMain.handle(
     );
   },
 );
-
-/* =========================================================
-   AULAS - BÚSQUEDA / EVALUACIÓN
-   ========================================================= */
-
-ipcMain.handle(
-  'aulas:buscar-disponibles',
-  async (_event, criterios) => {
-    const resultado =
-      await ejecutarPeticionAutenticada(
-        '/aulas/buscar-disponibles',
-        {
-          method: 'POST',
-          body: criterios,
-        },
-      );
-
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-
-    return {
-      ok: true,
-      aulas: resultado.data,
-    };
-  },
-);
-
-
-ipcMain.handle(
-  'aulas:evaluar-asignacion',
-  async (
-    _event,
-    aulaId,
-    criterios,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/aulas/${aulaId}/evaluar-asignacion`,
-      {
-        method: 'POST',
-        body: criterios,
-      },
-    );
-  },
-);
-
 
 /* =========================================================
    FORMULARIOS DE ESTUDIANTES
