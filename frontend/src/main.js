@@ -13,6 +13,7 @@ import { registrarAulasIndisponibilidadesIpc } from "./electron/ipc/aulas-indisp
 import { registrarAulasReservasIpc } from "./electron/ipc/aulas-reservas.ipc.js";
 import { registrarAulasDisponibilidadesIpc } from "./electron/ipc/aulas-disponibilidades.ipc.js";
 import { registrarAulasAsignacionIpc } from "./electron/ipc/aulas-asignacion.ipc.js";
+import { registrarProfesoresConsultasIpc } from "./electron/ipc/profesores-consultas.ipc.js";
 import { validarUrlExternaFormulario } from './utils/validar-url-formulario.js';
 import { fetchBackendSeguro, normalizarUrlBackend, resolverUrlBackend, verificarIdentidadBackend } from './electron/backend-identity.js';
 import { crearEstadoSesionAutenticada, invalidarSesionPor401, registrarCambiosContextoAutenticado } from './electron/ipc/auth-session-state.js';
@@ -229,6 +230,10 @@ registrarAulasDisponibilidadesIpc({
   ejecutarPeticionAutenticada,
 });
 registrarAulasAsignacionIpc({
+  ipcMain,
+  ejecutarPeticionAutenticada,
+});
+registrarProfesoresConsultasIpc({
   ipcMain,
   ejecutarPeticionAutenticada,
 });
@@ -1633,50 +1638,6 @@ ipcMain.handle(
         method: "PATCH",
         body: { activo },
       },
-    );
-  },
-);
-
-/* =========================================================
-   PROFESORES
-   ========================================================= */
-
-ipcMain.handle(
-  'profesores:listar',
-  async (_event, filtros = {}) => {
-    const resultado = await ejecutarPeticionAutenticada(
-      construirRutaConFiltros('/profesores', filtros),
-    );
-
-    if (!resultado.ok) {
-      return resultado;
-    }
-
-    return {
-      ok: true,
-      profesores: resultado.data,
-    };
-  },
-);
-
-ipcMain.handle(
-  'profesores:obtener',
-  async (_event, id) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${id}`,
-    );
-  },
-);
-
-ipcMain.handle(
-  'profesores:disponibilidad',
-  async (
-    _event,
-    profesorId,
-    periodoId,
-  ) => {
-    return ejecutarPeticionAutenticada(
-      `/profesores/${profesorId}/disponibilidad/${periodoId}`,
     );
   },
 );
