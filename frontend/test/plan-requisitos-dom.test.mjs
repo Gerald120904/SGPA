@@ -4,25 +4,23 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const source = readFileSync(
-  new URL('../src/pages/planes-estudio/PlanesEstudioPage.js', import.meta.url),
+  new URL('../src/pages/planes-estudio/PlanRequisitosDialog.js', import.meta.url),
   'utf8',
 );
 
 function functionSource(start, next) {
   const from = source.indexOf(start);
-  const to = source.indexOf(next, from);
-  assert.ok(from >= 0 && to > from, `No se encontró ${start}`);
+  const to = next ? source.indexOf(next, from) : source.length;
+  assert.ok(from >= 0 && (to > from || !next), `No se encontró ${start}`);
   return source.slice(from, to);
 }
 
 const functions = [
-  ['function renderizarDetallePlan()', 'function crearFilaCargaRapidaAsignatura('],
-  ['function actualizarListaRequisitos(', 'function abrirFormularioRequisitos('],
-  ['async function agregarRequisitoFrontend(', 'async function eliminarRequisitoFrontend('],
-  ['async function eliminarRequisitoFrontend(', 'async function recargarRequisitosPlan('],
-  ['async function recargarRequisitosPlan(', 'async function recargarResumenPlan('],
-  ['async function recargarResumenPlan(', 'function renderizarDatoResumen('],
-].map(([start, next]) => functionSource(start, next)).join('\n');
+  functionSource('export function actualizarListaRequisitos(', 'export function abrirFormularioRequisitos('),
+  functionSource('export async function agregarRequisitoFrontend(', 'export async function eliminarRequisitoFrontend('),
+  functionSource('export async function eliminarRequisitoFrontend(', 'export async function recargarRequisitosPlan('),
+  functionSource('export async function recargarRequisitosPlan(', null),
+].join('\n').replaceAll('export function ', 'function ').replaceAll('export async function ', 'async function ');
 
 function fixture() {
   const eventos = new Map();
@@ -33,16 +31,9 @@ function fixture() {
 
   const classList = () => ({ add() {}, remove() {} });
   const error = { textContent: '', classList: classList() };
-  const button = {
-    disabled: false,
-    isConnected: true,
-    focus() { focused = this; },
-  };
+  const button = { disabled: false, isConnected: true, focus() { focused = this; } };
   const tipo = { value: 'REQUISITO' };
-  const select = {
-    value: '2',
-    focus() { focused = this; },
-  };
+  const select = { value: '2', focus() { focused = this; } };
   const list = { innerHTML: '' };
   const count = { textContent: '0' };
   const form = { isConnected: true, marker: 'contexto-original' };
@@ -92,28 +83,25 @@ function fixture() {
     { id: 2, activo: true, nivel: 1, ciclo: 1, orden: 2, creditos: 3, curso: { codigo: 'B', nombre: 'Anterior' } },
     { id: 3, activo: true, nivel: 1, ciclo: 1, orden: 3, creditos: 3, curso: { codigo: 'C', nombre: 'Paralela' } },
   ];
-  const planSeleccionado = { id: 7 };
+  const estado = {
+    planSeleccionado: { id: 7 },
+    asignaturasPlan,
+    requisitosPlan: relaciones,
+    resumenPlan: null,
+  };
+  const contexto = {
+    estado,
+    obtenerAsignaturaPorId: (id) => asignaturasPlan.find((item) => item.id === id),
+  };
   const context = vm.createContext({
     document,
-    window: {},
-    planSeleccionado,
-    asignaturasPlan,
-    requisitosPlan: [],
-    resumenPlan: null,
-    reglaOptativasPlan: null,
-    vistaDetallePlan: 'LISTA',
-    observerMalla: null,
-    frameDibujoMalla: null,
+    contexto,
     puedeGestionarPlanes: () => true,
-    obtenerAsignaturaPorId: (id) => asignaturasPlan.find((item) => item.id === id),
-    obtenerRequisitosDeAsignatura: (id) => vm.runInContext('requisitosPlan', context).filter((item) => item.asignaturaId === id),
+    esAsistente: () => false,
+    obtenerRequisitosDeAsignatura: (id, requisitos = relaciones) => requisitos.filter((item) => item.asignaturaId === id),
     obtenerDatosAsignatura: (item) => item.curso || item,
     escapeHtml: (value) => String(value),
     renderizarIconos() {},
-    renderizarListaAsignaturas: () => '<section>Detalle actualizado</section>',
-    VerPlanPage: ({ contenidoVista }) => contenidoVista,
-    conectarEventosDetallePlan() {},
-    mostrarFeedbackDetalle() {},
     mostrarExito: (args) => llamadas.exito.push(args),
     confirmarAccion: async () => true,
     crearPlanRequisito: async (planId, datos) => {
@@ -124,24 +112,30 @@ function fixture() {
         return { ok: false, message: 'Relación inválida o circular' };
       }
       relaciones.push({ id: nextId++, ...datos });
+      estado.requisitosPlan = relaciones;
       return { ok: true };
     },
     eliminarPlanRequisito: async (planId, id) => {
       llamadas.eliminar.push({ planId, id });
       relaciones = relaciones.filter((item) => item.id !== id);
+      estado.requisitosPlan = relaciones;
       return { ok: true };
     },
     listarPlanRequisitos: async () => ({ ok: true, requisitos: structuredClone(relaciones) }),
-    obtenerResumenPlan: async () => {
-      llamadas.resumen++;
-      return { ok: true, resumen: { relaciones: relaciones.length } };
-    },
   });
-  vm.runInContext(`${functions}\nglobalThis.flujo = { agregarRequisitoFrontend, eliminarRequisitoFrontend };`, context);
+  vm.runInContext(`${functions}\nglobalThis.flujo = { agregarRequisitoFrontend, eliminarRequisitoFrontend, recargarRequisitosPlan };`, context);
 
   return {
-    context, dialog, form, button, select, tipo, list, count, error, llamadas,
+    context, contexto, dialog, form, button, select, tipo, list, count, error, llamadas,
     asignatura: asignaturasPlan[0],
+    recargar: (opciones) => context.flujo.recargarRequisitosPlan(contexto, {
+      ...opciones,
+      onRecargarResumen: async () => {
+        llamadas.resumen++;
+        estado.resumenPlan = { relaciones: relaciones.length };
+      },
+      onRenderizar: () => { llamadas.render++; },
+    }),
     get focused() { return focused; },
     get relaciones() { return relaciones; },
   };
@@ -149,7 +143,8 @@ function fixture() {
 
 test('prerrequisito y correquisito consecutivos actualizan el DOM sin perder diálogo, selección ni foco', async () => {
   const ui = fixture();
-  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura);
+  const opciones = { onRecargar: (params) => ui.recargar(params), onFeedback() {} };
+  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura, ui.contexto, opciones);
   assert.equal(ui.llamadas.crear[0].tipo, 'REQUISITO');
   assert.equal(ui.count.textContent, '1');
   assert.match(ui.list.innerHTML, /Anterior/);
@@ -162,7 +157,7 @@ test('prerrequisito y correquisito consecutivos actualizan el DOM sin perder di�
 
   ui.tipo.value = 'CORREQUISITO';
   ui.select.value = '3';
-  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura);
+  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura, ui.contexto, opciones);
   assert.equal(ui.llamadas.crear[1].tipo, 'CORREQUISITO');
   assert.equal(ui.count.textContent, '2');
   assert.equal((ui.list.innerHTML.match(/class="plan-requirement-row"/g) || []).length, 2);
@@ -177,13 +172,14 @@ test('prerrequisito y correquisito consecutivos actualizan el DOM sin perder di�
 
   ui.dialog.close();
   assert.equal(ui.llamadas.render, 1);
-  assert.equal(ui.context.resumenPlan.relaciones, 2);
+  assert.equal(ui.contexto.estado.resumenPlan.relaciones, 2);
 });
 
 test('relaciones inválidas se rechazan sin perder datos; después se puede eliminar una relación', async () => {
   const ui = fixture();
-  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura);
-  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura);
+  const opciones = { onRecargar: (params) => ui.recargar(params), onFeedback() {} };
+  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura, ui.contexto, opciones);
+  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura, ui.contexto, opciones);
   assert.equal(ui.relaciones.length, 1);
   assert.match(ui.error.textContent, /inválida o circular/);
   assert.equal(ui.llamadas.exito.length, 1);
@@ -192,11 +188,11 @@ test('relaciones inválidas se rechazan sin perder datos; después se puede elim
   assert.equal(ui.form.isConnected, true);
 
   ui.select.value = '1';
-  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura);
+  await ui.context.flujo.agregarRequisitoFrontend(ui.asignatura, ui.contexto, opciones);
   assert.equal(ui.relaciones.length, 1);
   assert.equal(ui.llamadas.exito.length, 1);
 
-  await ui.context.flujo.eliminarRequisitoFrontend(ui.relaciones[0].id, ui.asignatura);
+  await ui.context.flujo.eliminarRequisitoFrontend(ui.relaciones[0].id, ui.asignatura, ui.contexto, opciones);
   assert.equal(ui.llamadas.eliminar.length, 1);
   assert.equal(ui.relaciones.length, 0);
   assert.equal(ui.count.textContent, '0');

@@ -355,14 +355,21 @@ test("conserva relaciones fuera del viewport dentro del canvas completo", () => 
   assert.ok(rutas.every((ruta) => ruta.puntos.at(-1).x <= 1130));
 });
 
-test("mantiene el contrato visual y los disparadores de recálculo", () => {
+test("mantiene el contrato visual y los disparadores de recálculo en la arquitectura modular", () => {
   const css = readFileSync(
     new URL("../src/styles/planes-estudio.css", import.meta.url),
     "utf8",
   );
-  const pagina = readFileSync(
+  const mallaView = readFileSync(
     new URL(
-      "../src/pages/planes-estudio/PlanesEstudioPage.js",
+      "../src/pages/planes-estudio/PlanMallaCurricularView.js",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  const detalleView = readFileSync(
+    new URL(
+      "../src/pages/planes-estudio/PlanDetalleView.js",
       import.meta.url,
     ),
     "utf8",
@@ -372,11 +379,11 @@ test("mantiene el contrato visual y los disparadores de recálculo", () => {
   assert.match(css, /\.malla-connection\.is-corequisite[\s\S]*?#d97706/i);
   assert.match(css, /stroke-width:\s*2\.5/);
   assert.match(css, /stroke-dasharray:\s*8 6/);
-  assert.match(pagina, /new ResizeObserver/);
-  assert.doesNotMatch(pagina, /"scrollend",\s*programarDibujoMalla/);
-  assert.match(pagina, /window\.addEventListener\("resize", programarDibujoMalla/);
-  assert.match(pagina, /function mostrarTarjetaMallaCompleta\(card\)/);
-  assert.match(pagina, /scroll\.scrollBy\(\{ left: ajuste, behavior: "smooth" \}\)/);
+  assert.match(detalleView, /new ResizeObserver/);
+  assert.doesNotMatch(detalleView, /"scrollend",\s*programarDibujoMalla/);
+  assert.match(detalleView, /window\.addEventListener\(\s*["']resize["'],\s*\(\)\s*=>\s*programarDibujoMalla\(contexto\)/);
+  assert.match(mallaView, /function mostrarTarjetaMallaCompleta\(card\)/);
+  assert.match(mallaView, /scroll\.scrollBy\(\{ left: ajuste, behavior: "smooth" \}\)/);
 });
 
 test("la selección destaca solo las tarjetas relacionadas sin mover los puertos SVG", () => {
@@ -384,16 +391,264 @@ test("la selección destaca solo las tarjetas relacionadas sin mover los puertos
     new URL("../src/styles/planes-estudio.css", import.meta.url),
     "utf8",
   );
-  const pagina = readFileSync(
-    new URL("../src/pages/planes-estudio/PlanesEstudioPage.js", import.meta.url),
+  const mallaView = readFileSync(
+    new URL("../src/pages/planes-estudio/PlanMallaCurricularView.js", import.meta.url),
     "utf8",
   );
 
-  assert.match(pagina, /Boolean\(mallaAsignaturaSeleccionadaId\) && !idsRuta\.has\(id\)/);
-  assert.match(pagina, /mallaAsignaturaSeleccionadaId && !perteneceRuta \? "is-muted"/);
+  assert.match(mallaView, /Boolean\(estado\.mallaAsignaturaSeleccionadaId\) && !idsRuta\.has\(id\)/);
+  assert.match(mallaView, /card\.classList\.toggle\(\s*"is-muted"/);
   assert.match(css, /\.malla-card\.is-muted\s*\{[^}]*grayscale/);
   assert.match(css, /\.malla-card\.is-route\.is-requirement\s*\{[^}]*0 0 0 3px/);
   assert.match(css, /\.malla-card\.is-route\.is-corequisite\s*\{[^}]*0 0 0 3px/);
   assert.match(css, /\.malla-card\.is-route:hover,[\s\S]*?transform:\s*none/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.malla-card\s*\{\s*transition:\s*none/);
+});
+
+test("seleccionar y limpiar una asignatura actualiza el estado real de las tarjetas de malla", async () => {
+  const { conectarEventosDetallePlan } = await import("../src/pages/planes-estudio/PlanDetalleView.js");
+  const { crearContextoPlanesEstudio } = await import("../src/pages/planes-estudio/planes-estudio.context.js");
+  const original = {
+    document: globalThis.document,
+    window: globalThis.window,
+    Element: globalThis.Element,
+  };
+  const frameCalls = [];
+  const cancelCalls = [];
+  let nextFrame = 0;
+
+  class FakeCard {
+    constructor(id) {
+      this.dataset = { mallaAsignatura: String(id) };
+      this.classes = new Set();
+      this.attributes = {};
+      this.classList = {
+        toggle: (name, force) => force ? this.classes.add(name) : this.classes.delete(name),
+      };
+    }
+    closest(selector) {
+      return selector === "[data-malla-asignatura]" ? this : null;
+    }
+    setAttribute(name, value) {
+      this.attributes[name] = value;
+    }
+    getBoundingClientRect() {
+      return rect(10, 10);
+    }
+  }
+
+  const cards = [1, 2, 3, 4].map((id) => new FakeCard(id));
+  const canvas = { querySelectorAll: () => cards };
+  const resumen = { innerHTML: "" };
+  const scroll = {
+    getBoundingClientRect: () => rect(0, 0, 500, 500),
+    scrollLeft: 0,
+    scrollBy() {},
+  };
+  const elementos = {
+    mallaCanvas: canvas,
+    mallaSeleccionResumen: resumen,
+    mallaScroll: scroll,
+  };
+  const listeners = new Map();
+  const contenedor = {
+    addEventListener(event, handler) {
+      listeners.set(event, handler);
+    },
+    contains: () => true,
+  };
+
+  globalThis.Element = FakeCard;
+  globalThis.document = { getElementById: (id) => elementos[id] || null };
+  globalThis.window = {
+    requestAnimationFrame(callback) {
+      const id = ++nextFrame;
+      frameCalls.push({ id, callback });
+      return id;
+    },
+    cancelAnimationFrame(id) {
+      cancelCalls.push(id);
+    },
+    addEventListener() {},
+  };
+
+  try {
+    const contexto = crearContextoPlanesEstudio();
+    contexto.estado.planSeleccionado = { id: 7 };
+    contexto.estado.asignaturasPlan = cards.map((_, index) => ({
+      id: index + 1,
+      nivel: 1,
+      ciclo: 1,
+      nombre: `Materia ${index + 1}`,
+      curso: { nombre: `Materia ${index + 1}`, codigo: `MAT${index + 1}` },
+      activo: true,
+    }));
+    contexto.estado.requisitosPlan = [
+      { asignaturaId: 1, requisitoAsignaturaId: 2, tipo: "REQUISITO" },
+      { asignaturaId: 1, requisitoAsignaturaId: 3, tipo: "CORREQUISITO" },
+    ];
+    conectarEventosDetallePlan(contenedor, contexto);
+
+    const click = listeners.get("click");
+    await click({
+      target: cards[0],
+      preventDefault() {},
+      stopPropagation() {},
+    });
+
+    assert.equal(contexto.estado.mallaAsignaturaSeleccionadaId, 1);
+    assert.ok(cards[0].classes.has("is-selected"));
+    assert.ok(cards[1].classes.has("is-route"));
+    assert.ok(cards[1].classes.has("is-requirement"));
+    assert.ok(cards[2].classes.has("is-route"));
+    assert.ok(cards[2].classes.has("is-corequisite"));
+    assert.ok(cards[3].classes.has("is-muted"));
+    assert.equal(cards[0].attributes["aria-pressed"], "true");
+    assert.match(resumen.innerHTML, /Materia 1/);
+
+    await click({ target: cards[0], preventDefault() {}, stopPropagation() {} });
+    assert.equal(contexto.estado.mallaAsignaturaSeleccionadaId, null);
+    assert.ok(cards.every((card) => !card.classes.has("is-muted")));
+    assert.ok(cards.every((card) => !card.classes.has("is-route")));
+    assert.equal(cards[0].attributes["aria-pressed"], "false");
+    assert.match(resumen.innerHTML, /Seleccione una asignatura/);
+    assert.equal(frameCalls.length, 2);
+    assert.equal(cancelCalls.length, 1);
+  } finally {
+    globalThis.document = original.document;
+    globalThis.window = original.window;
+    globalThis.Element = original.Element;
+  }
+});
+
+test("programarDibujoMalla: exige contexto válido con estado y lanza TypeError si recibe evento o null", async () => {
+  const { programarDibujoMalla } = await import("../src/pages/planes-estudio/PlanMallaCurricularView.js");
+
+  assert.throws(() => programarDibujoMalla(), {
+    name: "TypeError",
+    message: /programarDibujoMalla requiere un contexto de Planes de Estudio válido con estado/,
+  });
+
+  const fakeEvent = { type: "resize" };
+  assert.throws(() => programarDibujoMalla(fakeEvent), {
+    name: "TypeError",
+    message: /programarDibujoMalla requiere un contexto de Planes de Estudio válido con estado/,
+  });
+});
+
+test("programarDibujoMalla: debouncing mediante requestAnimationFrame cancela frames previos", async () => {
+  const { programarDibujoMalla } = await import("../src/pages/planes-estudio/PlanMallaCurricularView.js");
+
+  const originalWindow = globalThis.window;
+  const rafCalls = [];
+  const cafCalls = [];
+  let frameId = 100;
+
+  globalThis.window = {
+    requestAnimationFrame: (cb) => {
+      const id = ++frameId;
+      rafCalls.push({ id, cb });
+      return id;
+    },
+    cancelAnimationFrame: (id) => {
+      cafCalls.push(id);
+    },
+  };
+
+  try {
+    const contexto = {
+      estado: {
+        frameDibujoMalla: null,
+        mallaAsignaturaSeleccionadaId: null,
+        requisitosPlan: [],
+      },
+    };
+
+    // Llamada 1
+    programarDibujoMalla(contexto);
+    assert.equal(contexto.estado.frameDibujoMalla, 101);
+    assert.equal(rafCalls.length, 1);
+    assert.equal(cafCalls.length, 0);
+
+    // Llamadas rápidas consecutivas deben cancelar el frame previo
+    programarDibujoMalla(contexto);
+    assert.equal(cafCalls.length, 1);
+    assert.equal(cafCalls[0], 101);
+    assert.equal(contexto.estado.frameDibujoMalla, 102);
+
+    programarDibujoMalla(contexto);
+    assert.equal(cafCalls.length, 2);
+    assert.equal(cafCalls[1], 102);
+    assert.equal(contexto.estado.frameDibujoMalla, 103);
+  } finally {
+    globalThis.window = originalWindow;
+  }
+});
+
+test("conectarEventosDetallePlan: registra listener de resize con contexto y AbortSignal de limpieza", async () => {
+  const { conectarEventosDetallePlan } = await import("../src/pages/planes-estudio/PlanDetalleView.js");
+  const { crearContextoPlanesEstudio } = await import("../src/pages/planes-estudio/planes-estudio.context.js");
+
+  const listeners = new Map();
+  const originalWindow = globalThis.window;
+  const rafCalls = [];
+  const cancelCalls = [];
+  let frameId = 0;
+
+  globalThis.window = {
+    addEventListener(event, handler, options) {
+      const list = listeners.get(event) || [];
+      list.push({ handler, options });
+      listeners.set(event, list);
+
+      options?.signal?.addEventListener("abort", () => {
+        const current = listeners.get(event) || [];
+        listeners.set(
+          event,
+          current.filter((item) => item.handler !== handler),
+        );
+      });
+    },
+    requestAnimationFrame: (cb) => {
+      const id = ++frameId;
+      rafCalls.push({ id, cb });
+      return id;
+    },
+    cancelAnimationFrame: (id) => cancelCalls.push(id),
+  };
+
+  try {
+    const contexto = crearContextoPlanesEstudio();
+    contexto.estado.planSeleccionado = { id: 10, nombre: "Plan A" };
+
+    const contenedor = {
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+
+    conectarEventosDetallePlan(contenedor, contexto, {});
+
+    const resizeListeners = listeners.get("resize") || [];
+    assert.equal(resizeListeners.length, 1);
+
+    resizeListeners[0].handler();
+    assert.equal(rafCalls.length, 1, "resize debe programar un frame");
+    assert.equal(contexto.estado.frameDibujoMalla, rafCalls[0].id);
+
+    // Registrar de nuevo reemplaza la suscripción anterior en vez de duplicarla.
+    conectarEventosDetallePlan(contenedor, contexto, {});
+    assert.equal((listeners.get("resize") || []).length, 1);
+    (listeners.get("resize") || [])[0].handler();
+    assert.equal(rafCalls.length, 2);
+    assert.deepEqual(cancelCalls, [rafCalls[0].id]);
+
+    // Desmontar / limpiar detalle
+    contexto.cancelarDetalleEventos();
+    const listenersActivosTrasLimpieza = listeners.get("resize") || [];
+    assert.equal(listenersActivosTrasLimpieza.length, 0);
+    contexto.limpiarObserverMalla();
+    assert.deepEqual(cancelCalls, [rafCalls[0].id, rafCalls[1].id]);
+  } finally {
+    globalThis.window = originalWindow;
+  }
 });
