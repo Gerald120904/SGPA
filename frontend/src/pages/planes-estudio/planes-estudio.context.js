@@ -135,5 +135,21 @@ export function crearContextoPlanesEstudio() {
       estado.vistaPapeleraPlan = false;
       estado.nivelPaginaPlan = 1;
     },
+
+    destruir() {
+      estado.instanciaActual += 1;
+      estado.cargaDetalleActual += 1;
+      this.cancelarDetalleEventos();
+      if (estado.paginaEventosController) {
+        try {
+          estado.paginaEventosController.abort();
+        } catch {
+          // No-op
+        }
+        estado.paginaEventosController = null;
+      }
+      this.limpiarObserverMalla();
+      this.resetearDetalle();
+    },
   };
 }

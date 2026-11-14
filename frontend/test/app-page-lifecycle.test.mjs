@@ -42,6 +42,8 @@ test('las páginas con consultas prolongadas declaran destructores opcionales y 
   assert.equal(typeof obtenerCicloVidaPagina('mis-asistentes').destroy, 'function');
   assert.equal(typeof obtenerCicloVidaPagina('cursos').destroy, 'function');
   assert.equal(typeof obtenerCicloVidaPagina('periodos').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('planes-estudio').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('perfiles-academicos').destroy, 'function');
   assert.equal(typeof obtenerCicloVidaPagina('dashboard').destroy, 'undefined');
   assert.equal(typeof obtenerCicloVidaPagina('aulas').destroy, 'undefined');
   assert.equal(obtenerCicloVidaPagina('login'), null);

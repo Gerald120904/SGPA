@@ -3,8 +3,8 @@ import { ModulesPage } from '../pages/modules/ModulesPage.js';
 import { UsuariosPage, iniciarUsuariosPage, destruirUsuariosPage } from '../pages/usuarios/UsuariosPage.js';
 import { MisAsistentesPage, iniciarMisAsistentesPage, destruirMisAsistentesPage } from '../pages/usuarios/MisAsistentesPage.js';
 import { CarrerasPage, iniciarCarrerasPage } from '../pages/carreras/CarrerasPage.js';
-import { PlanesEstudioPage, iniciarPlanesEstudioPage } from '../pages/planes-estudio/PlanesEstudioPage.js';
-import { PerfilesAcademicosPage, iniciarPerfilesAcademicosPage } from '../pages/perfiles-academicos/PerfilesAcademicosPage.js';
+import { PlanesEstudioPage, iniciarPlanesEstudioPage, destruirPlanesEstudioPage } from '../pages/planes-estudio/PlanesEstudioPage.js';
+import { PerfilesAcademicosPage, iniciarPerfilesAcademicosPage, destruirPerfilesAcademicosPage } from '../pages/perfiles-academicos/PerfilesAcademicosPage.js';
 import { CursosPage, iniciarCursosPage, destruirCursosPage } from '../pages/cursos/CursosPage.js';
 import { OptativasPage, iniciarOptativasPage } from '../pages/optativas/OptativasPage.js';
 import { PeriodosPage, iniciarPeriodosPage, destruirPeriodosPage } from '../pages/periodos/PeriodosPage.js';
@@ -31,8 +31,8 @@ const PAGE_LIFECYCLES = Object.freeze({
   usuarios: Object.freeze({ render: UsuariosPage, initialize: iniciarUsuariosPage, destroy: destruirUsuariosPage }),
   'mis-asistentes': Object.freeze({ render: MisAsistentesPage, initialize: iniciarMisAsistentesPage, destroy: destruirMisAsistentesPage }),
   carreras: Object.freeze({ render: CarrerasPage, initialize: iniciarCarrerasPage }),
-  'planes-estudio': Object.freeze({ render: PlanesEstudioPage, initialize: iniciarPlanesEstudioPage }),
-  'perfiles-academicos': Object.freeze({ render: PerfilesAcademicosPage, initialize: iniciarPerfilesAcademicosPage }),
+  'planes-estudio': Object.freeze({ render: PlanesEstudioPage, initialize: iniciarPlanesEstudioPage, destroy: destruirPlanesEstudioPage }),
+  'perfiles-academicos': Object.freeze({ render: PerfilesAcademicosPage, initialize: iniciarPerfilesAcademicosPage, destroy: destruirPerfilesAcademicosPage }),
   cursos: Object.freeze({ render: CursosPage, initialize: iniciarCursosPage, destroy: destruirCursosPage }),
   optativas: Object.freeze({ render: OptativasPage, initialize: iniciarOptativasPage }),
   periodos: Object.freeze({ render: PeriodosPage, initialize: iniciarPeriodosPage, destroy: destruirPeriodosPage }),

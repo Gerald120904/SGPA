@@ -60,22 +60,61 @@ function validarLineasUnicas(elementos, nombre) {
   return true;
 }
 
-async function guardarCambio(operacion, mensaje, dialog, onUpdated) {
-  const resultado = await operacion();
-  if (!resultado?.ok) {
-    mostrarError({
-      titulo: 'No se pudo guardar',
-      mensaje: resultado?.message || 'No fue posible actualizar el perfil.',
-    });
-    return;
-  }
-  dialog?.close();
-  mostrarExito({ titulo: 'Perfil actualizado', mensaje });
-  await onUpdated?.();
+function operacionVigente(controlOperacion) {
+  return controlOperacion?.esVigente?.() === true;
 }
 
-export async function abrirGestorCursosPerfil({ perfil, onReloadDetail }) {
-  if (!perfil) return;
+function reservar(controlOperacion, clave) {
+  if (!operacionVigente(controlOperacion)) return null;
+  return controlOperacion.reservar?.(clave) || null;
+}
+
+function liberar(controlOperacion, clave, token) {
+  controlOperacion?.liberar?.(clave, token);
+}
+
+function marcarEnviada(controlOperacion, clave, token) {
+  return controlOperacion?.marcarEnviada?.(clave, token) === true;
+}
+
+async function guardarCambio(
+  operacion,
+  mensaje,
+  dialog,
+  onUpdated,
+  controlOperacion,
+) {
+  try {
+    const resultado = await operacion();
+    if (!operacionVigente(controlOperacion)) return false;
+    if (!resultado?.ok) {
+      mostrarError({
+        titulo: 'No se pudo guardar',
+        mensaje: resultado?.message || 'No fue posible actualizar el perfil.',
+      });
+      return false;
+    }
+    dialog?.close();
+    mostrarExito({ titulo: 'Perfil actualizado', mensaje });
+    await onUpdated?.();
+    return true;
+  } catch (error) {
+    if (operacionVigente(controlOperacion)) {
+      mostrarError({
+        titulo: 'No se pudo guardar',
+        mensaje: error?.message || 'No fue posible actualizar el perfil.',
+      });
+    }
+    return false;
+  }
+}
+
+export async function abrirGestorCursosPerfil({
+  perfil,
+  controlOperacion,
+  onReloadDetail,
+}) {
+  if (!perfil || !operacionVigente(controlOperacion)) return;
 
   if (perfil.estructuraEditable === false) {
     mostrarError({
@@ -90,6 +129,8 @@ export async function abrirGestorCursosPerfil({ perfil, onReloadDetail }) {
     listarCursos(),
     listarCursosPerfil(perfil.id),
   ]);
+
+  if (!operacionVigente(controlOperacion)) return;
 
   if (!resultadoCatalogo?.ok) {
     mostrarError({
@@ -220,19 +261,26 @@ export async function abrirGestorCursosPerfil({ perfil, onReloadDetail }) {
     .getElementById('cursosPerfilContent')
     ?.addEventListener('click', async (event) => {
       const boton = event.target.closest('[data-curso-perfil-id]');
-      if (!boton) return;
+      if (!boton || !operacionVigente(controlOperacion)) return;
 
       const cursoId = Number(boton.dataset.cursoPerfilId);
       const accion = boton.dataset.cursoPerfilAccion;
       if (!cursoId) return;
 
+      const clave = `curso:${perfil.id}:${cursoId}`;
+      const token = reservar(controlOperacion, clave);
+      if (!token) return;
       boton.disabled = true;
 
       try {
+        if (!operacionVigente(controlOperacion)) return;
+        if (!marcarEnviada(controlOperacion, clave, token)) return;
         const resultado =
           accion === 'agregar'
             ? await asociarCursoPerfil(perfil.id, cursoId)
             : await desasociarCursoPerfil(perfil.id, cursoId);
+
+        if (!operacionVigente(controlOperacion)) return;
 
         if (!resultado?.ok) {
           throw new Error(
@@ -242,6 +290,7 @@ export async function abrirGestorCursosPerfil({ perfil, onReloadDetail }) {
         }
 
         const actualizado = await listarCursosPerfil(perfil.id);
+        if (!operacionVigente(controlOperacion)) return;
         if (!actualizado?.ok) {
           throw new Error(
             actualizado?.message ||
@@ -253,13 +302,16 @@ export async function abrirGestorCursosPerfil({ perfil, onReloadDetail }) {
         renderizarCursos();
         await onReloadDetail?.(perfil.id);
       } catch (error) {
-        mostrarError({
-          titulo: 'No se pudo modificar el curso',
-          mensaje:
-            error?.message ||
-            'No fue posible modificar los cursos habilitados.',
-        });
+        if (operacionVigente(controlOperacion)) {
+          mostrarError({
+            titulo: 'No se pudo modificar el curso',
+            mensaje:
+              error?.message ||
+              'No fue posible modificar los cursos habilitados.',
+          });
+        }
       } finally {
+        liberar(controlOperacion, clave, token);
         boton.disabled = false;
       }
     });
@@ -267,7 +319,12 @@ export async function abrirGestorCursosPerfil({ perfil, onReloadDetail }) {
   renderizarCursos();
 }
 
-export function abrirNuevoPerfilDialog({ carreras = [], onCreated }) {
+export function abrirNuevoPerfilDialog({
+  carreras = [],
+  controlOperacion,
+  onCreated,
+}) {
+  if (!operacionVigente(controlOperacion)) return;
   const carrerasActivas = carreras.filter((carrera) => carrera.activo !== false);
 
   if (!carrerasActivas.length) {
@@ -339,6 +396,7 @@ export function abrirNuevoPerfilDialog({ carreras = [], onCreated }) {
     .getElementById('nuevoPerfilForm')
     ?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!operacionVigente(controlOperacion)) return;
 
       const carreraId = Number(
         document.getElementById('nuevoPerfilCarrera')?.value,
@@ -363,15 +421,22 @@ export function abrirNuevoPerfilDialog({ carreras = [], onCreated }) {
       }
 
       const boton = document.getElementById('guardarPerfilForm');
+      const clave = `crear:${carreraId}:${codigo}`;
+      const token = reservar(controlOperacion, clave);
+      if (!token) return;
       if (boton) boton.disabled = true;
 
       try {
+        if (!operacionVigente(controlOperacion)) return;
+        if (!marcarEnviada(controlOperacion, clave, token)) return;
         const resultado = await crearPerfil({
           carreraId,
           codigo,
           nombre,
           descripcion: descripcion || undefined,
         });
+
+        if (!operacionVigente(controlOperacion)) return;
 
         if (!resultado?.ok) {
           throw new Error(
@@ -385,21 +450,30 @@ export function abrirNuevoPerfilDialog({ carreras = [], onCreated }) {
           mensaje: 'El perfil docente fue creado correctamente.',
         });
 
-        await onCreated?.(resultado.data?.id);
+        if (operacionVigente(controlOperacion)) {
+          await onCreated?.(resultado.data?.id);
+        }
       } catch (error) {
-        mostrarError({
-          titulo: 'No se pudo crear el perfil',
-          mensaje:
-            error?.message || 'No fue posible crear el perfil docente.',
-        });
+        if (operacionVigente(controlOperacion)) {
+          mostrarError({
+            titulo: 'No se pudo crear el perfil',
+            mensaje:
+              error?.message || 'No fue posible crear el perfil docente.',
+          });
+        }
       } finally {
+        liberar(controlOperacion, clave, token);
         if (boton) boton.disabled = false;
       }
     });
 }
 
-export function abrirEditorPerfilDialog({ perfil, onUpdated }) {
-  if (!perfil) return;
+export function abrirEditorPerfilDialog({
+  perfil,
+  controlOperacion,
+  onUpdated,
+}) {
+  if (!perfil || !operacionVigente(controlOperacion)) return;
 
   const body = `
     <label class="sgpa-form-field">
@@ -460,6 +534,7 @@ export function abrirEditorPerfilDialog({ perfil, onUpdated }) {
     .getElementById('editarPerfilForm')
     ?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!operacionVigente(controlOperacion)) return;
 
       const nombre =
         document.getElementById('perfilNombre')?.value?.trim() || '';
@@ -486,64 +561,112 @@ export function abrirEditorPerfilDialog({ perfil, onUpdated }) {
         tipoRegistro: document.getElementById('tipoRegistro')?.value || null,
       };
 
-      const resultado = await actualizarPerfil(perfil.id, datos);
-      if (!resultado?.ok) {
-        mostrarError({
-          titulo: 'No se pudo actualizar',
-          mensaje: resultado?.message || 'No fue posible actualizar el perfil.',
+      const boton = document.getElementById('guardarPerfilForm');
+      const clave = `editar:${perfil.id}`;
+      const token = reservar(controlOperacion, clave);
+      if (!token) return;
+      if (boton) boton.disabled = true;
+
+      try {
+        if (!operacionVigente(controlOperacion)) return;
+        if (!marcarEnviada(controlOperacion, clave, token)) return;
+        const resultado = await actualizarPerfil(perfil.id, datos);
+        if (!operacionVigente(controlOperacion)) return;
+        if (!resultado?.ok) {
+          mostrarError({
+            titulo: 'No se pudo actualizar',
+            mensaje: resultado?.message || 'No fue posible actualizar el perfil.',
+          });
+          return;
+        }
+
+        dialog?.close();
+        mostrarExito({
+          titulo: 'Perfil actualizado',
+          mensaje:
+            'La información del perfil docente fue actualizada correctamente.',
         });
-        return;
+
+        if (operacionVigente(controlOperacion)) await onUpdated?.();
+      } catch (error) {
+        if (operacionVigente(controlOperacion)) {
+          mostrarError({
+            titulo: 'No se pudo actualizar',
+            mensaje: error?.message || 'No fue posible actualizar el perfil.',
+          });
+        }
+      } finally {
+        liberar(controlOperacion, clave, token);
+        if (boton) boton.disabled = false;
       }
+    });
+}
 
-      dialog?.close();
-      mostrarExito({
-        titulo: 'Perfil actualizado',
+export async function cambiarEstadoPerfilActual({
+  perfil,
+  controlOperacion,
+  onUpdated,
+}) {
+  if (!perfil || !operacionVigente(controlOperacion)) return;
+  const clave = `estado:${perfil.id}`;
+  const token = reservar(controlOperacion, clave);
+  if (!token) return;
+
+  try {
+    const nuevoEstado = !perfil.activo;
+    const accion = nuevoEstado ? 'activar' : 'inactivar';
+
+    const confirmado = await confirmarAccion({
+      titulo: nuevoEstado ? 'Activar perfil' : 'Inactivar perfil',
+      mensaje: nuevoEstado
+        ? `¿Desea activar el perfil "${perfil.nombre}"?`
+        : `¿Desea inactivar el perfil "${perfil.nombre}"? Los antecedentes existentes se conservarán, pero el perfil dejará de estar disponible para nuevas solicitudes y no habilitará cursos.`,
+      textoConfirmar: nuevoEstado ? 'Activar' : 'Inactivar',
+      peligro: !nuevoEstado,
+    });
+
+    if (!confirmado || !operacionVigente(controlOperacion)) return;
+    if (!marcarEnviada(controlOperacion, clave, token)) return;
+
+    const resultado = await cambiarEstadoPerfil(perfil.id, nuevoEstado);
+    if (!operacionVigente(controlOperacion)) return;
+    if (!resultado?.ok) {
+      mostrarError({
+        titulo: `No se pudo ${accion} el perfil`,
         mensaje:
-          'La información del perfil docente fue actualizada correctamente.',
+          resultado?.message || `No fue posible ${accion} el perfil docente.`,
       });
+      return;
+    }
 
-      await onUpdated?.();
+    mostrarExito({
+      titulo: nuevoEstado ? 'Perfil activado' : 'Perfil inactivado',
+      mensaje: nuevoEstado
+        ? 'El perfil vuelve a estar disponible.'
+        : 'El perfil quedó inactivo y su historial fue conservado.',
     });
-}
 
-export async function cambiarEstadoPerfilActual({ perfil, onUpdated }) {
-  if (!perfil) return;
-
-  const nuevoEstado = !perfil.activo;
-  const accion = nuevoEstado ? 'activar' : 'inactivar';
-
-  const confirmado = await confirmarAccion({
-    titulo: nuevoEstado ? 'Activar perfil' : 'Inactivar perfil',
-    mensaje: nuevoEstado
-      ? `¿Desea activar el perfil "${perfil.nombre}"?`
-      : `¿Desea inactivar el perfil "${perfil.nombre}"? Los antecedentes existentes se conservarán, pero el perfil dejará de estar disponible para nuevas solicitudes y no habilitará cursos.`,
-    textoConfirmar: nuevoEstado ? 'Activar' : 'Inactivar',
-    peligro: !nuevoEstado,
-  });
-
-  if (!confirmado) return;
-
-  const resultado = await cambiarEstadoPerfil(perfil.id, nuevoEstado);
-  if (!resultado?.ok) {
-    mostrarError({
-      titulo: `No se pudo ${accion} el perfil`,
-      mensaje:
-        resultado?.message || `No fue posible ${accion} el perfil docente.`,
-    });
-    return;
+    if (operacionVigente(controlOperacion)) await onUpdated?.();
+  } catch (error) {
+    if (operacionVigente(controlOperacion)) {
+      mostrarError({
+        titulo: 'No se pudo cambiar el estado',
+        mensaje:
+          error?.message || 'No fue posible cambiar el estado del perfil.',
+      });
+    }
+  } finally {
+    liberar(controlOperacion, clave, token);
   }
-
-  mostrarExito({
-    titulo: nuevoEstado ? 'Perfil activado' : 'Perfil inactivado',
-    mensaje: nuevoEstado
-      ? 'El perfil vuelve a estar disponible.'
-      : 'El perfil quedó inactivo y su historial fue conservado.',
-  });
-
-  await onUpdated?.();
 }
 
-export function abrirEditorAreasDialog({ perfil, areasActuales = [], onUpdated }) {
+export function abrirEditorAreasDialog({
+  perfil,
+  areasActuales = [],
+  controlOperacion,
+  onUpdated,
+}) {
+  if (!operacionVigente(controlOperacion)) return;
   if (perfil?.estructuraEditable === false) {
     mostrarError({
       titulo: 'Configuración bloqueada',
@@ -587,6 +710,7 @@ export function abrirEditorAreasDialog({ perfil, areasActuales = [], onUpdated }
     .getElementById('perfilAreasForm')
     ?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!operacionVigente(controlOperacion) || perfil.estructuraEditable === false) return;
 
       const listaDisciplinares = extraerLineasTexto(
         document.getElementById('areasDisciplinares')?.value,
@@ -615,22 +739,41 @@ export function abrirEditorAreasDialog({ perfil, areasActuales = [], onUpdated }
         })),
       ];
 
-      if (
-        !(await confirmarAccion({
-          titulo: 'Reemplazar áreas',
-          mensaje: 'Se sustituirá la lista completa de áreas del perfil.',
-          textoConfirmar: 'Guardar áreas',
-        }))
-      ) {
-        return;
-      }
+      const boton = document.getElementById('guardarPerfilForm');
+      const clave = `areas:${perfil.id}`;
+      const token = reservar(controlOperacion, clave);
+      if (!token) return;
+      if (boton) boton.disabled = true;
 
-      await guardarCambio(
-        () => guardarAreasPerfil(perfil.id, areas),
-        'Las áreas fueron actualizadas.',
-        dialog,
-        onUpdated,
-      );
+      try {
+        if (
+          !(await confirmarAccion({
+            titulo: 'Reemplazar áreas',
+            mensaje: 'Se sustituirá la lista completa de áreas del perfil.',
+            textoConfirmar: 'Guardar áreas',
+          }))
+        ) {
+          return;
+        }
+        if (
+          !operacionVigente(controlOperacion) ||
+          perfil.estructuraEditable === false
+        ) {
+          return;
+        }
+        if (!marcarEnviada(controlOperacion, clave, token)) return;
+
+        await guardarCambio(
+          () => guardarAreasPerfil(perfil.id, areas),
+          'Las áreas fueron actualizadas.',
+          dialog,
+          onUpdated,
+          controlOperacion,
+        );
+      } finally {
+        liberar(controlOperacion, clave, token);
+        if (boton) boton.disabled = false;
+      }
     });
 }
 
@@ -681,8 +824,10 @@ function leerRequisitosEditor(validar) {
 export function abrirEditorRequisitosDialog({
   perfil,
   requisitosActuales = [],
+  controlOperacion,
   onUpdated,
 }) {
+  if (!perfil || !operacionVigente(controlOperacion)) return;
   if (perfil?.estructuraEditable === false) {
     mostrarError({
       titulo: 'Configuración bloqueada',
@@ -741,24 +886,45 @@ export function abrirEditorRequisitosDialog({
     .getElementById('perfilRequisitosForm')
     ?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!operacionVigente(controlOperacion) || perfil.estructuraEditable === false) return;
       const requisitos = leerRequisitosEditor(true);
       if (!requisitos) return;
-      if (
-        !(await confirmarAccion({
-          titulo: 'Guardar requisitos',
-          mensaje:
-            'Se actualizará la configuración completa de requisitos y condiciones.',
-          textoConfirmar: 'Guardar requisitos',
-        }))
-      ) {
-        return;
-      }
 
-      await guardarCambio(
-        () => guardarRequisitosPerfil(perfil.id, requisitos),
-        'Los requisitos fueron actualizados.',
-        dialog,
-        onUpdated,
-      );
+      const boton = document.getElementById('guardarPerfilForm');
+      const clave = `requisitos:${perfil.id}`;
+      const token = reservar(controlOperacion, clave);
+      if (!token) return;
+      if (boton) boton.disabled = true;
+
+      try {
+        if (
+          !(await confirmarAccion({
+            titulo: 'Guardar requisitos',
+            mensaje:
+              'Se actualizará la configuración completa de requisitos y condiciones.',
+            textoConfirmar: 'Guardar requisitos',
+          }))
+        ) {
+          return;
+        }
+        if (
+          !operacionVigente(controlOperacion) ||
+          perfil.estructuraEditable === false
+        ) {
+          return;
+        }
+        if (!marcarEnviada(controlOperacion, clave, token)) return;
+
+        await guardarCambio(
+          () => guardarRequisitosPerfil(perfil.id, requisitos),
+          'Los requisitos fueron actualizados.',
+          dialog,
+          onUpdated,
+          controlOperacion,
+        );
+      } finally {
+        liberar(controlOperacion, clave, token);
+        if (boton) boton.disabled = false;
+      }
     });
 }

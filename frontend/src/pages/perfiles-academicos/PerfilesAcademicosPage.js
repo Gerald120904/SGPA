@@ -10,7 +10,12 @@ import {
   obtenerPerfil,
 } from '../../services/perfiles-academicos.service.js';
 import { listarCarreras } from '../../services/carreras.service.js';
-import { usuarioTienePermiso } from '../../app/session.js';
+import {
+  obtenerRolActivo,
+  obtenerUsuario,
+  obtenerVersionSesion,
+  usuarioTienePermiso,
+} from '../../app/session.js';
 import { PERMISOS } from '../../config/permissions.js';
 import { habilitarCierreExterior } from '../../components/FormDialog.js';
 import { escapeHtml } from '../../utils/html.js';
@@ -32,6 +37,7 @@ import {
   abrirNuevoPerfilDialog,
   cambiarEstadoPerfilActual,
 } from './PerfilDialogs.js';
+import { crearContextoPerfilesAcademicos } from './perfiles-academicos.context.js';
 
 export {
   TIPOS_REQUISITO,
@@ -41,14 +47,42 @@ export {
   formatearFechaPerfil,
 };
 
-let perfiles = [];
-let carreras = [];
-let perfilActual = null;
-let areasActuales = [];
-let requisitosActuales = [];
+const contexto = crearContextoPerfilesAcademicos();
 
 function puedeGestionar() {
   return usuarioTienePermiso(PERMISOS.PERFILES_ACADEMICOS_GESTIONAR);
+}
+
+function crearControlOperacion(instancia, perfilId = null) {
+  const versionSesion = obtenerVersionSesion();
+  const usuario = obtenerUsuario();
+  const usuarioId = usuario?.id ?? null;
+  const rolActivo = obtenerRolActivo(usuario);
+  const detalleToken = contexto.estado.detalleToken;
+
+  return {
+    esVigente() {
+      const usuarioActual = obtenerUsuario();
+      return Boolean(
+        contexto.esInstanciaVigente(instancia) &&
+          contexto.estado.detalleToken === detalleToken &&
+          (perfilId == null || Number(contexto.estado.perfilActual?.id) === Number(perfilId)) &&
+          obtenerVersionSesion() === versionSesion &&
+          (usuarioActual?.id ?? null) === usuarioId &&
+          obtenerRolActivo(usuarioActual) === rolActivo &&
+          puedeGestionar(),
+      );
+    },
+    reservar(clave) {
+      return contexto.reservarOperacion(clave, instancia);
+    },
+    marcarEnviada(clave, token) {
+      return contexto.marcarOperacionEnviada(clave, token);
+    },
+    liberar(clave, token) {
+      return contexto.liberarOperacion(clave, token);
+    },
+  };
 }
 
 export function PerfilesAcademicosPage() {
@@ -114,38 +148,42 @@ function renderizarListado() {
   const estado = document.getElementById('perfilesEstado')?.value || 'TODOS';
 
   contenedor.innerHTML = renderizarTablaPerfiles({
-    perfiles,
+    perfiles: contexto.estado.perfiles,
     texto,
     estado,
   });
   renderizarIconos();
 }
 
-async function recargarPerfiles() {
+async function recargarPerfiles(instancia) {
   const resultado = await listarPerfilesAcademicos();
+  if (!contexto.esInstanciaVigente(instancia ?? contexto.estado.instanciaActual)) {
+    return;
+  }
   if (!resultado?.ok) {
     throw new Error(
       resultado?.message || 'No fue posible actualizar el listado de perfiles.',
     );
   }
-  perfiles = Array.isArray(resultado.data) ? resultado.data : [];
+  contexto.estado.perfiles = Array.isArray(resultado.data) ? resultado.data : [];
   renderizarListado();
 }
 
 function renderizarDetalle() {
   const contenedor = document.getElementById('perfilDetalle');
-  if (!contenedor || !perfilActual) return;
+  if (!contenedor || !contexto.estado.perfilActual) return;
 
   contenedor.innerHTML = renderizarDetallePerfilHtml({
-    perfil: perfilActual,
-    areas: areasActuales,
-    requisitos: requisitosActuales,
+    perfil: contexto.estado.perfilActual,
+    areas: contexto.estado.areasActuales,
+    requisitos: contexto.estado.requisitosActuales,
     puedeGestionar: puedeGestionar(),
   });
   renderizarIconos();
 }
 
 async function cargarDetalle(id) {
+  const marca = contexto.iniciarDetalle(id);
   const listado = document.getElementById('perfilesListado');
   const detalle = document.getElementById('perfilDetalle');
   listado?.classList.add('hidden');
@@ -155,30 +193,42 @@ async function cargarDetalle(id) {
       '<div class="sgpa-state-message">Cargando perfil docente...</div>';
   }
 
-  const [perfil, areas, requisitos] = await Promise.all([
-    obtenerPerfil(id),
-    listarAreasPerfil(id),
-    listarRequisitosPerfil(id),
-  ]);
+  try {
+    const [perfil, areas, requisitos] = await Promise.all([
+      obtenerPerfil(id),
+      listarAreasPerfil(id),
+      listarRequisitosPerfil(id),
+    ]);
 
-  const error = [perfil, areas, requisitos].find((resultado) => !resultado?.ok);
-  if (error) {
-    if (detalle) {
-      detalle.innerHTML = `<div class="sgpa-state-message sgpa-state-message-error">${escapeHtml(error.message || 'No fue posible cargar el perfil.')}</div>`;
+    if (!contexto.esDetalleVigente(marca)) {
+      return;
     }
-    return;
-  }
 
-  perfilActual = perfil.data;
-  areasActuales = Array.isArray(areas.data) ? areas.data : [];
-  requisitosActuales = Array.isArray(requisitos.data) ? requisitos.data : [];
-  renderizarDetalle();
+    const error = [perfil, areas, requisitos].find((resultado) => !resultado?.ok);
+    if (error) {
+      if (detalle) {
+        detalle.innerHTML = `<div class="sgpa-state-message sgpa-state-message-error">${escapeHtml(error.message || 'No fue posible cargar el perfil.')}</div>`;
+      }
+      return;
+    }
+
+    contexto.estado.perfilActual = perfil.data;
+    contexto.estado.areasActuales = Array.isArray(areas.data) ? areas.data : [];
+    contexto.estado.requisitosActuales = Array.isArray(requisitos.data) ? requisitos.data : [];
+    renderizarDetalle();
+  } catch (err) {
+    if (contexto.esDetalleVigente(marca) && detalle) {
+      detalle.innerHTML = `<div class="sgpa-state-message sgpa-state-message-error">${escapeHtml(err?.message || 'No fue posible cargar el perfil.')}</div>`;
+    }
+  }
 }
 
 async function recargarListadoYDetalle() {
-  await recargarPerfiles();
-  if (perfilActual?.id) {
-    await cargarDetalle(perfilActual.id);
+  const instancia = contexto.estado.instanciaActual;
+  await recargarPerfiles(instancia);
+  if (!contexto.esInstanciaVigente(instancia)) return;
+  if (contexto.estado.perfilActual?.id) {
+    await cargarDetalle(contexto.estado.perfilActual.id);
   }
 }
 
@@ -191,41 +241,61 @@ async function manejarDetalle(event) {
   if (event.target.closest('[data-volver-perfiles]')) {
     document.getElementById('perfilDetalle')?.classList.add('hidden');
     document.getElementById('perfilesListado')?.classList.remove('hidden');
-    perfilActual = null;
+    contexto.estado.perfilActual = null;
     return;
   }
   if (event.target.closest('[data-editar-perfil]')) {
     abrirEditorPerfilDialog({
-      perfil: perfilActual,
+      perfil: contexto.estado.perfilActual,
+      controlOperacion: crearControlOperacion(
+        contexto.estado.instanciaActual,
+        contexto.estado.perfilActual?.id,
+      ),
       onUpdated: recargarListadoYDetalle,
     });
     return;
   }
   if (event.target.closest('[data-cambiar-estado-perfil]')) {
     await cambiarEstadoPerfilActual({
-      perfil: perfilActual,
+      perfil: contexto.estado.perfilActual,
+      controlOperacion: crearControlOperacion(
+        contexto.estado.instanciaActual,
+        contexto.estado.perfilActual?.id,
+      ),
       onUpdated: recargarListadoYDetalle,
     });
     return;
   }
   if (event.target.closest('[data-gestionar-cursos]')) {
     await abrirGestorCursosPerfil({
-      perfil: perfilActual,
+      perfil: contexto.estado.perfilActual,
+      controlOperacion: crearControlOperacion(
+        contexto.estado.instanciaActual,
+        contexto.estado.perfilActual?.id,
+      ),
       onReloadDetail: cargarDetalle,
     });
     return;
   }
   if (event.target.closest('[data-editar-areas]')) {
     abrirEditorAreasDialog({
-      perfil: perfilActual,
-      areasActuales,
+      perfil: contexto.estado.perfilActual,
+      areasActuales: contexto.estado.areasActuales,
+      controlOperacion: crearControlOperacion(
+        contexto.estado.instanciaActual,
+        contexto.estado.perfilActual?.id,
+      ),
       onUpdated: recargarListadoYDetalle,
     });
   }
   if (event.target.closest('[data-editar-requisitos]')) {
     abrirEditorRequisitosDialog({
-      perfil: perfilActual,
-      requisitosActuales,
+      perfil: contexto.estado.perfilActual,
+      requisitosActuales: contexto.estado.requisitosActuales,
+      controlOperacion: crearControlOperacion(
+        contexto.estado.instanciaActual,
+        contexto.estado.perfilActual?.id,
+      ),
       onUpdated: recargarListadoYDetalle,
     });
   }
@@ -239,59 +309,85 @@ function mostrarFallo(mensaje) {
 }
 
 export async function iniciarPerfilesAcademicosPage() {
+  const { instancia, signal } = contexto.iniciarInstancia();
+
   document
     .getElementById('nuevoPerfilButton')
-    ?.addEventListener('click', () =>
-      abrirNuevoPerfilDialog({
-        carreras,
-        onCreated: async (id) => {
-          await recargarPerfiles();
-          if (id) await cargarDetalle(id);
-        },
-      }),
+    ?.addEventListener(
+      'click',
+      () => {
+        const controlOperacion = crearControlOperacion(instancia);
+        if (!controlOperacion.esVigente()) return;
+        abrirNuevoPerfilDialog({
+          carreras: contexto.estado.carreras,
+          controlOperacion,
+          onCreated: async (id) => {
+            if (!controlOperacion.esVigente()) return;
+            await recargarPerfiles(instancia);
+            if (id && contexto.esInstanciaVigente(instancia)) {
+              await cargarDetalle(id);
+            }
+          },
+        });
+      },
+      { signal },
     );
 
   document
     .getElementById('perfilesBuscar')
-    ?.addEventListener('input', renderizarListado);
+    ?.addEventListener('input', renderizarListado, { signal });
   document
     .getElementById('perfilesEstado')
-    ?.addEventListener('change', renderizarListado);
+    ?.addEventListener('change', renderizarListado, { signal });
   document
     .getElementById('perfilesContent')
-    ?.addEventListener('click', manejarListado);
+    ?.addEventListener('click', manejarListado, { signal });
   document
     .getElementById('perfilDetalle')
-    ?.addEventListener('click', manejarDetalle);
+    ?.addEventListener('click', manejarDetalle, { signal });
 
   const dialog = document.getElementById('perfilAcademicoDialog');
   habilitarCierreExterior(dialog);
 
-  const [resultadoPerfiles, resultadoCarreras] = await Promise.all([
-    listarPerfilesAcademicos(),
-    listarCarreras(),
-  ]);
+  try {
+    const [resultadoPerfiles, resultadoCarreras] = await Promise.all([
+      listarPerfilesAcademicos(),
+      listarCarreras(),
+    ]);
 
-  if (!resultadoPerfiles?.ok) {
-    mostrarFallo(
-      resultadoPerfiles?.message || 'No fue posible consultar los perfiles.',
-    );
-    return;
+    if (!contexto.esInstanciaVigente(instancia)) {
+      return;
+    }
+
+    if (!resultadoPerfiles?.ok) {
+      mostrarFallo(
+        resultadoPerfiles?.message || 'No fue posible consultar los perfiles.',
+      );
+      return;
+    }
+
+    if (!resultadoCarreras?.ok) {
+      mostrarFallo(
+        resultadoCarreras?.message || 'No fue posible consultar las carreras.',
+      );
+      return;
+    }
+
+    contexto.estado.perfiles = Array.isArray(resultadoPerfiles.data)
+      ? resultadoPerfiles.data
+      : [];
+    contexto.estado.carreras = Array.isArray(resultadoCarreras.carreras)
+      ? resultadoCarreras.carreras
+      : [];
+
+    renderizarListado();
+  } catch (error) {
+    if (contexto.esInstanciaVigente(instancia)) {
+      mostrarFallo(error?.message || 'Error de conexión al cargar perfiles.');
+    }
   }
+}
 
-  if (!resultadoCarreras?.ok) {
-    mostrarFallo(
-      resultadoCarreras?.message || 'No fue posible consultar las carreras.',
-    );
-    return;
-  }
-
-  perfiles = Array.isArray(resultadoPerfiles.data)
-    ? resultadoPerfiles.data
-    : [];
-  carreras = Array.isArray(resultadoCarreras.carreras)
-    ? resultadoCarreras.carreras
-    : [];
-
-  renderizarListado();
+export function destruirPerfilesAcademicosPage() {
+  contexto.destruir();
 }

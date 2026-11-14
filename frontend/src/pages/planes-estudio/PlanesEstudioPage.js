@@ -483,3 +483,11 @@ export function iniciarPlanesEstudioPage() {
 
   void cargarDatos(instancia);
 }
+
+/* =========================================================
+   DESTRUCTOR PRINCIPAL
+   ========================================================= */
+
+export function destruirPlanesEstudioPage() {
+  contextoPlanes.destruir();
+}
