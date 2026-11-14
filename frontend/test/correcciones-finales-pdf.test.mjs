@@ -101,12 +101,13 @@ test('5. Períodos Académicos: conserva el calendario nativo en los tres campos
 });
 
 test('6 y 7. Formularios: Vista previa de cursos completa y animación interactiva con confirmación real', () => {
-  const formulariosCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
-  assert.match(formulariosCode, /escapeHtml\(asignatura\.curso\?\.nombre \|\| asignatura\.nombreReferencia/);
-  assert.match(formulariosCode, /formularios-btn-spinner/);
-  assert.match(formulariosCode, /formulariosCreandoNotice/);
-  assert.match(formulariosCode, /estaCreando/);
-  assert.match(formulariosCode, /estaPublicado/);
+  const selectorCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormularioAsignaturasSelector.js', import.meta.url), 'utf8');
+  const dialogCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormularioNuevoDialog.js', import.meta.url), 'utf8');
+  assert.match(selectorCode, /escapeHtml\(asignatura\.curso\?\.nombre \|\| asignatura\.nombreReferencia/);
+  assert.match(dialogCode, /formularios-btn-spinner/);
+  assert.match(dialogCode, /formulariosCreandoNotice/);
+  assert.match(dialogCode, /estaCreando/);
+  assert.match(dialogCode, /estaPublicado/);
 
   const formulariosCss = readFileSync(new URL('../src/styles/formularios-estudiantes.css', import.meta.url), 'utf8');
   assert.match(formulariosCss, /\.formularios-btn-spinner/);

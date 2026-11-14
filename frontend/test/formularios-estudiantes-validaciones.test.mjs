@@ -7,7 +7,14 @@ import {
   FormulariosEstudiantesPage
 } from '../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
 
-const codigo = readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
+const dir = new URL('../src/pages/formularios-estudiantes/', import.meta.url);
+const codigo = [
+  'FormulariosEstudiantesPage.js',
+  'FormularioNuevoDialog.js',
+  'FormulariosListadoView.js',
+  'FormularioGoogleStatusView.js',
+  'FormularioAsignaturasSelector.js',
+].map((f) => readFileSync(new URL(f, dir), 'utf8')).join('\n');
 const css = readFileSync(new URL('../src/styles/formularios-estudiantes.css', import.meta.url), 'utf8');
 const valido = {
   proveedor: 'INTERNO',

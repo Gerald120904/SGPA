@@ -14,7 +14,11 @@ import {
   destruirProfesoresPage,
 } from '../pages/profesores/ProfesoresPage.js';
 import { AulasPage, iniciarAulasPage } from '../pages/aulas/AulasPage.js';
-import { FormulariosEstudiantesPage, iniciarFormulariosEstudiantesPage } from '../pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
+import {
+  FormulariosEstudiantesPage,
+  iniciarFormulariosEstudiantesPage,
+  destruirFormulariosEstudiantesPage,
+} from '../pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
 import {
   EstudiantesPage,
   iniciarEstudiantesPage,
@@ -38,7 +42,11 @@ const PAGE_LIFECYCLES = Object.freeze({
     destroy: destruirProfesoresPage,
   }),
   aulas: Object.freeze({ render: AulasPage, initialize: iniciarAulasPage }),
-  'formularios-estudiantes': Object.freeze({ render: FormulariosEstudiantesPage, initialize: iniciarFormulariosEstudiantesPage }),
+  'formularios-estudiantes': Object.freeze({
+    render: FormulariosEstudiantesPage,
+    initialize: iniciarFormulariosEstudiantesPage,
+    destroy: destruirFormulariosEstudiantesPage,
+  }),
   estudiantes: Object.freeze({
     render: EstudiantesPage,
     initialize: iniciarEstudiantesPage,
