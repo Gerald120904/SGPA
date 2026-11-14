@@ -6,9 +6,6 @@ import {
   DataTable,
 } from "../../components/DataTable.js";
 
-import {
-  StatusBadge,
-} from "../../components/StatusBadge.js";
 
 import {
   FormDialog,
@@ -21,7 +18,7 @@ import {
 
 import {
   usuarioTienePermiso,
-  obtenerRolActivo,
+  obtenerVersionSesion,
 } from "../../app/session.js";
 
 import {
@@ -48,6 +45,7 @@ import {
   ejecutarGuardadoPeriodo,
   ejecutarCambioEstadoPeriodo,
 } from "./PeriodoAcciones.js";
+import { construirFilasPeriodosHtml } from "./PeriodosCatalogo.js";
 
 export {
   ESTADOS,
@@ -245,219 +243,7 @@ function renderizarPeriodos() {
     puedeGestionarPeriodos();
 
 
-  const filas =
-    filtrados
-      .map(
-        (periodo) => {
-
-          const transiciones =
-            TRANSICIONES[
-              periodo.estado
-            ] || [];
-
-
-          const informacionBackend =
-            Array.isArray(
-              periodo.transicionesEstado,
-            )
-              ? periodo.transicionesEstado
-              : [];
-
-
-          const accionesEstado =
-            puedeGestionar
-              ? transiciones
-                  .map(
-                    (transicion) => {
-                      const informacion =
-                        informacionBackend.find(
-                          (item) =>
-                            item.estado ===
-                            transicion.estado,
-                        );
-
-                      const disponible =
-                        informacion
-                          ?.disponible !==
-                        false;
-
-                      const motivo =
-                        informacion?.motivo ||
-                        "";
-
-                      return `
-                        <div
-                          class="periodos-transition-wrapper"
-                        >
-                          <button
-                            class="
-                              periodos-transition-button
-                              ${
-                                transicion.peligro
-                                  ? "periodos-danger-button"
-                                  : ""
-                              }
-                            "
-                            type="button"
-                            data-action="estado"
-                            data-id="${periodo.id}"
-                            data-estado="${transicion.estado}"
-                            aria-disabled="${disponible ? "false" : "true"}"
-                            title="${escapeHtml(
-                              motivo ||
-                                transicion.titulo,
-                            )}"
-                          >
-                            ${escapeHtml(
-                              transicion.texto,
-                            )}
-                          </button>
-
-                        </div>
-                      `;
-                    },
-                  )
-                  .join("")
-              : "";
-
-
-          return `
-            <tr>
-
-              <td data-label="Código">
-                <strong
-                  class="periodos-code"
-                >
-                  ${escapeHtml(
-                    periodo.codigo,
-                  )}
-                </strong>
-              </td>
-
-
-              <td data-label="Periodo">
-
-                <div
-                  class="periodos-name"
-                >
-
-                  <strong>
-                    ${escapeHtml(
-                      periodo.nombre,
-                    )}
-                  </strong>
-
-                  <small>
-                    Año
-                    ${escapeHtml(
-                      periodo.anio,
-                    )}
-                    ·
-                    ${escapeHtml(
-                      obtenerNombreCiclo(
-                        periodo.ciclo,
-                      ),
-                    )}
-                  </small>
-
-                </div>
-
-              </td>
-
-
-              <td data-label="Fechas">
-
-                <div
-                  class="periodos-dates"
-                >
-
-                  <strong>
-                    ${formatearFecha(
-                      periodo.fechaInicio,
-                    )}
-                    —
-                    ${formatearFecha(
-                      periodo.fechaFin,
-                    )}
-                  </strong>
-
-                  <small>
-                    Límite disponibilidad:
-                    ${formatearFecha(
-                      periodo.fechaLimiteDisponibilidad,
-                    )}
-                  </small>
-
-                </div>
-
-              </td>
-
-
-              <td data-label="Estado">
-
-                ${StatusBadge({
-                  label:
-                    obtenerNombreEstado(
-                      periodo.estado,
-                    ),
-                  tone:
-                    obtenerTonoEstado(
-                      periodo.estado,
-                    ),
-                })}
-
-              </td>
-
-
-              <td data-label="Acciones">
-
-                <div
-                  class="periodos-actions"
-                >
-
-                  ${
-                    puedeGestionar &&
-                    periodoEditable(
-                      periodo,
-                    )
-                      ? `
-                        <button
-                          class="periodos-icon-button"
-                          type="button"
-                          data-action="editar"
-                          data-id="${periodo.id}"
-                          title="Editar periodo"
-                        >
-
-                          <i
-                            data-lucide="pencil"
-                            aria-hidden="true"
-                          ></i>
-
-                        </button>
-                      `
-                      : ""
-                  }
-
-
-                  ${accionesEstado}
-                  ${puedeGestionar && periodo.estado === 'CERRADO' && obtenerRolActivo() === 'ADMIN_GLOBAL'
-                    ? `<button class="periodos-icon-button" type="button" data-action="corregir-cerrado"
-                        data-id="${periodo.id}" title="Corrección excepcional auditada">
-                        <i data-lucide="pencil" aria-hidden="true"></i>
-                      </button>` : ''}
-
-                </div>
-
-              </td>
-
-            </tr>
-          `;
-
-        },
-      )
-      .join("");
-
+  const filas = construirFilasPeriodosHtml(filtrados, puedeGestionar);
 
   contenedor.innerHTML =
     DataTable({
@@ -588,6 +374,7 @@ function abrirFormulario(
   periodo = null,
   excepcional = false,
 ) {
+  const instancia = instanciaActual;
   const dialog =
     document.getElementById(
       "periodoDialog",
@@ -925,7 +712,10 @@ function abrirFormulario(
         datos: validacion.datos,
         guardarButton,
         cerrarDialogo: cerrar,
-        recargarPeriodos: () => cargarPeriodos(instanciaActual),
+        recargarPeriodos: () => {
+          if (instancia === instanciaActual) return cargarPeriodos(instancia);
+          return undefined;
+        },
       });
     });
 }
@@ -934,11 +724,24 @@ function abrirFormulario(
    CAMBIAR ESTADO
    ========================================================= */
 
-async function cambiarEstado(periodo, nuevoEstado) {
+async function cambiarEstado(periodo, nuevoEstado, contexto) {
+  const { instancia, pagina, versionSesion } = contexto;
+  const vigente = () => (
+    instancia === instanciaActual &&
+    document.getElementById("periodosPage") === pagina &&
+    obtenerVersionSesion() === versionSesion &&
+    puedeGestionarPeriodos()
+  );
+
   await ejecutarCambioEstadoPeriodo({
     periodo,
     nuevoEstado,
-    recargarPeriodos: () => cargarPeriodos(instanciaActual),
+    operacionId: instancia,
+    vigente,
+    recargarPeriodos: () => {
+      if (vigente()) return cargarPeriodos(instancia);
+      return undefined;
+    },
   });
 }
 
@@ -952,6 +755,8 @@ export function iniciarPeriodosPage() {
 
   const instancia =
     instanciaActual;
+  const pagina = document.getElementById("periodosPage");
+  const versionSesion = obtenerVersionSesion();
 
 
   periodos = [];
@@ -1054,6 +859,7 @@ export function iniciarPeriodosPage() {
           await cambiarEstado(
             periodo,
             button.dataset.estado,
+            { instancia, pagina, versionSesion },
           );
         }
 
@@ -1064,6 +870,11 @@ export function iniciarPeriodosPage() {
   cargarPeriodos(
     instancia,
   );
+}
+
+/** Invalida la consulta vigente al desmontar el módulo. */
+export function destruirPeriodosPage() {
+  instanciaActual += 1;
 }
 
 /* =========================================================

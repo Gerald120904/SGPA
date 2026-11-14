@@ -20,6 +20,8 @@ import {
   obtenerNombreEstadoPeriodo,
 } from './periodos.helpers.js';
 
+const cambiosEstadoPendientes = new Set();
+
 export async function ejecutarGuardadoPeriodo({
   periodo,
   editando,
@@ -75,7 +77,11 @@ export async function ejecutarCambioEstadoPeriodo({
   periodo,
   nuevoEstado,
   recargarPeriodos,
+  vigente,
+  operacionId,
 }) {
+  if (typeof vigente !== 'function' || !vigente() || operacionId == null) return;
+
   const informacion = Array.isArray(periodo.transicionesEstado)
     ? periodo.transicionesEstado.find((item) => item.estado === nuevoEstado)
     : null;
@@ -98,24 +104,29 @@ export async function ejecutarCambioEstadoPeriodo({
     return;
   }
 
-  const confirmado = await confirmarAccion({
-    titulo: transicion.titulo,
-    mensaje: `¿Desea cambiar "${periodo.nombre}" de ${obtenerNombreEstadoPeriodo(
-      periodo.estado,
-    )} a ${obtenerNombreEstadoPeriodo(nuevoEstado)}?`,
-    textoConfirmar: transicion.texto,
-    peligro: transicion.peligro,
-  });
-
-  if (!confirmado) {
-    return;
-  }
+  const claveOperacion = `${operacionId}:${periodo.id}:${nuevoEstado}`;
+  if (cambiosEstadoPendientes.has(claveOperacion)) return;
+  cambiosEstadoPendientes.add(claveOperacion);
 
   try {
+    const confirmado = await confirmarAccion({
+      titulo: transicion.titulo,
+      mensaje: `¿Desea cambiar "${periodo.nombre}" de ${obtenerNombreEstadoPeriodo(
+        periodo.estado,
+      )} a ${obtenerNombreEstadoPeriodo(nuevoEstado)}?`,
+      textoConfirmar: transicion.texto,
+      peligro: transicion.peligro,
+    });
+
+    if (!confirmado || !vigente()) return;
+
     const resultado = await cambiarEstadoPeriodoAcademico(
       periodo.id,
       nuevoEstado,
     );
+
+    // La escritura ya fue enviada; solo se descarta su efecto visual si la vista caducó.
+    if (!vigente()) return;
 
     if (!resultado?.ok) {
       throw new Error(
@@ -132,10 +143,14 @@ export async function ejecutarCambioEstadoPeriodo({
 
     await recargarPeriodos();
   } catch (error) {
-    mostrarError({
-      titulo: 'No se pudo cambiar el estado',
-      mensaje:
-        error?.message || 'No fue posible actualizar el periodo académico.',
-    });
+    if (vigente()) {
+      mostrarError({
+        titulo: 'No se pudo cambiar el estado',
+        mensaje:
+          error?.message || 'No fue posible actualizar el periodo académico.',
+      });
+    }
+  } finally {
+    cambiosEstadoPendientes.delete(claveOperacion);
   }
 }

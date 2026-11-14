@@ -19,6 +19,7 @@ import {
   listarCarreras,
 } from '../../services/carreras.service.js';
 import { ROLES } from '../../config/permissions.js';
+import { obtenerVersionSesion } from '../../app/session.js';
 import { obtenerCoordinadorJerarquia, obtenerAsistenteAdminJerarquia,
   previsualizarCoordinadorJerarquia, previsualizarAsistenteAdminJerarquia,
   configurarCoordinadorJerarquia, configurarAsistenteAdminJerarquia,
@@ -32,9 +33,7 @@ import {
   nombreVisibleRol,
   normalizarRolesUsuario as obtenerRoles,
   obtenerNombreCompletoUsuario as obtenerNombreCompleto,
-  usuarioEsAdminGlobal,
   mensajeResultado,
-  obtenerInformacionPermiso,
   obtenerPermisosSugeridosRoles as calcularPermisosSugeridosRoles,
   construirMensajeRevocacionRol,
   construirMensajeImpactoJerarquia,
@@ -43,14 +42,11 @@ import {
   filtrarListaUsuarios,
 } from './usuarios.helpers.js';
 import { renderizarCatalogoUsuarios } from './UsuariosCatalogo.js';
+import { construirDialogoJerarquiaUsuario } from './UsuarioJerarquiaDialog.js';
 import { construirDialogoConsultaAccesos } from './UsuarioAccesosDialog.js';
 import {
-  renderizarOpcionesCarrerasHtml,
-  renderizarOpcionesPermisosHtml,
-  renderizarCamposUsuarioHtml,
-  renderizarRolesEdicionHtml,
-  renderizarPermisosGranularesHtml,
-  renderizarAuditoriaJerarquiaHtml,
+  construirDialogoCreacionUsuario,
+  construirDialogoEdicionUsuario,
 } from './UsuarioFormDialog.js';
 
 export {
@@ -131,6 +127,7 @@ export async function iniciarUsuariosPage() {
   }
 
   const instancia = ++instanciaActual;
+  const versionSesion = obtenerVersionSesion();
   const estado = {
     usuarios: [],
     roles: [],
@@ -142,7 +139,8 @@ export async function iniciarUsuariosPage() {
 
   const sigueActiva = () => (
     instancia === instanciaActual &&
-    document.getElementById('usuariosPage') === pagina
+    document.getElementById('usuariosPage') === pagina &&
+    obtenerVersionSesion() === versionSesion
   );
 
   const contenido = pagina.querySelector('#usuariosContent');
@@ -182,14 +180,6 @@ export async function iniciarUsuariosPage() {
     );
     renderizarIconos();
     if (!dialogo.open) dialogo.showModal();
-  }
-
-  function renderizarOpcionesCarreras(seleccionados = new Set()) {
-    return renderizarOpcionesCarrerasHtml(estado.carreras, seleccionados);
-  }
-
-  function renderizarOpcionesPermisos(seleccionados = new Set()) {
-    return renderizarOpcionesPermisosHtml(estado.permisosCatalogo, seleccionados);
   }
 
   function obtenerPermisosSugeridosRoles(roles) {
@@ -495,189 +485,29 @@ export async function iniciarUsuariosPage() {
     return !primerInvalido;
   }
 
-  function camposUsuario(usuario = null) {
-    return renderizarCamposUsuarioHtml(usuario, LIMITES_USUARIO);
-  }
-
-  function renderizarGestorPermisos(
-    usuario,
-    permisosUsuario,
-  ) {
-    if (obtenerRoles(usuario).some((rol) =>
-      rol.nombre === ROLES.COORDINADOR || rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL)) {
-      return `<section class="usuario-permission-manager">
-        <h4>Permisos por carrera</h4>
-        <p>Utilice el botón de escudo en la lista de usuarios para configurar el alcance del coordinador.
-          Los permisos de asistentes se administran desde Asistentes y solicitudes.</p>
-      </section>`;
-    }
-
-    const esAdmin = usuarioEsAdminGlobal(usuario);
-
-    if (esAdmin) {
-      return `
-        <section
-          id="permisosCreacionSection"
-          class="usuario-permission-manager"
-        >
-          <div class="usuario-permission-header">
-            <div>
-              <h4>Permisos granulares</h4>
-              <p>
-                Este usuario posee el rol de
-                ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))}.
-              </p>
-            </div>
-          </div>
-
-          <div class="usuario-permission-superuser">
-            <i data-lucide="shield-check" aria-hidden="true"></i>
-            <div>
-              <strong>Acceso de superusuario</strong>
-              <p>
-                El ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))} cuenta con acceso administrativo total en el sistema y no requiere permisos granulares individuales.
-              </p>
-            </div>
-          </div>
-        </section>
-      `;
-    }
-
-    return renderizarPermisosGranularesHtml({
-      usuarioId: usuario.id,
-      permisosUsuario,
-      permisosCatalogo: estado.permisosCatalogo,
-    });
-  }
-
   function renderizarDialogoCreacion() {
-    mostrarFormularioUsuario({
-      formId: 'usuarioForm',
-      title: 'Nuevo usuario',
-      description: 'Cree una cuenta institucional y asigne al menos un rol oficial.',
-      body: `
-        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
-        <div class="usuario-section-heading">
-          <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
-          <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
-        </div>
-        ${camposUsuario()}
-
-        <div class="usuario-invitacion-banner">
-          <i data-lucide="mail" aria-hidden="true"></i>
-          <div>
-            <strong>Invitación por correo electrónico</strong>
-            <p>No se requiere contraseña temporal. Al crear la cuenta se enviará una invitación segura para que el usuario configure su acceso.</p>
-          </div>
-        </div>
-
-        <fieldset class="usuario-role-options">
-          <legend>Roles iniciales <b class="usuario-obligatorio" aria-hidden="true">*</b></legend>
-          <small class="usuario-roles-error hidden" role="alert">Seleccione al menos un rol para crear el usuario.</small>
-          ${estado.roles.map((rol) => `
-            <label>
-              <input type="checkbox" name="roles" value="${escapeHtml(rol.nombre)}">
-              <span>
-                <strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
-                <small>${escapeHtml(rol.descripcion || '')}</small>
-              </span>
-            </label>
-          `).join('')}
-        </fieldset>
-
-        <section id="carrerasCreacionSection" class="usuario-role-manager hidden">
-          <div class="usuario-permission-header">
-            <div>
-              <h4>Carreras asignadas (Profesor)</h4>
-              <p>Seleccione las carreras a las que pertenece el docente.</p>
-            </div>
-          </div>
-          <div class="usuario-carreras-grid">${renderizarOpcionesCarreras()}</div>
-        </section>
-
-        <section class="usuario-permission-manager">
-          <div class="usuario-permission-header">
-            <div>
-              <h4>Permisos iniciales</h4>
-              <p>Se sugieren según los roles, pero puede agregar o quitar cualquiera antes de crear el usuario.</p>
-            </div>
-          </div>
-          <div id="permisosCreacionUsuario" class="usuario-permission-grid">
-            ${renderizarOpcionesPermisos()}
-          </div>
-        </section>
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
-        <button class="sgpa-form-primary" type="submit">
-          <i data-lucide="user-plus" aria-hidden="true"></i><span>Crear usuario</span>
-        </button>
-      `,
-    });
+    mostrarFormularioUsuario(construirDialogoCreacionUsuario({
+      roles: estado.roles,
+      limites: LIMITES_USUARIO,
+      carreras: estado.carreras,
+      permisosCatalogo: estado.permisosCatalogo,
+    }));
   }
 
   function renderizarDialogoJerarquia(usuario, configuracion, auditoria = [], esAsistente = false) {
-    const asignadas = new Map((configuracion.carreras || []).map((c) => [Number(c.carreraId), new Set(c.permisos || [])]));
-    const delegables = esAsistente
-      ? new Map((configuracion.delegables || []).map((c) => [Number(c.id), new Set(c.permisos || [])])) : null;
-    mostrarFormularioUsuario({
-      formId: 'jerarquiaForm',
-      userId: usuario.id,
-      title: `Carreras y permisos de ${obtenerNombreCompleto(usuario)}`,
-      description: esAsistente
-        ? 'Seleccione únicamente carreras y permisos autorizados a su coordinador responsable.'
-        : 'Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.',
-      body: `
-        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
-        <div class="usuario-section-heading">
-          <span class="usuario-section-icon"><i data-lucide="shield-check" aria-hidden="true"></i></span>
-          <div><h4>Alcance académico por carrera</h4><p>Marque las carreras y los permisos que corresponden.</p></div>
-        </div>
-        <div class="usuarios-alcances">
-          ${estado.carreras.filter((c) => !esAsistente || delegables.has(Number(c.id))).map((carrera) => {
-            const permisos = asignadas.get(Number(carrera.id)) || new Set();
-            return `<fieldset class="usuarios-alcance" data-carrera-id="${carrera.id}">
-              <legend>
-                <label><input type="checkbox" name="jerarquia-carrera" value="${carrera.id}"
-                  ${asignadas.has(Number(carrera.id)) ? 'checked' : ''}>
-                  ${escapeHtml(carrera.nombre)} (${escapeHtml(carrera.codigo)})</label>
-              </legend>
-              <label class="usuarios-alcance-seleccionar-todos">
-                <input type="checkbox" name="jerarquia-todos-permisos">
-                <span>Seleccionar todos los permisos de esta carrera</span>
-              </label>
-              <div class="usuarios-alcance-permisos">
-                ${estado.permisosCatalogo.filter((permiso) =>
-                  [
-                    'ESTUDIANTES_VER',
-                    'ESTUDIANTES_GESTIONAR',
-                    'CURSOS_VER',
-                    'CURSOS_GESTIONAR',
-                    'PLANES_ESTUDIO_VER',
-                    'PLANES_ESTUDIO_GESTIONAR',
-                    'OPTATIVAS_VER',
-                    'OPTATIVAS_GESTIONAR',
-                  ].includes(permiso) && (!esAsistente || delegables.get(Number(carrera.id))?.has(permiso))).map((permiso) => `
-                  <label><input type="checkbox" name="jerarquia-permiso" value="${escapeHtml(permiso)}"
-                    ${permisos.has(permiso) ? 'checked' : ''}>
-                    ${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</label>
-                `).join('')}
-              </div>
-            </fieldset>`;
-          }).join('')}
-        </div>
-        ${renderizarAuditoriaJerarquiaHtml(auditoria)}
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
-        <button class="sgpa-form-primary" type="submit">
-          <i data-lucide="save" aria-hidden="true"></i><span>Guardar alcance</span>
-        </button>
-      `,
+    const dialogo = construirDialogoJerarquiaUsuario({
+      usuario,
+      configuracion,
+      auditoria,
+      esAsistente,
+      carreras: estado.carreras,
+      permisosCatalogo: estado.permisosCatalogo,
+      obtenerNombreCompleto,
     });
+    mostrarFormularioUsuario(dialogo);
     dialogoContenido.querySelectorAll('.usuarios-alcance')
       .forEach(actualizarSeleccionTodosPermisosCarrera);
-    dialogoContenido.querySelector('#jerarquiaForm').dataset.adminAsistente = esAsistente ? 'true' : 'false';
+    dialogoContenido.querySelector('#jerarquiaForm').dataset.adminAsistente = dialogo.esAsistente ? 'true' : 'false';
   }
 
   function actualizarSeleccionTodosPermisosCarrera(campo) {
@@ -694,58 +524,16 @@ export async function iniciarUsuariosPage() {
     selector.disabled = estadoSeleccion.disabled;
   }
 
-  function renderizarDialogoEdicion(
-    usuario,
-    permisosUsuario = [],
-  ) {
-    const rolesUsuario = obtenerRoles(usuario);
-    const nombresAsignados = new Set(rolesUsuario.map((rol) => rol.nombre));
-    const rolesDisponibles = estado.roles.filter(
-      (rol) => !nombresAsignados.has(rol.nombre),
-    );
-    const esProfesor = rolesUsuario.some((rol) => rol.nombre === ROLES.PROFESOR);
-    const carrerasAsignadas = new Set((usuario.carreras || []).map((c) => c.id));
-
-    mostrarFormularioUsuario({
-      formId: 'usuarioForm',
-      userId: usuario.id,
-      title: 'Editar usuario',
-      description: 'Actualice sus datos administrativos, roles, carreras y permisos.',
-      body: `
-        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
-        <div class="usuario-section-heading">
-          <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
-          <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
-        </div>
-        ${camposUsuario(usuario)}
-
-        ${renderizarRolesEdicionHtml({
-          usuarioId: usuario.id,
-          rolesUsuario,
-          rolesDisponibles,
-        })}
-
-        ${esProfesor ? `
-          <section class="usuario-role-manager">
-            <div class="usuario-permission-header">
-              <div>
-                <h4>Carreras asignadas (Profesor)</h4>
-                <p>Carreras asociadas al perfil docente de este usuario.</p>
-              </div>
-            </div>
-            <div class="usuario-carreras-grid">${renderizarOpcionesCarreras(carrerasAsignadas)}</div>
-          </section>
-        ` : ''}
-
-        ${renderizarGestorPermisos(usuario, permisosUsuario)}
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
-        <button class="sgpa-form-primary" type="submit">
-          <i data-lucide="save" aria-hidden="true"></i><span>Guardar cambios</span>
-        </button>
-      `,
-    });
+  function renderizarDialogoEdicion(usuario, permisosUsuario = []) {
+    const nombresAsignados = new Set(obtenerRoles(usuario).map((rol) => rol.nombre));
+    mostrarFormularioUsuario(construirDialogoEdicionUsuario({
+      usuario,
+      permisosUsuario,
+      rolesDisponiblesCatalogo: estado.roles.filter((rol) => !nombresAsignados.has(rol.nombre)),
+      carreras: estado.carreras,
+      permisosCatalogo: estado.permisosCatalogo,
+      limites: LIMITES_USUARIO,
+    }));
   }
 
   // PBI-87: consulta de roles y permisos en solo lectura.
@@ -992,6 +780,7 @@ export async function iniciarUsuariosPage() {
 
   pagina.addEventListener('submit', async (event) => {
     if (event.target.id !== 'usuarioForm') return;
+    if (!sigueActiva()) return;
     event.preventDefault();
 
     const formulario = event.target;
@@ -1063,6 +852,7 @@ export async function iniciarUsuariosPage() {
 
   pagina.addEventListener('submit', async (event) => {
     if (event.target.id !== 'jerarquiaForm') return;
+    if (!sigueActiva()) return;
     event.preventDefault();
     const formulario = event.target;
     const boton = formulario.querySelector('[type="submit"]');
@@ -1080,22 +870,24 @@ export async function iniciarUsuariosPage() {
         ? previsualizarAsistenteAdminJerarquia(usuarioId, carreras)
         : previsualizarCoordinadorJerarquia(usuarioId, carreras)),
         'No fue posible calcular el impacto de la revocación.').data;
+      if (!sigueActiva()) return;
       const usuario = estado.usuarios.find((item) => Number(item.id) === usuarioId);
       const nombreObjetivo = usuario?.nombres || (esAsistente ? 'este asistente' : 'este coordinador');
       const resumen = construirMensajeImpactoJerarquia(impacto, nombreObjetivo, estado.carreras);
       const confirmado = await confirmarAccion({ titulo: 'Impacto del cambio de permisos',
         mensaje: resumen, textoConfirmar: 'Continuar', peligro: impacto.revocados.length > 0 });
-      if (!confirmado) return;
+      if (!confirmado || !sigueActiva()) return;
       mensajeResultado(
         await (esAsistente
           ? configurarAsistenteAdminJerarquia(usuarioId, carreras, impacto.firma)
           : configurarCoordinadorJerarquia(usuarioId, carreras, impacto.firma)),
         'No fue posible guardar el alcance del coordinador.',
       );
+      if (!sigueActiva()) return;
       dialogo.close();
       mostrarFeedback('Carreras y permisos actualizados.');
     } catch (error) {
-      mostrarFeedback(error.message, 'error');
+      if (sigueActiva()) mostrarFeedback(error.message, 'error');
     } finally {
       boton.disabled = false;
     }
@@ -1104,6 +896,7 @@ export async function iniciarUsuariosPage() {
   pagina.addEventListener('click', async (event) => {
     const boton = event.target.closest('[data-action]');
     if (!boton) return;
+    if (!sigueActiva()) return;
 
     const accion = boton.dataset.action;
     const id = Number(boton.dataset.userId);
@@ -1185,7 +978,7 @@ export async function iniciarUsuariosPage() {
         peligro: !nuevoEstado,
       });
 
-      if (!confirmado) return;
+      if (!confirmado || !sigueActiva()) return;
 
       try {
         boton.disabled = true;
@@ -1193,10 +986,11 @@ export async function iniciarUsuariosPage() {
           await cambiarEstadoUsuario(id, !activo),
           `No fue posible ${verbo} el usuario.`,
         );
+        if (!sigueActiva()) return;
         mostrarFeedback(`Usuario ${activo ? 'desactivado' : 'activado'} correctamente.`);
         await cargarUsuarios(false);
       } catch (error) {
-        mostrarFeedback(error.message, 'error');
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
         boton.disabled = false;
       }
       return;
@@ -1230,9 +1024,10 @@ export async function iniciarUsuariosPage() {
         impacto = mensajeResultado(await previsualizarRevocacionRol(id, rolId),
           'No fue posible calcular el impacto de la revocación.').data;
       } catch (error) {
-        mostrarFeedback(error.message, 'error');
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
         return;
       }
+      if (!sigueActiva()) return;
 
       const confirmado = await confirmarAccion({
         titulo: 'Revocar rol',
@@ -1241,7 +1036,7 @@ export async function iniciarUsuariosPage() {
         peligro: true,
       });
 
-      if (!confirmado) return;
+      if (!confirmado || !sigueActiva()) return;
 
       try {
         boton.disabled = true;
@@ -1249,10 +1044,11 @@ export async function iniciarUsuariosPage() {
           await revocarRolUsuario(id, rolId, impacto.firma),
           'No fue posible revocar el rol.',
         );
+        if (!sigueActiva()) return;
         await actualizarVistaYDialogo(id);
         mostrarFeedback('Rol revocado correctamente.');
       } catch (error) {
-        mostrarFeedback(error.message, 'error');
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
         boton.disabled = false;
       }
       return;
@@ -1345,4 +1141,9 @@ export async function iniciarUsuariosPage() {
       </div>
     `;
   }
+}
+
+/** Invalida respuestas tardías al abandonar Usuarios. */
+export function destruirUsuariosPage() {
+  instanciaActual += 1;
 }

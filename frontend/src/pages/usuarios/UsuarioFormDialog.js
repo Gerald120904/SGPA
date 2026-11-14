@@ -6,9 +6,12 @@
 import { escapeHtml } from '../../utils/html.js';
 import {
   nombreVisibleRol,
+  normalizarRolesUsuario,
+  usuarioEsAdminGlobal,
   obtenerCodigosPermisos,
   obtenerInformacionPermiso,
 } from './usuarios.helpers.js';
+import { ROLES } from '../../config/permissions.js';
 
 export function renderizarOpcionesCarrerasHtml(carreras = [], seleccionados = new Set()) {
   if (!carreras.length) {
@@ -259,4 +262,154 @@ export function renderizarAuditoriaJerarquiaHtml(auditoria = []) {
       }
     </section>
   `;
+}
+
+export function construirDialogoCreacionUsuario({
+  roles = [],
+  limites = {},
+  carreras = [],
+  permisosCatalogo = [],
+}) {
+  return {
+    formId: 'usuarioForm',
+    title: 'Nuevo usuario',
+    description: 'Cree una cuenta institucional y asigne al menos un rol oficial.',
+    body: `
+      <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
+      <div class="usuario-section-heading">
+        <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
+        <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
+      </div>
+      ${renderizarCamposUsuarioHtml(null, limites)}
+
+      <div class="usuario-invitacion-banner">
+        <i data-lucide="mail" aria-hidden="true"></i>
+        <div>
+          <strong>Invitación por correo electrónico</strong>
+          <p>No se requiere contraseña temporal. Al crear la cuenta se enviará una invitación segura para que el usuario configure su acceso.</p>
+        </div>
+      </div>
+
+      <fieldset class="usuario-role-options">
+        <legend>Roles iniciales <b class="usuario-obligatorio" aria-hidden="true">*</b></legend>
+        <small class="usuario-roles-error hidden" role="alert">Seleccione al menos un rol para crear el usuario.</small>
+        ${roles.map((rol) => `
+          <label>
+            <input type="checkbox" name="roles" value="${escapeHtml(rol.nombre)}">
+            <span>
+              <strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
+              <small>${escapeHtml(rol.descripcion || '')}</small>
+            </span>
+          </label>
+        `).join('')}
+      </fieldset>
+
+      <section id="carrerasCreacionSection" class="usuario-role-manager hidden">
+        <div class="usuario-permission-header">
+          <div><h4>Carreras asignadas (Profesor)</h4><p>Seleccione las carreras a las que pertenece el docente.</p></div>
+        </div>
+        <div class="usuario-carreras-grid">${renderizarOpcionesCarrerasHtml(carreras)}</div>
+      </section>
+
+      <section class="usuario-permission-manager">
+        <div class="usuario-permission-header">
+          <div><h4>Permisos iniciales</h4><p>Se sugieren según los roles, pero puede agregar o quitar cualquiera antes de crear el usuario.</p></div>
+        </div>
+        <div id="permisosCreacionUsuario" class="usuario-permission-grid">
+          ${renderizarOpcionesPermisosHtml(permisosCatalogo)}
+        </div>
+      </section>
+    `,
+    footerHtml: `
+      <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
+      <button class="sgpa-form-primary" type="submit">
+        <i data-lucide="user-plus" aria-hidden="true"></i><span>Crear usuario</span>
+      </button>
+    `,
+  };
+}
+
+function construirGestorPermisosUsuario(usuario, permisosUsuario, permisosCatalogo) {
+  if (normalizarRolesUsuario(usuario).some((rol) =>
+    rol.nombre === ROLES.COORDINADOR || rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL)) {
+    return `<section class="usuario-permission-manager">
+      <h4>Permisos por carrera</h4>
+      <p>Utilice el botón de escudo en la lista de usuarios para configurar el alcance del coordinador.
+        Los permisos de asistentes se administran desde Asistentes y solicitudes.</p>
+    </section>`;
+  }
+
+  if (usuarioEsAdminGlobal(usuario)) {
+    return `
+      <section id="permisosCreacionSection" class="usuario-permission-manager">
+        <div class="usuario-permission-header">
+          <div>
+            <h4>Permisos granulares</h4>
+            <p>Este usuario posee el rol de ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))}.</p>
+          </div>
+        </div>
+        <div class="usuario-permission-superuser">
+          <i data-lucide="shield-check" aria-hidden="true"></i>
+          <div>
+            <strong>Acceso de superusuario</strong>
+            <p>El ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))} cuenta con acceso administrativo total en el sistema y no requiere permisos granulares individuales.</p>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  return renderizarPermisosGranularesHtml({
+    usuarioId: usuario.id,
+    permisosUsuario,
+    permisosCatalogo,
+  });
+}
+
+export function construirDialogoEdicionUsuario({
+  usuario,
+  permisosUsuario = [],
+  rolesDisponiblesCatalogo = [],
+  carreras = [],
+  permisosCatalogo = [],
+  limites = {},
+}) {
+  const rolesUsuario = normalizarRolesUsuario(usuario);
+  const nombresAsignados = new Set(rolesUsuario.map((rol) => rol.nombre));
+  const rolesDisponibles = rolesDisponiblesCatalogo.filter(
+    (rol) => !nombresAsignados.has(rol.nombre),
+  );
+  const esProfesor = rolesUsuario.some((rol) => rol.nombre === ROLES.PROFESOR);
+  const carrerasAsignadas = new Set((usuario.carreras || []).map((carrera) => carrera.id));
+
+  return {
+    formId: 'usuarioForm',
+    userId: usuario.id,
+    title: 'Editar usuario',
+    description: 'Actualice sus datos administrativos, roles, carreras y permisos.',
+    body: `
+      <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
+      <div class="usuario-section-heading">
+        <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
+        <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
+      </div>
+      ${renderizarCamposUsuarioHtml(usuario, limites)}
+      ${renderizarRolesEdicionHtml({ usuarioId: usuario.id, rolesUsuario, rolesDisponibles })}
+      ${esProfesor ? `
+        <section class="usuario-role-manager">
+          <div class="usuario-permission-header">
+            <div><h4>Carreras asignadas (Profesor)</h4><p>Carreras asociadas al perfil docente de este usuario.</p></div>
+          </div>
+          <div class="usuario-carreras-grid">${renderizarOpcionesCarrerasHtml(carreras, carrerasAsignadas)}</div>
+        </section>
+      ` : ''}
+      ${construirGestorPermisosUsuario(usuario, permisosUsuario, permisosCatalogo)}
+    `,
+    footerHtml: `
+      <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
+      <button class="sgpa-form-primary" type="submit">
+        <i data-lucide="save" aria-hidden="true"></i><span>Guardar cambios</span>
+      </button>
+    `,
+  };
 }

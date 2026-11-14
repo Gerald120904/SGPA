@@ -614,3 +614,8 @@ export async function iniciarMisAsistentesPage() {
   dialogo.addEventListener('click', (event) => { if (event.target === dialogo) dialogo.close(); });
   await cargar();
 }
+
+/** Invalida lecturas y mensajes pendientes al desmontar la vista. */
+export function destruirMisAsistentesPage() {
+  instanciaActual += 1;
+}

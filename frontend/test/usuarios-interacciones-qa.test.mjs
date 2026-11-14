@@ -708,4 +708,13 @@ test('UsuariosPage — revocación de rol respeta cancelación y ejecuta con fir
   await btnAceptar.dispatch('click', {});
   await promesaConfirm;
   assert.deepEqual(revocarArgs, { id: 7, rolId: 2, firma: 'firma-segura-123' });
+
+  // Un cambio de sesión mientras se muestra la confirmación invalida la acción pendiente.
+  const promesaSesionObsoleta = pagina.dispatch('click', { target: btnRevocar });
+  const btnAceptarSesionObsoleta = await esperarConfirmDialog('sgpaConfirmAccept');
+  guardarSesion({ usuario: { id: 99, rolActivo: ROLES.COORDINADOR } });
+  await btnAceptarSesionObsoleta.dispatch('click', {});
+  await promesaSesionObsoleta;
+  assert.deepEqual(revocarArgs, { id: 7, rolId: 2, firma: 'firma-segura-123' });
+  limpiarSesion();
 });

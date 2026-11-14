@@ -34,10 +34,15 @@ test('el registro no asigna páginas a módulos desconocidos', () => {
   assert.equal(obtenerCicloVidaPagina('__proto__'), null);
 });
 
-test('Profesores, Estudiantes y Formularios declaran destructores opcionales para el resto de páginas', () => {
+test('las páginas con consultas prolongadas declaran destructores opcionales y Login conserva su ciclo especial', () => {
   assert.equal(typeof obtenerCicloVidaPagina('profesores').destroy, 'function');
   assert.equal(typeof obtenerCicloVidaPagina('estudiantes').destroy, 'function');
   assert.equal(typeof obtenerCicloVidaPagina('formularios-estudiantes').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('usuarios').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('mis-asistentes').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('cursos').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('periodos').destroy, 'function');
   assert.equal(typeof obtenerCicloVidaPagina('dashboard').destroy, 'undefined');
   assert.equal(typeof obtenerCicloVidaPagina('aulas').destroy, 'undefined');
+  assert.equal(obtenerCicloVidaPagina('login'), null);
 });

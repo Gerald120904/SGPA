@@ -187,8 +187,97 @@ test('PeriodoAcciones — impide transiciones no disponibles declaradas por el b
     },
     nuevoEstado: 'EN_PREPARACION',
     recargarPeriodos: async () => {},
+    vigente: () => true,
+    operacionId: 1,
   });
 
   assert.equal(llamadoServicio, false);
   assert.match(htmlAlerta, /Falta definir fechas/);
+});
+
+test('PeriodoAcciones — procesa el error devuelto por el servicio de cambio de estado', async () => {
+  const botones = new Map();
+  const confirmDialog = {
+    open: false,
+    innerHTML: '',
+    addEventListener: () => {},
+    querySelector(selector) {
+      const id = selector.slice(1);
+      if (!botones.has(id)) {
+        const listeners = new Map();
+        botones.set(id, {
+          addEventListener(tipo, callback) {
+            listeners.set(tipo, callback);
+          },
+          click() {
+            return listeners.get('click')?.({ target: this });
+          },
+        });
+      }
+      return botones.get(id);
+    },
+    showModal() {
+      this.open = true;
+      queueMicrotask(() => botones.get('sgpaConfirmAccept')?.click());
+    },
+    close() {
+      this.open = false;
+    },
+    remove: () => {},
+  };
+  const alertEl = {
+    id: 'sgpaAlertDialog',
+    open: false,
+    classList: { add: () => {}, remove: () => {} },
+    addEventListener: () => {},
+    querySelector: () => null,
+    getBoundingClientRect: () => ({ left: 0, right: 100, top: 0, bottom: 100 }),
+    showModal() {
+      this.open = true;
+    },
+    close() {
+      this.open = false;
+    },
+  };
+  let htmlAlerta = '';
+  Object.defineProperty(alertEl, 'innerHTML', {
+    get: () => htmlAlerta,
+    set: (value) => {
+      htmlAlerta = value;
+    },
+  });
+
+  const anteriorDocument = globalThis.document;
+  const anteriorWindow = globalThis.window;
+  let llamadasServicio = 0;
+  globalThis.document = {
+    body: { appendChild: () => {} },
+    getElementById: (id) => (id === 'sgpaAlertDialog' ? alertEl : null),
+    createElement: () => confirmDialog,
+    querySelectorAll: () => [],
+  };
+  globalThis.window = { setTimeout, clearTimeout };
+  globalThis.window.sgpa = {
+    cambiarEstadoPeriodoAcademico: async () => {
+      llamadasServicio += 1;
+      return { ok: false, message: 'Backend de períodos no disponible' };
+    },
+  };
+
+  try {
+    await ejecutarCambioEstadoPeriodo({
+      periodo: { id: 5, nombre: 'II Ciclo 2026', estado: 'BORRADOR' },
+      nuevoEstado: 'EN_PREPARACION',
+      recargarPeriodos: async () => {},
+      vigente: () => true,
+      operacionId: 2,
+    });
+
+    assert.equal(llamadasServicio, 1);
+    assert.match(htmlAlerta, /Backend de períodos no disponible/);
+    assert.match(htmlAlerta, /No se pudo cambiar el estado/);
+  } finally {
+    globalThis.document = anteriorDocument;
+    globalThis.window = anteriorWindow;
+  }
 });

@@ -39,6 +39,7 @@ import {
 } from "./CursosCatalogo.js";
 import { abrirFormularioCurso } from "./CursoForm.js";
 import { abrirRequisitosCurso } from "./CursoRequisitosDialog.js";
+import { estadoCursos, reiniciarEstadoCursos } from "./cursos.context.js";
 
 /* Re-exportar contratos públicos para compatibilidad total con tests */
 export {
@@ -50,19 +51,6 @@ export {
 /* =========================================================
    ESTADO EN MEMORIA DEL MÓDULO
    ========================================================= */
-
-let cursos = [];
-let carrerasDisponibles = [];
-let planesDisponibles = [];
-
-let carreraSeleccionadaId = null;
-let planCarreraSeleccionado = null;
-let asignaturasPlanCarrera = [];
-let requisitosPlanCarrera = [];
-
-let instanciaActual = 0;
-let seleccionCarreraActual = 0;
-let paginaCursos = 1;
 
 function puedeGestionarCursos() {
   return usuarioTienePermiso(PERMISOS.CURSOS_GESTIONAR);
@@ -218,23 +206,23 @@ export function CursosPage() {
 
 function obtenerCarreraSeleccionada() {
   return (
-    carrerasDisponibles.find(
+    estadoCursos.carrerasDisponibles.find(
       (carrera) =>
-        Number(carrera.id) === Number(carreraSeleccionadaId),
+        Number(carrera.id) === Number(estadoCursos.carreraSeleccionadaId),
     ) || null
   );
 }
 
 function obtenerCursosCarrera() {
-  if (!carreraSeleccionadaId) {
+  if (!estadoCursos.carreraSeleccionadaId) {
     return [];
   }
 
-  return cursos.filter((curso) =>
+  return estadoCursos.cursos.filter((curso) =>
     cursoPerteneceACarrera(
       curso,
-      carreraSeleccionadaId,
-      asignaturasPlanCarrera,
+      estadoCursos.carreraSeleccionadaId,
+      estadoCursos.asignaturasPlanCarrera,
     ),
   );
 }
@@ -261,9 +249,9 @@ function renderizarCarreras() {
   }
 
   contenedor.innerHTML = CarrerasCursosCards({
-    carreras: carrerasDisponibles,
-    cursos,
-    carreraSeleccionadaId,
+    carreras: estadoCursos.carrerasDisponibles,
+    cursos: estadoCursos.cursos,
+    carreraSeleccionadaId: estadoCursos.carreraSeleccionadaId,
   });
 
   renderizarIconos();
@@ -284,7 +272,7 @@ function renderizarCatalogo() {
     seccion.classList.add("hidden");
     heading.innerHTML = "";
     contenedor.innerHTML = "";
-    paginaCursos = 1;
+    estadoCursos.paginaCursos = 1;
     return;
   }
 
@@ -294,22 +282,22 @@ function renderizarCatalogo() {
 
   heading.innerHTML = CursosCatalogoHeading({
     carrera,
-    plan: planCarreraSeleccionado,
+    plan: estadoCursos.planCarreraSeleccionado,
     cantidad: cursosCarrera.length,
   });
 
   const cursosFiltrados = obtenerCursosFiltrados();
   const paginacion = calcularPaginacionCursos(
     cursosFiltrados.length,
-    paginaCursos,
+    estadoCursos.paginaCursos,
   );
-  paginaCursos = paginacion.pagina;
+  estadoCursos.paginaCursos = paginacion.pagina;
 
   contenedor.innerHTML =
     CursosTabla({
       cursos: cursosFiltrados.slice(paginacion.inicio, paginacion.fin),
-      asignaturasPlan: asignaturasPlanCarrera,
-      requisitosPlan: requisitosPlanCarrera,
+      asignaturasPlan: estadoCursos.asignaturasPlanCarrera,
+      requisitosPlan: estadoCursos.requisitosPlanCarrera,
       puedeGestionar: puedeGestionarCursos(),
     }) + renderizarPaginacionCursos(paginacion);
 
@@ -351,7 +339,7 @@ async function cargarDatos(instancia) {
         }
       : resultadoCatalogo[1];
 
-    if (instancia !== instanciaActual) {
+    if (instancia !== estadoCursos.instanciaActual) {
       return;
     }
 
@@ -376,15 +364,15 @@ async function cargarDatos(instancia) {
       );
     }
 
-    cursos = Array.isArray(resultadoCursos.cursos)
+    estadoCursos.cursos = Array.isArray(resultadoCursos.cursos)
       ? resultadoCursos.cursos
       : [];
 
-    carrerasDisponibles = Array.isArray(resultadoCarreras.carreras)
+    estadoCursos.carrerasDisponibles = Array.isArray(resultadoCarreras.carreras)
       ? resultadoCarreras.carreras
       : [];
 
-    planesDisponibles = Array.isArray(resultadoPlanes.planes)
+    estadoCursos.planesDisponibles = Array.isArray(resultadoPlanes.planes)
       ? resultadoPlanes.planes
       : [];
 
@@ -429,15 +417,15 @@ async function seleccionarCarrera(
     return;
   }
 
-  const instancia = instanciaActual;
-  seleccionCarreraActual += 1;
-  const tokenSeleccion = seleccionCarreraActual;
+  const instancia = estadoCursos.instanciaActual;
+  estadoCursos.seleccionCarreraActual += 1;
+  const tokenSeleccion = estadoCursos.seleccionCarreraActual;
 
-  carreraSeleccionadaId = id;
-  if (!conservarPagina) paginaCursos = 1;
-  planCarreraSeleccionado = null;
-  asignaturasPlanCarrera = [];
-  requisitosPlanCarrera = [];
+  estadoCursos.carreraSeleccionadaId = id;
+  if (!conservarPagina) estadoCursos.paginaCursos = 1;
+  estadoCursos.planCarreraSeleccionado = null;
+  estadoCursos.asignaturasPlanCarrera = [];
+  estadoCursos.requisitosPlanCarrera = [];
 
   renderizarCarreras();
 
@@ -454,7 +442,7 @@ async function seleccionarCarrera(
     `;
   }
 
-  const planes = planesDisponibles
+  const planes = estadoCursos.planesDisponibles
     .filter(
       (plan) =>
         plan.activo === true && Number(plan.carreraId) === id,
@@ -463,7 +451,7 @@ async function seleccionarCarrera(
     .sort((a, b) => Number(b.id) - Number(a.id));
 
   const planSeleccionado = planes[0] || null;
-  planCarreraSeleccionado = planSeleccionado;
+  estadoCursos.planCarreraSeleccionado = planSeleccionado;
 
   try {
     let asignaturas = [];
@@ -477,8 +465,8 @@ async function seleccionarCarrera(
         ]);
 
       if (
-        instancia !== instanciaActual ||
-        tokenSeleccion !== seleccionCarreraActual
+        instancia !== estadoCursos.instanciaActual ||
+        tokenSeleccion !== estadoCursos.seleccionCarreraActual
       ) {
         return;
       }
@@ -511,22 +499,22 @@ async function seleccionarCarrera(
     }
 
     if (
-      instancia !== instanciaActual ||
-      tokenSeleccion !== seleccionCarreraActual
+      instancia !== estadoCursos.instanciaActual ||
+      tokenSeleccion !== estadoCursos.seleccionCarreraActual
     ) {
       return;
     }
 
-    asignaturasPlanCarrera = asignaturas;
-    requisitosPlanCarrera = requisitos;
+    estadoCursos.asignaturasPlanCarrera = asignaturas;
+    estadoCursos.requisitosPlanCarrera = requisitos;
 
     renderizarCatalogo();
 
     if (desplazar) {
       window.requestAnimationFrame(() => {
         if (
-          instancia !== instanciaActual ||
-          tokenSeleccion !== seleccionCarreraActual
+          instancia !== estadoCursos.instanciaActual ||
+          tokenSeleccion !== estadoCursos.seleccionCarreraActual
         ) {
           return;
         }
@@ -537,8 +525,8 @@ async function seleccionarCarrera(
     }
   } catch (error) {
     if (
-      instancia !== instanciaActual ||
-      tokenSeleccion !== seleccionCarreraActual
+      instancia !== estadoCursos.instanciaActual ||
+      tokenSeleccion !== estadoCursos.seleccionCarreraActual
     ) {
       return;
     }
@@ -558,8 +546,10 @@ async function seleccionarCarrera(
    RECARGAR DESPUÉS DE OPERACIONES
    ========================================================= */
 
-async function recargarCursos() {
+async function recargarCursos(instancia = estadoCursos.instanciaActual) {
   const resultado = await listarCursos();
+
+  if (instancia !== estadoCursos.instanciaActual) return;
 
   if (!resultado?.ok) {
     throw new Error(
@@ -568,12 +558,12 @@ async function recargarCursos() {
     );
   }
 
-  cursos = Array.isArray(resultado.cursos) ? resultado.cursos : [];
+  estadoCursos.cursos = Array.isArray(resultado.cursos) ? resultado.cursos : [];
 
   renderizarCarreras();
 
-  if (carreraSeleccionadaId) {
-    await seleccionarCarrera(carreraSeleccionadaId, {
+  if (estadoCursos.carreraSeleccionadaId) {
+    await seleccionarCarrera(estadoCursos.carreraSeleccionadaId, {
       conservarPagina: true,
       desplazar: false,
     });
@@ -596,6 +586,7 @@ async function alternarEstado(curso) {
   }
 
   const nuevoEstado = !curso.activo;
+  const instancia = estadoCursos.instanciaActual;
 
   const confirmado = await confirmarAccion({
     titulo: nuevoEstado ? "Activar curso" : "Desactivar curso",
@@ -610,10 +601,14 @@ async function alternarEstado(curso) {
     return;
   }
 
+  if (instancia !== estadoCursos.instanciaActual || !puedeGestionarCursos()) return;
+
   try {
     const resultado = await (esAsistente()
       ? proponerEstadoCurso
       : cambiarEstadoCurso)(curso.id, nuevoEstado);
+
+    if (instancia !== estadoCursos.instanciaActual) return;
 
     if (!resultado?.ok) {
       throw new Error(
@@ -634,8 +629,9 @@ async function alternarEstado(curso) {
           } correctamente.`,
     });
 
-    await recargarCursos();
+    await recargarCursos(instancia);
   } catch (error) {
+    if (instancia !== estadoCursos.instanciaActual) return;
     mostrarError({
       titulo: "No se pudo cambiar el estado",
       mensaje:
@@ -649,19 +645,11 @@ async function alternarEstado(curso) {
    ========================================================= */
 
 export function iniciarCursosPage() {
-  instanciaActual += 1;
-  seleccionCarreraActual += 1;
-  const instancia = instanciaActual;
+  estadoCursos.instanciaActual += 1;
+  estadoCursos.seleccionCarreraActual += 1;
+  const instancia = estadoCursos.instanciaActual;
 
-  cursos = [];
-  carrerasDisponibles = [];
-  planesDisponibles = [];
-
-  carreraSeleccionadaId = null;
-  planCarreraSeleccionado = null;
-  asignaturasPlanCarrera = [];
-  requisitosPlanCarrera = [];
-  paginaCursos = 1;
+  reiniciarEstadoCursos();
 
   document
     .getElementById("nuevoCursoButton")
@@ -675,10 +663,10 @@ export function iniciarCursosPage() {
       }
 
       void abrirFormularioCurso({
-        carreraInicialId: carreraSeleccionadaId,
-        carrerasDisponibles,
-        planesDisponibles,
-        onGuardado: recargarCursos,
+        carreraInicialId: estadoCursos.carreraSeleccionadaId,
+        carrerasDisponibles: estadoCursos.carrerasDisponibles,
+        planesDisponibles: estadoCursos.planesDisponibles,
+        onGuardado: () => recargarCursos(instancia),
       });
     });
 
@@ -697,14 +685,14 @@ export function iniciarCursosPage() {
   document
     .getElementById("cursosBuscar")
     ?.addEventListener("input", () => {
-      paginaCursos = 1;
+      estadoCursos.paginaCursos = 1;
       renderizarCatalogo();
     });
 
   document
     .getElementById("cursosEstado")
     ?.addEventListener("change", () => {
-      paginaCursos = 1;
+      estadoCursos.paginaCursos = 1;
       renderizarCatalogo();
     });
 
@@ -722,7 +710,7 @@ export function iniciarCursosPage() {
         estado.value = "TODOS";
       }
 
-      paginaCursos = 1;
+      estadoCursos.paginaCursos = 1;
       renderizarCatalogo();
     });
 
@@ -743,7 +731,7 @@ export function iniciarCursosPage() {
         ) {
           return;
         }
-        paginaCursos = solicitada;
+        estadoCursos.paginaCursos = solicitada;
         renderizarCatalogo();
         return;
       }
@@ -753,7 +741,7 @@ export function iniciarCursosPage() {
       );
 
       if (requisitoButton) {
-        const curso = cursos.find(
+        const curso = estadoCursos.cursos.find(
           (item) =>
             Number(item.id) ===
             Number(requisitoButton.dataset.requisitoCurso),
@@ -765,8 +753,8 @@ export function iniciarCursosPage() {
 
         const requisitos = obtenerRequisitosCurso(
           curso,
-          asignaturasPlanCarrera,
-          requisitosPlanCarrera,
+          estadoCursos.asignaturasPlanCarrera,
+          estadoCursos.requisitosPlanCarrera,
         );
 
         const requisito =
@@ -792,7 +780,7 @@ export function iniciarCursosPage() {
 
       const id = Number(button.dataset.id);
 
-      const curso = cursos.find((item) => Number(item.id) === id);
+      const curso = estadoCursos.cursos.find((item) => Number(item.id) === id);
 
       if (!curso) {
         return;
@@ -801,10 +789,10 @@ export function iniciarCursosPage() {
       if (button.dataset.action === "requisitos") {
         void abrirRequisitosCurso({
           curso,
-          cursos,
+          cursos: estadoCursos.cursos,
           puedeGestionar:
             curso.puedeGestionarGlobal ?? puedeGestionarCursos(),
-          onActualizado: recargarCursos,
+          onActualizado: () => recargarCursos(instancia),
         });
         return;
       }
@@ -812,10 +800,10 @@ export function iniciarCursosPage() {
       if (button.dataset.action === "editar") {
         void abrirFormularioCurso({
           curso,
-          carreraInicialId: carreraSeleccionadaId,
-          carrerasDisponibles,
-          planesDisponibles,
-          onGuardado: recargarCursos,
+          carreraInicialId: estadoCursos.carreraSeleccionadaId,
+          carrerasDisponibles: estadoCursos.carrerasDisponibles,
+          planesDisponibles: estadoCursos.planesDisponibles,
+          onGuardado: () => recargarCursos(instancia),
         });
 
         return;
@@ -827,4 +815,10 @@ export function iniciarCursosPage() {
     });
 
   void cargarDatos(instancia);
+}
+
+/** Invalida consultas de la vista antes de que el router reemplace su DOM. */
+export function destruirCursosPage() {
+  estadoCursos.instanciaActual += 1;
+  estadoCursos.seleccionCarreraActual += 1;
 }
