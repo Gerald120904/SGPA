@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const usuarios = readFileSync(new URL('../src/pages/usuarios/UsuariosPage.js', import.meta.url), 'utf8');
-const estudiantes = readFileSync(new URL('../src/pages/estudiantes/EstudiantesPage.js', import.meta.url), 'utf8');
+const estudiantesCatalogo = readFileSync(new URL('../src/pages/estudiantes/EstudiantesCatalogo.js', import.meta.url), 'utf8');
+const estudiantesOperaciones = readFileSync(new URL('../src/pages/estudiantes/EstudiantesOperaciones.js', import.meta.url), 'utf8');
 
 test('el diálogo jerárquico ofrece todos los módulos integrados por carrera', () => {
   const inicio = usuarios.indexOf('function renderizarDialogoJerarquia');
@@ -30,7 +31,7 @@ test('el selector general conserva el contrato de guardado por carrera', () => {
 });
 
 test('los formularios de estudiantes jerárquicos usan el catálogo de períodos autorizado', () => {
-  assert.match(estudiantes, /async function listarPeriodosParaEstudiantes\(\)/);
-  assert.match(estudiantes, /async function abrirNuevoEstudiante[\s\S]*?await listarPeriodosParaEstudiantes\(\)/);
-  assert.equal(estudiantes.match(/listarPeriodosAcademicos\(\)/g)?.length, 1);
+  assert.match(estudiantesCatalogo, /async function listarPeriodosParaEstudiantes\(\)/);
+  assert.match(estudiantesOperaciones, /async function abrirNuevoEstudiante[\s\S]*?await acciones\.listarPeriodosParaEstudiantes\(\)/);
+  assert.equal(estudiantesCatalogo.match(/dependencias\.listarPeriodosAcademicos\(\)/g)?.length, 1);
 });

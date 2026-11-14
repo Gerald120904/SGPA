@@ -15,7 +15,11 @@ import {
 } from '../pages/profesores/ProfesoresPage.js';
 import { AulasPage, iniciarAulasPage } from '../pages/aulas/AulasPage.js';
 import { FormulariosEstudiantesPage, iniciarFormulariosEstudiantesPage } from '../pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
-import { EstudiantesPage, iniciarEstudiantesPage } from '../pages/estudiantes/EstudiantesPage.js';
+import {
+  EstudiantesPage,
+  iniciarEstudiantesPage,
+  destruirEstudiantesPage,
+} from '../pages/estudiantes/EstudiantesPage.js';
 
 const PAGE_LIFECYCLES = Object.freeze({
   home: Object.freeze({ render: HomePage, initialize: iniciarHomePage }),
@@ -35,7 +39,11 @@ const PAGE_LIFECYCLES = Object.freeze({
   }),
   aulas: Object.freeze({ render: AulasPage, initialize: iniciarAulasPage }),
   'formularios-estudiantes': Object.freeze({ render: FormulariosEstudiantesPage, initialize: iniciarFormulariosEstudiantesPage }),
-  estudiantes: Object.freeze({ render: EstudiantesPage, initialize: iniciarEstudiantesPage }),
+  estudiantes: Object.freeze({
+    render: EstudiantesPage,
+    initialize: iniciarEstudiantesPage,
+    destroy: destruirEstudiantesPage,
+  }),
 });
 
 /** Devuelve el renderizador y el inicializador asociados a un módulo implementado. */
