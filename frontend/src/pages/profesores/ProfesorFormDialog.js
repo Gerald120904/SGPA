@@ -20,6 +20,7 @@ import {
 export function abrirFormularioAtestado({
   atestado = null,
   onGuardado = null,
+  vigente = () => true,
 } = {}) {
   const dialog = document.getElementById('profesorRevisionDialog');
   const content = document.getElementById('profesorRevisionDialogContent');
@@ -237,6 +238,8 @@ export function abrirFormularioAtestado({
           ? await actualizarAtestadoProfesor(atestado.id, datos)
           : await crearAtestadoProfesor(datos);
 
+        if (!vigente()) return;
+
         if (!resultado?.ok) {
           throw new Error(
             resultado?.message || 'No fue posible guardar el atestado.',
@@ -256,12 +259,14 @@ export function abrirFormularioAtestado({
           await onGuardado(resultado);
         }
       } catch (error) {
+        if (!vigente()) return;
+
         mostrarError({
           titulo: 'No se pudo guardar el atestado',
           mensaje: error?.message || 'No fue posible guardar la información.',
         });
       } finally {
-        if (boton) {
+        if (boton && vigente()) {
           boton.disabled = false;
         }
       }
@@ -275,6 +280,7 @@ export function abrirFormularioAtestado({
 export async function inactivarMiAtestado({
   atestadoId,
   onInactivado = null,
+  vigente = () => true,
 } = {}) {
   const confirmado = await confirmarAccion({
     titulo: 'Inactivar atestado',
@@ -287,8 +293,12 @@ export async function inactivarMiAtestado({
     return;
   }
 
+  if (!vigente()) return;
+
   try {
     const resultado = await inactivarMiAtestadoProfesor(atestadoId);
+
+    if (!vigente()) return;
 
     if (!resultado?.ok) {
       throw new Error(
@@ -305,6 +315,8 @@ export async function inactivarMiAtestado({
       await onInactivado();
     }
   } catch (error) {
+    if (!vigente()) return;
+
     mostrarError({
       titulo: 'No se pudo inactivar el atestado',
       mensaje: error?.message || 'No fue posible actualizar el atestado.',
@@ -315,6 +327,7 @@ export async function inactivarMiAtestado({
 export function abrirFormularioProyecto({
   proyecto = null,
   onGuardado = null,
+  vigente = () => true,
 } = {}) {
   const dialog = document.getElementById('profesorRevisionDialog');
   const content = document.getElementById('profesorRevisionDialogContent');
@@ -448,6 +461,8 @@ export function abrirFormularioProyecto({
           ? await actualizarProyectoProfesor(proyecto.id, datos)
           : await crearProyectoProfesor(datos);
 
+        if (!vigente()) return;
+
         if (!resultado?.ok) {
           throw new Error(
             resultado?.message || 'No fue posible guardar el proyecto.',
@@ -467,12 +482,14 @@ export function abrirFormularioProyecto({
           await onGuardado(resultado);
         }
       } catch (error) {
+        if (!vigente()) return;
+
         mostrarError({
           titulo: 'No se pudo guardar el proyecto',
           mensaje: error?.message || 'No fue posible guardar la información.',
         });
       } finally {
-        if (boton) {
+        if (boton && vigente()) {
           boton.disabled = false;
         }
       }
@@ -487,6 +504,7 @@ export async function cambiarEstadoMiProyecto({
   proyecto,
   activo,
   onActualizado = null,
+  vigente = () => true,
 } = {}) {
   const confirmado = await confirmarAccion({
     titulo: activo ? 'Reactivar proyecto' : 'Inactivar proyecto',
@@ -501,8 +519,12 @@ export async function cambiarEstadoMiProyecto({
     return;
   }
 
+  if (!vigente()) return;
+
   try {
     const resultado = await cambiarEstadoProyectoProfesor(proyecto.id, activo);
+
+    if (!vigente()) return;
 
     if (!resultado?.ok) {
       throw new Error(
@@ -519,6 +541,8 @@ export async function cambiarEstadoMiProyecto({
       await onActualizado();
     }
   } catch (error) {
+    if (!vigente()) return;
+
     mostrarError({
       titulo: 'No se pudo cambiar el estado',
       mensaje: error?.message || 'No fue posible actualizar el proyecto.',

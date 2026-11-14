@@ -33,3 +33,9 @@ test('el registro no asigna páginas a módulos desconocidos', () => {
   assert.equal(obtenerCicloVidaPagina('constructor'), null);
   assert.equal(obtenerCicloVidaPagina('__proto__'), null);
 });
+
+test('solo Profesores declara destructor y las demás páginas mantienen su ciclo opcional', () => {
+  assert.equal(typeof obtenerCicloVidaPagina('profesores').destroy, 'function');
+  assert.equal(typeof obtenerCicloVidaPagina('dashboard').destroy, 'undefined');
+  assert.equal(typeof obtenerCicloVidaPagina('aulas').destroy, 'undefined');
+});

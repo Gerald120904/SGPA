@@ -8,7 +8,11 @@ import { PerfilesAcademicosPage, iniciarPerfilesAcademicosPage } from '../pages/
 import { CursosPage, iniciarCursosPage } from '../pages/cursos/CursosPage.js';
 import { OptativasPage, iniciarOptativasPage } from '../pages/optativas/OptativasPage.js';
 import { PeriodosPage, iniciarPeriodosPage } from '../pages/periodos/PeriodosPage.js';
-import { ProfesoresPage, iniciarProfesoresPage } from '../pages/profesores/ProfesoresPage.js';
+import {
+  ProfesoresPage,
+  iniciarProfesoresPage,
+  destruirProfesoresPage,
+} from '../pages/profesores/ProfesoresPage.js';
 import { AulasPage, iniciarAulasPage } from '../pages/aulas/AulasPage.js';
 import { FormulariosEstudiantesPage, iniciarFormulariosEstudiantesPage } from '../pages/formularios-estudiantes/FormulariosEstudiantesPage.js';
 import { EstudiantesPage, iniciarEstudiantesPage } from '../pages/estudiantes/EstudiantesPage.js';
@@ -24,7 +28,11 @@ const PAGE_LIFECYCLES = Object.freeze({
   cursos: Object.freeze({ render: CursosPage, initialize: iniciarCursosPage }),
   optativas: Object.freeze({ render: OptativasPage, initialize: iniciarOptativasPage }),
   periodos: Object.freeze({ render: PeriodosPage, initialize: iniciarPeriodosPage }),
-  profesores: Object.freeze({ render: ProfesoresPage, initialize: iniciarProfesoresPage }),
+  profesores: Object.freeze({
+    render: ProfesoresPage,
+    initialize: iniciarProfesoresPage,
+    destroy: destruirProfesoresPage,
+  }),
   aulas: Object.freeze({ render: AulasPage, initialize: iniciarAulasPage }),
   'formularios-estudiantes': Object.freeze({ render: FormulariosEstudiantesPage, initialize: iniciarFormulariosEstudiantesPage }),
   estudiantes: Object.freeze({ render: EstudiantesPage, initialize: iniciarEstudiantesPage }),

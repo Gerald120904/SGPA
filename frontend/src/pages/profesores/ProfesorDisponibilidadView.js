@@ -24,9 +24,29 @@ import {
 
 let periodosMiDisponibilidad = [];
 let miDisponibilidadActual = null;
+let vigenciaVistaDisponibilidad = () => true;
+let versionVistaDisponibilidad = 0;
+
+export function setVigenciaDisponibilidad(callback = null) {
+  vigenciaVistaDisponibilidad =
+    typeof callback === 'function' ? callback : () => true;
+  versionVistaDisponibilidad += 1;
+}
 
 export function setPeriodosDisponibilidad(periodos = []) {
   periodosMiDisponibilidad = Array.isArray(periodos) ? periodos : [];
+  versionVistaDisponibilidad += 1;
+}
+
+export function getPeriodosDisponibilidad() {
+  return periodosMiDisponibilidad;
+}
+
+export function destruirMiDisponibilidad() {
+  vigenciaVistaDisponibilidad = () => false;
+  versionVistaDisponibilidad += 1;
+  periodosMiDisponibilidad = [];
+  miDisponibilidadActual = null;
 }
 
 export function getDisponibilidadActual() {
@@ -65,6 +85,7 @@ export function configurarMiDisponibilidad(periodos = null) {
 }
 
 export async function cargarMiDisponibilidad(periodoId) {
+  const version = ++versionVistaDisponibilidad;
   const contenido = document.getElementById('miDisponibilidadContent');
   if (!contenido) {
     return;
@@ -79,6 +100,13 @@ export async function cargarMiDisponibilidad(periodoId) {
   try {
     const resultado = await consultarMiDisponibilidadProfesor(periodoId);
 
+    if (
+      version !== versionVistaDisponibilidad ||
+      !vigenciaVistaDisponibilidad()
+    ) {
+      return;
+    }
+
     if (!resultado?.ok) {
       throw new Error(
         resultado?.message ||
@@ -89,6 +117,13 @@ export async function cargarMiDisponibilidad(periodoId) {
     miDisponibilidadActual = resultado.data;
     renderizarMiDisponibilidad();
   } catch (error) {
+    if (
+      version !== versionVistaDisponibilidad ||
+      !vigenciaVistaDisponibilidad()
+    ) {
+      return;
+    }
+
     contenido.innerHTML = `
       <div class="profesores-loading-inline profesores-error">
         ${escapeHtml(
@@ -386,6 +421,7 @@ export function agregarFilaDisponibilidad(bloque = null) {
 }
 
 export async function guardarFormularioMiDisponibilidad(event) {
+  const version = versionVistaDisponibilidad;
   if (event?.preventDefault) {
     event.preventDefault();
   }
@@ -421,6 +457,8 @@ export async function guardarFormularioMiDisponibilidad(event) {
           ?.value?.trim() || '',
     });
 
+    if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
+
     if (!resultado?.ok) {
       throw new Error(
         resultado?.message ||
@@ -440,6 +478,8 @@ export async function guardarFormularioMiDisponibilidad(event) {
         miDisponibilidadActual.periodo?.id,
     );
   } catch (error) {
+    if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
+
     mostrarError({
       titulo: 'No se pudo guardar la disponibilidad',
       mensaje:
@@ -450,6 +490,7 @@ export async function guardarFormularioMiDisponibilidad(event) {
 }
 
 export async function copiarDisponibilidadAnterior() {
+  const version = versionVistaDisponibilidad;
   if (!miDisponibilidadActual) {
     return;
   }
@@ -474,11 +515,15 @@ export async function copiarDisponibilidadAnterior() {
     return;
   }
 
+  if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
+
   try {
     const resultado = await copiarMiDisponibilidadProfesor({
       periodoOrigenId: origen.id,
       periodoDestinoId: destino.id,
     });
+
+    if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
 
     if (!resultado?.ok) {
       throw new Error(
@@ -494,6 +539,8 @@ export async function copiarDisponibilidadAnterior() {
 
     await cargarMiDisponibilidad(destino.id);
   } catch (error) {
+    if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
+
     mostrarError({
       titulo: 'No se pudo copiar la disponibilidad',
       mensaje:
@@ -504,6 +551,7 @@ export async function copiarDisponibilidadAnterior() {
 }
 
 export async function abrirHistorialMiDisponibilidad() {
+  const version = versionVistaDisponibilidad;
   if (!miDisponibilidadActual) {
     return;
   }
@@ -536,6 +584,8 @@ export async function abrirHistorialMiDisponibilidad() {
       miDisponibilidadActual.periodo?.id;
 
     const resultado = await obtenerHistorialMiDisponibilidadProfesor(periodoId);
+
+    if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
 
     if (!resultado?.ok) {
       throw new Error(
@@ -597,6 +647,8 @@ export async function abrirHistorialMiDisponibilidad() {
       renderizarIconos();
     }
   } catch (error) {
+    if (version !== versionVistaDisponibilidad || !vigenciaVistaDisponibilidad()) return;
+
     content.innerHTML = `
       <div class="sgpa-dialog-header">
         <div>

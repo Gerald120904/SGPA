@@ -60,6 +60,7 @@ let appRoot = null;
 let layoutActivo = null;
 let appEventos = null;
 let desuscribirSesionInvalidada = null;
+let paginaActual = null;
 
 let detenerObservadorRutas = null;
 let intervaloSesion = null;
@@ -68,6 +69,18 @@ let cerrandoSesionEnCurso = false;
 let generacionVigilanciaSesion = 0;
 let generacionAplicacion = 0;
 
+function desmontarPaginaActual() {
+  const pagina = paginaActual;
+  paginaActual = null;
+  if (typeof pagina?.destroy !== 'function') return;
+
+  try {
+    pagina.destroy();
+  } catch (error) {
+    console.error('Error al desmontar la página actual:', error);
+  }
+}
+
 function desmontarLayoutActual() {
   layoutActivo?.desmontar();
   layoutActivo = null;
@@ -75,6 +88,7 @@ function desmontarLayoutActual() {
 
 export function destruirAplicacion() {
   generacionAplicacion += 1;
+  desmontarPaginaActual();
   detenerVigilanciaSesion();
   desmontarRouter();
   desmontarLayoutActual();
@@ -142,6 +156,7 @@ function vigilarSesion() {
 }
 
 function mostrarSeleccionCarrera(usuario, carreras) {
+  desmontarPaginaActual();
   desmontarRouter();
   desmontarLayoutActual();
   appRoot.innerHTML = `<main class="content-area"><h1>Seleccioná una carrera</h1>
@@ -157,6 +172,7 @@ export function pantallaSinPermisos() {
 }
 
 function mostrarSinPermisos() {
+  desmontarPaginaActual();
   desmontarRouter();
   desmontarLayoutActual();
   appRoot.innerHTML = pantallaSinPermisos();
@@ -205,6 +221,7 @@ export function iniciarAplicacion({ rootElement = null } = {}) {
 
 function mostrarLogin() {
 
+  desmontarPaginaActual();
   desmontarRouter();
   desmontarLayoutActual();
 
@@ -370,7 +387,7 @@ function mostrarAplicacion() {
    RENDERIZAR RUTA
    ========================================================= */
 
-function renderizarRuta(
+export function renderizarRuta(
   route
 ) {
 
@@ -458,6 +475,8 @@ function renderizarRuta(
     return;
   }
 
+  desmontarPaginaActual();
+
 
   /* =======================================================
      BUSCAR RENDERER
@@ -499,6 +518,8 @@ function renderizarRuta(
       });
 
   }
+
+  paginaActual = page;
 
 
   actualizarNavegacion(
@@ -680,6 +701,7 @@ async function cerrarSesion() {
   }
 
   cerrandoSesionEnCurso = true;
+  desmontarPaginaActual();
   const generacion = generacionAplicacion;
   const versionSesionInicial = obtenerVersionSesion();
   detenerVigilanciaSesion();
