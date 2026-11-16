@@ -241,4 +241,104 @@ describe('JerarquiaUsuariosService', () => {
     expect(solicitudesRepo.save).not.toHaveBeenCalled();
     expect(usuarioRepo.update).toHaveBeenCalledTimes(1);
   });
+
+  it('concurrencia simulada: la primera reconfiguración actualiza permisos y la firma repetida se rechaza', async () => {
+    const asignaciones = [
+      { usuarioId: 2, carreraId: 2, tipo: TipoAsignacionAcademica.COORDINADOR_CARRERA,
+        activo: true, fechaInicio: '2000-01-01', fechaFin: null },
+      { usuarioId: 4, carreraId: 2, tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA,
+        activo: true, fechaInicio: '2000-01-01', fechaFin: null },
+    ];
+    const permisosEstado = [
+      { usuarioId: 2, carreraId: 2, permiso, activo: true },
+      { usuarioId: 4, carreraId: 2, permiso, activo: true },
+    ];
+    const dependencia = { id: 1, coordinadorId: 2, asistenteId: 4, activo: true };
+    const usuarioManager = {
+      findOne: jest.fn(async ({ where }: any) => where.id === 2
+        ? cuenta(2, RolSistema.COORDINADOR)
+        : cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL)),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const asignacionesRepo = {
+      find: jest.fn(async ({ where }: any) => asignaciones.filter((item) =>
+        item.usuarioId === where.usuarioId && item.tipo === where.tipo && item.activo === where.activo)),
+      create: jest.fn((item: any) => item),
+      save: jest.fn(async (item: any) => {
+        if (!asignaciones.includes(item)) asignaciones.push(item);
+        return item;
+      }),
+    };
+    const permisosRepo = {
+      find: jest.fn(async ({ where }: any) => permisosEstado.filter((item) =>
+        item.usuarioId === where.usuarioId && (where.activo === undefined || item.activo === where.activo))),
+      create: jest.fn((item: any) => item),
+      save: jest.fn(async (item: any) => {
+        if (!permisosEstado.includes(item)) permisosEstado.push(item);
+        return item;
+      }),
+    };
+    const dependenciaRepo = { findOne: jest.fn().mockResolvedValue(dependencia) };
+    const solicitudRepo = { find: jest.fn().mockResolvedValue([]) };
+    const auditoriaRepo = { save: jest.fn(async (item: any) => item) };
+    const excepcionesRepo = { delete: jest.fn(), create: (item: any) => item, save: jest.fn() };
+    const permisosLegacyRepo = { delete: jest.fn(), create: (item: any) => item, save: jest.fn() };
+    const manager = { getRepository: jest.fn((entity: any) => {
+      if (entity === Usuario) return usuarioManager;
+      if (entity === AsignacionAcademica) return asignacionesRepo;
+      if (entity === PermisoCarrera) return permisosRepo;
+      if (entity === DependenciaUsuario) return dependenciaRepo;
+      if (entity === SolicitudCambio) return solicitudRepo;
+      if (entity === AuditoriaJerarquia) return auditoriaRepo;
+      if (entity === UsuarioPermisoExcepcion) return excepcionesRepo;
+      if (entity === UsuarioPermiso) return permisosLegacyRepo;
+      throw new Error(`Repositorio inesperado: ${entity?.name}`);
+    }) };
+    let cola = Promise.resolve();
+    const dataSource = {
+      manager,
+      transaction: jest.fn(async (callback: any) => {
+        const anterior = cola;
+        let liberar!: () => void;
+        cola = new Promise<void>((resolve) => { liberar = resolve; });
+        await anterior;
+        try {
+          return await callback(manager);
+        } finally {
+          liberar();
+        }
+      }),
+    };
+    const usuariosRepo = { findOne: jest.fn(async ({ where }: any) => where.id === 1
+      ? cuenta(1, RolSistema.ADMIN_GLOBAL)
+      : where.id === 2 ? cuenta(2, RolSistema.COORDINADOR) : cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL)) };
+    const alcance = {
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([2]),
+      obtenerPermisosDelegables: jest.fn().mockResolvedValue([permiso]),
+    };
+    service = new JerarquiaUsuariosService(dataSource as any, usuariosRepo as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any, dependenciaRepo as any,
+      auditoriaRepo as any, alcance as any, {} as any);
+
+    const vistaPrevia = await service.previsualizarAsistente(1, 4, []);
+    const resultados = await Promise.allSettled([
+      service.configurarAsistentePorAdmin(1, 4, [], vistaPrevia.firma),
+      service.configurarAsistentePorAdmin(1, 4, [], vistaPrevia.firma),
+    ]);
+
+    expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(resultados.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect((resultados.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason)
+      .toBeInstanceOf(ConflictException);
+    expect(asignaciones.find((a) => a.usuarioId === 4)?.activo).toBe(false);
+    expect(permisosEstado.find((p) => p.usuarioId === 4)?.activo).toBe(false);
+    expect(usuarioManager.update).toHaveBeenCalledTimes(1);
+    expect(auditoriaRepo.save).toHaveBeenCalledTimes(2);
+    expect(auditoriaRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+      actorUsuarioId: 1, objetivoUsuarioId: 4, accion: 'CONFIGURAR_ASISTENTE',
+    }));
+    expect(auditoriaRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+      actorUsuarioId: 1, objetivoUsuarioId: 4, accion: 'REVOCACION_ADMINISTRATIVA',
+    }));
+  });
 });

@@ -22,6 +22,7 @@ describe('SolicitudesCambioService', () => {
     cambiarEstadoDesdeSolicitud: jest.Mock; cambiarPlanDesdeSolicitud: jest.Mock;
     registrarResultadoDesdeSolicitud: jest.Mock };
   let service: SolicitudesCambioService;
+  let dataSource: { transaction: jest.Mock };
   let planEnTransaccion: { id: number; estado: string; versionAnteriorId: number | null };
   let cursos: { contextoCreacion: jest.Mock; obtenerCursoCompleto: jest.Mock;
     huellaCurso: jest.Mock; validarDelegacionCompleta: jest.Mock; crearDesdeSolicitud: jest.Mock;
@@ -97,7 +98,7 @@ describe('SolicitudesCambioService', () => {
     const manager = { getRepository: (entidad: unknown) => entidad === SolicitudCambio ? solicitudRepo :
       entidad === Usuario ? { findOne: jest.fn().mockResolvedValue({ id: 1, usuarioRoles: [{ rol: { nombre: 'COORDINADOR' } }] }) } :
         entidad === PlanEstudio ? planRepo : auditoriaRepo };
-    const dataSource = { transaction: jest.fn(async (fn) => fn(manager)) };
+    dataSource = { manager, transaction: jest.fn(async (fn) => fn(manager)) } as any;
     alcance = {
       puedeEjecutar: jest.fn().mockResolvedValue(true),
       puedeAdministrarAsistente: jest.fn().mockResolvedValue(true),
@@ -281,6 +282,32 @@ describe('SolicitudesCambioService', () => {
     expect(solicitudRepo.findOne).toHaveBeenCalledWith({ where: { id: 1 }, lock: { mode: 'pessimistic_write' } });
     await expect(service.aprobar(1, 1)).rejects.toThrow(ConflictException);
     expect(estudiantes.crearDesdeSolicitud).toHaveBeenCalledTimes(1);
+  });
+
+  it('concurrencia simulada: serializa dos aprobaciones y aplica la solicitud una sola vez', async () => {
+    const solicitud = await service.proponerCrearEstudiante(3, propuesta);
+    let cola = Promise.resolve();
+    dataSource.transaction.mockImplementation(async (fn) => {
+      const anterior = cola;
+      let liberar!: () => void;
+      cola = new Promise<void>((resolve) => { liberar = resolve; });
+      await anterior;
+      try {
+        return await fn((dataSource as any).manager);
+      } finally {
+        liberar();
+      }
+    });
+
+    const resultados = await Promise.allSettled([
+      service.aprobar(1, solicitud.id),
+      service.aprobar(1, solicitud.id),
+    ]);
+
+    expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(resultados.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect(estudiantes.crearDesdeSolicitud).toHaveBeenCalledTimes(1);
+    expect(solicitud.estado).toBe('APROBADA');
   });
 
   it('revocación invalida la solicitud sin aplicar datos oficiales', async () => {

@@ -144,4 +144,31 @@ describe('revocación del rol coordinador con asistentes', () => {
     expect(dependencias.filter((d) => d.activo)).toHaveLength(4);
     expect(auditorias).toEqual([]);
   });
+
+  it('concurrencia simulada: una revocación gana y la segunda firma queda obsoleta', async () => {
+    const impacto = await service.previsualizarRevocacionRol(10, 2);
+    let cola = Promise.resolve();
+    datasource.transaction.mockImplementation(async (callback: any) => {
+      const anterior = cola;
+      let liberar!: () => void;
+      cola = new Promise<void>((resolve) => { liberar = resolve; });
+      await anterior;
+      try {
+        return await callback(datasource.manager);
+      } finally {
+        liberar();
+      }
+    });
+
+    const resultados = await Promise.allSettled([
+      service.revocarRol(10, 2, 1, impacto.firma),
+      service.revocarRol(10, 2, 1, impacto.firma),
+    ]);
+
+    expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(resultados.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect((resultados.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason)
+      .toBeInstanceOf(ConflictException);
+    expect(auditorias.filter((a) => a.accion === 'REVOCAR_COORDINADOR')).toHaveLength(1);
+  });
 });
