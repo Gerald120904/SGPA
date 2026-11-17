@@ -397,7 +397,9 @@ test('Profesores — Handlers reales: Envío simulado de atestados, proyectos y 
 
   let llamadasServicio = {
     crearAtestado: [],
+    actualizarAtestado: [],
     crearProyecto: [],
+    actualizarProyecto: [],
     guardarDisponibilidad: [],
   };
 
@@ -458,12 +460,23 @@ test('Profesores — Handlers reales: Envío simulado de atestados, proyectos y 
         }
         return { ok: true, atestado: { id: 50, ...datos } };
       },
+      actualizarAtestadoProfesor: async (id, datos) => {
+        llamadasServicio.actualizarAtestado.push({ id, datos });
+        return { ok: true, atestado: { id, ...datos } };
+      },
       crearProyectoProfesor: async (datos) => {
         llamadasServicio.crearProyecto.push(datos);
         if (datos.nombre?.includes('ERROR_FORZADO')) {
           return { ok: false, message: 'Error forzado al registrar proyecto' };
         }
         return { ok: true, proyecto: { id: 70, ...datos } };
+      },
+      actualizarProyectoProfesor: async (id, datos) => {
+        llamadasServicio.actualizarProyecto.push({ id, datos });
+        if (datos.nombre?.includes('ERROR_FORZADO')) {
+          return { ok: false, message: 'Error forzado al actualizar proyecto' };
+        }
+        return { ok: true, proyecto: { id, ...datos } };
       },
       guardarMiDisponibilidadProfesor: async (payload) => {
         llamadasServicio.guardarDisponibilidad.push(payload);
@@ -492,6 +505,20 @@ test('Profesores — Handlers reales: Envío simulado de atestados, proyectos y 
     assert.equal(llamadasServicio.crearAtestado[0].nombre, 'Maestría en Ciberseguridad');
     assert.equal(llamadasServicio.crearAtestado[0].fechaObtencion, '2024-06-15');
     assert.ok(atestadoGuardado, 'onGuardado debe invocarse');
+
+    // La edición conserva el identificador y el payload del servicio existente.
+    let atestadoActualizado = null;
+    abrirFormularioAtestado({
+      atestado: { id: 58, tipo: 'CERTIFICACION', nombre: 'Anterior' },
+      onGuardado: (res) => { atestadoActualizado = res; },
+    });
+    mockElement('atestadoTipo').value = 'CERTIFICACION';
+    mockElement('atestadoNombre').value = 'Certificacion actualizada';
+    mockElement('atestadoInstitucion').value = 'UNA';
+    await mockElement('miAtestadoForm').onsubmit({ preventDefault: () => {} });
+    assert.equal(llamadasServicio.actualizarAtestado[0].id, 58);
+    assert.equal(llamadasServicio.actualizarAtestado[0].datos.nombre, 'Certificacion actualizada');
+    assert.ok(atestadoActualizado, 'onGuardado debe ejecutarse al actualizar.');
 
     // 2. Envío de atestado con error de servicio
     let atestadoErrorGuardado = false;
@@ -527,6 +554,18 @@ test('Profesores — Handlers reales: Envío simulado de atestados, proyectos y 
     assert.equal(llamadasServicio.crearProyecto.length, 1);
     assert.equal(llamadasServicio.crearProyecto[0].nombre, 'Investigación en Redes Cuánticas');
     assert.ok(proyectoGuardado, 'onGuardado de proyecto debe invocarse');
+
+    // Una respuesta fallida al actualizar conserva el diálogo y recupera el botón.
+    let proyectoActualizadoTrasError = false;
+    abrirFormularioProyecto({
+      proyecto: { id: 72, nombre: 'Proyecto existente' },
+      onGuardado: () => { proyectoActualizadoTrasError = true; },
+    });
+    mockElement('proyectoNombre').value = 'ERROR_FORZADO';
+    await mockElement('miProyectoForm').onsubmit({ preventDefault: () => {} });
+    assert.equal(llamadasServicio.actualizarProyecto[0].id, 72);
+    assert.equal(proyectoActualizadoTrasError, false);
+    assert.equal(mockElement('guardarMiProyecto').disabled, false);
 
     // 4. Validación de fechaFin < fechaInicio en proyecto (bloqueo sin llamada a servicio)
     abrirFormularioProyecto({ proyecto: null });

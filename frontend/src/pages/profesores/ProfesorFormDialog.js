@@ -17,6 +17,48 @@ import {
   cambiarEstadoProyectoProfesor,
 } from '../../services/profesores.service.js';
 
+async function ejecutarGuardadoAutogestion({
+  boton,
+  dialog,
+  guardar,
+  mensajeResultadoInvalido,
+  tituloError,
+  mensajeError,
+  tituloExito,
+  mensajeExito,
+  onGuardado,
+  vigente,
+}) {
+  if (boton) boton.disabled = true;
+
+  try {
+    const resultado = await guardar();
+    if (!vigente()) return;
+
+    if (!resultado?.ok) {
+      throw new Error(resultado?.message || mensajeResultadoInvalido);
+    }
+
+    dialog.close();
+    mostrarExito({ titulo: tituloExito, mensaje: mensajeExito });
+
+    if (typeof onGuardado === 'function') {
+      await onGuardado(resultado);
+    }
+  } catch (error) {
+    if (!vigente()) return;
+
+    mostrarError({
+      titulo: tituloError,
+      mensaje: error?.message || mensajeError,
+    });
+  } finally {
+    if (boton && vigente()) {
+      boton.disabled = false;
+    }
+  }
+}
+
 export function abrirFormularioAtestado({
   atestado = null,
   onGuardado = null,
@@ -228,48 +270,23 @@ export function abrirFormularioAtestado({
         descripcion,
       };
 
-      const boton = document.getElementById('guardarMiAtestado');
-      if (boton) {
-        boton.disabled = true;
-      }
-
-      try {
-        const resultado = editando
-          ? await actualizarAtestadoProfesor(atestado.id, datos)
-          : await crearAtestadoProfesor(datos);
-
-        if (!vigente()) return;
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || 'No fue posible guardar el atestado.',
-          );
-        }
-
-        dialog.close();
-
-        mostrarExito({
-          titulo: editando ? 'Atestado actualizado' : 'Atestado registrado',
-          mensaje: editando
-            ? 'El atestado fue actualizado correctamente.'
-            : 'El atestado quedó pendiente de revisión.',
-        });
-
-        if (typeof onGuardado === 'function') {
-          await onGuardado(resultado);
-        }
-      } catch (error) {
-        if (!vigente()) return;
-
-        mostrarError({
-          titulo: 'No se pudo guardar el atestado',
-          mensaje: error?.message || 'No fue posible guardar la información.',
-        });
-      } finally {
-        if (boton && vigente()) {
-          boton.disabled = false;
-        }
-      }
+      await ejecutarGuardadoAutogestion({
+        boton: document.getElementById('guardarMiAtestado'),
+        dialog,
+        guardar: () =>
+          editando
+            ? actualizarAtestadoProfesor(atestado.id, datos)
+            : crearAtestadoProfesor(datos),
+        mensajeResultadoInvalido: 'No fue posible guardar el atestado.',
+        tituloError: 'No se pudo guardar el atestado',
+        mensajeError: 'No fue posible guardar la información.',
+        tituloExito: editando ? 'Atestado actualizado' : 'Atestado registrado',
+        mensajeExito: editando
+          ? 'El atestado fue actualizado correctamente.'
+          : 'El atestado quedó pendiente de revisión.',
+        onGuardado,
+        vigente,
+      });
     });
 
   if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
@@ -451,48 +468,23 @@ export function abrirFormularioProyecto({
         descripcion: document.getElementById('proyectoDescripcion')?.value?.trim() || '',
       };
 
-      const boton = document.getElementById('guardarMiProyecto');
-      if (boton) {
-        boton.disabled = true;
-      }
-
-      try {
-        const resultado = editando
-          ? await actualizarProyectoProfesor(proyecto.id, datos)
-          : await crearProyectoProfesor(datos);
-
-        if (!vigente()) return;
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || 'No fue posible guardar el proyecto.',
-          );
-        }
-
-        dialog.close();
-
-        mostrarExito({
-          titulo: editando ? 'Proyecto actualizado' : 'Proyecto registrado',
-          mensaje: editando
-            ? 'El proyecto fue actualizado correctamente.'
-            : 'El proyecto fue registrado correctamente.',
-        });
-
-        if (typeof onGuardado === 'function') {
-          await onGuardado(resultado);
-        }
-      } catch (error) {
-        if (!vigente()) return;
-
-        mostrarError({
-          titulo: 'No se pudo guardar el proyecto',
-          mensaje: error?.message || 'No fue posible guardar la información.',
-        });
-      } finally {
-        if (boton && vigente()) {
-          boton.disabled = false;
-        }
-      }
+      await ejecutarGuardadoAutogestion({
+        boton: document.getElementById('guardarMiProyecto'),
+        dialog,
+        guardar: () =>
+          editando
+            ? actualizarProyectoProfesor(proyecto.id, datos)
+            : crearProyectoProfesor(datos),
+        mensajeResultadoInvalido: 'No fue posible guardar el proyecto.',
+        tituloError: 'No se pudo guardar el proyecto',
+        mensajeError: 'No fue posible guardar la información.',
+        tituloExito: editando ? 'Proyecto actualizado' : 'Proyecto registrado',
+        mensajeExito: editando
+          ? 'El proyecto fue actualizado correctamente.'
+          : 'El proyecto fue registrado correctamente.',
+        onGuardado,
+        vigente,
+      });
     });
 
   if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
