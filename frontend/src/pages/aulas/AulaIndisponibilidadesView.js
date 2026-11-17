@@ -24,6 +24,7 @@ import {
   renderizarControlFechaHoraCompacto,
 } from './aulas.horarios.js';
 import { puedeGestionarAulas, validarGestionAulas } from './aulas.context.js';
+import { ejecutarGuardadoAula } from './aulas.operaciones.js';
 
 export function renderizarIndisponibilidades(indisponibilidades = []) {
   if (!indisponibilidades.length) {
@@ -255,53 +256,33 @@ export function abrirFormularioIndisponibilidad(
         motivo,
       };
 
-      const boton = document.getElementById('guardarIndisponibilidad');
-
-      if (boton) {
-        boton.disabled = true;
-      }
-
-      try {
-        const resultado = editando
-          ? await actualizarIndisponibilidadAula(
-              aulaDetalleActual.id,
-              indisponibilidad.id,
-              datos,
-            )
-          : await crearIndisponibilidadAula(aulaDetalleActual.id, datos);
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message ||
-              'No fue posible guardar la indisponibilidad.',
-          );
-        }
-
-        dialog.close();
-
-        mostrarExito({
-          titulo: editando
-            ? 'Indisponibilidad actualizada'
-            : 'Indisponibilidad registrada',
-          mensaje: editando
-            ? 'La indisponibilidad fue actualizada correctamente.'
-            : 'El aula quedó bloqueada durante el periodo indicado.',
-        });
-
-        if (typeof onActualizado === 'function') {
-          await onActualizado(aulaDetalleActual.id);
-        }
-      } catch (error) {
-        mostrarError({
-          titulo: 'No se pudo guardar',
-          mensaje:
-            error?.message || 'No fue posible guardar la indisponibilidad.',
-        });
-      } finally {
-        if (boton) {
-          boton.disabled = false;
-        }
-      }
+      await ejecutarGuardadoAula({
+        boton: document.getElementById('guardarIndisponibilidad'),
+        dialog,
+        guardar: () =>
+          editando
+            ? actualizarIndisponibilidadAula(
+                aulaDetalleActual.id,
+                indisponibilidad.id,
+                datos,
+              )
+            : crearIndisponibilidadAula(aulaDetalleActual.id, datos),
+        mensajeResultadoInvalido:
+          'No fue posible guardar la indisponibilidad.',
+        tituloError: 'No se pudo guardar',
+        mensajeError: 'No fue posible guardar la indisponibilidad.',
+        tituloExito: editando
+          ? 'Indisponibilidad actualizada'
+          : 'Indisponibilidad registrada',
+        mensajeExito: editando
+          ? 'La indisponibilidad fue actualizada correctamente.'
+          : 'El aula quedó bloqueada durante el periodo indicado.',
+        despuesDeGuardar: () => {
+          if (typeof onActualizado === 'function') {
+            return onActualizado(aulaDetalleActual.id);
+          }
+        },
+      });
     });
 
   if (typeof document !== 'undefined') {

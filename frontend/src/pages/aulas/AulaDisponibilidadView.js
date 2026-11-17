@@ -28,6 +28,7 @@ import {
   puedeVerPeriodos,
   validarGestionAulas,
 } from './aulas.context.js';
+import { ejecutarGuardadoAula } from './aulas.operaciones.js';
 
 export function renderizarSeccionDisponibilidadBase(contexto) {
   if (!puedeVerPeriodos()) {
@@ -463,53 +464,32 @@ export function abrirFormularioBloqueAula(bloque = null, contexto) {
         horaFin,
       };
 
-      const boton = document.getElementById('guardarDisponibilidadAula');
-
-      if (boton) {
-        boton.disabled = true;
-      }
-
-      try {
-        const resultado = editando
-          ? await actualizarDisponibilidadAula(
-              aulaDetalleActual.id,
-              bloque.id,
-              datos,
-            )
-          : await crearDisponibilidadAula(aulaDetalleActual.id, {
-              periodoId: periodoDisponibilidadActual.id,
-              ...datos,
-            });
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || 'No fue posible guardar el bloque.',
-          );
-        }
-
-        dialog.close();
-
-        mostrarExito({
-          titulo: editando ? 'Bloque actualizado' : 'Bloque agregado',
-          mensaje:
-            'La disponibilidad base del aula fue actualizada correctamente.',
-        });
-
-        await cargarDisponibilidadBaseAula(
-          periodoDisponibilidadActual.id,
-          contexto,
-        );
-      } catch (error) {
-        mostrarError({
-          titulo: 'No se pudo guardar el bloque',
-          mensaje:
-            error?.message || 'No fue posible actualizar la disponibilidad.',
-        });
-      } finally {
-        if (boton) {
-          boton.disabled = false;
-        }
-      }
+      await ejecutarGuardadoAula({
+        boton: document.getElementById('guardarDisponibilidadAula'),
+        dialog,
+        guardar: () =>
+          editando
+            ? actualizarDisponibilidadAula(
+                aulaDetalleActual.id,
+                bloque.id,
+                datos,
+              )
+            : crearDisponibilidadAula(aulaDetalleActual.id, {
+                periodoId: periodoDisponibilidadActual.id,
+                ...datos,
+              }),
+        mensajeResultadoInvalido: 'No fue posible guardar el bloque.',
+        tituloError: 'No se pudo guardar el bloque',
+        mensajeError: 'No fue posible actualizar la disponibilidad.',
+        tituloExito: editando ? 'Bloque actualizado' : 'Bloque agregado',
+        mensajeExito:
+          'La disponibilidad base del aula fue actualizada correctamente.',
+        despuesDeGuardar: () =>
+          cargarDisponibilidadBaseAula(
+            periodoDisponibilidadActual.id,
+            contexto,
+          ),
+      });
     });
 
   if (typeof document !== 'undefined') {

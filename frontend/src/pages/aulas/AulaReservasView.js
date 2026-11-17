@@ -24,6 +24,7 @@ import {
   renderizarControlFechaHoraCompacto,
 } from './aulas.horarios.js';
 import { puedeGestionarAulas, validarGestionAulas } from './aulas.context.js';
+import { ejecutarGuardadoAula } from './aulas.operaciones.js';
 
 export function renderizarReservasAula(reservas = []) {
   if (!reservas.length) {
@@ -268,45 +269,26 @@ export function abrirFormularioReserva(
         fechaHoraFin: normalizarFechaHoraInput(fin),
       };
 
-      const boton = document.getElementById('guardarReservaAula');
-
-      if (boton) {
-        boton.disabled = true;
-      }
-
-      try {
-        const resultado = editando
-          ? await actualizarReservaAula(aulaDetalleActual.id, reserva.id, datos)
-          : await crearReservaAula(aulaDetalleActual.id, datos);
-
-        if (!resultado?.ok) {
-          throw new Error(
-            resultado?.message || 'No fue posible guardar la reserva.',
-          );
-        }
-
-        dialog.close();
-
-        mostrarExito({
-          titulo: editando ? 'Reserva actualizada' : 'Reserva creada',
-          mensaje: editando
-            ? 'La reserva fue actualizada correctamente.'
-            : 'El aula quedó reservada en el horario indicado.',
-        });
-
-        if (typeof onActualizado === 'function') {
-          await onActualizado(aulaDetalleActual.id);
-        }
-      } catch (error) {
-        mostrarError({
-          titulo: 'No se pudo guardar la reserva',
-          mensaje: error?.message || 'No fue posible registrar la reserva.',
-        });
-      } finally {
-        if (boton) {
-          boton.disabled = false;
-        }
-      }
+      await ejecutarGuardadoAula({
+        boton: document.getElementById('guardarReservaAula'),
+        dialog,
+        guardar: () =>
+          editando
+            ? actualizarReservaAula(aulaDetalleActual.id, reserva.id, datos)
+            : crearReservaAula(aulaDetalleActual.id, datos),
+        mensajeResultadoInvalido: 'No fue posible guardar la reserva.',
+        tituloError: 'No se pudo guardar la reserva',
+        mensajeError: 'No fue posible registrar la reserva.',
+        tituloExito: editando ? 'Reserva actualizada' : 'Reserva creada',
+        mensajeExito: editando
+          ? 'La reserva fue actualizada correctamente.'
+          : 'El aula quedó reservada en el horario indicado.',
+        despuesDeGuardar: () => {
+          if (typeof onActualizado === 'function') {
+            return onActualizado(aulaDetalleActual.id);
+          }
+        },
+      });
     });
 
   if (typeof document !== 'undefined') {
