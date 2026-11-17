@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { normalizarEntradaCampoUsuario } from '../src/pages/usuarios/usuarios.helpers.js';
 
 test('1. Modales de todo el SGPA: AlertModal y confirm.js tienen diseño profesional e iconografía completa', async () => {
   const alertModalCode = readFileSync(new URL('../src/components/AlertModal.js', import.meta.url), 'utf8');
@@ -84,9 +85,11 @@ test('2, 3 y 4. Usuarios: validaciones actuales, invitaciones y roles amigables'
   assert.match(usuariosPageCode, /correoDuplicado/);
 
   // Restricción de caracteres y errores visuales
-  assert.match(
-    usuariosCode,
-    /anterior\.replace\(\/\\D\/g, ''\)/
+  assert.match(usuariosPageCode, /normalizarEntradaCampoUsuario\(/);
+  assert.deepEqual(
+    normalizarEntradaCampoUsuario('cedula', '12a-345', 5),
+    { valor: '12345', posicionCursor: 3 },
+    'La cédula elimina caracteres no numéricos y conserva la posición lógica del cursor'
   );
   assert.match(usuariosCode, /aria-invalid/);
 });

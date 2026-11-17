@@ -54,6 +54,34 @@ export function mensajeResultado(resultado, mensajePredeterminado) {
   throw new Error(resultado?.message || mensajePredeterminado);
 }
 
+export function obtenerCarrerasActivas(resultado) {
+  const carreras = Array.isArray(resultado.carreras)
+    ? resultado.carreras
+    : Array.isArray(resultado.data)
+      ? resultado.data
+      : [];
+
+  return carreras.filter((carrera) => carrera.activo);
+}
+
+const CAMPOS_NOMBRE_USUARIO = new Set(['nombres', 'apellido1', 'apellido2']);
+
+export function normalizarEntradaCampoUsuario(nombre, valor, posicionCursor = null) {
+  const texto = String(valor ?? '');
+  const normalizar = nombre === 'cedula'
+    ? (entrada) => entrada.replace(/\D/g, '')
+    : CAMPOS_NOMBRE_USUARIO.has(nombre)
+      ? (entrada) => entrada.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g, '')
+      : (entrada) => entrada;
+
+  return {
+    valor: normalizar(texto),
+    posicionCursor: Number.isInteger(posicionCursor)
+      ? normalizar(texto.slice(0, posicionCursor)).length
+      : null,
+  };
+}
+
 export const INFORMACION_PERMISOS = Object.freeze({
   PROFESORES_VER: {
     nombre: 'Ver profesores',

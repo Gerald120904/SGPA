@@ -4,6 +4,8 @@ import {
   ROLES_VISIBLES,
   nombreVisibleRol,
   normalizarRolesUsuario,
+  obtenerCarrerasActivas,
+  normalizarEntradaCampoUsuario,
   obtenerNombreCompletoUsuario,
   usuarioEsAdminGlobal,
   obtenerCodigosPermisos,
@@ -43,6 +45,37 @@ test('usuarios.helpers — normalización, nombres, permisos y agrupación por m
   );
   assert.equal(usuarioEsAdminGlobal({ roles: [{ nombre: 'ADMIN_GLOBAL' }] }), true);
   assert.equal(usuarioEsAdminGlobal({ roles: ['PROFESOR'] }), false);
+
+  assert.deepEqual(
+    obtenerCarrerasActivas({
+      carreras: [{ id: 1, activo: true }, { id: 2, activo: false }],
+      data: [{ id: 3, activo: true }],
+    }).map((carrera) => carrera.id),
+    [1],
+  );
+  assert.deepEqual(
+    obtenerCarrerasActivas({ data: [{ id: 4, activo: true }, { id: 5, activo: false }] })
+      .map((carrera) => carrera.id),
+    [4],
+  );
+  assert.deepEqual(obtenerCarrerasActivas({ data: null }), []);
+
+  assert.deepEqual(normalizarEntradaCampoUsuario('cedula', '20a-85', 4), {
+    valor: '2085',
+    posicionCursor: 2,
+  });
+  assert.deepEqual(normalizarEntradaCampoUsuario('nombres', "Mar1ía! O'Neil", 5), {
+    valor: "María O'Neil",
+    posicionCursor: 4,
+  });
+  assert.deepEqual(normalizarEntradaCampoUsuario('correo', 'a+b@una.cr', 4), {
+    valor: 'a+b@una.cr',
+    posicionCursor: 4,
+  });
+  assert.deepEqual(normalizarEntradaCampoUsuario('apellido2', null), {
+    valor: '',
+    posicionCursor: null,
+  });
 
   const codigos = obtenerCodigosPermisos(['CURSOS_VER', { permiso: 'AULAS_GESTIONAR' }, null]);
   assert.deepEqual([...codigos], ['CURSOS_VER', 'AULAS_GESTIONAR']);

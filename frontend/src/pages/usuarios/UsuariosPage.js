@@ -38,6 +38,8 @@ import {
   construirMensajeRevocacionRol,
   construirMensajeImpactoJerarquia,
   obtenerEstadoSeleccionPermisosCarrera,
+  obtenerCarrerasActivas,
+  normalizarEntradaCampoUsuario,
   establecerSeleccionPermisosCarrera,
   filtrarListaUsuarios,
 } from './usuarios.helpers.js';
@@ -325,11 +327,7 @@ export async function iniciarUsuariosPage() {
     );
 
     if (!sigueActiva()) return;
-    estado.carreras = Array.isArray(resultado.carreras)
-      ? resultado.carreras.filter((c) => c.activo)
-      : Array.isArray(resultado.data)
-        ? resultado.data.filter((c) => c.activo)
-        : [];
+    estado.carreras = obtenerCarrerasActivas(resultado);
   }
 
 
@@ -379,7 +377,6 @@ export async function iniciarUsuariosPage() {
   });
 
   const NOMBRES_CAMPOS_USUARIO = ['cedula', 'correo', 'nombres', 'apellido1', 'apellido2'];
-  const EXPRESION_CARACTERES_NOMBRE = /[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g;
 
   function leerDatosUsuarioFormulario(formulario) {
     const datos = new FormData(formulario);
@@ -679,23 +676,15 @@ export async function iniciarUsuariosPage() {
     if (campoUsuario) {
       const anterior = campoUsuario.value;
       const nombre = campoUsuario.name;
-      const depurado = nombre === 'cedula'
-        ? anterior.replace(/\D/g, '')
-        : ['nombres', 'apellido1', 'apellido2'].includes(nombre)
-          ? anterior.replace(EXPRESION_CARACTERES_NOMBRE, '')
-          : anterior;
+      const { valor: depurado, posicionCursor: nuevaPosicion } = normalizarEntradaCampoUsuario(
+        nombre,
+        anterior,
+        campoUsuario.selectionStart,
+      );
 
       // La cédula no admite letras, y los nombres y apellidos no admiten números,
       // ni siquiera al pegar texto. Conservar el cursor al eliminar caracteres.
       if (depurado !== anterior) {
-        const cursor = campoUsuario.selectionStart;
-        const nuevaPosicion = Number.isInteger(cursor)
-          ? (nombre === 'cedula'
-            ? anterior.slice(0, cursor).replace(/\D/g, '').length
-            : ['nombres', 'apellido1', 'apellido2'].includes(nombre)
-              ? anterior.slice(0, cursor).replace(EXPRESION_CARACTERES_NOMBRE, '').length
-              : cursor)
-          : null;
         campoUsuario.value = depurado;
         if (nuevaPosicion != null) campoUsuario.setSelectionRange(nuevaPosicion, nuevaPosicion);
       }
