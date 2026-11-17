@@ -62,9 +62,11 @@ test('alta: valida correo obligatorio, con formato y longitud', () => {
 
 test('alta: mantiene la creación por servicio y la delegación existentes', () => {
   for (const llamada of ['crearAsistenteJerarquia(', 'configurarAsistenteJerarquia(',
-    'aprobarSolicitudCambio(', 'rechazarSolicitudCambio(']) {
+    'aprobarSolicitudCambio(']) {
     assert.ok(codigo.includes(llamada));
   }
+  assert.match(codigo, /ejecutar: rechazarSolicitudCambio/);
+  assert.match(codigo, /ejecutar: devolverSolicitudCambio/);
   assert.match(codigo, /\.filter\(\(campo\) => campo\.querySelector\('\[name="carrera"\]'\)\?\.checked\)/);
   assert.match(codigo, /if \(!id && !carreras\.length\)/);
   assert.match(codigo, /if \(!id && !carreras\.some/);

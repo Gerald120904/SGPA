@@ -19,14 +19,15 @@ test('asistentes: formularios usan FormDialog sin cambiar identificadores', () =
   assert.match(vista, /import \{ FormDialog \}/);
   assert.match(vista, /formId: 'formAsistente'/);
   assert.match(vista, /formId: 'formRechazo'/);
+  assert.match(vista, /formId: 'formDevolver'/);
   assert.match(vista, /id="resumenDelegacionAsistente"/);
   assert.match(vista, /formulario\.dataset\.id = String\(id \|\| ''\)/);
-  assert.match(vista, /querySelector\('#formRechazo'\)\.dataset\.id/);
+  assert.match(vista, /querySelector\(`#\$\{configuracionDecision\.formId\}`\)\.dataset\.id/);
 });
 
 test('asistentes: se mantienen nombres de campos y nuevos limites de entrada', () => {
   for (const name of ['cedula', 'nombres', 'apellido1', 'apellido2', 'correo',
-    'carrera', 'seleccionar-todos-permisos', 'permiso', 'motivo']) {
+    'carrera', 'seleccionar-todos-permisos', 'permiso']) {
     assert.match(vista, new RegExp(`name="${name}"`));
   }
   assert.match(vista, /maxlength="9"/);
@@ -34,6 +35,9 @@ test('asistentes: se mantienen nombres de campos y nuevos limites de entrada', (
   assert.match(vista, /maxlength="50"/);
   assert.match(vista, /maxlength="150"/);
   assert.match(vista, /minlength="3" maxlength="500"/);
+  assert.match(vista, /campo: 'motivo'/);
+  assert.match(vista, /campo: 'observaciones'/);
+  assert.match(vista, /name="\$\{configuracionDecision\.campo\}"/);
 });
 
 test('asistentes: las acciones y atributos de delegación se conservan', () => {
@@ -49,9 +53,11 @@ test('asistentes: todas las consultas y escrituras siguen usando los servicios d
     'listarSolicitudesPendientesCambio', 'listarMisSolicitudesCambio',
     'obtenerConfiguracionAsistentesJerarquia', 'obtenerAsistenteJerarquia',
     'crearAsistenteJerarquia', 'configurarAsistenteJerarquia',
-    'aprobarSolicitudCambio', 'rechazarSolicitudCambio']) {
+    'aprobarSolicitudCambio']) {
     assert.match(vista, new RegExp(`${llamada}\\(`));
   }
+  assert.match(vista, /ejecutar: rechazarSolicitudCambio/);
+  assert.match(vista, /ejecutar: devolverSolicitudCambio/);
   assert.match(vista, /await confirmarAccion\(/);
 });
 

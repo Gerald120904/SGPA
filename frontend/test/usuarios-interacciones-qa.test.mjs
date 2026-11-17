@@ -371,6 +371,68 @@ function mountPage(doc, html) {
   return container;
 }
 
+async function prepararFormularioDecisionSolicitud(
+  accion,
+  texto,
+  respuestaServicio = { ok: true, data: {} },
+) {
+  guardarSesion({
+    usuario: {
+      id: 1,
+      rolActivo: ROLES.COORDINADOR,
+      roles: [ROLES.COORDINADOR],
+    },
+  });
+
+  const llamadas = [];
+  const servicio = accion === 'rechazar' ? 'rechazarSolicitudCambio' : 'devolverSolicitudCambio';
+  const campo = accion === 'rechazar' ? 'motivo' : 'observaciones';
+  const doc = setupEnv({
+    listarMisAlcancesJerarquia: async () => ({ ok: true, data: [] }),
+    listarMisAsistentes: async () => ({ ok: true, data: [] }),
+    listarSolicitudesPendientesCambio: async () => ({
+      ok: true,
+      data: [{
+        id: 71,
+        modulo: 'CURSOS',
+        operacion: 'ACTUALIZAR',
+        estado: 'PENDIENTE',
+        carreraId: 10,
+        solicitanteId: 2,
+        createdAt: '2026-01-01T12:00:00.000Z',
+        datosPropuestos: { nombre: 'Curso propuesto' },
+      }],
+    }),
+    obtenerConfiguracionAsistentesJerarquia: async () => ({ ok: true, data: {} }),
+    [servicio]: async (...argumentos) => {
+      llamadas.push(argumentos);
+      return respuestaServicio;
+    },
+  });
+
+  mountPage(doc, MisAsistentesPage());
+  await iniciarMisAsistentesPage();
+  const pagina = doc.getElementById('misAsistentesPage');
+  const boton = doc
+    .getElementById('misAsistentesContenido')
+    .querySelector(`[data-action="${accion}"]`);
+  await pagina.dispatch('click', { target: boton });
+
+  const idFormulario = accion === 'rechazar' ? 'formRechazo' : 'formDevolver';
+  const formulario = doc.getElementById(idFormulario);
+  const submit = new MockElement({ tagName: 'button', doc });
+  submit.setAttribute('type', 'submit');
+  formulario.appendChild(submit);
+
+  global.FormData = class MockFormDataDecision {
+    get(nombre) {
+      return nombre === campo ? texto : '';
+    }
+  };
+
+  return { doc, pagina, formulario, llamadas, campo };
+}
+
 test('UsuariosPage — carga catálogo, filtro en vivo y consulta de accesos en modo solo lectura', async () => {
   let revocarLlamado = false;
   const doc = setupEnv({
@@ -718,3 +780,53 @@ test('UsuariosPage — revocación de rol respeta cancelación y ejecuta con fir
   assert.deepEqual(revocarArgs, { id: 7, rolId: 2, firma: 'firma-segura-123' });
   limpiarSesion();
 });
+
+for (const decision of ['rechazar', 'devolver']) {
+  test(`MisAsistentesPage — ${decision} conserva la validación mínima del texto`, async () => {
+    const { doc, pagina, formulario, llamadas } = await prepararFormularioDecisionSolicitud(
+      decision,
+      '  x  ',
+    );
+
+    await pagina.dispatch('submit', { target: formulario });
+
+    assert.equal(llamadas.length, 0);
+    assert.equal(doc.getElementById('misAsistentesDialog').open, true);
+    assert.match(doc.getElementById('misAsistentesFeedback').textContent, /al menos 3 caracteres/);
+    limpiarSesion();
+  });
+
+  test(`MisAsistentesPage — ${decision} ejecuta el servicio configurado y muestra éxito`, async () => {
+    const { doc, pagina, formulario, llamadas, campo } = await prepararFormularioDecisionSolicitud(
+      decision,
+      '  observación válida  ',
+    );
+
+    await pagina.dispatch('submit', { target: formulario });
+
+    assert.deepEqual(llamadas, [[71, 'observación válida']]);
+    assert.equal(doc.getElementById('misAsistentesDialog').open, false);
+    assert.match(
+      doc.getElementById('misAsistentesFeedback').textContent,
+      decision === 'rechazar' ? /Solicitud rechazada/ : /Solicitud devuelta/,
+    );
+    assert.equal(campo, decision === 'rechazar' ? 'motivo' : 'observaciones');
+    limpiarSesion();
+  });
+
+  test(`MisAsistentesPage — ${decision} informa errores del servicio y permite reintentar`, async () => {
+    const { doc, pagina, formulario, llamadas } = await prepararFormularioDecisionSolicitud(
+      decision,
+      'texto válido',
+      { ok: false, message: 'La solicitud ya no está pendiente.' },
+    );
+
+    await pagina.dispatch('submit', { target: formulario });
+
+    assert.equal(llamadas.length, 1);
+    assert.equal(doc.getElementById('misAsistentesDialog').open, true);
+    assert.match(doc.getElementById('misAsistentesFeedback').textContent, /ya no está pendiente/);
+    assert.equal(formulario.querySelector('[type="submit"]').disabled, false);
+    limpiarSesion();
+  });
+}

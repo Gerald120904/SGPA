@@ -42,6 +42,38 @@ const MODULOS_DELEGABLES = [
   { nombre: 'Optativas', consultar: 'OPTATIVAS_VER', gestionar: 'OPTATIVAS_GESTIONAR' },
 ];
 
+const CONFIGURACIONES_DECISION_SOLICITUD = Object.freeze({
+  rechazar: {
+    formId: 'formRechazo',
+    campo: 'motivo',
+    titulo: 'Rechazar solicitud',
+    descripcion: 'Indique el motivo para que el asistente pueda revisar su propuesta.',
+    clase: 'mis-asistentes-rechazo-form',
+    etiqueta: 'Motivo',
+    icono: 'circle-x',
+    textoBoton: 'Rechazar solicitud',
+    mensajeValidacion: 'Escriba un motivo de al menos 3 caracteres.',
+    mensajeError: 'No se pudo rechazar la solicitud.',
+    mensajeExito: 'Solicitud rechazada.',
+    ejecutar: rechazarSolicitudCambio,
+  },
+  devolver: {
+    formId: 'formDevolver',
+    campo: 'observaciones',
+    titulo: 'Devolver solicitud al asistente',
+    descripcion: 'Indique las observaciones para que el asistente pueda realizar las correcciones necesarias.',
+    clase: 'mis-asistentes-devolucion-form',
+    etiqueta: 'Observaciones de devolución',
+    icono: 'rotate-ccw',
+    textoBoton: 'Devolver solicitud',
+    estiloBoton: 'background-color:#d97706; border-color:#d97706;',
+    mensajeValidacion: 'Escriba una observación de al menos 3 caracteres.',
+    mensajeError: 'No se pudo devolver la solicitud.',
+    mensajeExito: 'Solicitud devuelta al asistente para corrección.',
+    ejecutar: devolverSolicitudCambio,
+  },
+});
+
 export function MisAsistentesPage() {
   return `<section id="misAsistentesPage" class="module-view mis-asistentes-page">
     <header class="mis-asistentes-header sgpa-toolbar">
@@ -463,39 +495,24 @@ export async function iniciarMisAsistentesPage() {
       } catch (error) { mensaje(error.message, true); } finally { boton.disabled = false; }
       return;
     }
-    if (accion === 'rechazar') {
+    const configuracionDecision = CONFIGURACIONES_DECISION_SOLICITUD[accion];
+    if (configuracionDecision) {
       dialogoContenido.innerHTML = FormDialog({
-        formId: 'formRechazo',
-        title: 'Rechazar solicitud',
-        description: 'Indique el motivo para que el asistente pueda revisar su propuesta.',
+        formId: configuracionDecision.formId,
+        title: configuracionDecision.titulo,
+        description: configuracionDecision.descripcion,
         layout: 'custom',
-        formClass: 'mis-asistentes-form mis-asistentes-rechazo-form',
+        formClass: `mis-asistentes-form ${configuracionDecision.clase}`,
         bodyClass: 'mis-asistentes-dialog-body',
         body: `<button type="button" data-action="cerrar" class="mis-asistentes-dialog-close" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
-          <label class="mis-asistentes-motivo-input">Motivo<textarea name="motivo" required minlength="3" maxlength="500" rows="4"></textarea></label>`,
+          <label class="mis-asistentes-motivo-input">${configuracionDecision.etiqueta}<textarea name="${configuracionDecision.campo}" required minlength="3" maxlength="500" rows="4"></textarea></label>`,
         footerHtml: `<button type="button" data-action="cerrar" class="sgpa-form-secondary">Cancelar</button>
-          <button type="submit" class="sgpa-form-primary"><i data-lucide="circle-x" aria-hidden="true"></i>Rechazar solicitud</button>`,
+          <button type="submit" class="sgpa-form-primary" ${configuracionDecision.estiloBoton ? `style="${configuracionDecision.estiloBoton}"` : ''}><i data-lucide="${configuracionDecision.icono}" aria-hidden="true"></i>${configuracionDecision.textoBoton}</button>`,
       });
-      dialogoContenido.querySelector('#formRechazo').dataset.id = String(Number(boton.dataset.id));
+      dialogoContenido.querySelector(`#${configuracionDecision.formId}`).dataset.id = String(Number(boton.dataset.id));
       renderizarIconos();
       dialogo.showModal();
-    }
-    if (accion === 'devolver') {
-      dialogoContenido.innerHTML = FormDialog({
-        formId: 'formDevolver',
-        title: 'Devolver solicitud al asistente',
-        description: 'Indique las observaciones para que el asistente pueda realizar las correcciones necesarias.',
-        layout: 'custom',
-        formClass: 'mis-asistentes-form mis-asistentes-devolucion-form',
-        bodyClass: 'mis-asistentes-dialog-body',
-        body: `<button type="button" data-action="cerrar" class="mis-asistentes-dialog-close" aria-label="Cerrar"><i data-lucide="x" aria-hidden="true"></i></button>
-          <label class="mis-asistentes-motivo-input">Observaciones de devolución<textarea name="observaciones" required minlength="3" maxlength="500" rows="4"></textarea></label>`,
-        footerHtml: `<button type="button" data-action="cerrar" class="sgpa-form-secondary">Cancelar</button>
-          <button type="submit" class="sgpa-form-primary" style="background-color:#d97706; border-color:#d97706;"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Devolver solicitud</button>`,
-      });
-      dialogoContenido.querySelector('#formDevolver').dataset.id = String(Number(boton.dataset.id));
-      renderizarIconos();
-      dialogo.showModal();
+      return;
     }
   });
 
@@ -543,32 +560,25 @@ export async function iniciarMisAsistentesPage() {
 
   crearAsistenteButton.addEventListener('click', () => abrirFormulario());
   pagina.addEventListener('submit', async (event) => {
-    if (event.target.id === 'formRechazo') {
+    const configuracionDecision = Object.values(CONFIGURACIONES_DECISION_SOLICITUD)
+      .find((configuracion) => configuracion.formId === event.target.id);
+    if (configuracionDecision) {
       event.preventDefault();
       const form = event.target;
-      const motivo = String(new FormData(form).get('motivo') || '').trim();
-      if (motivo.length < 3) { mensaje('Escriba un motivo de al menos 3 caracteres.', true); return; }
+      const texto = String(new FormData(form).get(configuracionDecision.campo) || '').trim();
+      if (texto.length < 3) {
+        mensaje(configuracionDecision.mensajeValidacion, true);
+        return;
+      }
       const boton = form.querySelector('[type="submit"]');
       try {
         boton.disabled = true;
-        verificar(await rechazarSolicitudCambio(Number(form.dataset.id), motivo), 'No se pudo rechazar la solicitud.');
+        verificar(
+          await configuracionDecision.ejecutar(Number(form.dataset.id), texto),
+          configuracionDecision.mensajeError,
+        );
         dialogo.close();
-        mensaje('Solicitud rechazada.');
-        await cargar();
-      } catch (error) { mensaje(error.message, true); } finally { boton.disabled = false; }
-      return;
-    }
-    if (event.target.id === 'formDevolver') {
-      event.preventDefault();
-      const form = event.target;
-      const observaciones = String(new FormData(form).get('observaciones') || '').trim();
-      if (observaciones.length < 3) { mensaje('Escriba una observación de al menos 3 caracteres.', true); return; }
-      const boton = form.querySelector('[type="submit"]');
-      try {
-        boton.disabled = true;
-        verificar(await devolverSolicitudCambio(Number(form.dataset.id), observaciones), 'No se pudo devolver la solicitud.');
-        dialogo.close();
-        mensaje('Solicitud devuelta al asistente para corrección.');
+        mensaje(configuracionDecision.mensajeExito);
         await cargar();
       } catch (error) { mensaje(error.message, true); } finally { boton.disabled = false; }
       return;
