@@ -8,6 +8,7 @@ import {
   obtenerTonoEstadoSolicitud,
   extraerDataResultado,
   obtenerNombreCompletoEstudiante,
+  normalizarDatosPersonalesEstudiante,
   formatearEstadoEstudiante,
   obtenerTextoAsignaturaEstudiante,
   obtenerTextoPeriodoEstudiante,
@@ -45,6 +46,47 @@ test('estudiantes.helpers — nombres completos y extracción de datos', () => {
 
   assert.deepEqual(extraerDataResultado({ data: [1, 2, 3] }), [1, 2, 3]);
   assert.deepEqual(extraerDataResultado({ ok: true }), { ok: true });
+});
+
+test('estudiantes.helpers — normaliza los campos compartidos entre creación y edición', () => {
+  assert.deepEqual(
+    normalizarDatosPersonalesEstudiante({
+      cedula: '  1-2345  ',
+      nombres: ' Ana María ',
+      apellido1: ' Solís ',
+      apellido2: '  ',
+      correoInstitucional: ' ana@una.ac.cr ',
+      telefono: '',
+    }),
+    {
+      cedula: '1-2345',
+      nombres: 'Ana María',
+      apellido1: 'Solís',
+      apellido2: null,
+      correoInstitucional: 'ana@una.ac.cr',
+      telefono: null,
+    },
+  );
+
+  assert.deepEqual(
+    normalizarDatosPersonalesEstudiante({
+      cedula: '',
+      nombres: '  ',
+      apellido1: '',
+      apellido2: '',
+      correoInstitucional: '',
+      telefono: '  ',
+    }),
+    {
+      cedula: '',
+      nombres: '',
+      apellido1: '',
+      apellido2: null,
+      correoInstitucional: '',
+      telefono: null,
+    },
+    'Los campos requeridos permanecen sujetos a la validación existente del formulario.',
+  );
 });
 
 test('estudiantes.helpers — asignaturas, planes y períodos', () => {

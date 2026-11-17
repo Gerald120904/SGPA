@@ -1,8 +1,23 @@
 import { dependencias } from './estudiantes.dependencies.js';
+import { normalizarDatosPersonalesEstudiante } from './estudiantes.helpers.js';
 
 export function crearEstudiantesOperaciones({ estado, acciones }) {
 function esContextoVigente(instancia, versionDialog) {
   return instancia === estado.instanciaActual && versionDialog === estado.versionDialog;
+}
+
+function leerDatosPersonalesEstudiante(prefijo) {
+  const leer = (campo) =>
+    document.getElementById(`${prefijo}${campo}`).value;
+
+  return normalizarDatosPersonalesEstudiante({
+    cedula: leer('Cedula'),
+    nombres: leer('Nombres'),
+    apellido1: leer('Apellido1'),
+    apellido2: leer('Apellido2'),
+    correoInstitucional: leer('Correo'),
+    telefono: leer('Telefono'),
+  });
 }
 
 function renderizarHistorialAcademico(
@@ -378,55 +393,7 @@ async function abrirEditarEstudiante(
                 ? dependencias.proponerActualizarEstudiante
                 : dependencias.actualizarEstudiante)(
                 estudiante.id,
-                {
-                  cedula:
-                    document
-                      .getElementById(
-                        'editarCedula'
-                      )
-                      .value
-                      .trim(),
-
-                  nombres:
-                    document
-                      .getElementById(
-                        'editarNombres'
-                      )
-                      .value
-                      .trim(),
-
-                  apellido1:
-                    document
-                      .getElementById(
-                        'editarApellido1'
-                      )
-                      .value
-                      .trim(),
-
-                  apellido2:
-                    document
-                      .getElementById(
-                        'editarApellido2'
-                      )
-                      .value
-                      .trim() || null,
-
-                  correoInstitucional:
-                    document
-                      .getElementById(
-                        'editarCorreo'
-                      )
-                      .value
-                      .trim(),
-
-                  telefono:
-                    document
-                      .getElementById(
-                        'editarTelefono'
-                      )
-                      .value
-                      .trim() || null
-                }
+                leerDatosPersonalesEstudiante('editar')
               );
         if (!esContextoVigente(instanciaOperacion, versionOperacion)) return;
 
@@ -692,36 +659,7 @@ async function abrirNuevoEstudiante() {
           try {
             const esAsistente = acciones.esAsistenteActivo();
             const datosEstudiante = {
-                cedula:
-                  document
-                    .getElementById('nuevoCedula')
-                    .value.trim(),
-
-                nombres:
-                  document
-                    .getElementById('nuevoNombres')
-                    .value.trim(),
-
-                apellido1:
-                  document
-                    .getElementById('nuevoApellido1')
-                    .value.trim(),
-
-                apellido2:
-                  document
-                    .getElementById('nuevoApellido2')
-                    .value.trim() || null,
-
-                correoInstitucional:
-                  document
-                    .getElementById('nuevoCorreo')
-                    .value.trim(),
-
-                telefono:
-                  document
-                    .getElementById('nuevoTelefono')
-                    .value.trim() || null,
-
+                ...leerDatosPersonalesEstudiante('nuevo'),
                 carreraId:
                   estado.carreraSeleccionada.id,
 

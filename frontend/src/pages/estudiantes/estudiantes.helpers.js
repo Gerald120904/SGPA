@@ -66,6 +66,17 @@ export function obtenerNombreCompletoEstudiante(estudiante) {
     .join(' ');
 }
 
+export function normalizarDatosPersonalesEstudiante(datos) {
+  return {
+    cedula: datos.cedula.trim(),
+    nombres: datos.nombres.trim(),
+    apellido1: datos.apellido1.trim(),
+    apellido2: datos.apellido2.trim() || null,
+    correoInstitucional: datos.correoInstitucional.trim(),
+    telefono: datos.telefono.trim() || null,
+  };
+}
+
 export function formatearEstadoEstudiante(estado) {
   return (
     ESTADOS_ESTUDIANTE.find((item) => item.value === estado)?.label ||
