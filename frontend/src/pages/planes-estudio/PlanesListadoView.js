@@ -64,16 +64,15 @@ export function obtenerPlanesFiltrados(contexto) {
         .some((valor) => String(valor).toLowerCase().includes(busqueda));
     const coincideCarrera =
       !carreraId || Number(plan.carreraId) === Number(carreraId);
+    const estadoPlan = obtenerPresentacionEstadoPlan(plan).estado;
     let coincideEstado = true;
 
     if (estado === "ACTIVOS") {
-      coincideEstado =
-        (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE";
+      coincideEstado = estadoPlan === "VIGENTE";
     }
 
     if (estado === "INACTIVOS") {
-      coincideEstado =
-        (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) !== "VIGENTE";
+      coincideEstado = estadoPlan !== "VIGENTE";
     }
 
     return coincideBusqueda && coincideCarrera && coincideEstado;
@@ -176,8 +175,7 @@ export function renderizarPlanes(contexto) {
 
                   <button
                     class="planes-icon-button ${
-                      (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) ===
-                      "VIGENTE"
+                      obtenerPresentacionEstadoPlan(plan).estado === "VIGENTE"
                         ? "planes-danger-button"
                         : "planes-success-button"
                     }"
@@ -185,16 +183,14 @@ export function renderizarPlanes(contexto) {
                     data-id="${plan.id}"
                     type="button"
                     title="${
-                      (plan.estado || (plan.activo ? "VIGENTE" : "CERRADO")) ===
-                      "VIGENTE"
+                      obtenerPresentacionEstadoPlan(plan).estado === "VIGENTE"
                         ? "Cerrar a nuevos ingresos"
                         : "Reabrir plan"
                     }"
                   >
                     <i
                       data-lucide="${
-                        (plan.estado ||
-                          (plan.activo ? "VIGENTE" : "CERRADO")) === "VIGENTE"
+                        obtenerPresentacionEstadoPlan(plan).estado === "VIGENTE"
                           ? "circle-pause"
                           : "circle-check"
                       }"

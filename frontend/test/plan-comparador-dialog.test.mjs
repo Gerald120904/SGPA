@@ -26,6 +26,7 @@ test('PlanComparadorDialog — abrirComparadorPlanes monta diálogo y selectores
   const planesMock = [
     { id: 1, carreraId: 10, codigo: 'INF-2018', nombre: 'Plan 2018', activo: true },
     { id: 2, carreraId: 10, codigo: 'INF-2024', nombre: 'Plan 2024', activo: true },
+    { id: 3, carreraId: 20, codigo: 'ADM-2024', nombre: 'Plan de otra carrera', activo: true },
   ];
   const carrerasMock = [
     { id: 10, codigo: 'EIF', nombre: 'Ingeniería en Informática' },
@@ -45,6 +46,7 @@ test('PlanComparadorDialog — abrirComparadorPlanes monta diálogo y selectores
   assert.match(content.innerHTML, /id="compPlanDestinoSelect"/);
   assert.match(content.innerHTML, /INF-2018/);
   assert.match(content.innerHTML, /INF-2024/);
+  assert.doesNotMatch(content.innerHTML, /ADM-2024|Plan de otra carrera/);
 });
 
 test('PlanComparadorDialog — abrirTransicionCurricular monta herramienta de transición', async () => {
@@ -68,6 +70,7 @@ test('PlanComparadorDialog — abrirTransicionCurricular monta herramienta de tr
   const planesMock = [
     { id: 1, carreraId: 10, codigo: 'INF-2018', nombre: 'Plan 2018', activo: true },
     { id: 2, carreraId: 10, codigo: 'INF-2024', nombre: 'Plan 2024', activo: true },
+    { id: 3, carreraId: 20, codigo: 'ADM-2024', nombre: 'Plan de otra carrera', activo: true },
   ];
   const carrerasMock = [
     { id: 10, codigo: 'EIF', nombre: 'Ingeniería en Informática' },
@@ -82,4 +85,5 @@ test('PlanComparadorDialog — abrirTransicionCurricular monta herramienta de tr
 
   assert.match(content.innerHTML, /Transición Curricular Institucional/);
   assert.match(content.innerHTML, /tcBtnCargarPoblacion/);
+  assert.doesNotMatch(content.innerHTML, /ADM-2024|Plan de otra carrera/);
 });

@@ -22,6 +22,10 @@ import {
 } from '../../services/plan-asignaturas.service.js';
 import { obtenerPresentacionEstadoPlan } from './plan-status-presentation.mjs';
 
+function obtenerPlanesDeCarrera(planes, carreraId) {
+  return planes.filter((plan) => !carreraId || Number(plan.carreraId) === Number(carreraId));
+}
+
 export async function abrirComparadorPlanes(paramsOrCarreraId = null, maybePlanOrigenId = null) {
   let planes = [];
   let carrerasDisponibles = [];
@@ -65,7 +69,7 @@ export async function abrirComparadorPlanes(paramsOrCarreraId = null, maybePlanO
   }, { once: true });
 
   function normalizarPlanes() {
-    const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
+    const planesCarrera = obtenerPlanesDeCarrera(planes, carreraId);
     if (!planesCarrera.some((p) => Number(p.id) === Number(planOrigenId))) {
       planOrigenId = planesCarrera[0]?.id || null;
     }
@@ -280,7 +284,7 @@ export async function abrirComparadorPlanes(paramsOrCarreraId = null, maybePlanO
     document.getElementById("compPlanOrigenSelect")?.addEventListener("change", (e) => {
       planOrigenId = e.target.value ? Number(e.target.value) : null;
       if (planOrigenId && planDestinoId && Number(planOrigenId) === Number(planDestinoId)) {
-        const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
+        const planesCarrera = obtenerPlanesDeCarrera(planes, carreraId);
         planDestinoId = planesCarrera.find((p) => Number(p.id) !== Number(planOrigenId))?.id || null;
       }
       refrescarDatosPlanes();
@@ -809,7 +813,7 @@ export async function abrirTransicionCurricular(paramsOrPlanOrigenId = null) {
   }
 
   function renderVistaTransicion() {
-    const planesCarrera = planes.filter((p) => !carreraId || Number(p.carreraId) === Number(carreraId));
+    const planesCarrera = obtenerPlanesDeCarrera(planes, carreraId);
     if (!planOrigenId && planesCarrera.length > 0) planOrigenId = planesCarrera[0].id;
     if (!planDestinoId && planesCarrera.length > 1) {
       planDestinoId = planesCarrera.find((p) => Number(p.id) !== Number(planOrigenId))?.id || planesCarrera[1].id;

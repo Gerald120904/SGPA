@@ -197,6 +197,27 @@ test("Helpers puros: Clasificación de tipos y ayudas curriculares", () => {
   assert.match(resumen, /4/);
 });
 
+test("Helpers puros: Optativas activas solo excluye activo=false y normaliza tipos", () => {
+  const asignaturas = [
+    { id: 1, activo: true, tipo: "optativa", tipoOptativa: "disciplinaria" },
+    { id: 2, activo: false, tipo: "OPTATIVA", tipoOptativa: "DISCIPLINARIA" },
+    { id: 3, tipo: "OpTaTiVa", tipoOptativa: "AbIeRtA" },
+    { id: 4, activo: true, tipo: "ObLiGaToRiA", tipoOptativa: "SEDE" },
+  ];
+
+  assert.deepEqual(obtenerConteoOptativasPlan(asignaturas), {
+    total: 2,
+    disciplinarias: 1,
+    abiertas: 1,
+    sede: 0,
+    otrasAreas: 1,
+    sinClasificar: 0,
+  });
+  assert.equal(obtenerConteoTipoOptativaSinAsignatura("DiScIpLiNaRiA", asignaturas), 1);
+  assert.equal(obtenerConteoTipoOptativaSinAsignatura("ABIERTA", asignaturas), 1);
+  assert.equal(obtenerConteoTipoOptativaSinAsignatura("SEDE", asignaturas), 0);
+});
+
 test("PlanRequisitosDialog: Gestión dinámica de filas y construcción de carga rápida", () => {
   const ctx = crearContextoPlanesEstudio();
   assert.equal(ctx.estado.filasRequisitosRapidos.length, 0);

@@ -53,11 +53,16 @@ export function obtenerPresentacionTipoOptativa(tipoOptativa) {
   );
 }
 
+function esOptativaActiva(asignatura) {
+  return (
+    asignatura.activo !== false &&
+    String(asignatura.tipo || "").toUpperCase() === "OPTATIVA"
+  );
+}
+
 export function obtenerConteoOptativasPlan(asignaturasPlan = []) {
   const optativas = asignaturasPlan.filter(
-    (asignatura) =>
-      asignatura.activo !== false &&
-      String(asignatura.tipo || "").toUpperCase() === "OPTATIVA",
+    esOptativaActiva,
   );
 
   const disciplinarias = optativas.filter(
@@ -126,9 +131,8 @@ export function obtenerConteoTipoOptativaSinAsignatura(
 
   return asignaturasPlan.filter(
     (asignatura) =>
-      asignatura.activo !== false &&
+      esOptativaActiva(asignatura) &&
       Number(asignatura.id) !== Number(excluirId) &&
-      String(asignatura.tipo || "").toUpperCase() === "OPTATIVA" &&
       String(asignatura.tipoOptativa || "").toUpperCase() === tipo,
   ).length;
 }
