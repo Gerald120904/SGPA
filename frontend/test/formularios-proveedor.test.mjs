@@ -34,7 +34,7 @@ test('el diálogo presenta ambas modalidades y el IPC entrega el payload al endp
   const page = readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 const pageCode = readFileSync(
-  new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url),
+  new URL('../src/pages/formularios-estudiantes/FormularioNuevoDialog.js', import.meta.url),
   'utf8'
 );
 

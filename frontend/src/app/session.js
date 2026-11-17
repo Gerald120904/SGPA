@@ -4,6 +4,7 @@ import {
 
 
 let sesionActual = null;
+let versionSesion = 0;
 
 
 const ROLE_PRIORITY = [
@@ -36,14 +37,28 @@ export function guardarSesion(
       resultado?.usuario?.rolActivo || null
 
   };
+  versionSesion += 1;
 
 }
 
-export async function cambiarCarreraActiva(carreraId) {
+export function obtenerVersionSesion() {
+  return versionSesion;
+}
+
+export async function cambiarCarreraActiva(carreraId, { vigente } = {}) {
   if (!Number.isInteger(Number(carreraId)) || Number(carreraId) <= 0) {
     throw new Error('Seleccione una carrera válida.');
   }
+  const versionInicial = versionSesion;
+  const usuarioInicial = sesionActual?.usuario;
   const respuesta = await window.sgpa.cambiarCarreraActiva(Number(carreraId));
+  if (
+    (typeof vigente === 'function' && !vigente()) ||
+    versionInicial !== versionSesion ||
+    usuarioInicial !== sesionActual?.usuario
+  ) {
+    throw new Error('La sesión cambió durante la operación.');
+  }
   if (!respuesta?.ok || !respuesta.usuario) {
     throw new Error(respuesta?.message || 'No fue posible cambiar de carrera.');
   }
@@ -222,9 +237,11 @@ export function obtenerRolActivo(
 ) {
 
   const activo =
-    sesionActual?.rolActivo ||
-    usuario?.rolActivo ||
-    null;
+    usuario && usuario !== sesionActual?.usuario
+      ? usuario?.rolActivo || null
+      : sesionActual?.rolActivo ||
+        usuario?.rolActivo ||
+        null;
 
   if (activo) {
 
@@ -262,8 +279,12 @@ export function obtenerRolesEfectivos(
 
 export async function cambiarRolActivo(
   nuevoRol,
-  usuario = obtenerUsuario()
+  usuario = obtenerUsuario(),
+  { vigente } = {}
 ) {
+
+  const versionInicial = versionSesion;
+  const usuarioInicial = sesionActual?.usuario;
 
   const roles =
     obtenerRolesUsuario(
@@ -276,6 +297,13 @@ export async function cambiarRolActivo(
 
   if (typeof window !== 'undefined' && window.sgpa && typeof window.sgpa.cambiarRolActivo === 'function') {
     const res = await window.sgpa.cambiarRolActivo(nuevoRol);
+    if (
+      (typeof vigente === 'function' && !vigente()) ||
+      versionInicial !== versionSesion ||
+      usuarioInicial !== sesionActual?.usuario
+    ) {
+      return false;
+    }
     if (!res || !res.ok) {
       throw new Error(res?.message || 'No fue posible cambiar al espacio seleccionado en el backend.');
     }
@@ -283,11 +311,15 @@ export async function cambiarRolActivo(
       if (!sesionActual) {
         sesionActual = {};
       }
+      if (!res.usuario.rolActivo) {
+        res.usuario.rolActivo = nuevoRol;
+      }
       sesionActual.usuario = res.usuario;
       sesionActual.rolActivo = nuevoRol;
       if (res.accessToken) {
         sesionActual.token = res.accessToken;
       }
+      versionSesion += 1;
       return true;
     }
   }
@@ -459,5 +491,6 @@ export function usuarioTienePermiso(
 export function limpiarSesion() {
 
   sesionActual = null;
+  versionSesion += 1;
 
 }

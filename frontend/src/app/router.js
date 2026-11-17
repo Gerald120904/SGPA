@@ -45,11 +45,15 @@ export function navegar(
     nuevoHash
   ) {
 
-    window.dispatchEvent(
-      new HashChangeEvent(
-        'hashchange'
-      )
-    );
+    if (typeof window.dispatchEvent === 'function') {
+      const evento =
+        typeof HashChangeEvent === 'function'
+          ? new HashChangeEvent('hashchange')
+          : typeof Event === 'function'
+            ? new Event('hashchange')
+            : { type: 'hashchange' };
+      window.dispatchEvent(evento);
+    }
 
     return;
 
@@ -113,7 +117,7 @@ export function observarRutas(
 
   return () => {
 
-    window.removeEventListener(
+    window.removeEventListener?.(
       'hashchange',
       handler
     );

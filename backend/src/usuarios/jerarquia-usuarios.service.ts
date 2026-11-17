@@ -20,6 +20,7 @@ import { AuditoriaJerarquia } from './entities/auditoria-jerarquia.entity';
 import { SolicitudCambio } from './entities/solicitud-cambio.entity';
 import { DependenciaUsuario } from './entities/dependencia-usuario.entity';
 import { Usuario } from './entities/usuario.entity';
+import { InvitacionOutbox } from './entities/invitacion-outbox.entity';
 import { UsuariosService } from './usuarios.service';
 import { carrerasDeSolicitud, ESTADOS_ABIERTOS_SOLICITUD, firmaImpacto, solicitudAfectada } from './revocacion-impacto';
 
@@ -72,6 +73,74 @@ export class JerarquiaUsuariosService {
       carreraId: a.carreraId!,
       permisos: permisos.filter((p) => p.carreraId === a.carreraId).map((p) => p.permiso),
     })) };
+  }
+
+  private async estadoAdministracionAsistente(
+    coordinadorId: number,
+    asistenteId: number,
+  ): Promise<'ADMINISTRABLE' | 'NO_PERTENECE' | 'INACTIVO'> {
+    const tipoCoordinador = await this.alcance.tipoCuentaJerarquica(coordinadorId);
+    if (tipoCoordinador !== 'COORDINADOR') return 'NO_PERTENECE';
+    const coordinador = await this.usuarioConRoles(coordinadorId);
+    if (!coordinador.activo || this.tieneRol(coordinador, RolSistema.ADMIN_GLOBAL)) {
+      return 'NO_PERTENECE';
+    }
+    const dependencia = await this.dependencias.findOne({
+      where: { coordinadorId, asistenteId, activo: true },
+    });
+    if (!dependencia) return 'NO_PERTENECE';
+    const asistente = await this.usuarioConRoles(asistenteId);
+    if (!this.tieneRol(asistente, RolSistema.ASISTENTE_ESTUDIANTIL) ||
+      this.tieneRol(asistente, RolSistema.COORDINADOR) ||
+      this.tieneRol(asistente, RolSistema.ADMIN_GLOBAL)) return 'NO_PERTENECE';
+    if (asistente.activo || await this.usuariosService.invitacionPendienteVigente(asistenteId)) {
+      return 'ADMINISTRABLE';
+    }
+    return 'INACTIVO';
+  }
+
+  private async validarPertenenciaAsistenteEnTransaccion(
+    manager: EntityManager,
+    coordinadorId: number,
+    asistenteId: number,
+  ): Promise<void> {
+    const usuarios = manager.getRepository(Usuario);
+    const coordinador = await usuarios.findOne({
+      where: { id: coordinadorId, activo: true },
+      relations: { usuarioRoles: { rol: true } },
+      lock: { mode: 'pessimistic_write' },
+    });
+    const asistente = await usuarios.findOne({
+      where: { id: asistenteId },
+      relations: { usuarioRoles: { rol: true } },
+      lock: { mode: 'pessimistic_write' },
+    });
+    const dependencia = await manager.getRepository(DependenciaUsuario).findOne({
+      where: { asistenteId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!coordinador || !this.tieneRol(coordinador, RolSistema.COORDINADOR) ||
+      this.tieneRol(coordinador, RolSistema.ADMIN_GLOBAL) || !asistente ||
+      !this.tieneRol(asistente, RolSistema.ASISTENTE_ESTUDIANTIL) ||
+      this.tieneRol(asistente, RolSistema.COORDINADOR) ||
+      this.tieneRol(asistente, RolSistema.ADMIN_GLOBAL) ||
+      !dependencia?.activo || dependencia.coordinadorId !== coordinadorId) {
+      throw new ForbiddenException('El asistente no pertenece al coordinador.');
+    }
+    if (!asistente.activo) {
+      const invitacion = await manager.getRepository(InvitacionOutbox).findOne({
+        where: { usuarioId: asistenteId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const ahora = Date.now();
+      if (!invitacion || invitacion.estado !== 'PENDIENTE' ||
+        !invitacion.enlaceCifrado || invitacion.expiraEn.getTime() <= ahora ||
+        asistente.passwordResetTokenHash !== invitacion.tokenHash ||
+        !asistente.passwordResetExpiresAt ||
+        asistente.passwordResetExpiresAt.getTime() <= ahora) {
+        throw new ConflictException('La cuenta asistente está inactiva o su invitación no está vigente.');
+      }
+    }
   }
 
   async obtenerCoordinador(actorId: number, coordinadorId: number) {
@@ -150,13 +219,24 @@ export class JerarquiaUsuariosService {
     const relaciones = await this.dependencias.find({ where: { coordinadorId, activo: true } });
     if (!relaciones.length) return [];
     const usuarios = await this.usuarios.find({ where: { id: In(relaciones.map((d) => d.asistenteId)) } });
-    return usuarios.map((u) => ({ id: u.id, nombres: u.nombres, apellido1: u.apellido1,
-      apellido2: u.apellido2, correo: u.correo, activo: u.activo }));
+    const administrables = await Promise.all(usuarios.map(async (u) => {
+      if (await this.estadoAdministracionAsistente(coordinadorId, u.id) !== 'ADMINISTRABLE') return null;
+      return {
+        id: u.id, nombres: u.nombres, apellido1: u.apellido1,
+        apellido2: u.apellido2, correo: u.correo, activo: u.activo,
+        invitacion: await this.usuariosService.obtenerEstadoInvitacion(u.id),
+      };
+    }));
+    return administrables.filter((u) => u !== null);
   }
 
   async obtenerAsistente(coordinadorId: number, asistenteId: number) {
-    if (!(await this.alcance.puedeAdministrarAsistente(coordinadorId, asistenteId))) {
+    const estado = await this.estadoAdministracionAsistente(coordinadorId, asistenteId);
+    if (estado === 'NO_PERTENECE') {
       throw new ForbiddenException('El asistente no pertenece al coordinador.');
+    }
+    if (estado === 'INACTIVO') {
+      throw new ConflictException('La cuenta asistente está inactiva y no tiene una invitación pendiente vigente.');
     }
     return this.configuracion(asistenteId, TipoAsignacionAcademica.ASISTENTE_CARRERA);
   }
@@ -373,30 +453,23 @@ export class JerarquiaUsuariosService {
 
   async vincularAsistente(coordinadorId: number, asistenteId: number, carreras: AlcanceCarreraDto[]) {
     await this.validarDelegacion(coordinadorId, carreras);
-    const asistente = await this.usuarioConRoles(asistenteId);
-    if (!this.tieneRol(asistente, RolSistema.ASISTENTE_ESTUDIANTIL) ||
-      this.tieneRol(asistente, RolSistema.COORDINADOR) || this.tieneRol(asistente, RolSistema.ADMIN_GLOBAL)) {
-      throw new ForbiddenException('La cuenta no es exclusivamente asistente.');
-    }
     return this.dataSource.transaction(async (manager) => {
       await this.validarDelegacionEnTransaccion(manager, coordinadorId, carreras);
-      const bloqueado = await manager.getRepository(Usuario).findOne({
-        where: { id: asistenteId, activo: true }, lock: { mode: 'pessimistic_write' },
-      });
-      const rolesActuales = await manager.getRepository(Usuario).findOne({
-        where: { id: asistenteId }, relations: { usuarioRoles: { rol: true } },
-      });
-      if (!bloqueado || !rolesActuales || !this.tieneRol(rolesActuales, RolSistema.ASISTENTE_ESTUDIANTIL) ||
-        this.tieneRol(rolesActuales, RolSistema.COORDINADOR) || this.tieneRol(rolesActuales, RolSistema.ADMIN_GLOBAL)) {
-        throw new ForbiddenException('La cuenta ya no tiene el rol o estado de asistente.');
-      }
-      const existentes = await manager.getRepository(DependenciaUsuario).find({ where: { asistenteId } });
-      if (!existentes.length || existentes[0].coordinadorId !== coordinadorId || !existentes[0].activo) {
-        throw new ForbiddenException('El asistente no pertenece al coordinador.');
-      }
+      await this.validarPertenenciaAsistenteEnTransaccion(manager, coordinadorId, asistenteId);
       await this.configurarAsistenteEnTransaccion(manager, coordinadorId, asistenteId, carreras);
       return { asistenteId, coordinadorId, carreras };
     });
+  }
+
+  async procesarInvitacionPendiente(coordinadorId: number, asistenteId: number) {
+    const estado = await this.estadoAdministracionAsistente(coordinadorId, asistenteId);
+    if (estado === 'NO_PERTENECE') {
+      throw new ForbiddenException('El asistente no pertenece al coordinador.');
+    }
+    if (estado === 'INACTIVO') {
+      throw new ConflictException('La cuenta asistente está inactiva y su invitación no está vigente.');
+    }
+    return { estado: await this.usuariosService.procesarInvitacionPendiente(asistenteId) };
   }
 
   async crearAsistente(coordinadorId: number, dto: CrearAsistenteJerarquicoDto) {

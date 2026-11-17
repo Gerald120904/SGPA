@@ -25,7 +25,7 @@ test('todas las pantallas usan el logo institucional original desde public', () 
 
   for (const file of [
     'src/components/Sidebar.js',
-    'src/pages/login/LoginPage.js',
+    'src/pages/login/LoginView.js',
     'src/components/FormDialog.js',
   ]) {
     const source = leer(file);

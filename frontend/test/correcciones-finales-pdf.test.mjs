@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { normalizarEntradaCampoUsuario } from '../src/pages/usuarios/usuarios.helpers.js';
 
 test('1. Modales de todo el SGPA: AlertModal y confirm.js tienen diseño profesional e iconografía completa', async () => {
   const alertModalCode = readFileSync(new URL('../src/components/AlertModal.js', import.meta.url), 'utf8');
@@ -36,41 +37,46 @@ test('2, 3 y 4. Usuarios: validaciones actuales, invitaciones y roles amigables'
     new URL('../src/pages/usuarios/UsuariosPage.js', import.meta.url),
     'utf8'
   );
+  const usuarioFormDialogCode = readFileSync(
+    new URL('../src/pages/usuarios/UsuarioFormDialog.js', import.meta.url),
+    'utf8'
+  );
+  const usuariosCode = `${usuariosPageCode}\n${usuarioFormDialogCode}`;
 
   // Invitaciones y presentación de roles
-  assert.match(usuariosPageCode, /usuario-invitacion-banner/);
-  assert.match(usuariosPageCode, /Invitación por correo electrónico/);
+  assert.match(usuariosCode, /usuario-invitacion-banner/);
+  assert.match(usuariosCode, /Invitación por correo electrónico/);
   assert.doesNotMatch(
-    usuariosPageCode,
+    usuariosCode,
     /Este usuario posee el rol\s+ADMIN_GLOBAL\./
   );
   assert.match(
-    usuariosPageCode,
+    usuariosCode,
     /nombreVisibleRol\(ROLES\.ADMIN_GLOBAL\)/
   );
 
   // Cédula: solamente números y máximo 9 dígitos
   assert.match(
-    usuariosPageCode,
+    usuariosCode,
     /const cedulaRegex\s*=\s*\/\^\\d\{1,9\}\$\//
   );
   assert.match(
-    usuariosPageCode,
+    usuariosCode,
     /La cédula solo debe contener números \(máximo 9 dígitos, sin guiones\)\./
   );
-  assert.match(usuariosPageCode, /cedula:\s*9\b/);
+  assert.match(usuariosCode, /cedula:\s*9\b/);
 
   // Restricciones de longitud de los campos
-  assert.match(usuariosPageCode, /correo:\s*150\b/);
-  assert.match(usuariosPageCode, /nombres:\s*60\b/);
-  assert.match(usuariosPageCode, /apellido1:\s*50\b/);
-  assert.match(usuariosPageCode, /apellido2:\s*50\b/);
+  assert.match(usuariosCode, /correo:\s*150\b/);
+  assert.match(usuariosCode, /nombres:\s*60\b/);
+  assert.match(usuariosCode, /apellido1:\s*50\b/);
+  assert.match(usuariosCode, /apellido2:\s*50\b/);
 
   // Validaciones de nombres y correo
-  assert.match(usuariosPageCode, /nombreRegex/);
-  assert.match(usuariosPageCode, /correoRegex/);
+  assert.match(usuariosCode, /nombreRegex/);
+  assert.match(usuariosCode, /correoRegex/);
   assert.match(
-    usuariosPageCode,
+    usuariosCode,
     /El nombre solo debe contener letras y espacios válidos/
   );
 
@@ -79,11 +85,13 @@ test('2, 3 y 4. Usuarios: validaciones actuales, invitaciones y roles amigables'
   assert.match(usuariosPageCode, /correoDuplicado/);
 
   // Restricción de caracteres y errores visuales
-  assert.match(
-    usuariosPageCode,
-    /anterior\.replace\(\/\\D\/g, ''\)/
+  assert.match(usuariosPageCode, /normalizarEntradaCampoUsuario\(/);
+  assert.deepEqual(
+    normalizarEntradaCampoUsuario('cedula', '12a-345', 5),
+    { valor: '12345', posicionCursor: 3 },
+    'La cédula elimina caracteres no numéricos y conserva la posición lógica del cursor'
   );
-  assert.match(usuariosPageCode, /aria-invalid/);
+  assert.match(usuariosCode, /aria-invalid/);
 });
 
 
@@ -101,12 +109,13 @@ test('5. Períodos Académicos: conserva el calendario nativo en los tres campos
 });
 
 test('6 y 7. Formularios: Vista previa de cursos completa y animación interactiva con confirmación real', () => {
-  const formulariosCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
-  assert.match(formulariosCode, /escapeHtml\(asignatura\.curso\?\.nombre \|\| asignatura\.nombreReferencia/);
-  assert.match(formulariosCode, /formularios-btn-spinner/);
-  assert.match(formulariosCode, /formulariosCreandoNotice/);
-  assert.match(formulariosCode, /estaCreando/);
-  assert.match(formulariosCode, /estaPublicado/);
+  const selectorCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormularioAsignaturasSelector.js', import.meta.url), 'utf8');
+  const dialogCode = readFileSync(new URL('../src/pages/formularios-estudiantes/FormularioNuevoDialog.js', import.meta.url), 'utf8');
+  assert.match(selectorCode, /escapeHtml\(asignatura\.curso\?\.nombre \|\| asignatura\.nombreReferencia/);
+  assert.match(dialogCode, /formularios-btn-spinner/);
+  assert.match(dialogCode, /formulariosCreandoNotice/);
+  assert.match(dialogCode, /estaCreando/);
+  assert.match(dialogCode, /estaPublicado/);
 
   const formulariosCss = readFileSync(new URL('../src/styles/formularios-estudiantes.css', import.meta.url), 'utf8');
   assert.match(formulariosCss, /\.formularios-btn-spinner/);

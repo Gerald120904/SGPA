@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const pagina = readFileSync(
   new URL(
-    '../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js',
+    '../src/pages/formularios-estudiantes/FormularioGoogleStatusView.js',
     import.meta.url
   ),
   'utf8'

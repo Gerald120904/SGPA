@@ -1,163 +1,34 @@
-import { escapeHtml } from "../../utils/html.js";
-import { DataTable } from "../../components/DataTable.js";
-
 /* =========================================================
-   HELPERS
+   SGPA — MÓDULO CURSOS: CATÁLOGO Y COMPONENTES VISUALES
+   frontend/src/pages/cursos/CursosCatalogo.js
    ========================================================= */
 
-export function obtenerCreditosCurso(curso, asignaturaPlan = null) {
-  const valor =
-    asignaturaPlan?.creditos ??
-    curso?.creditos ??
-    curso?.planAsignatura?.creditos ??
-    0;
+import { escapeHtml } from "../../utils/html.js";
+import { DataTable } from "../../components/DataTable.js";
+import {
+  CURSOS_POR_PAGINA,
+  obtenerCreditosCurso,
+  obtenerCarreraCursoIds,
+  cursoPerteneceACarrera,
+  encontrarAsignaturaPlanCurso,
+  obtenerRequisitosCurso,
+  compararCursosPorEstadoYCodigo,
+  calcularPaginacionCursos,
+  filtrarCursos,
+} from "./cursos.helpers.js";
 
-  return Number(valor || 0);
-}
-
-export function obtenerCarreraCursoIds(curso) {
-  if (!Array.isArray(curso?.carreras)) {
-    return [];
-  }
-
-  return curso.carreras
-    .map((carrera) => Number(carrera.id))
-    .filter((id) => Number.isInteger(id) && id > 0);
-}
-
-export function cursoPerteneceACarrera(
-  curso,
-  carreraId,
-  asignaturasPlan = [],
-) {
-  const id = Number(carreraId);
-
-  if (!Number.isInteger(id) || id < 1) {
-    return false;
-  }
-
-  if (obtenerCarreraCursoIds(curso).includes(id)) {
-    return true;
-  }
-
-  return asignaturasPlan.some((asignatura) => {
-    if (
-      asignatura?.cursoId !== null &&
-      asignatura?.cursoId !== undefined
-    ) {
-      return Number(asignatura.cursoId) === Number(curso.id);
-    }
-
-    const codigoAsignatura =
-      asignatura?.codigoReferencia ||
-      asignatura?.curso?.codigo ||
-      "";
-
-    return (
-      codigoAsignatura &&
-      String(codigoAsignatura).toUpperCase() ===
-        String(curso?.codigo || "").toUpperCase()
-    );
-  });
-}
-
-export function encontrarAsignaturaPlanCurso(
-  curso,
-  asignaturasPlan = [],
-) {
-  const porId = asignaturasPlan.find(
-    (asignatura) =>
-      Number(asignatura?.cursoId) === Number(curso?.id),
-  );
-
-  if (porId) {
-    return porId;
-  }
-
-  const codigoCurso =
-    String(curso?.codigo || "")
-      .trim()
-      .toUpperCase();
-
-  if (!codigoCurso) {
-    return null;
-  }
-
-  return (
-    asignaturasPlan.find((asignatura) => {
-      const codigo =
-        asignatura?.codigoReferencia ||
-        asignatura?.curso?.codigo ||
-        "";
-
-      return (
-        String(codigo).trim().toUpperCase() ===
-        codigoCurso
-      );
-    }) || null
-  );
-}
-
-export function obtenerRequisitosCurso(
-  curso,
-  asignaturasPlan = [],
-  requisitosPlan = [],
-) {
-  const asignatura =
-    encontrarAsignaturaPlanCurso(
-      curso,
-      asignaturasPlan,
-    );
-
-  if (!asignatura) {
-    return [];
-  }
-
-  return requisitosPlan
-    .filter(
-      (relacion) =>
-        Number(relacion.asignaturaId) ===
-        Number(asignatura.id),
-    )
-    .map((relacion) => {
-      const requisito =
-        asignaturasPlan.find(
-          (item) =>
-            Number(item.id) ===
-            Number(
-              relacion.requisitoAsignaturaId,
-            ),
-        ) ||
-        relacion.requisitoAsignatura ||
-        null;
-
-      const codigo =
-        requisito?.codigoReferencia ||
-        requisito?.curso?.codigo ||
-        "SIN CÓDIGO";
-
-      const nombre =
-        requisito?.nombreReferencia ||
-        requisito?.curso?.nombre ||
-        "Asignatura no disponible";
-
-      return {
-        relacionId: relacion.id,
-        tipo:
-          relacion.tipo === "CORREQUISITO"
-            ? "CORREQUISITO"
-            : "REQUISITO",
-        codigo,
-        nombre,
-        creditos:
-          Number(requisito?.creditos || 0),
-        nivel:
-          requisito?.nivel ?? null,
-        ciclo:
-          requisito?.ciclo ?? null,
-      };
-    });
-}
+/* Re-exportar funciones de dominio para compatibilidad total */
+export {
+  CURSOS_POR_PAGINA,
+  obtenerCreditosCurso,
+  obtenerCarreraCursoIds,
+  cursoPerteneceACarrera,
+  encontrarAsignaturaPlanCurso,
+  obtenerRequisitosCurso,
+  compararCursosPorEstadoYCodigo,
+  calcularPaginacionCursos,
+  filtrarCursos,
+};
 
 /* =========================================================
    CARDS DE CARRERA
@@ -168,12 +39,12 @@ export function CarrerasCursosCards({
   cursos = [],
   carreraSeleccionadaId = null,
 }) {
-  const activas = carreras
-    .filter((carrera) => carrera.activo === true)
+  const activas = (Array.isArray(carreras) ? carreras : [])
+    .filter((carrera) => carrera?.activo === true)
     .slice()
     .sort((a, b) =>
-      String(a.nombre || "").localeCompare(
-        String(b.nombre || ""),
+      String(a?.nombre || "").localeCompare(
+        String(b?.nombre || ""),
         "es",
       ),
     );
@@ -208,7 +79,7 @@ export function CarrerasCursosCards({
       <div class="cursos-career-grid">
         ${activas
           .map((carrera) => {
-            const cantidad = cursos.filter((curso) =>
+            const cantidad = (Array.isArray(cursos) ? cursos : []).filter((curso) =>
               obtenerCarreraCursoIds(curso).includes(
                 Number(carrera.id),
               ),
@@ -344,7 +215,7 @@ export function CursosCatalogoHeading({
 }
 
 /* =========================================================
-   TABLA
+   REQUISITOS EN TABLA
    ========================================================= */
 
 function renderizarRequisitosTabla(
@@ -391,13 +262,74 @@ function renderizarRequisitosTabla(
   `;
 }
 
+/* =========================================================
+   PAGINACIÓN DEL CATÁLOGO (10 POR PÁGINA)
+   ========================================================= */
+
+export function renderizarPaginacionCursos({
+  total,
+  pagina,
+  totalPaginas,
+  inicio,
+  fin,
+  paginasVisibles,
+}) {
+  if (total === 0) return "";
+
+  return `
+    <nav class="plan-level-pagination" aria-label="Paginación del catálogo de cursos">
+      <div class="plan-level-pagination-info">
+        <span>CURSOS POR PÁGINA: ${CURSOS_POR_PAGINA}</span>
+        <strong>Mostrando ${inicio + 1}–${fin} de ${total} cursos</strong>
+      </div>
+
+      <div class="plan-level-pagination-controls">
+        <button class="plan-level-nav-button" type="button"
+          data-cursos-pagina="${pagina - 1}" aria-label="Página anterior"
+          ${pagina === 1 ? "disabled" : ""}>
+          <i data-lucide="chevron-left" aria-hidden="true"></i>
+          <span>Anterior</span>
+        </button>
+
+        <div class="plan-level-pagination-pages" aria-label="Páginas de cursos">
+          ${paginasVisibles
+            .map(
+              (numero) => `
+            <button class="plan-level-page-button ${
+              numero === pagina ? "is-active" : ""
+            }"
+              type="button" data-cursos-pagina="${numero}"
+              aria-label="Página ${numero}"
+              ${numero === pagina ? 'aria-current="page"' : ""}>
+              ${numero}
+            </button>
+          `,
+            )
+            .join("")}
+        </div>
+
+        <button class="plan-level-nav-button" type="button"
+          data-cursos-pagina="${pagina + 1}" aria-label="Página siguiente"
+          ${pagina === totalPaginas ? "disabled" : ""}>
+          <span>Siguiente</span>
+          <i data-lucide="chevron-right" aria-hidden="true"></i>
+        </button>
+      </div>
+    </nav>
+  `;
+}
+
+/* =========================================================
+   TABLA DE CURSOS (UTILIZA DATATABLE)
+   ========================================================= */
+
 export function CursosTabla({
   cursos = [],
   asignaturasPlan = [],
   requisitosPlan = [],
   puedeGestionar = false,
 }) {
-  const filas = cursos
+  const filas = (Array.isArray(cursos) ? cursos : [])
     .map((curso) => {
       const asignaturaPlan =
         encontrarAsignaturaPlanCurso(
@@ -422,18 +354,18 @@ export function CursosTabla({
         <tr>
           <td>
             <strong class="curso-code">
-              ${escapeHtml(curso.codigo)}
+              ${escapeHtml(curso?.codigo || "")}
             </strong>
           </td>
 
           <td>
             <div class="curso-name">
               <strong>
-                ${escapeHtml(curso.nombre)}
+                ${escapeHtml(curso?.nombre || "")}
               </strong>
 
               ${
-                curso.descripcion
+                curso?.descripcion
                   ? `
                       <small>
                         ${escapeHtml(curso.descripcion)}
@@ -462,14 +394,14 @@ export function CursosTabla({
               class="
                 curso-status
                 ${
-                  curso.activo
+                  curso?.activo
                     ? "curso-status-active"
                     : "curso-status-inactive"
                 }
               "
             >
               ${
-                curso.activo
+                curso?.activo
                   ? "Activo"
                   : "Inactivo"
               }
@@ -480,10 +412,10 @@ export function CursosTabla({
             <button
               class="cursos-icon-button"
               data-action="requisitos"
-              data-id="${curso.id}"
+              data-id="${curso?.id}"
               type="button"
               title="Requisitos del curso"
-              aria-label="Requisitos de ${escapeHtml(curso.nombre)}"
+              aria-label="Requisitos de ${escapeHtml(curso?.nombre || "")}"
             >
               <i
                 data-lucide="git-branch"
@@ -492,16 +424,16 @@ export function CursosTabla({
             </button>
 
             ${
-              (curso.puedeGestionarGlobal ?? puedeGestionar)
+              (curso?.puedeGestionarGlobal ?? puedeGestionar)
                 ? `
                   <button
                     class="cursos-icon-button"
                     data-action="editar"
-                    data-id="${curso.id}"
+                    data-id="${curso?.id}"
                     type="button"
                     title="Editar curso"
                     aria-label="Editar ${escapeHtml(
-                      curso.nombre,
+                      curso?.nombre || "",
                     )}"
                   >
                     <i
@@ -514,28 +446,28 @@ export function CursosTabla({
                     class="
                       cursos-icon-button
                       ${
-                        curso.activo
+                        curso?.activo
                           ? "cursos-danger-button"
                           : "cursos-success-button"
                       }
                     "
                     data-action="estado"
-                    data-id="${curso.id}"
+                    data-id="${curso?.id}"
                     type="button"
                     title="${
-                      curso.activo
+                      curso?.activo
                         ? "Desactivar curso"
                         : "Activar curso"
                     }"
                     aria-label="${
-                      curso.activo
+                      curso?.activo
                         ? "Desactivar"
                         : "Activar"
-                    } ${escapeHtml(curso.nombre)}"
+                    } ${escapeHtml(curso?.nombre || "")}"
                   >
                     <i
                       data-lucide="${
-                        curso.activo
+                        curso?.activo
                           ? "circle-pause"
                           : "circle-check"
                       }"

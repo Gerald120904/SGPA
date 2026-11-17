@@ -1,8 +1,4 @@
 import {
-  actualizarPeriodoAcademico,
-  cambiarEstadoPeriodoAcademico,
-  crearPeriodoAcademico,
-  corregirPeriodoCerrado,
   listarPeriodosAcademicos,
 } from "../../services/periodos.service.js";
 
@@ -10,9 +6,6 @@ import {
   DataTable,
 } from "../../components/DataTable.js";
 
-import {
-  StatusBadge,
-} from "../../components/StatusBadge.js";
 
 import {
   FormDialog,
@@ -20,22 +13,12 @@ import {
 } from "../../components/FormDialog.js";
 
 import {
-  mostrarError,
-  mostrarExito,
-  mostrarAdvertencia,
-} from "../../components/AlertModal.js";
-
-import {
-  confirmarAccion,
-} from "../../utils/confirm.js";
-
-import {
   escapeHtml,
 } from "../../utils/html.js";
 
 import {
   usuarioTienePermiso,
-  obtenerRolActivo,
+  obtenerVersionSesion,
 } from "../../app/session.js";
 
 import {
@@ -46,124 +29,36 @@ import {
   renderizarIconos,
 } from "../../utils/icons.js";
 
+import {
+  ESTADOS_PERIODO as ESTADOS,
+  TRANSICIONES_PERIODO as TRANSICIONES,
+  obtenerTonoEstadoPeriodo as obtenerTonoEstado,
+  obtenerNombreEstadoPeriodo as obtenerNombreEstado,
+  obtenerNombreCicloPeriodo as obtenerNombreCiclo,
+  formatearFechaPeriodo as formatearFecha,
+  esPeriodoEditable as periodoEditable,
+  filtrarPeriodosAcademicos,
+  calcularFechaMaximaDisponibilidad,
+  validarYConstruirDatosPeriodo,
+} from "./periodos.helpers.js";
+import {
+  ejecutarGuardadoPeriodo,
+  ejecutarCambioEstadoPeriodo,
+} from "./PeriodoAcciones.js";
+import { construirFilasPeriodosHtml } from "./PeriodosCatalogo.js";
+
+export {
+  ESTADOS,
+  TRANSICIONES,
+  obtenerTonoEstado,
+  obtenerNombreEstado,
+  obtenerNombreCiclo,
+  formatearFecha,
+  periodoEditable,
+};
 
 let periodos = [];
 let instanciaActual = 0;
-
-
-const ESTADOS = {
-  BORRADOR: "Borrador",
-
-  EN_PREPARACION:
-    "En preparación",
-
-  EN_CURSO:
-    "En curso",
-
-  CERRADO:
-    "Cerrado",
-
-  CANCELADO:
-    "Cancelado",
-};
-
-
-function obtenerTonoEstado(
-  estado,
-) {
-  const tonos = {
-    BORRADOR: "neutral",
-    EN_PREPARACION: "info",
-    EN_CURSO: "success",
-    CERRADO: "neutral",
-    CANCELADO: "danger",
-  };
-
-  return tonos[estado] || "neutral";
-}
-
-
-const TRANSICIONES = {
-  BORRADOR: [
-    {
-      estado:
-        "EN_PREPARACION",
-
-      texto:
-        "Preparar",
-
-      titulo:
-        "Pasar periodo a preparación",
-
-      peligro:
-        false,
-    },
-
-    {
-      estado:
-        "CANCELADO",
-
-      texto:
-        "Cancelar",
-
-      titulo:
-        "Cancelar periodo",
-
-      peligro:
-        true,
-    },
-  ],
-
-  EN_PREPARACION: [
-    {
-      estado:
-        "EN_CURSO",
-
-      texto:
-        "Iniciar",
-
-      titulo:
-        "Iniciar periodo académico",
-
-      peligro:
-        false,
-    },
-
-    {
-      estado:
-        "CANCELADO",
-
-      texto:
-        "Cancelar",
-
-      titulo:
-        "Cancelar periodo",
-
-      peligro:
-        true,
-    },
-  ],
-
-  EN_CURSO: [
-    {
-      estado:
-        "CERRADO",
-
-      texto:
-        "Cerrar",
-
-      titulo:
-        "Cerrar periodo académico",
-
-      peligro:
-        true,
-    },
-  ],
-
-  CERRADO: [],
-
-  CANCELADO: [],
-};
 
 
 function puedeGestionarPeriodos() {
@@ -312,130 +207,16 @@ export function PeriodosPage() {
 
 
 /* =========================================================
-   FORMATOS
-   ========================================================= */
-
-function obtenerNombreEstado(
-  estado,
-) {
-  return (
-    ESTADOS[estado] ||
-    estado ||
-    "Sin estado"
-  );
-}
-
-
-function obtenerNombreCiclo(
-  ciclo,
-) {
-  const ciclos = {
-    1: "I Ciclo",
-    2: "II Ciclo",
-    3: "Verano",
-  };
-
-  return (
-    ciclos[ciclo] ||
-    `Ciclo ${ciclo}`
-  );
-}
-
-
-function formatearFecha(
-  fecha,
-) {
-  if (!fecha) {
-    return "—";
-  }
-
-  const partes =
-    String(fecha).split("-");
-
-  if (partes.length !== 3) {
-    return fecha;
-  }
-
-  const [
-    anio,
-    mes,
-    dia,
-  ] = partes;
-
-  return `${dia}/${mes}/${anio}`;
-}
-
-
-function periodoEditable(
-  periodo,
-) {
-  return [
-    "BORRADOR",
-    "EN_PREPARACION",
-  ].includes(
-    periodo.estado,
-  );
-}
-
-
-/* =========================================================
    FILTROS
    ========================================================= */
 
 function obtenerPeriodosFiltrados() {
   const busqueda =
-    document
-      .getElementById(
-        "periodosBuscar",
-      )
-      ?.value
-      ?.trim()
-      .toLowerCase() || "";
-
+    document.getElementById("periodosBuscar")?.value?.trim() || "";
   const estado =
-    document
-      .getElementById(
-        "periodosEstado",
-      )
-      ?.value || "";
+    document.getElementById("periodosEstado")?.value || "";
 
-
-  return periodos.filter(
-    (periodo) => {
-
-      const coincideBusqueda =
-        !busqueda ||
-        [
-          periodo.codigo,
-          periodo.nombre,
-          periodo.anio,
-          periodo.ciclo,
-        ]
-          .filter(
-            (valor) =>
-              valor !== undefined &&
-              valor !== null,
-          )
-          .some(
-            (valor) =>
-              String(valor)
-                .toLowerCase()
-                .includes(busqueda),
-          );
-
-
-      const coincideEstado =
-        !estado ||
-        periodo.estado === estado;
-
-
-      return (
-        coincideBusqueda &&
-        coincideEstado
-      );
-
-    },
-  );
+  return filtrarPeriodosAcademicos(periodos, busqueda, estado);
 }
 
 
@@ -462,219 +243,7 @@ function renderizarPeriodos() {
     puedeGestionarPeriodos();
 
 
-  const filas =
-    filtrados
-      .map(
-        (periodo) => {
-
-          const transiciones =
-            TRANSICIONES[
-              periodo.estado
-            ] || [];
-
-
-          const informacionBackend =
-            Array.isArray(
-              periodo.transicionesEstado,
-            )
-              ? periodo.transicionesEstado
-              : [];
-
-
-          const accionesEstado =
-            puedeGestionar
-              ? transiciones
-                  .map(
-                    (transicion) => {
-                      const informacion =
-                        informacionBackend.find(
-                          (item) =>
-                            item.estado ===
-                            transicion.estado,
-                        );
-
-                      const disponible =
-                        informacion
-                          ?.disponible !==
-                        false;
-
-                      const motivo =
-                        informacion?.motivo ||
-                        "";
-
-                      return `
-                        <div
-                          class="periodos-transition-wrapper"
-                        >
-                          <button
-                            class="
-                              periodos-transition-button
-                              ${
-                                transicion.peligro
-                                  ? "periodos-danger-button"
-                                  : ""
-                              }
-                            "
-                            type="button"
-                            data-action="estado"
-                            data-id="${periodo.id}"
-                            data-estado="${transicion.estado}"
-                            aria-disabled="${disponible ? "false" : "true"}"
-                            title="${escapeHtml(
-                              motivo ||
-                                transicion.titulo,
-                            )}"
-                          >
-                            ${escapeHtml(
-                              transicion.texto,
-                            )}
-                          </button>
-
-                        </div>
-                      `;
-                    },
-                  )
-                  .join("")
-              : "";
-
-
-          return `
-            <tr>
-
-              <td data-label="Código">
-                <strong
-                  class="periodos-code"
-                >
-                  ${escapeHtml(
-                    periodo.codigo,
-                  )}
-                </strong>
-              </td>
-
-
-              <td data-label="Periodo">
-
-                <div
-                  class="periodos-name"
-                >
-
-                  <strong>
-                    ${escapeHtml(
-                      periodo.nombre,
-                    )}
-                  </strong>
-
-                  <small>
-                    Año
-                    ${escapeHtml(
-                      periodo.anio,
-                    )}
-                    ·
-                    ${escapeHtml(
-                      obtenerNombreCiclo(
-                        periodo.ciclo,
-                      ),
-                    )}
-                  </small>
-
-                </div>
-
-              </td>
-
-
-              <td data-label="Fechas">
-
-                <div
-                  class="periodos-dates"
-                >
-
-                  <strong>
-                    ${formatearFecha(
-                      periodo.fechaInicio,
-                    )}
-                    —
-                    ${formatearFecha(
-                      periodo.fechaFin,
-                    )}
-                  </strong>
-
-                  <small>
-                    Límite disponibilidad:
-                    ${formatearFecha(
-                      periodo.fechaLimiteDisponibilidad,
-                    )}
-                  </small>
-
-                </div>
-
-              </td>
-
-
-              <td data-label="Estado">
-
-                ${StatusBadge({
-                  label:
-                    obtenerNombreEstado(
-                      periodo.estado,
-                    ),
-                  tone:
-                    obtenerTonoEstado(
-                      periodo.estado,
-                    ),
-                })}
-
-              </td>
-
-
-              <td data-label="Acciones">
-
-                <div
-                  class="periodos-actions"
-                >
-
-                  ${
-                    puedeGestionar &&
-                    periodoEditable(
-                      periodo,
-                    )
-                      ? `
-                        <button
-                          class="periodos-icon-button"
-                          type="button"
-                          data-action="editar"
-                          data-id="${periodo.id}"
-                          title="Editar periodo"
-                        >
-
-                          <i
-                            data-lucide="pencil"
-                            aria-hidden="true"
-                          ></i>
-
-                        </button>
-                      `
-                      : ""
-                  }
-
-
-                  ${accionesEstado}
-                  ${puedeGestionar && periodo.estado === 'CERRADO' && obtenerRolActivo() === 'ADMIN_GLOBAL'
-                    ? `<button class="periodos-icon-button" type="button" data-action="corregir-cerrado"
-                        data-id="${periodo.id}" title="Corrección excepcional auditada">
-                        <i data-lucide="pencil" aria-hidden="true"></i>
-                      </button>` : ''}
-
-                </div>
-
-              </td>
-
-            </tr>
-          `;
-
-        },
-      )
-      .join("");
-
+  const filas = construirFilasPeriodosHtml(filtrados, puedeGestionar);
 
   contenedor.innerHTML =
     DataTable({
@@ -805,6 +374,7 @@ function abrirFormulario(
   periodo = null,
   excepcional = false,
 ) {
+  const instancia = instanciaActual;
   const dialog =
     document.getElementById(
       "periodoDialog",
@@ -1082,15 +652,8 @@ function abrirFormulario(
   const inputFechaInicio = document.getElementById("periodoFechaInicio");
   const inputFechaLimite = document.getElementById("periodoFechaLimite");
   const actualizarLimiteDisponibilidad = () => {
-    const partes = inputFechaInicio?.value?.split("-").map(Number);
-    if (partes?.length === 3 && !partes.some(Number.isNaN)) {
-      const [anio, mes, dia] = partes;
-      const diaAnterior = new Date(anio, mes - 1, dia - 1);
-      const fechaMaxima = [
-        diaAnterior.getFullYear(),
-        String(diaAnterior.getMonth() + 1).padStart(2, "0"),
-        String(diaAnterior.getDate()).padStart(2, "0"),
-      ].join("-");
+    const fechaMaxima = calcularFechaMaximaDisponibilidad(inputFechaInicio?.value);
+    if (fechaMaxima) {
       inputFechaLimite.max = fechaMaxima;
     } else {
       inputFechaLimite?.removeAttribute("max");
@@ -1101,351 +664,85 @@ function abrirFormulario(
     inputFechaInicio.addEventListener("change", actualizarLimiteDisponibilidad);
   }
 
-  const cerrar =
-    () => dialog.close();
-
+  const cerrar = () => dialog.close();
 
   document
-    .getElementById(
-      "cancelarPeriodoButton",
-    )
-    ?.addEventListener(
-      "click",
-      cerrar,
-    );
-
+    .getElementById("cancelarPeriodoButton")
+    ?.addEventListener("click", cerrar);
 
   document
-    .getElementById(
-      "periodoForm",
-    )
-    ?.addEventListener(
-      "submit",
-      async (event) => {
+    .getElementById("periodoForm")
+    ?.addEventListener("submit", async (event) => {
+      event.preventDefault();
 
-        event.preventDefault();
+      const errorBox = document.getElementById("periodoFormError");
+      const guardarButton = document.getElementById("guardarPeriodoButton");
+      const mostrarErrorFormulario = (mensaje) => {
+        if (!errorBox) return;
+        errorBox.textContent = mensaje;
+        errorBox.classList.remove("hidden");
+      };
 
+      errorBox?.classList.add("hidden");
 
-        const anio =
-          Number(
-            document
-              .getElementById(
-                "periodoAnio",
-              )
-              ?.value,
-          );
+      const validacion = validarYConstruirDatosPeriodo({
+        anio: Number(document.getElementById("periodoAnio")?.value),
+        ciclo: Number(document.getElementById("periodoCiclo")?.value),
+        fechaInicio: document.getElementById("periodoFechaInicio")?.value || "",
+        fechaFin: document.getElementById("periodoFechaFin")?.value || "",
+        fechaLimiteDisponibilidad:
+          document.getElementById("periodoFechaLimite")?.value || "",
+        observaciones:
+          document.getElementById("periodoObservaciones")?.value?.trim() || "",
+        motivo: document.getElementById("periodoMotivoExcepcional")?.value || "",
+        editando,
+        estructuraBloqueada,
+        excepcional,
+      });
 
+      if (!validacion.ok) {
+        mostrarErrorFormulario(validacion.error);
+        return;
+      }
 
-        const ciclo =
-          Number(
-            document
-              .getElementById(
-                "periodoCiclo",
-              )
-              ?.value,
-          );
-
-
-        const fechaInicio =
-          document
-            .getElementById(
-              "periodoFechaInicio",
-            )
-            ?.value || "";
-
-
-        const fechaFin =
-          document
-            .getElementById(
-              "periodoFechaFin",
-            )
-            ?.value || "";
-
-
-        const fechaLimiteDisponibilidad =
-          document
-            .getElementById(
-              "periodoFechaLimite",
-            )
-            ?.value || "";
-
-
-        const observaciones =
-          document
-            .getElementById(
-              "periodoObservaciones",
-            )
-            ?.value
-            ?.trim() || "";
-
-
-        const errorBox =
-          document.getElementById(
-            "periodoFormError",
-          );
-
-
-        const guardarButton =
-          document.getElementById(
-            "guardarPeriodoButton",
-          );
-
-
-        const mostrarErrorFormulario =
-          (mensaje) => {
-
-            if (!errorBox) {
-              return;
-            }
-
-            errorBox.textContent =
-              mensaje;
-
-            errorBox.classList.remove(
-              "hidden",
-            );
-
-          };
-
-
-        errorBox?.classList.add(
-          "hidden",
-        );
-
-
-        if (!estructuraBloqueada) {
-          if (
-            fechaFin <=
-            fechaInicio
-          ) {
-
-            mostrarErrorFormulario(
-              "La fecha de finalización debe ser posterior a la fecha de inicio.",
-            );
-
-            return;
-          }
-
-
-          if (
-            fechaLimiteDisponibilidad >=
-            fechaInicio
-          ) {
-
-            mostrarErrorFormulario(
-              "La fecha límite de disponibilidad debe ser anterior al inicio del periodo.",
-            );
-
-            return;
-          }
-        }
-
-
-        const datos =
-          editando &&
-          estructuraBloqueada
-            ? {
-                observaciones,
-              }
-            : {
-                anio,
-                ciclo,
-                fechaInicio,
-                fechaFin,
-                fechaLimiteDisponibilidad,
-                observaciones,
-              };
-
-        if (excepcional) {
-          const motivo = document.getElementById("periodoMotivoExcepcional")?.value?.trim() || "";
-          if (motivo.length < 10) {
-            mostrarErrorFormulario("Indique un motivo institucional de al menos 10 caracteres.");
-            return;
-          }
-          datos.motivo = motivo;
-        }
-
-
-        if (guardarButton) {
-          guardarButton.disabled =
-            true;
-        }
-
-
-        try {
-
-          const resultado =
-            excepcional
-              ? await corregirPeriodoCerrado(periodo.id, datos)
-              : editando
-              ? await actualizarPeriodoAcademico(
-                  periodo.id,
-                  datos,
-                )
-              : await crearPeriodoAcademico(
-                  datos,
-                );
-
-
-          if (!resultado?.ok) {
-            throw new Error(
-              resultado?.message ||
-                "No fue posible guardar el periodo.",
-            );
-          }
-
-
-          cerrar();
-
-
-          mostrarExito({
-
-            titulo:
-              editando
-                ? "Periodo actualizado"
-                : "Periodo creado",
-
-            mensaje:
-              editando
-                ? "El periodo académico fue actualizado correctamente."
-                : "El nuevo periodo académico fue creado en estado borrador.",
-
-          });
-
-
-          await cargarPeriodos(
-            instanciaActual,
-          );
-
-        } catch (error) {
-
-          mostrarError({
-
-            titulo:
-              editando
-                ? "No se pudo actualizar el periodo"
-                : "No se pudo crear el periodo",
-
-            mensaje:
-              error?.message ||
-              "No fue posible guardar el periodo académico.",
-
-          });
-
-        } finally {
-
-          if (guardarButton) {
-            guardarButton.disabled =
-              false;
-          }
-
-        }
-
-      },
-    );
+      await ejecutarGuardadoPeriodo({
+        periodo,
+        editando,
+        excepcional,
+        datos: validacion.datos,
+        guardarButton,
+        cerrarDialogo: cerrar,
+        recargarPeriodos: () => {
+          if (instancia === instanciaActual) return cargarPeriodos(instancia);
+          return undefined;
+        },
+      });
+    });
 }
-
 
 /* =========================================================
    CAMBIAR ESTADO
    ========================================================= */
 
-async function cambiarEstado(
-  periodo,
-  nuevoEstado,
-) {
-  const transicion =
-    (
-      TRANSICIONES[
-        periodo.estado
-      ] || []
-    ).find(
-      (item) =>
-        item.estado ===
-        nuevoEstado,
-    );
+async function cambiarEstado(periodo, nuevoEstado, contexto) {
+  const { instancia, pagina, versionSesion } = contexto;
+  const vigente = () => (
+    instancia === instanciaActual &&
+    document.getElementById("periodosPage") === pagina &&
+    obtenerVersionSesion() === versionSesion &&
+    puedeGestionarPeriodos()
+  );
 
-
-  if (!transicion) {
-    return;
-  }
-
-
-  const confirmado =
-    await confirmarAccion({
-
-      titulo:
-        transicion.titulo,
-
-      mensaje:
-        `¿Desea cambiar "${periodo.nombre}" de ${obtenerNombreEstado(
-          periodo.estado,
-        )} a ${obtenerNombreEstado(
-          nuevoEstado,
-        )}?`,
-
-      textoConfirmar:
-        transicion.texto,
-
-      peligro:
-        transicion.peligro,
-
-    });
-
-
-  if (!confirmado) {
-    return;
-  }
-
-
-  try {
-
-    const resultado =
-      await cambiarEstadoPeriodoAcademico(
-        periodo.id,
-        nuevoEstado,
-      );
-
-
-    if (!resultado?.ok) {
-      throw new Error(
-        resultado?.message ||
-          "No fue posible cambiar el estado del periodo.",
-      );
-    }
-
-
-    mostrarExito({
-
-      titulo:
-        "Estado actualizado",
-
-      mensaje:
-        `El periodo quedó en estado "${obtenerNombreEstado(
-          nuevoEstado,
-        )}".`,
-
-    });
-
-
-    await cargarPeriodos(
-      instanciaActual,
-    );
-
-  } catch (error) {
-
-    mostrarError({
-
-      titulo:
-        "No se pudo cambiar el estado",
-
-      mensaje:
-        error?.message ||
-        "No fue posible actualizar el periodo académico.",
-
-    });
-
-  }
+  await ejecutarCambioEstadoPeriodo({
+    periodo,
+    nuevoEstado,
+    operacionId: instancia,
+    vigente,
+    recargarPeriodos: () => {
+      if (vigente()) return cargarPeriodos(instancia);
+      return undefined;
+    },
+  });
 }
 
 
@@ -1458,6 +755,8 @@ export function iniciarPeriodosPage() {
 
   const instancia =
     instanciaActual;
+  const pagina = document.getElementById("periodosPage");
+  const versionSesion = obtenerVersionSesion();
 
 
   periodos = [];
@@ -1557,24 +856,11 @@ export function iniciarPeriodosPage() {
           button.dataset.action ===
           "estado"
         ) {
-          // Botón visualmente inhabilitado, pero accesible al clic para explicar el motivo.
-          // Nunca se envía al backend una transición declarada no disponible.
-          const informacion = Array.isArray(periodo.transicionesEstado)
-            ? periodo.transicionesEstado.find((item) => item.estado === button.dataset.estado)
-            : null;
-          if (informacion?.disponible === false) {
-            mostrarAdvertencia({
-              titulo: "Acción no disponible",
-              mensaje: informacion.motivo || "Esta transición no está disponible para el periodo seleccionado.",
-            });
-            return;
-          }
-
           await cambiarEstado(
             periodo,
             button.dataset.estado,
+            { instancia, pagina, versionSesion },
           );
-
         }
 
       },
@@ -1584,6 +870,11 @@ export function iniciarPeriodosPage() {
   cargarPeriodos(
     instancia,
   );
+}
+
+/** Invalida la consulta vigente al desmontar el módulo. */
+export function destruirPeriodosPage() {
+  instanciaActual += 1;
 }
 
 /* =========================================================

@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { RolSistema } from '../auth/constants/roles.constants';
 import { PermisoSistema } from '../permisos/constants/permisos.constant';
 import { Carrera } from '../carreras/entities/carrera.entity';
@@ -124,13 +124,47 @@ describe('JerarquiaUsuariosService', () => {
   });
 
   it('rechaza que un coordinador edite al asistente de otro', async () => {
-    const alcance = { ...scope, puedeAdministrarAsistente: jest.fn().mockResolvedValue(false) };
+    const alcance = { ...scope, tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR') };
+    const dependencias = { findOne: jest.fn().mockResolvedValue(null) };
     service = new JerarquiaUsuariosService(
       { transaction: tx } as any, usuarios as any, {} as any, {} as any,
-      {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, dependencias as any, {} as any,
       alcance as any, {} as any,
     );
     await expect(service.obtenerAsistente(3, 4)).rejects.toThrow(ForbiddenException);
+    expect(dependencias.findOne).toHaveBeenCalledWith({ where: { coordinadorId: 3, asistenteId: 4, activo: true } });
+  });
+
+  it('permite editar una cuenta inactiva del propietario si tiene una invitacion pendiente vigente', async () => {
+    const usuariosRepo = { findOne: jest.fn(async ({ where }) => where.id === 2
+      ? cuenta(2, RolSistema.COORDINADOR)
+      : { ...cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL, false), passwordResetTokenHash: 'hash', passwordResetExpiresAt: new Date(Date.now() + 60_000) }) };
+    const dependencias = { findOne: jest.fn().mockResolvedValue({ coordinadorId: 2, asistenteId: 4, activo: true }) };
+    const alcance = { ...scope, tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR') };
+    const usuariosSvc = { invitacionPendienteVigente: jest.fn().mockResolvedValue(true) };
+    service = new JerarquiaUsuariosService(
+      { transaction: tx } as any, usuariosRepo as any, {} as any, {} as any,
+      {} as any, { find: jest.fn().mockResolvedValue([]) } as any,
+      { find: jest.fn().mockResolvedValue([]) } as any, dependencias as any, {} as any,
+      alcance as any, usuariosSvc as any,
+    );
+    await expect(service.obtenerAsistente(2, 4)).resolves.toEqual({ usuarioId: 4, carreras: [] });
+    expect(usuariosSvc.invitacionPendienteVigente).toHaveBeenCalledWith(4);
+  });
+
+  it('bloquea la edicion de cuentas inactivas sin invitacion vigente', async () => {
+    const usuariosRepo = { findOne: jest.fn(async ({ where }) => where.id === 2
+      ? cuenta(2, RolSistema.COORDINADOR)
+      : cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL, false)) };
+    const dependencias = { findOne: jest.fn().mockResolvedValue({ coordinadorId: 2, asistenteId: 4, activo: true }) };
+    const alcance = { ...scope, tipoCuentaJerarquica: jest.fn().mockResolvedValue('COORDINADOR') };
+    const usuariosSvc = { invitacionPendienteVigente: jest.fn().mockResolvedValue(false) };
+    service = new JerarquiaUsuariosService(
+      { transaction: tx } as any, usuariosRepo as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, dependencias as any, {} as any,
+      alcance as any, usuariosSvc as any,
+    );
+    await expect(service.obtenerAsistente(2, 4)).rejects.toThrow(ConflictException);
   });
 
   it('revoca la ultima carrera y permiso del coordinador sin dejar acceso activo', async () => {
@@ -206,5 +240,105 @@ describe('JerarquiaUsuariosService', () => {
     expect(solicitudes.map((s) => s.estado)).toEqual(['PENDIENTE', 'PENDIENTE']);
     expect(solicitudesRepo.save).not.toHaveBeenCalled();
     expect(usuarioRepo.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('concurrencia simulada: la primera reconfiguración actualiza permisos y la firma repetida se rechaza', async () => {
+    const asignaciones = [
+      { usuarioId: 2, carreraId: 2, tipo: TipoAsignacionAcademica.COORDINADOR_CARRERA,
+        activo: true, fechaInicio: '2000-01-01', fechaFin: null },
+      { usuarioId: 4, carreraId: 2, tipo: TipoAsignacionAcademica.ASISTENTE_CARRERA,
+        activo: true, fechaInicio: '2000-01-01', fechaFin: null },
+    ];
+    const permisosEstado = [
+      { usuarioId: 2, carreraId: 2, permiso, activo: true },
+      { usuarioId: 4, carreraId: 2, permiso, activo: true },
+    ];
+    const dependencia = { id: 1, coordinadorId: 2, asistenteId: 4, activo: true };
+    const usuarioManager = {
+      findOne: jest.fn(async ({ where }: any) => where.id === 2
+        ? cuenta(2, RolSistema.COORDINADOR)
+        : cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL)),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const asignacionesRepo = {
+      find: jest.fn(async ({ where }: any) => asignaciones.filter((item) =>
+        item.usuarioId === where.usuarioId && item.tipo === where.tipo && item.activo === where.activo)),
+      create: jest.fn((item: any) => item),
+      save: jest.fn(async (item: any) => {
+        if (!asignaciones.includes(item)) asignaciones.push(item);
+        return item;
+      }),
+    };
+    const permisosRepo = {
+      find: jest.fn(async ({ where }: any) => permisosEstado.filter((item) =>
+        item.usuarioId === where.usuarioId && (where.activo === undefined || item.activo === where.activo))),
+      create: jest.fn((item: any) => item),
+      save: jest.fn(async (item: any) => {
+        if (!permisosEstado.includes(item)) permisosEstado.push(item);
+        return item;
+      }),
+    };
+    const dependenciaRepo = { findOne: jest.fn().mockResolvedValue(dependencia) };
+    const solicitudRepo = { find: jest.fn().mockResolvedValue([]) };
+    const auditoriaRepo = { save: jest.fn(async (item: any) => item) };
+    const excepcionesRepo = { delete: jest.fn(), create: (item: any) => item, save: jest.fn() };
+    const permisosLegacyRepo = { delete: jest.fn(), create: (item: any) => item, save: jest.fn() };
+    const manager = { getRepository: jest.fn((entity: any) => {
+      if (entity === Usuario) return usuarioManager;
+      if (entity === AsignacionAcademica) return asignacionesRepo;
+      if (entity === PermisoCarrera) return permisosRepo;
+      if (entity === DependenciaUsuario) return dependenciaRepo;
+      if (entity === SolicitudCambio) return solicitudRepo;
+      if (entity === AuditoriaJerarquia) return auditoriaRepo;
+      if (entity === UsuarioPermisoExcepcion) return excepcionesRepo;
+      if (entity === UsuarioPermiso) return permisosLegacyRepo;
+      throw new Error(`Repositorio inesperado: ${entity?.name}`);
+    }) };
+    let cola = Promise.resolve();
+    const dataSource = {
+      manager,
+      transaction: jest.fn(async (callback: any) => {
+        const anterior = cola;
+        let liberar!: () => void;
+        cola = new Promise<void>((resolve) => { liberar = resolve; });
+        await anterior;
+        try {
+          return await callback(manager);
+        } finally {
+          liberar();
+        }
+      }),
+    };
+    const usuariosRepo = { findOne: jest.fn(async ({ where }: any) => where.id === 1
+      ? cuenta(1, RolSistema.ADMIN_GLOBAL)
+      : where.id === 2 ? cuenta(2, RolSistema.COORDINADOR) : cuenta(4, RolSistema.ASISTENTE_ESTUDIANTIL)) };
+    const alcance = {
+      obtenerCarrerasAutorizadas: jest.fn().mockResolvedValue([2]),
+      obtenerPermisosDelegables: jest.fn().mockResolvedValue([permiso]),
+    };
+    service = new JerarquiaUsuariosService(dataSource as any, usuariosRepo as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any, dependenciaRepo as any,
+      auditoriaRepo as any, alcance as any, {} as any);
+
+    const vistaPrevia = await service.previsualizarAsistente(1, 4, []);
+    const resultados = await Promise.allSettled([
+      service.configurarAsistentePorAdmin(1, 4, [], vistaPrevia.firma),
+      service.configurarAsistentePorAdmin(1, 4, [], vistaPrevia.firma),
+    ]);
+
+    expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(resultados.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect((resultados.find((r) => r.status === 'rejected') as PromiseRejectedResult).reason)
+      .toBeInstanceOf(ConflictException);
+    expect(asignaciones.find((a) => a.usuarioId === 4)?.activo).toBe(false);
+    expect(permisosEstado.find((p) => p.usuarioId === 4)?.activo).toBe(false);
+    expect(usuarioManager.update).toHaveBeenCalledTimes(1);
+    expect(auditoriaRepo.save).toHaveBeenCalledTimes(2);
+    expect(auditoriaRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+      actorUsuarioId: 1, objetivoUsuarioId: 4, accion: 'CONFIGURAR_ASISTENTE',
+    }));
+    expect(auditoriaRepo.save).toHaveBeenCalledWith(expect.objectContaining({
+      actorUsuarioId: 1, objetivoUsuarioId: 4, accion: 'REVOCACION_ADMINISTRATIVA',
+    }));
   });
 });

@@ -3,11 +3,11 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = await readFile(new URL('../src/pages/formularios-estudiantes/FormulariosEstudiantesPage.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('../src/pages/formularios-estudiantes/FormularioGoogleStatusView.js', import.meta.url), 'utf8');
 const conectarSource = source.slice(
-  source.indexOf('async function conectarGoogle()'),
-  source.indexOf('async function desconectarGoogle()'),
-);
+  source.indexOf('async function conectarGoogle'),
+  source.indexOf('export async function desconectarGoogle'),
+).replace(/^export\s+/, '').trim();
 
 async function conectar(resultado, error) {
   const avisos = [];

@@ -19,6 +19,7 @@ import {
   listarCarreras,
 } from '../../services/carreras.service.js';
 import { ROLES } from '../../config/permissions.js';
+import { obtenerVersionSesion } from '../../app/session.js';
 import { obtenerCoordinadorJerarquia, obtenerAsistenteAdminJerarquia,
   previsualizarCoordinadorJerarquia, previsualizarAsistenteAdminJerarquia,
   configurarCoordinadorJerarquia, configurarAsistenteAdminJerarquia,
@@ -27,32 +28,38 @@ import { obtenerCoordinadorJerarquia, obtenerAsistenteAdminJerarquia,
 import { escapeHtml } from '../../utils/html.js';
 import { renderizarIconos } from '../../utils/icons.js';
 import { confirmarAccion } from '../../utils/confirm.js';
-import { DataTable } from '../../components/DataTable.js';
 import { FormDialog, habilitarCierreExterior } from '../../components/FormDialog.js';
-import { StatCard } from '../../components/StatCard.js';
-import { StatusBadge } from '../../components/StatusBadge.js';
+import {
+  nombreVisibleRol,
+  normalizarRolesUsuario as obtenerRoles,
+  obtenerNombreCompletoUsuario as obtenerNombreCompleto,
+  mensajeResultado,
+  obtenerPermisosSugeridosRoles as calcularPermisosSugeridosRoles,
+  construirMensajeRevocacionRol,
+  construirMensajeImpactoJerarquia,
+  obtenerEstadoSeleccionPermisosCarrera,
+  obtenerCarrerasActivas,
+  normalizarEntradaCampoUsuario,
+  establecerSeleccionPermisosCarrera,
+  filtrarListaUsuarios,
+} from './usuarios.helpers.js';
+import { renderizarCatalogoUsuarios } from './UsuariosCatalogo.js';
+import { construirDialogoJerarquiaUsuario } from './UsuarioJerarquiaDialog.js';
+import { construirDialogoConsultaAccesos } from './UsuarioAccesosDialog.js';
+import {
+  construirDialogoCreacionUsuario,
+  construirDialogoEdicionUsuario,
+} from './UsuarioFormDialog.js';
+
+export {
+  nombreVisibleRol,
+  obtenerEstadoSeleccionPermisosCarrera,
+  establecerSeleccionPermisosCarrera,
+  filtrarListaUsuarios,
+  construirMensajeRevocacionRol,
+};
 
 let instanciaActual = 0;
-
-export function construirMensajeRevocacionRol(impacto, carreras = []) {
-  const nombreCarrera = (id) => carreras.find((c) => Number(c.id) === Number(id))?.nombre || `#${id}`;
-  const permisos = impacto.permisosRevocados.map((p) =>
-    `${nombreCarrera(p.carreraId)}: ${p.permiso}`).join(', ') || 'ninguno';
-  const asistentes = impacto.rol === ROLES.COORDINADOR
-    ? `${impacto.totalAsistentes || 0} dependencia(s) vigente(s), de las cuales ` +
-      `${impacto.totalAsistentesActivos || 0} corresponden a cuentas activas, perderán su coordinador: ` +
-      `${(impacto.asistentesAfectados || []).map((a) =>
-        `${a.nombre} (#${a.id}; ${a.cuentaActiva ? 'cuenta activa' : 'cuenta inactiva'}; ${a.delegaciones.map((p) =>
-          `${nombreCarrera(p.carreraId)}: ${p.permiso}`).join(', ') || 'sin permisos efectivos'})`)
-        .join('; ') || 'ninguno'}. ` +
-      'Las cuentas activas seguirán activas y podrán ingresar sin permisos. ' +
-      `Se invalidarán las sesiones del coordinador y de ${impacto.sesionesInvalidadas?.length || 0} asistente(s) con acceso efectivo. `
-    : '';
-  return `Se revocará el rol ${impacto.rol} de ${impacto.usuario}. ` +
-    `Permisos y carreras afectados: ${permisos}. ${asistentes}` +
-    `${impacto.totalSolicitudes} solicitud(es) afectada(s) quedarán RECHAZADAS con motivo y auditoría. ` +
-    '¿Desea continuar?';
-}
 
 export function UsuariosPage() {
   return `
@@ -114,250 +121,6 @@ export function UsuariosPage() {
   `;
 }
 
-function obtenerNombreCompleto(usuario) {
-  return [
-    usuario?.nombres,
-    usuario?.apellido1,
-    usuario?.apellido2,
-  ].filter(Boolean).join(' ');
-}
-
-function obtenerRoles(usuario) {
-  if (!Array.isArray(usuario?.roles)) {
-    return [];
-  }
-
-  return usuario.roles
-    .map((rol) => (
-      typeof rol === 'string'
-        ? { id: null, nombre: rol, descripcion: null }
-        : rol
-    ))
-    .filter((rol) => rol?.nombre);
-}
-
-export function nombreVisibleRol(nombre) {
-  return {
-    ADMIN_GLOBAL: 'Administrador global',
-    COORDINADOR: 'Coordinador',
-    PROFESOR: 'Profesor',
-    ASISTENTE_ESTUDIANTIL: 'Asistente estudiantil',
-  }[nombre] || nombre;
-}
-
-function mensajeResultado(resultado, mensajePredeterminado) {
-  if (resultado?.ok) {
-    return resultado;
-  }
-
-  throw new Error(resultado?.message || mensajePredeterminado);
-}
-
-const INFORMACION_PERMISOS = {
-
-  PROFESORES_VER: {
-    nombre:
-      'Ver profesores',
-
-    descripcion:
-      'Permite consultar información administrativa de profesores.',
-  },
-
-  ATESTADOS_VALIDAR: {
-    nombre:
-      'Validar atestados',
-
-    descripcion:
-      'Permite aprobar o rechazar atestados de profesores.',
-  },
-
-  PERFILES_DOCENTES_VALIDAR: {
-    nombre:
-      'Validar perfiles docentes',
-
-    descripcion:
-      'Permite aprobar, rechazar o inactivar perfiles solicitados por profesores.',
-  },
-
-  PERFILES_ACADEMICOS_GESTIONAR: {
-    nombre:
-      'Gestionar perfiles académicos',
-
-    descripcion:
-      'Permite administrar perfiles académicos según el alcance autorizado.',
-  },
-
-  PROYECCION_VER: {
-    nombre:
-      'Ver proyección académica',
-
-    descripcion:
-      'Permite consultar información de proyección académica.',
-  },
-
-  PROYECCION_GESTIONAR: {
-    nombre:
-      'Gestionar proyección académica',
-
-    descripcion:
-      'Permite realizar operaciones de gestión sobre la proyección académica.',
-  },
-
-  OFERTA_VER: {
-    nombre:
-      'Ver oferta académica',
-
-    descripcion:
-      'Permite consultar la oferta académica.',
-  },
-
-  OFERTA_GESTIONAR: {
-    nombre:
-      'Gestionar oferta académica',
-
-    descripcion:
-      'Permite realizar operaciones administrativas sobre la oferta académica.',
-  },
-
-  PROFESORES_ASIGNAR: {
-    nombre:
-      'Asignar profesores',
-
-    descripcion:
-      'Permite asignar profesores dentro de los procesos académicos autorizados.',
-  },
-
-  AULAS_VER: {
-    nombre:
-      'Ver aulas',
-
-    descripcion:
-      'Permite consultar aulas, equipamiento, disponibilidad y ocupación.',
-  },
-
-  AULAS_GESTIONAR: {
-    nombre:
-      'Gestionar aulas',
-
-    descripcion:
-      'Permite administrar aulas y su información operativa.',
-  },
-
-  AULAS_ASIGNAR: {
-    nombre:
-      'Asignar aulas',
-
-    descripcion:
-      'Permite evaluar y utilizar aulas dentro de procesos de asignación académica.',
-  },
-
-};
-
-
-function obtenerInformacionPermiso(
-  permiso,
-) {
-  const etiquetas = {
-    VER: 'Ver',
-    GESTIONAR: 'Gestionar',
-    VALIDAR: 'Validar',
-    ASIGNAR: 'Asignar',
-    AUTORIZAR: 'Autorizar',
-  };
-
-  const partes = String(permiso)
-    .split('_');
-  const accion = partes.pop();
-  const recurso = partes
-    .join(' ')
-    .toLocaleLowerCase('es-CR')
-    .replace('academicos', 'académicos')
-    .replace('academica', 'académica')
-    .replace('proyeccion', 'proyección');
-
-  return (
-    INFORMACION_PERMISOS[
-      permiso
-    ] || {
-      nombre: `${
-        etiquetas[accion] || accion
-      } ${recurso}`,
-      descripcion:
-        `Permite ${
-          (etiquetas[accion] || accion)
-            .toLocaleLowerCase('es-CR')
-        } ${recurso}.`,
-    }
-  );
-}
-
-
-function usuarioEsAdminGlobal(
-  usuario,
-) {
-  return obtenerRoles(
-    usuario,
-  ).some(
-    (rol) =>
-      rol.nombre ===
-      'ADMIN_GLOBAL',
-  );
-}
-
-
-function obtenerCodigosPermisos(
-  permisos,
-) {
-  return new Set(
-    (
-      Array.isArray(permisos)
-        ? permisos
-        : []
-    )
-      .map(
-        (item) =>
-          typeof item === 'string'
-            ? item
-            : item?.permiso,
-      )
-      .filter(Boolean),
-  );
-}
-
-export function obtenerEstadoSeleccionPermisosCarrera(
-  permisos,
-) {
-  const editables = Array.from(
-    permisos || [],
-  ).filter(
-    (permiso) => !permiso.disabled,
-  );
-  const seleccionados = editables.filter(
-    (permiso) => permiso.checked,
-  ).length;
-
-  return {
-    checked:
-      editables.length > 0 &&
-      seleccionados === editables.length,
-    indeterminate:
-      seleccionados > 0 &&
-      seleccionados < editables.length,
-    disabled: editables.length === 0,
-  };
-}
-
-export function establecerSeleccionPermisosCarrera(
-  permisos,
-  seleccionado,
-) {
-  Array.from(permisos || [])
-    .filter((permiso) => !permiso.disabled)
-    .forEach((permiso) => {
-      permiso.checked = Boolean(seleccionado);
-    });
-}
-
 export async function iniciarUsuariosPage() {
   const pagina = document.getElementById('usuariosPage');
 
@@ -366,6 +129,7 @@ export async function iniciarUsuariosPage() {
   }
 
   const instancia = ++instanciaActual;
+  const versionSesion = obtenerVersionSesion();
   const estado = {
     usuarios: [],
     roles: [],
@@ -377,7 +141,8 @@ export async function iniciarUsuariosPage() {
 
   const sigueActiva = () => (
     instancia === instanciaActual &&
-    document.getElementById('usuariosPage') === pagina
+    document.getElementById('usuariosPage') === pagina &&
+    obtenerVersionSesion() === versionSesion
   );
 
   const contenido = pagina.querySelector('#usuariosContent');
@@ -419,121 +184,8 @@ export async function iniciarUsuariosPage() {
     if (!dialogo.open) dialogo.showModal();
   }
 
-  function renderizarOpcionesCarreras(
-    seleccionados = new Set(),
-  ) {
-    if (!estado.carreras.length) {
-      return '<p class="usuarios-muted">No hay carreras registradas o activas.</p>';
-    }
-
-    return estado.carreras
-      .map(
-        (carrera) => `
-          <label
-            class="usuario-carrera-option"
-          >
-            <input
-              type="checkbox"
-              name="carreras"
-              value="${carrera.id}"
-              ${
-                seleccionados.has(
-                  carrera.id,
-                )
-                  ? 'checked'
-                  : ''
-              }
-            >
-            <span>
-              <strong>${escapeHtml(
-                carrera.codigo,
-              )}</strong>
-              <small>${escapeHtml(
-                carrera.nombre,
-              )}</small>
-            </span>
-          </label>
-        `,
-      )
-      .join('');
-  }
-
-  function renderizarOpcionesPermisos(
-    seleccionados = new Set(),
-  ) {
-    return estado.permisosCatalogo
-      .map(
-        (permiso) => {
-          const informacion =
-            obtenerInformacionPermiso(
-              permiso,
-            );
-
-          return `
-            <label
-              class="usuario-permission-option"
-            >
-              <input
-                type="checkbox"
-                name="permisos"
-                value="${escapeHtml(
-                  permiso,
-                )}"
-                ${
-                  seleccionados.has(
-                    permiso,
-                  )
-                    ? 'checked'
-                    : ''
-                }
-              >
-
-              <span>
-                <strong>
-                  ${escapeHtml(
-                    informacion.nombre,
-                  )}
-                </strong>
-
-                <small>
-                  ${escapeHtml(
-                    informacion.descripcion,
-                  )}
-                </small>
-
-                <code>
-                  ${escapeHtml(
-                    permiso,
-                  )}
-                </code>
-              </span>
-            </label>
-          `;
-        },
-      )
-      .join('');
-  }
-
-  function obtenerPermisosSugeridosRoles(
-    roles,
-  ) {
-    if (
-      roles.includes(
-        ROLES.ADMIN_GLOBAL,
-      )
-    ) {
-      return new Set();
-    }
-
-    return new Set(
-      roles.flatMap(
-        (rol) =>
-          estado
-            .plantillasPermisos?.[
-              rol
-            ] || [],
-      ),
-    );
+  function obtenerPermisosSugeridosRoles(roles) {
+    return calcularPermisosSugeridosRoles(roles, estado.plantillasPermisos);
   }
 
   function aplicarPlantillaCreacion() {
@@ -621,128 +273,22 @@ export async function iniciarUsuariosPage() {
   function renderizarTabla() {
     if (!contenido || !sigueActiva()) return;
 
-    const total = estado.usuarios.length;
-    const activos = estado.usuarios.filter((usuario) => usuario.activo).length;
-    const inactivos = total - activos;
-    const coordinadores = estado.usuarios.filter((usuario) =>
-      obtenerRoles(usuario).some((rol) => rol.nombre === ROLES.COORDINADOR)
-    ).length;
+    const { resumenHtml, contadorTexto, tablaHtml } = renderizarCatalogoUsuarios({
+      usuarios: estado.usuarios,
+      filtro: estado.filtro,
+    });
 
     const resumen = pagina.querySelector('#usuariosResumen');
     if (resumen) {
-      resumen.innerHTML = [
-        StatCard({ icon: 'users', title: 'Usuarios registrados',
-          value: String(total), description: 'Cuentas en el directorio' }),
-        StatCard({ icon: 'circle-check', title: 'Cuentas activas',
-          value: String(activos), description: 'Accesos habilitados' }),
-        StatCard({ icon: 'circle-pause', title: 'Cuentas inactivas',
-          value: String(inactivos), description: 'Accesos deshabilitados' }),
-        StatCard({ icon: 'shield-check', title: 'Coordinadores',
-          value: String(coordinadores), description: 'Con rol de coordinación' }),
-      ].join('');
+      resumen.innerHTML = resumenHtml;
     }
-
-    const termino = estado.filtro.trim().toLowerCase();
-    const usuarios = estado.usuarios.filter((usuario) => {
-      const texto = [
-        usuario.cedula,
-        obtenerNombreCompleto(usuario),
-        usuario.correo,
-        ...obtenerRoles(usuario).map((rol) => nombreVisibleRol(rol.nombre)),
-      ].join(' ').toLowerCase();
-
-      return texto.includes(termino);
-    });
 
     const contador = pagina.querySelector('#usuariosContador');
     if (contador) {
-      contador.textContent = termino
-        ? `${usuarios.length} de ${total} usuarios`
-        : `${total} ${total === 1 ? 'usuario' : 'usuarios'}`;
+      contador.textContent = contadorTexto;
     }
 
-    const filas = usuarios.map((usuario) => {
-      const roles = obtenerRoles(usuario);
-      const nombre = obtenerNombreCompleto(usuario);
-      const inicial = nombre.trim().charAt(0).toUpperCase() || 'U';
-
-      return `
-        <tr>
-          <td><span class="usuarios-cedula">${escapeHtml(usuario.cedula)}</span></td>
-          <td>
-            <div class="usuarios-persona">
-              <span class="usuarios-avatar" aria-hidden="true">${escapeHtml(inicial)}</span>
-              <strong>${escapeHtml(nombre)}</strong>
-            </div>
-          </td>
-          <td><span class="usuarios-correo">${escapeHtml(usuario.correo)}</span></td>
-          <td>
-            <button class="usuarios-role-view-button" type="button"
-              data-action="ver-roles-permisos" data-user-id="${usuario.id}"
-              aria-label="Ver roles y permisos de ${escapeHtml(nombre)}"
-              title="Ver roles y permisos de ${escapeHtml(nombre)}">
-              <i data-lucide="eye" aria-hidden="true"></i>
-              <span>Ver</span>
-              <span class="usuarios-role-view-count" aria-label="${roles.length} roles asignados">${roles.length}</span>
-            </button>
-          </td>
-          <td>${StatusBadge({
-            label: usuario.activo ? 'Activo' : 'Inactivo',
-            tone: usuario.activo ? 'success' : 'neutral',
-          })}</td>
-          <td>
-            <div class="usuarios-actions">
-              <button class="usuarios-icon-button" type="button"
-                data-action="editar" data-user-id="${usuario.id}"
-                aria-label="Editar ${escapeHtml(nombre)}" title="Editar usuario">
-                <i data-lucide="pencil" aria-hidden="true"></i>
-              </button>
-              ${roles.some((rol) => rol.nombre === ROLES.COORDINADOR) ? `
-                <button class="usuarios-icon-button" type="button"
-                  data-action="configurar-jerarquia" data-user-id="${usuario.id}"
-                  aria-label="Configurar carreras y permisos de ${escapeHtml(nombre)}"
-                  title="Carreras y permisos por carrera">
-                  <i data-lucide="shield-check" aria-hidden="true"></i>
-                </button>
-              ` : ''}
-              ${roles.some((rol) => rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL) ? `
-                <button class="usuarios-icon-button" type="button"
-                  data-action="configurar-asistente-admin" data-user-id="${usuario.id}"
-                  aria-label="Configurar carreras y permisos de ${escapeHtml(nombre)}"
-                  title="Carreras y permisos del asistente">
-                  <i data-lucide="shield-check" aria-hidden="true"></i>
-                </button>
-              ` : ''}
-              <button
-                class="usuarios-icon-button ${usuario.activo ? 'is-danger' : 'is-success'}"
-                type="button" data-action="estado" data-user-id="${usuario.id}"
-                data-active="${usuario.activo}"
-                aria-label="${usuario.activo ? 'Desactivar' : 'Activar'} usuario"
-                title="${usuario.activo ? 'Desactivar' : 'Activar'}">
-                <i data-lucide="power" aria-hidden="true"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    contenido.innerHTML = DataTable({
-      columns: [
-        { label: 'Cédula' },
-        { label: 'Usuario' },
-        { label: 'Correo institucional' },
-        { label: 'Roles' },
-        { label: 'Estado' },
-        { label: 'Acciones' },
-      ],
-      rows: filas,
-      emptyMessage: termino
-        ? 'No hay usuarios que coincidan con la búsqueda.'
-        : 'No hay usuarios registrados.',
-      ariaLabel: 'Directorio institucional de usuarios',
-    });
-
+    contenido.innerHTML = tablaHtml;
     renderizarIconos();
   }
 
@@ -781,11 +327,7 @@ export async function iniciarUsuariosPage() {
     );
 
     if (!sigueActiva()) return;
-    estado.carreras = Array.isArray(resultado.carreras)
-      ? resultado.carreras.filter((c) => c.activo)
-      : Array.isArray(resultado.data)
-        ? resultado.data.filter((c) => c.activo)
-        : [];
+    estado.carreras = obtenerCarrerasActivas(resultado);
   }
 
 
@@ -835,7 +377,6 @@ export async function iniciarUsuariosPage() {
   });
 
   const NOMBRES_CAMPOS_USUARIO = ['cedula', 'correo', 'nombres', 'apellido1', 'apellido2'];
-  const EXPRESION_CARACTERES_NOMBRE = /[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]/g;
 
   function leerDatosUsuarioFormulario(formulario) {
     const datos = new FormData(formulario);
@@ -941,379 +482,29 @@ export async function iniciarUsuariosPage() {
     return !primerInvalido;
   }
 
-  function camposUsuario(usuario = null) {
-    return `
-      <div class="usuario-form-info">Los campos marcados con <strong>*</strong> son obligatorios.</div>
-      <div class="usuario-form-grid">
-        <label class="usuario-campo">
-          <span>Cédula <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
-          <input
-            name="cedula"
-            type="text"
-            inputmode="numeric"
-            pattern="[0-9]{1,9}"
-            required
-            maxlength="${LIMITES_USUARIO.cedula}"
-            aria-describedby="usuario-cedula-ayuda usuario-cedula-error"
-            autocomplete="off"
-            placeholder="Ej: 208570524"
-            value="${escapeHtml(usuario?.cedula || '')}"
-          >
-          <small id="usuario-cedula-ayuda">Solo números, hasta 9 dígitos, sin guiones.</small>
-          <small id="usuario-cedula-error" class="usuario-campo-error hidden" role="alert"></small>
-        </label>
-
-        <label class="usuario-campo">
-          <span>Correo electrónico <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
-          <input
-            name="correo"
-            type="email"
-            required
-            maxlength="${LIMITES_USUARIO.correo}"
-            aria-describedby="usuario-correo-ayuda usuario-correo-error"
-            autocomplete="email"
-            placeholder="Ej: usuario@una.cr"
-            value="${escapeHtml(usuario?.correo || '')}"
-          >
-          <small id="usuario-correo-ayuda">Correo institucional · máximo 150 caracteres.</small>
-          <small id="usuario-correo-error" class="usuario-campo-error hidden" role="alert"></small>
-        </label>
-
-        <label class="usuario-campo">
-          <span>Nombres <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
-          <input
-            name="nombres"
-            required
-            maxlength="${LIMITES_USUARIO.nombres}"
-            aria-describedby="usuario-nombres-ayuda usuario-nombres-error"
-            autocomplete="given-name"
-            placeholder="Primer y segundo nombre"
-            value="${escapeHtml(usuario?.nombres || '')}"
-          >
-          <small id="usuario-nombres-ayuda">Hasta 60 caracteres, únicamente letras.</small>
-          <small id="usuario-nombres-error" class="usuario-campo-error hidden" role="alert"></small>
-        </label>
-
-        <label class="usuario-campo">
-          <span>Primer apellido <b class="usuario-obligatorio" aria-hidden="true">*</b></span>
-          <input
-            name="apellido1"
-            required
-            maxlength="${LIMITES_USUARIO.apellido1}"
-            aria-describedby="usuario-apellido1-ayuda usuario-apellido1-error"
-            autocomplete="family-name"
-            placeholder="Primer apellido"
-            value="${escapeHtml(usuario?.apellido1 || '')}"
-          >
-          <small id="usuario-apellido1-ayuda">Hasta 50 caracteres, sin números.</small>
-          <small id="usuario-apellido1-error" class="usuario-campo-error hidden" role="alert"></small>
-        </label>
-
-        <label class="usuario-campo usuario-form-full">
-          <span>Segundo apellido <small class="usuario-opcional">Opcional</small></span>
-          <input
-            name="apellido2"
-            maxlength="${LIMITES_USUARIO.apellido2}"
-            aria-describedby="usuario-apellido2-ayuda usuario-apellido2-error"
-            autocomplete="additional-name"
-            placeholder="Segundo apellido (opcional)"
-            value="${escapeHtml(usuario?.apellido2 || '')}"
-          >
-          <small id="usuario-apellido2-ayuda">Hasta 50 caracteres, sin números.</small>
-          <small id="usuario-apellido2-error" class="usuario-campo-error hidden" role="alert"></small>
-        </label>
-      </div>
-    `;
-  }
-
-  function renderizarGestorPermisos(
-    usuario,
-    permisosUsuario,
-  ) {
-    if (obtenerRoles(usuario).some((rol) =>
-      rol.nombre === ROLES.COORDINADOR || rol.nombre === ROLES.ASISTENTE_ESTUDIANTIL)) {
-      return `<section class="usuario-permission-manager">
-        <h4>Permisos por carrera</h4>
-        <p>Utilice el botón de escudo en la lista de usuarios para configurar el alcance del coordinador.
-          Los permisos de asistentes se administran desde Asistentes y solicitudes.</p>
-      </section>`;
-    }
-    const asignados =
-      obtenerCodigosPermisos(
-        permisosUsuario,
-      );
-
-    const esAdmin =
-      usuarioEsAdminGlobal(
-        usuario,
-      );
-
-    if (esAdmin) {
-      return `
-        <section
-          id="permisosCreacionSection"
-          class="usuario-permission-manager"
-        >
-
-          <div
-            class="usuario-permission-header"
-          >
-
-            <div>
-
-              <h4>
-                Permisos granulares
-              </h4>
-
-              <p>
-                Este usuario posee el rol de
-                ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))}.
-              </p>
-
-            </div>
-
-          </div>
-
-
-          <div
-            class="usuario-permission-superuser"
-          >
-
-            <i
-              data-lucide="shield-check"
-              aria-hidden="true"
-            ></i>
-
-
-            <div>
-
-              <strong>
-                Acceso de superusuario
-              </strong>
-
-              <p>
-                El ${escapeHtml(nombreVisibleRol(ROLES.ADMIN_GLOBAL))} cuenta con acceso administrativo total en el sistema y no requiere permisos granulares individuales.
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-      `;
-    }
-
-    return `
-      <section
-        class="usuario-permission-manager"
-      >
-
-        <div
-          class="usuario-permission-header"
-        >
-
-          <div>
-
-            <h4>
-              Permisos granulares
-            </h4>
-
-            <p>
-              Defina las operaciones
-              administrativas adicionales
-              permitidas para este usuario.
-            </p>
-
-          </div>
-
-
-          <span
-            class="usuario-permission-count"
-          >
-            ${
-              asignados.size
-            }
-            asignados
-          </span>
-
-        </div>
-
-
-        <div
-          class="usuario-permission-grid"
-        >
-          ${renderizarOpcionesPermisos(asignados)}
-        </div>
-
-
-        <div
-          class="usuario-permission-actions"
-        >
-
-          <small>
-            Los permisos no seleccionados
-            serán removidos al guardar.
-          </small>
-
-
-          <button
-            type="button"
-            class="usuarios-secondary-button"
-            data-action="guardar-permisos"
-            data-user-id="${
-              usuario.id
-            }"
-          >
-            <i
-              data-lucide="shield-check"
-              aria-hidden="true"
-            ></i>
-
-            Guardar permisos
-          </button>
-
-        </div>
-
-      </section>
-    `;
-  }
-
   function renderizarDialogoCreacion() {
-    mostrarFormularioUsuario({
-      formId: 'usuarioForm',
-      title: 'Nuevo usuario',
-      description: 'Cree una cuenta institucional y asigne al menos un rol oficial.',
-      body: `
-        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
-        <div class="usuario-section-heading">
-          <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
-          <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
-        </div>
-        ${camposUsuario()}
-
-        <div class="usuario-invitacion-banner">
-          <i data-lucide="mail" aria-hidden="true"></i>
-          <div>
-            <strong>Invitación por correo electrónico</strong>
-            <p>No se requiere contraseña temporal. Al crear la cuenta se enviará una invitación segura para que el usuario configure su acceso.</p>
-          </div>
-        </div>
-
-        <fieldset class="usuario-role-options">
-          <legend>Roles iniciales <b class="usuario-obligatorio" aria-hidden="true">*</b></legend>
-          <small class="usuario-roles-error hidden" role="alert">Seleccione al menos un rol para crear el usuario.</small>
-          ${estado.roles.map((rol) => `
-            <label>
-              <input type="checkbox" name="roles" value="${escapeHtml(rol.nombre)}">
-              <span>
-                <strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
-                <small>${escapeHtml(rol.descripcion || '')}</small>
-              </span>
-            </label>
-          `).join('')}
-        </fieldset>
-
-        <section id="carrerasCreacionSection" class="usuario-role-manager hidden">
-          <div class="usuario-permission-header">
-            <div>
-              <h4>Carreras asignadas (Profesor)</h4>
-              <p>Seleccione las carreras a las que pertenece el docente.</p>
-            </div>
-          </div>
-          <div class="usuario-carreras-grid">${renderizarOpcionesCarreras()}</div>
-        </section>
-
-        <section class="usuario-permission-manager">
-          <div class="usuario-permission-header">
-            <div>
-              <h4>Permisos iniciales</h4>
-              <p>Se sugieren según los roles, pero puede agregar o quitar cualquiera antes de crear el usuario.</p>
-            </div>
-          </div>
-          <div id="permisosCreacionUsuario" class="usuario-permission-grid">
-            ${renderizarOpcionesPermisos()}
-          </div>
-        </section>
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
-        <button class="sgpa-form-primary" type="submit">
-          <i data-lucide="user-plus" aria-hidden="true"></i><span>Crear usuario</span>
-        </button>
-      `,
-    });
+    mostrarFormularioUsuario(construirDialogoCreacionUsuario({
+      roles: estado.roles,
+      limites: LIMITES_USUARIO,
+      carreras: estado.carreras,
+      permisosCatalogo: estado.permisosCatalogo,
+    }));
   }
 
   function renderizarDialogoJerarquia(usuario, configuracion, auditoria = [], esAsistente = false) {
-    const asignadas = new Map((configuracion.carreras || []).map((c) => [Number(c.carreraId), new Set(c.permisos || [])]));
-    const delegables = esAsistente
-      ? new Map((configuracion.delegables || []).map((c) => [Number(c.id), new Set(c.permisos || [])])) : null;
-    mostrarFormularioUsuario({
-      formId: 'jerarquiaForm',
-      userId: usuario.id,
-      title: `Carreras y permisos de ${obtenerNombreCompleto(usuario)}`,
-      description: esAsistente
-        ? 'Seleccione únicamente carreras y permisos autorizados a su coordinador responsable.'
-        : 'Seleccione las operaciones autorizadas en cada carrera. La revocación se aplica a sus asistentes.',
-      body: `
-        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
-        <div class="usuario-section-heading">
-          <span class="usuario-section-icon"><i data-lucide="shield-check" aria-hidden="true"></i></span>
-          <div><h4>Alcance académico por carrera</h4><p>Marque las carreras y los permisos que corresponden.</p></div>
-        </div>
-        <div class="usuarios-alcances">
-          ${estado.carreras.filter((c) => !esAsistente || delegables.has(Number(c.id))).map((carrera) => {
-            const permisos = asignadas.get(Number(carrera.id)) || new Set();
-            return `<fieldset class="usuarios-alcance" data-carrera-id="${carrera.id}">
-              <legend>
-                <label><input type="checkbox" name="jerarquia-carrera" value="${carrera.id}"
-                  ${asignadas.has(Number(carrera.id)) ? 'checked' : ''}>
-                  ${escapeHtml(carrera.nombre)} (${escapeHtml(carrera.codigo)})</label>
-              </legend>
-              <label class="usuarios-alcance-seleccionar-todos">
-                <input type="checkbox" name="jerarquia-todos-permisos">
-                <span>Seleccionar todos los permisos de esta carrera</span>
-              </label>
-              <div class="usuarios-alcance-permisos">
-                ${estado.permisosCatalogo.filter((permiso) =>
-                  [
-                    'ESTUDIANTES_VER',
-                    'ESTUDIANTES_GESTIONAR',
-                    'CURSOS_VER',
-                    'CURSOS_GESTIONAR',
-                    'PLANES_ESTUDIO_VER',
-                    'PLANES_ESTUDIO_GESTIONAR',
-                    'OPTATIVAS_VER',
-                    'OPTATIVAS_GESTIONAR',
-                  ].includes(permiso) && (!esAsistente || delegables.get(Number(carrera.id))?.has(permiso))).map((permiso) => `
-                  <label><input type="checkbox" name="jerarquia-permiso" value="${escapeHtml(permiso)}"
-                    ${permisos.has(permiso) ? 'checked' : ''}>
-                    ${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</label>
-                `).join('')}
-              </div>
-            </fieldset>`;
-          }).join('')}
-        </div>
-        <section class="usuarios-auditoria">
-          <div class="usuario-section-heading">
-            <span class="usuario-section-icon"><i data-lucide="history" aria-hidden="true"></i></span>
-            <div><h4>Historial reciente</h4><p>Registro de las últimas modificaciones al alcance.</p></div>
-          </div>
-          ${auditoria.length ? `<ul>${auditoria.map((item) => `
-            <li>${escapeHtml(item.accion)} · ${escapeHtml(new Date(item.createdAt).toLocaleString('es-CR'))}</li>
-          `).join('')}</ul>` : '<p class="usuarios-muted">Sin cambios registrados.</p>'}
-        </section>
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
-        <button class="sgpa-form-primary" type="submit">
-          <i data-lucide="save" aria-hidden="true"></i><span>Guardar alcance</span>
-        </button>
-      `,
+    const dialogo = construirDialogoJerarquiaUsuario({
+      usuario,
+      configuracion,
+      auditoria,
+      esAsistente,
+      carreras: estado.carreras,
+      permisosCatalogo: estado.permisosCatalogo,
+      obtenerNombreCompleto,
     });
+    mostrarFormularioUsuario(dialogo);
     dialogoContenido.querySelectorAll('.usuarios-alcance')
       .forEach(actualizarSeleccionTodosPermisosCarrera);
-    dialogoContenido.querySelector('#jerarquiaForm').dataset.adminAsistente = esAsistente ? 'true' : 'false';
+    dialogoContenido.querySelector('#jerarquiaForm').dataset.adminAsistente = dialogo.esAsistente ? 'true' : 'false';
   }
 
   function actualizarSeleccionTodosPermisosCarrera(campo) {
@@ -1330,219 +521,30 @@ export async function iniciarUsuariosPage() {
     selector.disabled = estadoSeleccion.disabled;
   }
 
-  function renderizarDialogoEdicion(
-    usuario,
-    permisosUsuario = [],
-  ) {
-    const rolesUsuario = obtenerRoles(usuario);
-    const nombresAsignados = new Set(rolesUsuario.map((rol) => rol.nombre));
-    const rolesDisponibles = estado.roles.filter(
-      (rol) => !nombresAsignados.has(rol.nombre),
-    );
-    const esProfesor = rolesUsuario.some((rol) => rol.nombre === ROLES.PROFESOR);
-    const carrerasAsignadas = new Set((usuario.carreras || []).map((c) => c.id));
-
-    mostrarFormularioUsuario({
-      formId: 'usuarioForm',
-      userId: usuario.id,
-      title: 'Editar usuario',
-      description: 'Actualice sus datos administrativos, roles, carreras y permisos.',
-      body: `
-        <div class="usuario-dialog-feedback hidden" role="status" aria-live="polite"></div>
-        <div class="usuario-section-heading">
-          <span class="usuario-section-icon"><i data-lucide="user-round" aria-hidden="true"></i></span>
-          <div><h4>Información personal</h4><p>Datos de identificación y contacto institucional.</p></div>
-        </div>
-        ${camposUsuario(usuario)}
-
-        <section class="usuario-role-manager">
-          <div class="usuario-section-heading">
-            <span class="usuario-section-icon"><i data-lucide="users" aria-hidden="true"></i></span>
-            <div><h4>Roles asignados</h4><p>Administre los perfiles de acceso del usuario.</p></div>
-          </div>
-          <div class="usuario-assigned-roles">
-            ${rolesUsuario.length
-              ? rolesUsuario.map((rol) => `
-                  <span class="usuarios-role-badge is-removable">
-                    ${escapeHtml(nombreVisibleRol(rol.nombre))}
-                    <button type="button" data-action="revocar-rol"
-                      data-user-id="${usuario.id}" data-role-id="${rol.id ?? ''}"
-                      aria-label="Revocar ${escapeHtml(nombreVisibleRol(rol.nombre))}"
-                      title="Revocar rol" ${rol.id == null ? 'disabled' : ''}>
-                      <i data-lucide="x" aria-hidden="true"></i>
-                    </button>
-                  </span>
-                `).join('')
-              : '<span class="usuarios-no-role">Sin rol asignado</span>'}
-          </div>
-
-          <div class="usuario-add-role">
-            <select id="rolParaAsignar" aria-label="Rol para asignar"
-              ${rolesDisponibles.length ? '' : 'disabled'}>
-              ${rolesDisponibles.length
-                ? rolesDisponibles.map((rol) => `
-                    <option value="${escapeHtml(rol.nombre)}">${escapeHtml(nombreVisibleRol(rol.nombre))}</option>
-                  `).join('')
-                : '<option>Todos los roles están asignados</option>'}
-            </select>
-            <button class="usuarios-secondary-button" type="button"
-              data-action="asignar-rol" data-user-id="${usuario.id}"
-              ${rolesDisponibles.length ? '' : 'disabled'}>
-              <i data-lucide="plus" aria-hidden="true"></i>Agregar rol
-            </button>
-          </div>
-        </section>
-
-        ${esProfesor ? `
-          <section class="usuario-role-manager">
-            <div class="usuario-permission-header">
-              <div>
-                <h4>Carreras asignadas (Profesor)</h4>
-                <p>Carreras asociadas al perfil docente de este usuario.</p>
-              </div>
-            </div>
-            <div class="usuario-carreras-grid">${renderizarOpcionesCarreras(carrerasAsignadas)}</div>
-          </section>
-        ` : ''}
-
-        ${renderizarGestorPermisos(usuario, permisosUsuario)}
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">Cancelar</button>
-        <button class="sgpa-form-primary" type="submit">
-          <i data-lucide="save" aria-hidden="true"></i><span>Guardar cambios</span>
-        </button>
-      `,
-    });
+  function renderizarDialogoEdicion(usuario, permisosUsuario = []) {
+    const nombresAsignados = new Set(obtenerRoles(usuario).map((rol) => rol.nombre));
+    mostrarFormularioUsuario(construirDialogoEdicionUsuario({
+      usuario,
+      permisosUsuario,
+      rolesDisponiblesCatalogo: estado.roles.filter((rol) => !nombresAsignados.has(rol.nombre)),
+      carreras: estado.carreras,
+      permisosCatalogo: estado.permisosCatalogo,
+      limites: LIMITES_USUARIO,
+    }));
   }
 
   // PBI-87: consulta de roles y permisos en solo lectura.
   // Reutiliza los endpoints actuales y el FormDialog; no cambia permisos.
   function mostrarConsultaAccesos(usuario, permisosUsuario = [], alcance = null, errorAlcance = '') {
-    const roles = obtenerRoles(usuario);
-    const esAdminGlobal = roles.some((rol) => rol.nombre === ROLES.ADMIN_GLOBAL);
-    const esCoordinador = roles.some((rol) => rol.nombre === ROLES.COORDINADOR);
-    const codigos = Array.from(obtenerCodigosPermisos(permisosUsuario))
-      .sort((a, b) => a.localeCompare(b, 'es'));
-
-    const grupos = new Map();
-    const prefijos = [
-      ['FORMULARIOS_ESTUDIANTES_', 'Formularios de estudiantes'],
-      ['PLANES_ESTUDIO_', 'Planes de estudio'],
-      ['PERFILES_ACADEMICOS_', 'Perfiles académicos'],
-      ['PERFILES_DOCENTES_', 'Perfiles docentes'],
-      ['ESTRUCTURA_ACADEMICA_', 'Estructura académica'],
-      ['PROYECCION_', 'Proyección académica'],
-      ['OFERTA_', 'Oferta académica'],
-      ['ESTUDIANTES_', 'Estudiantes'],
-      ['PROFESORES_', 'Profesores'],
-      ['CURSOS_', 'Cursos'],
-      ['CARRERAS_', 'Carreras'],
-      ['OPTATIVAS_', 'Optativas'],
-      ['PERIODOS_', 'Períodos académicos'],
-      ['AULAS_', 'Aulas'],
-    ];
-    for (const codigo of codigos) {
-      const grupo = prefijos.find(([prefijo]) => codigo.startsWith(prefijo));
-      const etiqueta = grupo?.[1] || 'Otros permisos';
-      if (!grupos.has(etiqueta)) grupos.set(etiqueta, []);
-      grupos.get(etiqueta).push(codigo);
-    }
-
-    const nombre = obtenerNombreCompleto(usuario) || 'Usuario';
-    const resumenPermisos = esAdminGlobal
-      ? `<div class="usuarios-accesos-admin-note" role="note">
-           <i data-lucide="shield-check" aria-hidden="true"></i>
-           <div><strong>Acceso administrativo global</strong>
-             <p>Este rol dispone de acceso administrativo total. No depende de permisos granulares individuales.</p>
-           </div>
-         </div>`
-      : codigos.length
-        ? Array.from(grupos.entries()).map(([grupo, permisos]) => `
-            <section class="usuarios-accesos-permission-group">
-              <h5>${escapeHtml(grupo)} <span>${permisos.length}</span></h5>
-              <ul>${permisos.map((permiso) => `
-                <li title="${escapeHtml(permiso)}">
-                  <i data-lucide="circle-check" aria-hidden="true"></i>
-                  <div><strong>${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</strong>
-                    <small>${escapeHtml(permiso)}</small>
-                  </div>
-                </li>`).join('')}</ul>
-            </section>`).join('')
-        : `<p class="usuarios-accesos-empty">No hay permisos individuales registrados para este usuario.</p>`;
-
-    const carreras = new Map(estado.carreras.map((carrera) => [Number(carrera.id), carrera]));
-    const asignaciones = Array.isArray(alcance?.carreras) ? alcance.carreras : [];
-    const resumenAlcance = !esCoordinador ? '' : `
-      <section class="usuarios-accesos-section">
-        <div class="usuarios-accesos-section-header">
-          <i data-lucide="graduation-cap" aria-hidden="true"></i>
-          <div><h4>Permisos por carrera</h4>
-            <p>Alcance académico configurado específicamente para el coordinador.</p></div>
-        </div>
-        ${errorAlcance
-          ? `<p class="usuarios-accesos-warning" role="status">No fue posible consultar los permisos por carrera: ${escapeHtml(errorAlcance)}</p>`
-          : asignaciones.length
-            ? `<div class="usuarios-accesos-career-list">${asignaciones.map((asignacion) => {
-                const carrera = carreras.get(Number(asignacion.carreraId));
-                const permisos = Array.isArray(asignacion.permisos) ? asignacion.permisos : [];
-                return `<div class="usuarios-accesos-career">
-                  <strong>${escapeHtml(carrera?.nombre || `Carrera ${asignacion.carreraId}`)}</strong>
-                  <span>${permisos.length} ${permisos.length === 1 ? 'permiso' : 'permisos'}</span>
-                  <ul>${permisos.length ? permisos.map((permiso) => `
-                    <li>${escapeHtml(obtenerInformacionPermiso(permiso).nombre)}</li>`).join('')
-                    : '<li>Sin permisos configurados.</li>'}</ul>
-                </div>`;
-              }).join('')}</div>`
-            : '<p class="usuarios-accesos-empty">No hay carreras con permisos configurados.</p>'}
-      </section>`;
-
-    mostrarFormularioUsuario({
-      formId: 'usuarioConsultaAccesosForm',
-      title: 'Roles y permisos del usuario',
-      description: 'Consulta de solo lectura de los accesos registrados en el SGPA.',
-      userId: usuario.id,
-      body: `
-        <div class="usuarios-accesos-summary">
-          <span class="usuarios-accesos-avatar" aria-hidden="true">${escapeHtml(nombre.charAt(0).toUpperCase() || 'U')}</span>
-          <div>
-            <strong>${escapeHtml(nombre)}</strong>
-            <span>${escapeHtml(usuario.correo || '')}</span>
-            <small>${usuario.activo ? 'Cuenta activa' : 'Cuenta inactiva'}</small>
-          </div>
-        </div>
-        <section class="usuarios-accesos-section">
-          <div class="usuarios-accesos-section-header">
-            <i data-lucide="users" aria-hidden="true"></i>
-            <div><h4>Roles asignados <span class="usuarios-accesos-count">${roles.length}</span></h4>
-              <p>Perfiles asociados a la cuenta.</p></div>
-          </div>
-          <div class="usuarios-accesos-roles">
-            ${roles.length ? roles.map((rol) => `
-              <div class="usuarios-accesos-role">
-                <i data-lucide="shield-check" aria-hidden="true"></i>
-                <div><strong>${escapeHtml(nombreVisibleRol(rol.nombre))}</strong>
-                  ${rol.descripcion ? `<small>${escapeHtml(rol.descripcion)}</small>` : ''}
-                </div>
-              </div>`).join('') : '<p class="usuarios-accesos-empty">Sin roles asignados.</p>'}
-          </div>
-        </section>
-        <section class="usuarios-accesos-section">
-          <div class="usuarios-accesos-section-header">
-            <i data-lucide="shield-check" aria-hidden="true"></i>
-            <div><h4>Permisos del sistema ${esAdminGlobal ? '' : `<span class="usuarios-accesos-count">${codigos.length}</span>`}</h4>
-              <p>${esAdminGlobal ? 'Privilegios asociados al rol administrador global.' : 'Permisos registrados para esta cuenta, agrupados por módulo.'}</p></div>
-          </div>
-          <div class="usuarios-accesos-permissions">${resumenPermisos}</div>
-        </section>
-        ${resumenAlcance}
-      `,
-      footerHtml: `
-        <button class="sgpa-form-secondary" type="button" data-action="cerrar-dialogo">
-          Cerrar
-        </button>
-      `,
-    });
+    mostrarFormularioUsuario(
+      construirDialogoConsultaAccesos({
+        usuario,
+        permisosUsuario,
+        alcance,
+        errorAlcance,
+        carreras: estado.carreras,
+      }),
+    );
   }
 
   async function abrirConsultaAccesos(id) {
@@ -1674,23 +676,15 @@ export async function iniciarUsuariosPage() {
     if (campoUsuario) {
       const anterior = campoUsuario.value;
       const nombre = campoUsuario.name;
-      const depurado = nombre === 'cedula'
-        ? anterior.replace(/\D/g, '')
-        : ['nombres', 'apellido1', 'apellido2'].includes(nombre)
-          ? anterior.replace(EXPRESION_CARACTERES_NOMBRE, '')
-          : anterior;
+      const { valor: depurado, posicionCursor: nuevaPosicion } = normalizarEntradaCampoUsuario(
+        nombre,
+        anterior,
+        campoUsuario.selectionStart,
+      );
 
       // La cédula no admite letras, y los nombres y apellidos no admiten números,
       // ni siquiera al pegar texto. Conservar el cursor al eliminar caracteres.
       if (depurado !== anterior) {
-        const cursor = campoUsuario.selectionStart;
-        const nuevaPosicion = Number.isInteger(cursor)
-          ? (nombre === 'cedula'
-            ? anterior.slice(0, cursor).replace(/\D/g, '').length
-            : ['nombres', 'apellido1', 'apellido2'].includes(nombre)
-              ? anterior.slice(0, cursor).replace(EXPRESION_CARACTERES_NOMBRE, '').length
-              : cursor)
-          : null;
         campoUsuario.value = depurado;
         if (nuevaPosicion != null) campoUsuario.setSelectionRange(nuevaPosicion, nuevaPosicion);
       }
@@ -1775,6 +769,7 @@ export async function iniciarUsuariosPage() {
 
   pagina.addEventListener('submit', async (event) => {
     if (event.target.id !== 'usuarioForm') return;
+    if (!sigueActiva()) return;
     event.preventDefault();
 
     const formulario = event.target;
@@ -1846,6 +841,7 @@ export async function iniciarUsuariosPage() {
 
   pagina.addEventListener('submit', async (event) => {
     if (event.target.id !== 'jerarquiaForm') return;
+    if (!sigueActiva()) return;
     event.preventDefault();
     const formulario = event.target;
     const boton = formulario.querySelector('[type="submit"]');
@@ -1863,30 +859,24 @@ export async function iniciarUsuariosPage() {
         ? previsualizarAsistenteAdminJerarquia(usuarioId, carreras)
         : previsualizarCoordinadorJerarquia(usuarioId, carreras)),
         'No fue posible calcular el impacto de la revocación.').data;
+      if (!sigueActiva()) return;
       const usuario = estado.usuarios.find((item) => Number(item.id) === usuarioId);
       const nombreObjetivo = usuario?.nombres || (esAsistente ? 'este asistente' : 'este coordinador');
-      const resumen = impacto.revocados.length
-        ? `Se revocarán a ${nombreObjetivo}: ${impacto.revocados.map((item) => {
-            const [carreraId, permiso] = item.split(':');
-            const nombreCarrera = estado.carreras.find((c) => Number(c.id) === Number(carreraId))?.nombre || `#${carreraId}`;
-            return `${nombreCarrera}: ${permiso}`;
-          }).join(', ')}. ` +
-          `${impacto.totalSolicitudes} solicitud(es) afectada(s) quedarán RECHAZADAS con motivo y auditoría. ` +
-          'Las demás solicitudes permanecerán pendientes. ¿Desea continuar?'
-        : `Se actualizarán las carreras y permisos de ${nombreObjetivo}. ¿Desea continuar?`;
+      const resumen = construirMensajeImpactoJerarquia(impacto, nombreObjetivo, estado.carreras);
       const confirmado = await confirmarAccion({ titulo: 'Impacto del cambio de permisos',
         mensaje: resumen, textoConfirmar: 'Continuar', peligro: impacto.revocados.length > 0 });
-      if (!confirmado) return;
+      if (!confirmado || !sigueActiva()) return;
       mensajeResultado(
         await (esAsistente
           ? configurarAsistenteAdminJerarquia(usuarioId, carreras, impacto.firma)
           : configurarCoordinadorJerarquia(usuarioId, carreras, impacto.firma)),
         'No fue posible guardar el alcance del coordinador.',
       );
+      if (!sigueActiva()) return;
       dialogo.close();
       mostrarFeedback('Carreras y permisos actualizados.');
     } catch (error) {
-      mostrarFeedback(error.message, 'error');
+      if (sigueActiva()) mostrarFeedback(error.message, 'error');
     } finally {
       boton.disabled = false;
     }
@@ -1895,6 +885,7 @@ export async function iniciarUsuariosPage() {
   pagina.addEventListener('click', async (event) => {
     const boton = event.target.closest('[data-action]');
     if (!boton) return;
+    if (!sigueActiva()) return;
 
     const accion = boton.dataset.action;
     const id = Number(boton.dataset.userId);
@@ -1976,7 +967,7 @@ export async function iniciarUsuariosPage() {
         peligro: !nuevoEstado,
       });
 
-      if (!confirmado) return;
+      if (!confirmado || !sigueActiva()) return;
 
       try {
         boton.disabled = true;
@@ -1984,10 +975,11 @@ export async function iniciarUsuariosPage() {
           await cambiarEstadoUsuario(id, !activo),
           `No fue posible ${verbo} el usuario.`,
         );
+        if (!sigueActiva()) return;
         mostrarFeedback(`Usuario ${activo ? 'desactivado' : 'activado'} correctamente.`);
         await cargarUsuarios(false);
       } catch (error) {
-        mostrarFeedback(error.message, 'error');
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
         boton.disabled = false;
       }
       return;
@@ -2021,9 +1013,10 @@ export async function iniciarUsuariosPage() {
         impacto = mensajeResultado(await previsualizarRevocacionRol(id, rolId),
           'No fue posible calcular el impacto de la revocación.').data;
       } catch (error) {
-        mostrarFeedback(error.message, 'error');
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
         return;
       }
+      if (!sigueActiva()) return;
 
       const confirmado = await confirmarAccion({
         titulo: 'Revocar rol',
@@ -2032,7 +1025,7 @@ export async function iniciarUsuariosPage() {
         peligro: true,
       });
 
-      if (!confirmado) return;
+      if (!confirmado || !sigueActiva()) return;
 
       try {
         boton.disabled = true;
@@ -2040,10 +1033,11 @@ export async function iniciarUsuariosPage() {
           await revocarRolUsuario(id, rolId, impacto.firma),
           'No fue posible revocar el rol.',
         );
+        if (!sigueActiva()) return;
         await actualizarVistaYDialogo(id);
         mostrarFeedback('Rol revocado correctamente.');
       } catch (error) {
-        mostrarFeedback(error.message, 'error');
+        if (sigueActiva()) mostrarFeedback(error.message, 'error');
         boton.disabled = false;
       }
       return;
@@ -2136,4 +1130,9 @@ export async function iniciarUsuariosPage() {
       </div>
     `;
   }
+}
+
+/** Invalida respuestas tardías al abandonar Usuarios. */
+export function destruirUsuariosPage() {
+  instanciaActual += 1;
 }

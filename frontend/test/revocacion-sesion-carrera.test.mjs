@@ -21,7 +21,7 @@ test('la advertencia identifica asistentes, delegaciones, sesiones y solicitudes
   }
   const fuente = readFileSync(new URL('../src/pages/usuarios/UsuariosPage.js', import.meta.url), 'utf8');
   const confirmar = fuente.indexOf('mensaje: construirMensajeRevocacionRol(impacto, estado.carreras)');
-  const cancelar = fuente.indexOf('if (!confirmado) return;', confirmar);
+  const cancelar = fuente.indexOf('if (!confirmado || !sigueActiva()) return;', confirmar);
   const ejecutar = fuente.indexOf('await revocarRolUsuario(id, rolId, impacto.firma)', confirmar);
   assert.ok(confirmar >= 0 && cancelar > confirmar && ejecutar > cancelar);
 });

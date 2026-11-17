@@ -442,9 +442,20 @@ export class UsuariosService {
       : usuario;
   }
 
-  async reintentarInvitacion(id: number) {
+  async invitacionPendienteVigente(id: number): Promise<boolean> {
+    return this.invitaciones?.pendienteVigente(id) ?? false;
+  }
+
+  async procesarInvitacionPendiente(id: number) {
+    if (!this.invitaciones) {
+      throw new ServiceUnavailableException('El procesamiento de invitaciones no está disponible.');
+    }
+    return this.invitaciones.procesarPendiente(id);
+  }
+
+  async reintentarInvitacion(id: number, actorUsuarioId: number) {
     const origen = this.origenInvitacion();
-    const estado = await this.invitaciones!.rotarYReintentar(id, origen);
+    const estado = await this.invitaciones!.rotarYReintentar(id, origen, actorUsuarioId);
     if (estado !== 'ENVIADA') {
       throw new ServiceUnavailableException(
         'La invitación requiere una nueva revisión administrativa.',

@@ -4,6 +4,16 @@ import * as nodemailer from 'nodemailer';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+class DestinatarioInvitacionRechazado extends Error {
+  readonly definitive = true;
+  readonly code = 'SMTP_DESTINATARIO_RECHAZADO';
+
+  constructor() {
+    super('El proveedor SMTP no aceptó el destinatario de la invitación.');
+    this.name = 'DestinatarioInvitacionRechazado';
+  }
+}
+
 @Injectable()
 export class MailService {
   private readonly transporter: nodemailer.Transporter;
@@ -51,13 +61,17 @@ export class MailService {
     enlace: string,
   ): Promise<void> {
     const remitente = this.configService.get<string>('MAIL_FROM');
-    await this.transporter.sendMail({
+    const entrega = await this.transporter.sendMail({
       from: remitente,
       to: destinatario,
       subject: 'Invitación al SGPA',
       text: `Hola ${nombre}. Para establecer tu contraseña del SGPA, abre este enlace en las próximas 48 horas: ${enlace}`,
       html: `<!doctype html><html lang="es"><meta charset="utf-8"><body style="font-family:Arial,sans-serif;color:#344054;background:#fff"><h1 style="color:#cf2029">Invitación al SGPA</h1><p>Hola ${this.escaparHtml(nombre)}.</p><p>Establece tu contraseña mediante el siguiente enlace. Vence en 48 horas y solo puede usarse una vez.</p><p><a href="${this.escaparHtml(enlace)}">Establecer contraseña</a></p><p>Si no esperabas esta invitación, ignora el mensaje.</p></body></html>`,
     });
+    if (!entrega.accepted?.some((correo: string) =>
+      correo.toLowerCase() === destinatario.toLowerCase())) {
+      throw new DestinatarioInvitacionRechazado();
+    }
   }
 
   async enviarCodigoRecuperacion(

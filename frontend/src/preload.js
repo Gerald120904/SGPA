@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld("sgpa", {
   obtenerAsistenteJerarquia: (id) => ipcRenderer.invoke('jerarquia:asistente', id),
   crearAsistenteJerarquia: (datos) => ipcRenderer.invoke('jerarquia:crear-asistente', datos),
   configurarAsistenteJerarquia: (id, carreras) => ipcRenderer.invoke('jerarquia:configurar-asistente', id, carreras),
+  procesarInvitacionAsistenteJerarquia: (id) => ipcRenderer.invoke('jerarquia:procesar-invitacion-asistente', id),
   listarAuditoriaJerarquia: (id) => ipcRenderer.invoke('jerarquia:auditoria', id),
   obtenerCatalogoCursosJerarquia: () => ipcRenderer.invoke('jerarquia:catalogo-cursos'),
   obtenerCatalogoPlanesJerarquia: () => ipcRenderer.invoke('jerarquia:catalogo-planes'),

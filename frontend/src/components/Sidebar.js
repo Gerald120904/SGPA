@@ -1,236 +1,80 @@
+import { MODULES } from '../config/modules.js';
+import { puedeAcceder } from '../config/permissions.js';
 import {
-  MODULES
-} from '../config/modules.js';
-
-import {
-  puedeAcceder
-} from '../config/permissions.js';
-
-import {
-  formatearRol,
   obtenerRolActivo,
-  obtenerEspaciosDisponibles,
-  cambiarRolActivo
+  obtenerPermisosUsuario,
 } from '../app/session.js';
-
-import {
-  escapeHtml
-} from '../utils/html.js';
-
+import { obtenerIconoRol, iniciarSelectorRol } from './RoleSelector.js';
+import { escapeHtml } from '../utils/html.js';
 import { logoUnaUrl } from '../utils/brand-assets.js';
 import { renderizarIconos } from '../utils/icons.js';
+import { crearGestorEventos } from '../utils/event-lifecycle.js';
 
+export { obtenerIconoRol };
 
-export function obtenerIconoRol(rol) {
-  switch (rol) {
-    case 'ADMIN_GLOBAL':
-      return 'shield-check';
-    case 'COORDINADOR':
-      return 'briefcase';
-    case 'PROFESOR':
-      return 'graduation-cap';
-    case 'ASISTENTE_ESTUDIANTIL':
-      return 'user-cog';
-    default:
-      return 'user-cog';
-  }
+export const BREAKPOINT_SIDEBAR_COMPACTO = 900;
+
+let sidebarActivaInstancia = null;
+
+/**
+ * Indica si el ancho del viewport corresponde al modo responsive compacto.
+ */
+export function esViewportCompacto(ancho = typeof window !== 'undefined' ? window.innerWidth : 1200) {
+  return Number.isFinite(ancho) && ancho <= BREAKPOINT_SIDEBAR_COMPACTO;
 }
 
-
-/* =========================================================
-   SELECTOR DE ROL REUTILIZADO EN EL ENCABEZADO
-   Se conserva su estructura, identificadores y eventos originales.
-   ========================================================= */
-export function SelectorRolActivo({ usuario }) {
+/**
+ * Calcula los módulos y secciones visibles del Sidebar para el rol activo del usuario.
+ */
+export function obtenerModulosVisiblesSidebar(usuario, permisos = []) {
   const rolActivo = obtenerRolActivo(usuario) || usuario?.rolActivo || null;
-  const espacios = obtenerEspaciosDisponibles(usuario);
-  const tieneVariosRoles = espacios.length > 1;
-  const nombreRolFormateado = rolActivo ? formatearRol(rolActivo) : 'Sin rol activo';
-  const iconoRolActivo = obtenerIconoRol(rolActivo);
-  return `
-      <!-- =============================================== -->
-      <!-- SELECTOR INSTITUCIONAL DE ROL ACTIVO -->
-      <!-- =============================================== -->
+  const rolesEfectivos = rolActivo ? [rolActivo] : [];
+  const permisosLista = Array.isArray(permisos)
+    ? permisos
+    : obtenerPermisosUsuario(usuario);
 
-      <div
-        class="sidebar-role-container"
-        id="sidebarRoleContainer"
-        data-rol-activo="${escapeHtml(rolActivo || '')}"
-      >
+  const modulosDisponiblesTotal = MODULES.filter(
+    (m) =>
+      m.id !== 'home' &&
+      m.id !== 'dashboard' &&
+      puedeAcceder(rolesEfectivos, m.id, permisosLista),
+  );
 
-        <!-- Control select semántico/accesible para compatibilidad -->
-        <select
-          id="selectEspacioActivo"
-          class="sr-only"
-          aria-hidden="true"
-          tabindex="-1"
-          style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;"
-        >
-          ${espacios.map((espacio) => `
-            <option value="${escapeHtml(espacio)}" ${espacio === rolActivo ? 'selected' : ''}>
-              ${escapeHtml(formatearRol(espacio))}
-            </option>
-          `).join('')}
-        </select>
+  const modulosVisibles = MODULES.filter((module) => {
+    if (module.id === 'dashboard' && modulosDisponiblesTotal.length === 0) {
+      return false;
+    }
+    return puedeAcceder(rolesEfectivos, module.id, permisosLista);
+  });
 
-        <!-- Vista Expandida: selector institucional discreto -->
-        <div class="role-selector-expanded">
+  const secciones = [
+    ...new Set(modulosVisibles.map((module) => module.section).filter(Boolean)),
+  ];
 
-          <div class="role-selector-header-row">
-            <span class="role-selector-label" id="roleSelectorLabel">
-              Rol activo
-            </span>
-
-            ${tieneVariosRoles ? `
-              <span class="role-selector-badge" title="${espacios.length} roles disponibles">
-                ${espacios.length} roles
-              </span>
-            ` : ''}
-          </div>
-
-          <button
-            id="btnRolActivoExpanded"
-            class="role-selector-trigger ${tieneVariosRoles ? '' : 'is-single'}"
-            type="button"
-            aria-haspopup="${tieneVariosRoles ? 'listbox' : 'false'}"
-            aria-expanded="false"
-            aria-labelledby="roleSelectorLabel btnRolActivoExpanded"
-            ${tieneVariosRoles ? 'title="Cambiar rol activo"' : `title="Rol activo: ${escapeHtml(nombreRolFormateado)}"`}
-          >
-
-            <span class="role-trigger-icon-wrap" aria-hidden="true">
-              <i data-lucide="${iconoRolActivo}"></i>
-            </span>
-
-            <span class="role-trigger-content">
-              <span class="role-trigger-name" title="${escapeHtml(nombreRolFormateado)}">
-                ${escapeHtml(nombreRolFormateado)}
-              </span>
-
-              ${tieneVariosRoles ? `
-                <span class="role-trigger-action">
-                  Cambiar rol
-                </span>
-              ` : `
-                <span class="role-trigger-meta">
-                  Rol asignado
-                </span>
-              `}
-            </span>
-
-            ${tieneVariosRoles ? `
-              <span class="role-trigger-chevron" aria-hidden="true">
-                <i data-lucide="chevron-down"></i>
-              </span>
-            ` : ''}
-
-          </button>
-
-        </div>
-
-
-        <!-- Vista Contraída: ícono compacto para menú flotante -->
-        <div class="role-selector-collapsed">
-
-          <button
-            id="btnRolActivoCollapsed"
-            class="role-selector-compact-btn ${tieneVariosRoles ? '' : 'is-single'}"
-            type="button"
-            aria-haspopup="${tieneVariosRoles ? 'listbox' : 'false'}"
-            aria-expanded="false"
-            aria-label="Rol activo: ${escapeHtml(nombreRolFormateado)}${tieneVariosRoles ? '. Cambiar rol' : ''}"
-            title="Rol activo: ${escapeHtml(nombreRolFormateado)}${tieneVariosRoles ? ' (clic para cambiar)' : ''}"
-          >
-            <i data-lucide="${iconoRolActivo}" aria-hidden="true"></i>
-          </button>
-
-        </div>
-
-
-        <!-- Menú flotante / Desplegable de roles -->
-        ${tieneVariosRoles ? `
-        <div
-          id="menuRolesFlotante"
-          class="role-dropdown-menu dropdown-expanded"
-          role="listbox"
-          aria-label="Roles asignados disponibles"
-          tabindex="-1"
-          hidden
-        >
-
-          <div class="role-menu-header">
-            <span class="role-menu-title">
-              Cambiar rol activo
-            </span>
-            <span class="role-menu-subtitle">
-              Seleccione el espacio de trabajo
-            </span>
-          </div>
-
-          <div class="role-menu-list">
-            ${espacios.map((espacio) => {
-              const esActivo = espacio === rolActivo;
-              const nombreEspacio = formatearRol(espacio);
-              const iconoEspacio = obtenerIconoRol(espacio);
-
-              return `
-                <button
-                  type="button"
-                  role="option"
-                  class="role-menu-item ${esActivo ? 'active' : ''}"
-                  data-rol="${escapeHtml(espacio)}"
-                  aria-selected="${esActivo ? 'true' : 'false'}"
-                  aria-label="${escapeHtml(nombreEspacio)}${esActivo ? ' (Rol actual)' : ''}"
-                  tabindex="-1"
-                >
-
-                  <span class="role-item-icon ${esActivo ? 'active' : ''}" aria-hidden="true">
-                    <i data-lucide="${iconoEspacio}"></i>
-                  </span>
-
-                  <div class="role-item-text">
-                    <strong class="role-item-title">
-                      ${escapeHtml(nombreEspacio)}
-                    </strong>
-                    <span class="role-item-desc">
-                      ${esActivo ? 'Rol actual en uso' : 'Cambiar a este espacio'}
-                    </span>
-                  </div>
-
-                  ${esActivo ? `
-                    <span class="role-item-check" aria-hidden="true" title="Rol actual">
-                      <i data-lucide="check"></i>
-                    </span>
-                  ` : ''}
-
-                </button>
-              `;
-            }).join('')}
-          </div>
-
-        </div>
-        ` : ''}
-
-      </div>
-
-
-  `;
+  return {
+    rolActivo,
+    rolesEfectivos,
+    modulosVisibles,
+    secciones,
+  };
 }
 
-function renderNavItem(module) {
+function esRutaOIdActivo(module, rutaActiva) {
+  if (!rutaActiva) return false;
+  return module.id === rutaActiva || module.route === rutaActiva;
+}
 
-  const label =
-    module.navLabel ||
-    module.title;
-
+function renderNavItem(module, rutaActiva = null) {
+  const label = module.navLabel || module.title;
+  const activo = esRutaOIdActivo(module, rutaActiva);
 
   return `
     <button
-      class="nav-item"
+      class="nav-item${activo ? ' active' : ''}"
       data-module="${module.id}"
       data-route="${module.route}"
       type="button"
-      title="${escapeHtml(label)}"
+      title="${escapeHtml(label)}"${activo ? ' aria-current="page"' : ''}
     >
 
       <i
@@ -246,121 +90,55 @@ function renderNavItem(module) {
   `;
 }
 
-
-export function Sidebar({
+/**
+ * Renderiza el contenido de secciones e ítems de navegación del Sidebar.
+ */
+export function renderizarNavegacionSidebar({
   usuario,
-  roles,
-  permisos,
-  isCollapsed = false
+  permisos = [],
+  rutaActiva = null,
 }) {
+  const { modulosVisibles, secciones } = obtenerModulosVisiblesSidebar(
+    usuario,
+    permisos,
+  );
 
-  const nombre =
-    usuario?.nombres ||
-    'Usuario';
+  return secciones
+    .map((section) => {
+      const modules = modulosVisibles.filter(
+        (module) => module.section === section,
+      );
 
-
-  const inicial =
-    nombre
-      .trim()
-      .charAt(0)
-      .toUpperCase() ||
-    'A';
-
-
-  const rolActivo =
-    obtenerRolActivo(
-      usuario
-    ) ||
-    usuario?.rolActivo ||
-    null;
-
-  const espacios =
-    obtenerEspaciosDisponibles(
-      usuario
-    );
-
-  const tieneVariosRoles =
-    espacios.length > 1;
-
-  const rolesEfectivos =
-    rolActivo ? [rolActivo] : [];
-
-  const modulosDisponiblesTotal =
-    MODULES.filter(
-      (m) =>
-        m.id !== 'home' &&
-        m.id !== 'dashboard' &&
-        puedeAcceder(
-          rolesEfectivos,
-          m.id,
-          permisos,
-        )
-    );
-
-  const modulosVisibles =
-    MODULES.filter(
-      (module) => {
-        if (
-          module.id === 'dashboard' &&
-          modulosDisponiblesTotal.length === 0
-        ) {
-          return false;
-        }
-
-        return puedeAcceder(
-          rolesEfectivos,
-          module.id,
-          permisos,
-        );
-      }
-    );
-
-
-  const secciones = [
-    ...new Set(
-      modulosVisibles
-        .map(
-          (module) =>
-            module.section
-        )
-        .filter(Boolean)
-    )
-  ];
-
-
-  const navegacion =
-    secciones
-      .map(
-        (section) => {
-
-          const modules =
-            modulosVisibles.filter(
-              (module) =>
-                module.section ===
-                section
-            );
-
-
-          return `
+      return `
             <div class="nav-section-title">
               ${escapeHtml(section)}
             </div>
 
-            ${modules
-              .map(renderNavItem)
-              .join('')}
+            ${modules.map((module) => renderNavItem(module, rutaActiva)).join('')}
           `;
+    })
+    .join('');
+}
 
-        }
-      )
-      .join('');
-
-  const nombreRolFormateado =
-    rolActivo ? formatearRol(rolActivo) : 'Sin rol activo';
-
-  const iconoRolActivo =
-    obtenerIconoRol(rolActivo);
-
+/**
+ * Renderiza la estructura completa del menú lateral institucional.
+ */
+export function Sidebar({
+  usuario,
+  roles,
+  permisos,
+  rutaActiva = null,
+  isCollapsed = false,
+}) {
+  const nombre = usuario?.nombres || 'Usuario';
+  const inicial = nombre.trim().charAt(0).toUpperCase() || 'A';
+  const permisosLista =
+    permisos !== undefined ? permisos : obtenerPermisosUsuario(usuario);
+  const navegacion = renderizarNavegacionSidebar({
+    usuario,
+    permisos: permisosLista,
+    rutaActiva,
+  });
 
   return `
     <aside
@@ -474,216 +252,255 @@ export function Sidebar({
   `;
 }
 
+/**
+ * Sincroniza la clase activa y aria-current de los ítems de navegación del Sidebar.
+ */
+export function sincronizarRutaSidebar(moduleIdORoute, root = null) {
+  const ambito =
+    root ||
+    (typeof document !== 'undefined'
+      ? document.getElementById?.('sidebar') || document
+      : null);
+  if (!ambito || typeof ambito.querySelectorAll !== 'function') {
+    return;
+  }
 
-export function iniciarSidebar({ onCambiarRol } = {}) {
-  const appShell = document.getElementById('appShell');
-  const sidebar = document.getElementById('sidebar');
-  const btnExpanded = document.getElementById('btnRolActivoExpanded');
-  const btnCollapsed = document.getElementById('btnRolActivoCollapsed');
-  const menu = document.getElementById('menuRolesFlotante');
-  const container = document.getElementById('sidebarRoleContainer');
-  const selectEspacio = document.getElementById('selectEspacioActivo');
+  ambito.querySelectorAll('.nav-item').forEach((item) => {
+    const activo =
+      Boolean(moduleIdORoute) &&
+      (item.dataset?.module === moduleIdORoute ||
+        item.dataset?.route === moduleIdORoute);
+    item.classList?.toggle('active', activo);
+    if (activo) {
+      item.setAttribute?.('aria-current', 'page');
+    } else {
+      item.removeAttribute?.('aria-current');
+    }
+  });
+}
 
-  let ultimoBotonDisparador = null;
-
-  // La barra se expande automáticamente mediante :hover en dashboard-v2.css.
-  // Retiramos el estado persistido del antiguo botón manual, ya que sus reglas
-  // .collapsed competían con el hover y ocultaban el logo y los textos.
+/**
+ * Limpia el estado colapsado heredado en #appShell, #sidebar y localStorage
+ * para preservar la expansión automática por hover del diseño institucional.
+ */
+export function limpiarEstadoColapsadoSidebar({ appShell = null, sidebar = null } = {}) {
   if (appShell && sidebar) {
-    appShell.classList.remove('sidebar-collapsed');
-    sidebar.classList.remove('collapsed');
+    appShell.classList?.remove('sidebar-collapsed');
+    sidebar.classList?.remove('collapsed');
     try {
-      localStorage.setItem('sgpa_sidebar_collapsed', 'false');
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('sgpa_sidebar_collapsed', 'false');
+      }
     } catch (_) {}
   }
+}
 
-  // 2. Control del menú flotante de roles
-  function estaColapsado() {
-    return (
-      appShell?.classList.contains('sidebar-collapsed') ||
-      sidebar?.classList.contains('collapsed') ||
-      window.innerWidth <= 760
-    );
+function resolverElemento(container, doc, id) {
+  if (container && typeof container.querySelector === 'function') {
+    const encontrado = container.querySelector(`#${id}`);
+    if (encontrado) return encontrado;
   }
+  return doc?.getElementById?.(id) || null;
+}
 
-  function posicionarMenu() {
-    if (!menu) return;
-    // El selector ahora pertenece al Topbar y no al Sidebar.
-    // Su menú siempre se ancla debajo del rol activo, incluso si
-    // la barra lateral está contraída.
-    menu.classList.remove('dropdown-collapsed');
-    menu.classList.add('dropdown-expanded');
-    menu.style.position = 'absolute';
-    menu.style.top = 'calc(100% + 6px)';
-    menu.style.left = 'auto';
-    menu.style.right = '0';
-    menu.style.width = 'min(280px, calc(100vw - 24px))';
-  }
+/**
+ * Inicializa el ciclo de vida del menú lateral, su estado de expansión/responsive
+ * y, en invocaciones directas heredadas, delega el selector de rol sin acumular listeners.
+ */
+export function iniciarSidebar({
+  onCambiarRol,
+  onNavegar,
+  onCerrarSesion,
+  onCambioEstado,
+  onError,
+  container = null,
+  gestionarSelectorRol = true,
+  gestionarResize = true,
+  rutaActiva = null,
+} = {}) {
+  sidebarActivaInstancia?.destruir();
 
-  function abrirMenu(disparador) {
-    if (!menu) return;
+  const gestor = crearGestorEventos();
+  const doc = typeof document !== 'undefined' ? document : null;
+  const win = typeof window !== 'undefined' ? window : null;
 
-    ultimoBotonDisparador = disparador;
-    posicionarMenu();
-    menu.removeAttribute('hidden');
-    disparador?.setAttribute('aria-expanded', 'true');
+  let appShell = resolverElemento(container, doc, 'appShell');
+  let sidebar = resolverElemento(container, doc, 'sidebar');
+  let navEl = sidebar?.querySelector?.('.sidebar-nav') || null;
+  let logoutButton =
+    sidebar?.querySelector?.('#logoutButton') ||
+    resolverElemento(container, doc, 'logoutButton');
 
-    // Mover foco a la opción activa o primera opción
-    const opcionActiva =
-      menu.querySelector('.role-menu-item.active') ||
-      menu.querySelector('.role-menu-item');
+  limpiarEstadoColapsadoSidebar({ appShell, sidebar });
 
-    if (opcionActiva) {
-      setTimeout(() => opcionActiva.focus(), 15);
+  const estado = {
+    expandido: false,
+    colapsado: false,
+    viewportCompacto: esViewportCompacto(win?.innerWidth),
+    rutaActiva,
+  };
+
+  function aplicarEstadoAtributos() {
+    if (sidebar?.dataset) {
+      sidebar.dataset.sidebarExpanded = String(estado.expandido);
+      sidebar.dataset.viewportCompacto = String(estado.viewportCompacto);
+    }
+    if (appShell?.dataset) {
+      appShell.dataset.sidebarExpanded = String(estado.expandido);
+      appShell.dataset.viewportCompacto = String(estado.viewportCompacto);
     }
   }
 
-  function cerrarMenu() {
-    if (!menu) return;
-
-    menu.setAttribute('hidden', '');
-    btnExpanded?.setAttribute('aria-expanded', 'false');
-    btnCollapsed?.setAttribute('aria-expanded', 'false');
+  function notificarCambioEstado() {
+    if (typeof onCambioEstado === 'function' && !gestor.destruido) {
+      onCambioEstado({ ...estado });
+    }
   }
 
-  function toggleMenu(disparador) {
-    if (!menu) return;
+  function establecerExpandido(valor) {
+    if (gestor.destruido) return;
+    const siguiente = Boolean(valor);
+    if (siguiente && estado.colapsado) {
+      estado.colapsado = false;
+      appShell?.classList?.remove('sidebar-collapsed');
+      sidebar?.classList?.remove('collapsed');
+    }
+    estado.expandido = siguiente;
+    aplicarEstadoAtributos();
+    notificarCambioEstado();
+  }
 
-    const estaAbierto = !menu.hasAttribute('hidden');
-    if (estaAbierto) {
-      cerrarMenu();
+  function establecerColapsado(valor) {
+    if (gestor.destruido) return;
+    estado.colapsado = Boolean(valor);
+    if (estado.colapsado) {
+      estado.expandido = false;
+    }
+    appShell?.classList?.toggle('sidebar-collapsed', estado.colapsado);
+    sidebar?.classList?.toggle('collapsed', estado.colapsado);
+    aplicarEstadoAtributos();
+    notificarCambioEstado();
+  }
+
+  function actualizarResponsive(ancho = win?.innerWidth) {
+    if (gestor.destruido) return;
+    const compacto = esViewportCompacto(ancho);
+    if (estado.viewportCompacto !== compacto) {
+      estado.viewportCompacto = compacto;
+      if (compacto && estado.expandido) {
+        estado.expandido = false;
+      }
+      aplicarEstadoAtributos();
+      notificarCambioEstado();
     } else {
-      abrirMenu(disparador);
+      aplicarEstadoAtributos();
     }
   }
 
-  if (btnExpanded && !btnExpanded.classList.contains('is-single')) {
-    btnExpanded.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleMenu(btnExpanded);
-    });
+  function sincronizarRuta(moduleIdORoute) {
+    if (gestor.destruido) return;
+    estado.rutaActiva = moduleIdORoute || null;
+    sincronizarRutaSidebar(moduleIdORoute, sidebar || container || doc);
+  }
 
-    btnExpanded.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        abrirMenu(btnExpanded);
+  aplicarEstadoAtributos();
+  if (rutaActiva) {
+    sincronizarRuta(rutaActiva);
+  }
+
+  if (sidebar) {
+    gestor.escuchar(sidebar, 'mouseenter', () => establecerExpandido(true));
+    gestor.escuchar(sidebar, 'mouseleave', () => establecerExpandido(false));
+  }
+
+  if (navEl && typeof onNavegar === 'function') {
+    gestor.escuchar(navEl, 'click', (event) => {
+      const boton = event?.target?.closest?.('[data-route]');
+      const route = boton?.dataset?.route;
+      if (!route) return;
+      event?.stopPropagation?.();
+      onNavegar(route, boton);
+    });
+  }
+
+  if (logoutButton && typeof onCerrarSesion === 'function') {
+    gestor.escuchar(logoutButton, 'click', (event) => {
+      event?.stopPropagation?.();
+      onCerrarSesion();
+    });
+  }
+
+  const hayControlesSelector = Boolean(
+    resolverElemento(container, doc, 'btnRolActivoExpanded') ||
+      resolverElemento(container, doc, 'btnRolActivoCollapsed') ||
+      resolverElemento(container, doc, 'menuRolesFlotante'),
+  );
+
+  const selectorRolCompat =
+    gestionarSelectorRol && hayControlesSelector
+      ? iniciarSelectorRol({
+          onCambiarRol,
+          onError,
+          container,
+          gestionarResize: false,
+        })
+      : null;
+
+  if (gestionarResize && win) {
+    gestor.escuchar(win, 'resize', () => {
+      actualizarResponsive(win.innerWidth);
+      if (selectorRolCompat?.estaAbierto()) {
+        selectorRolCompat.posicionarMenu();
       }
     });
   }
 
-  if (btnCollapsed && !btnCollapsed.classList.contains('is-single')) {
-    btnCollapsed.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleMenu(btnCollapsed);
-    });
-
-    btnCollapsed.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        abrirMenu(btnCollapsed);
-      }
-    });
-  }
-
-  // 3. Ejecución de cambio de rol activo
-  async function seleccionarRol(nuevoRol) {
-    const rolActual = container?.dataset.rolActivo;
-
-    if (!nuevoRol || nuevoRol === rolActual) {
-      cerrarMenu();
-      ultimoBotonDisparador?.focus();
-      return;
-    }
-
-    if (btnExpanded) btnExpanded.disabled = true;
-    if (btnCollapsed) btnCollapsed.disabled = true;
-
-    try {
-      if (selectEspacio) {
-        selectEspacio.value = nuevoRol;
-      }
-
-      const ok = await cambiarRolActivo(nuevoRol);
-      if (ok) {
-        cerrarMenu();
-        if (typeof onCambiarRol === 'function') {
-          await onCambiarRol(nuevoRol);
-        }
-      } else {
-        cerrarMenu();
-        if (btnExpanded) btnExpanded.disabled = false;
-        if (btnCollapsed) btnCollapsed.disabled = false;
-        alert('No fue posible cambiar al rol seleccionado.');
-      }
-    } catch (err) {
-      cerrarMenu();
-      if (btnExpanded) btnExpanded.disabled = false;
-      if (btnCollapsed) btnCollapsed.disabled = false;
-      alert(err?.message || 'Error al cambiar de rol activo.');
-    }
-  }
-
-  if (menu) {
-    const opciones = Array.from(menu.querySelectorAll('.role-menu-item'));
-
-    opciones.forEach((item) => {
-      item.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const rol = item.dataset.rol;
-        await seleccionarRol(rol);
+  const instancia = {
+    sincronizarRuta,
+    establecerExpandido,
+    establecerColapsado,
+    actualizarResponsive,
+    actualizarMenu({ usuario, permisos = [], rutaActiva: nuevaRuta = estado.rutaActiva } = {}) {
+      if (gestor.destruido || !navEl) return;
+      const permisosLista =
+        permisos !== undefined ? permisos : obtenerPermisosUsuario(usuario);
+      estado.rutaActiva = nuevaRuta || null;
+      navEl.innerHTML = renderizarNavegacionSidebar({
+        usuario,
+        permisos: permisosLista,
+        rutaActiva: estado.rutaActiva,
       });
-    });
-
-    menu.addEventListener('keydown', async (e) => {
-      const items = Array.from(menu.querySelectorAll('.role-menu-item'));
-      const currentIndex = items.indexOf(document.activeElement);
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = (currentIndex + 1) % items.length;
-        items[nextIndex]?.focus();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = (currentIndex - 1 + items.length) % items.length;
-        items[prevIndex]?.focus();
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        items[0]?.focus();
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        items[items.length - 1]?.focus();
-      } else if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        const rol = document.activeElement?.dataset.rol;
-        if (rol) {
-          await seleccionarRol(rol);
-        }
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        cerrarMenu();
-        ultimoBotonDisparador?.focus();
-      } else if (e.key === 'Tab') {
-        cerrarMenu();
+      if (typeof doc !== 'undefined' && typeof doc.querySelectorAll === 'function') {
+        try {
+          renderizarIconos();
+        } catch (_) {}
       }
-    });
-  }
+    },
+    obtenerEstado: () => ({ ...estado }),
+    destruir() {
+      selectorRolCompat?.destruir();
+      gestor.destruir();
+      if (sidebarActivaInstancia === instancia) {
+        sidebarActivaInstancia = null;
+      }
+      appShell = null;
+      sidebar = null;
+      navEl = null;
+      logoutButton = null;
+    },
+  };
 
-  // Cierre global al hacer click fuera o cambiar de tamaño
-  document.addEventListener('click', (e) => {
-    if (!menu || menu.hasAttribute('hidden')) return;
-
-    if (
-      !menu.contains(e.target) &&
-      !btnExpanded?.contains(e.target) &&
-      !btnCollapsed?.contains(e.target)
-    ) {
-      cerrarMenu();
+  gestor.registrarLimpieza(() => {
+    selectorRolCompat?.destruir();
+    if (sidebarActivaInstancia === instancia) {
+      sidebarActivaInstancia = null;
     }
+    appShell = null;
+    sidebar = null;
+    navEl = null;
+    logoutButton = null;
   });
 
-  window.addEventListener('resize', () => {
-    if (menu && !menu.hasAttribute('hidden')) {
-      posicionarMenu();
-    }
-  });
+  sidebarActivaInstancia = instancia;
+  return instancia;
 }

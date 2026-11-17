@@ -19,6 +19,7 @@ export const listarMisAsistentes = () => invocar('listarMisAsistentes');
 export const obtenerAsistenteJerarquia = (id) => invocar('obtenerAsistenteJerarquia', id);
 export const crearAsistenteJerarquia = (datos) => invocar('crearAsistenteJerarquia', datos);
 export const configurarAsistenteJerarquia = (id, carreras) => invocar('configurarAsistenteJerarquia', id, carreras);
+export const procesarInvitacionAsistenteJerarquia = (id) => invocar('procesarInvitacionAsistenteJerarquia', id);
 export const listarAuditoriaJerarquia = (id) => invocar('listarAuditoriaJerarquia', id);
 export const obtenerCatalogoCursosJerarquia = () => invocar('obtenerCatalogoCursosJerarquia');
 export const obtenerCatalogoPlanesJerarquia = () => invocar('obtenerCatalogoPlanesJerarquia');
