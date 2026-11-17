@@ -579,3 +579,81 @@ test('FormularioRespuestasDialog — informa un error de actualización sin ocul
   assert.match(alert, /Error de lectura al actualizar/);
   limpiarSesion();
 });
+
+test('FormulariosEstudiantesPage — acciones compartidas conservan recarga, cancelación y recuperación ante error', async () => {
+  guardarSesion({
+    usuario: {
+      rolActivo: ROLES.COORDINADOR,
+      roles: [ROLES.COORDINADOR],
+      permisos: [PERMISOS.FORMULARIOS_ESTUDIANTES_GESTIONAR],
+    },
+  });
+
+  let consultas = 0;
+  let idSincronizado = null;
+  let idRegenerado = null;
+  const { doc } = setupEnv({
+    obtenerEstadoGoogleFormularios: async () => ({ ok: true, data: { conectado: true } }),
+    listarFormulariosEstudiantes: async () => {
+      consultas += 1;
+      return {
+        ok: true,
+        data: [
+          {
+            id: 51,
+            titulo: 'Formulario Google',
+            proveedor: 'GOOGLE_FORMS',
+            estado: 'PUBLICADO',
+            responderUri: 'https://forms.google.invalid/51',
+          },
+          {
+            id: 52,
+            titulo: 'Formulario institucional',
+            proveedor: 'INTERNO',
+            estado: 'PUBLICADO',
+            responderUri: 'https://sgpa.example.invalid/formularios/p/52',
+          },
+        ],
+      };
+    },
+    sincronizarFormularioEstudiantes: async (id) => {
+      idSincronizado = id;
+      return {
+        ok: true,
+        data: { recibidasGoogle: 4, nuevas: 2, ignoradasExistentes: 1, errores: 1 },
+      };
+    },
+    regenerarTokenFormularioEstudiantes: async (id) => {
+      idRegenerado = id;
+      return { ok: false, message: 'El servicio rechazó la regeneración.' };
+    },
+  });
+
+  await iniciarFormulariosEstudiantesPage();
+  const content = doc.getElementById('formulariosEstudiantesContent');
+
+  const botonSincronizar = content.querySelector('[data-action="sincronizar"]');
+  await content.dispatch('click', { target: botonSincronizar });
+  assert.equal(idSincronizado, 51);
+  assert.equal(consultas, 2, 'La acción debe recargar el listado después del éxito.');
+  assert.equal(botonSincronizar.disabled, false);
+  assert.match(doc.getElementById('sgpaAlertDialog').innerHTML, /4 respuestas/);
+  assert.match(doc.getElementById('sgpaAlertDialog').innerHTML, /2 nuevas/);
+
+  const botonRegenerar = content.querySelector('[data-action="regenerar-token"]');
+  const cancelacion = content.dispatch('click', { target: botonRegenerar });
+  (await esperarConfirm(doc, 'sgpaConfirmCancel')).dispatch('click', {});
+  await cancelacion;
+  assert.equal(idRegenerado, null, 'Cancelar no debe llamar al servicio.');
+  assert.equal(botonRegenerar.disabled, false);
+
+  const regeneracion = content.dispatch('click', { target: botonRegenerar });
+  (await esperarConfirm(doc, 'sgpaConfirmAccept')).dispatch('click', {});
+  await regeneracion;
+  assert.equal(idRegenerado, 52);
+  assert.equal(botonRegenerar.disabled, false, 'El botón debe reactivarse ante error.');
+  assert.match(doc.getElementById('sgpaAlertDialog').innerHTML, /El servicio rechazó la regeneración/);
+  assert.equal(consultas, 2, 'Un error no debe recargar ni alterar el listado.');
+
+  limpiarSesion();
+});

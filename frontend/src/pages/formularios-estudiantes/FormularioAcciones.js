@@ -19,6 +19,35 @@ import {
   resolverUrlVistaPreviaFormulario,
 } from './formularios-estudiantes.helpers.js';
 
+async function ejecutarAccionFormulario({
+  formulario,
+  button,
+  recargarFormularios,
+  ejecutar,
+  mensajeResultadoInvalido,
+  tituloError,
+  mensajeError,
+  notificarExito,
+}) {
+  button.disabled = true;
+
+  try {
+    const resultado = extraerResultadoFormularioServicio(
+      await ejecutar(formulario),
+      mensajeResultadoInvalido,
+    );
+    notificarExito(resultado);
+    await recargarFormularios();
+  } catch (error) {
+    mostrarError({
+      titulo: tituloError,
+      mensaje: error?.message || mensajeError,
+    });
+  } finally {
+    button.disabled = false;
+  }
+}
+
 export async function copiarEnlaceFormulario(formulario) {
   if (!formulario.responderUri) {
     mostrarError({
@@ -80,33 +109,24 @@ export async function sincronizarFormularioAction(
   button,
   recargarFormularios,
 ) {
-  button.disabled = true;
-
-  try {
-    const res = await sincronizarFormularioEstudiantes(formulario.id);
-    const resultado = extraerResultadoFormularioServicio(
-      res,
-      'No fue posible sincronizar las respuestas.',
-    );
-
-    mostrarExito({
-      titulo: 'Respuestas sincronizadas',
-      mensaje:
-        `Google reportó ${resultado.recibidasGoogle ?? 0} respuestas. ` +
-        `${resultado.nuevas ?? 0} nuevas, ` +
-        `${resultado.ignoradasExistentes ?? 0} ya existentes, ` +
-        `${resultado.errores ?? 0} con error.`,
-    });
-
-    await recargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo: 'No fue posible sincronizar',
-      mensaje: error?.message || 'Ocurrió un error al consultar Google Forms.',
-    });
-  } finally {
-    button.disabled = false;
-  }
+  return ejecutarAccionFormulario({
+    formulario,
+    button,
+    recargarFormularios,
+    ejecutar: ({ id }) => sincronizarFormularioEstudiantes(id),
+    mensajeResultadoInvalido: 'No fue posible sincronizar las respuestas.',
+    tituloError: 'No fue posible sincronizar',
+    mensajeError: 'Ocurrió un error al consultar Google Forms.',
+    notificarExito: (resultado) =>
+      mostrarExito({
+        titulo: 'Respuestas sincronizadas',
+        mensaje:
+          `Google reportó ${resultado.recibidasGoogle ?? 0} respuestas. ` +
+          `${resultado.nuevas ?? 0} nuevas, ` +
+          `${resultado.ignoradasExistentes ?? 0} ya existentes, ` +
+          `${resultado.errores ?? 0} con error.`,
+      }),
+  });
 }
 
 export async function publicarFormularioAction(
@@ -123,29 +143,20 @@ export async function publicarFormularioAction(
 
   if (!aceptado) return;
 
-  button.disabled = true;
-
-  try {
-    const res = await publicarFormularioEstudiantes(formulario.id);
-    extraerResultadoFormularioServicio(
-      res,
-      'No fue posible publicar el formulario.',
-    );
-
-    mostrarExito({
-      titulo: 'Formulario publicado',
-      mensaje: `El formulario "${formulario.titulo}" ahora está disponible públicamente.`,
-    });
-
-    await recargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo: 'No fue posible publicar el formulario',
-      mensaje: error?.message || 'Ocurrió un error al publicar el formulario.',
-    });
-  } finally {
-    button.disabled = false;
-  }
+  return ejecutarAccionFormulario({
+    formulario,
+    button,
+    recargarFormularios,
+    ejecutar: ({ id }) => publicarFormularioEstudiantes(id),
+    mensajeResultadoInvalido: 'No fue posible publicar el formulario.',
+    tituloError: 'No fue posible publicar el formulario',
+    mensajeError: 'Ocurrió un error al publicar el formulario.',
+    notificarExito: () =>
+      mostrarExito({
+        titulo: 'Formulario publicado',
+        mensaje: `El formulario "${formulario.titulo}" ahora está disponible públicamente.`,
+      }),
+  });
 }
 
 export async function regenerarTokenFormularioAction(
@@ -162,31 +173,21 @@ export async function regenerarTokenFormularioAction(
 
   if (!aceptado) return;
 
-  button.disabled = true;
-
-  try {
-    const res = await regenerarTokenFormularioEstudiantes(formulario.id);
-    extraerResultadoFormularioServicio(
-      res,
-      'No fue posible regenerar el enlace público.',
-    );
-
-    mostrarExito({
-      titulo: 'Enlace regenerado',
-      mensaje:
-        'Se generó un nuevo enlace público. El enlace anterior ya no aceptará respuestas.',
-    });
-
-    await recargarFormularios();
-  } catch (error) {
-    mostrarError({
-      titulo: 'No fue posible regenerar el enlace',
-      mensaje:
-        error?.message || 'Ocurrió un error al regenerar el enlace público.',
-    });
-  } finally {
-    button.disabled = false;
-  }
+  return ejecutarAccionFormulario({
+    formulario,
+    button,
+    recargarFormularios,
+    ejecutar: ({ id }) => regenerarTokenFormularioEstudiantes(id),
+    mensajeResultadoInvalido: 'No fue posible regenerar el enlace público.',
+    tituloError: 'No fue posible regenerar el enlace',
+    mensajeError: 'Ocurrió un error al regenerar el enlace público.',
+    notificarExito: () =>
+      mostrarExito({
+        titulo: 'Enlace regenerado',
+        mensaje:
+          'Se generó un nuevo enlace público. El enlace anterior ya no aceptará respuestas.',
+      }),
+  });
 }
 
 export async function cerrarFormularioAction(
